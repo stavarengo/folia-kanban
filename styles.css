@@ -1,0 +1,312 @@
+/* Markdown Kanban — board styling. Uses Obsidian theme variables so it adapts to the
+   user's theme (light/dark) automatically. */
+
+/* The view content area has default padding and no fixed height; the board needs the full
+   pane with no inset. Scoped to this view (and broadly, in case contentEl nesting differs). */
+.workspace-leaf-content[data-type="markdown-kanban-view"] {
+  padding: 0;
+}
+.workspace-leaf-content[data-type="markdown-kanban-view"] .view-content {
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mdkb-root {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--background-primary);
+}
+
+.mdkb-loading,
+.mdkb-error {
+  padding: 2em;
+  color: var(--text-muted);
+}
+.mdkb-error {
+  color: var(--text-error);
+}
+
+/* --- board + columns --- */
+.mdkb-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.mdkb-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 300px;
+  width: 300px;
+  max-height: 100%;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  overflow: hidden;
+}
+
+.mdkb-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-top: 3px solid var(--interactive-accent);
+  position: sticky;
+  top: 0;
+  background: var(--background-secondary);
+}
+.mdkb-column-title {
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+.mdkb-column-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 0 7px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.mdkb-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+  min-height: 40px;
+  flex: 1 1 auto;
+}
+.mdkb-column-body.is-over {
+  background: var(--background-modifier-hover);
+}
+
+/* --- cards --- */
+.mdkb-card {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  padding: 8px 10px;
+  cursor: grab;
+  box-shadow: var(--shadow-s, 0 1px 2px rgba(0, 0, 0, 0.15));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mdkb-card:hover {
+  border-color: var(--interactive-accent);
+}
+.mdkb-card.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.mdkb-card:active {
+  cursor: grabbing;
+}
+.mdkb-card-overlay {
+  box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.35));
+  cursor: grabbing;
+}
+.mdkb-card-title {
+  font-size: var(--font-ui-small, 13px);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text-normal);
+}
+
+.mdkb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mdkb-chip {
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+}
+.mdkb-chip-a { color: var(--color-red, #e5534b); border-color: var(--color-red, #e5534b); background: transparent; }
+.mdkb-chip-b { color: var(--color-orange, #d98c3f); border-color: var(--color-orange, #d98c3f); background: transparent; }
+.mdkb-chip-c { color: var(--color-yellow, #c0a23b); border-color: var(--color-yellow, #c0a23b); background: transparent; }
+.mdkb-chip-d { color: var(--color-green, #57a76a); border-color: var(--color-green, #57a76a); background: transparent; }
+.mdkb-chip-danger { color: var(--text-on-accent, #fff); background: var(--color-red, #e5534b); }
+.mdkb-chip-warn { color: var(--color-orange, #d98c3f); }
+.mdkb-chip-accent { color: var(--interactive-accent); border-color: var(--interactive-accent); background: transparent; }
+.mdkb-chip-muted { color: var(--text-muted); }
+
+.mdkb-card-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* --- inline add card --- */
+.mdkb-add-card textarea,
+.mdkb-add-inline input,
+.mdkb-add-inline textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  padding: 6px 8px;
+}
+.mdkb-row-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mdkb-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+.mdkb-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.mdkb-mini {
+  font-size: 12px;
+  margin-left: auto;
+}
+
+/* --- detail panel --- */
+.mdkb-detail {
+  flex: 0 0 360px;
+  width: 360px;
+  border-left: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.mdkb-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  position: sticky;
+  top: 0;
+  background: var(--background-secondary);
+}
+.mdkb-detail-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 16px;
+}
+.mdkb-detail-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.mdkb-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mdkb-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.mdkb-fields select,
+.mdkb-fields input {
+  font: inherit;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  padding: 4px 6px;
+}
+
+.mdkb-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.mdkb-desc {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  font: inherit;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  padding: 6px 8px;
+}
+
+.mdkb-subtasks,
+.mdkb-comments,
+.mdkb-history {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdkb-subtask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdkb-link {
+  background: transparent;
+  border: none;
+  color: var(--link-color, var(--interactive-accent));
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+.mdkb-done {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.mdkb-comments li,
+.mdkb-history li {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+.mdkb-ts {
+  font-size: 11px;
+  color: var(--text-faint, var(--text-muted));
+}
+.mdkb-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+button {
+  cursor: pointer;
+}

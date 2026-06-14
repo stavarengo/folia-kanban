@@ -1,0 +1,10 @@
+{
+  "id": "markdown-kanban",
+  "name": "Markdown Kanban",
+  "version": "0.1.0",
+  "minAppVersion": "1.7.0",
+  "description": "A real Kanban board with drag-and-drop, nested subcards, comments, and history — every card is a plain Markdown file.",
+  "author": "Rafael Stavarengo",
+  "authorUrl": "https://github.com/stavarengo",
+  "isDesktopOnly": false
+}

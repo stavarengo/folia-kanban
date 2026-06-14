@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output (shipped via GitHub releases, not committed)
+main.js
+*.js.map
+
+# obsidian plugin local data
+data.json
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
