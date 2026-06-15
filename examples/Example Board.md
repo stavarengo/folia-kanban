@@ -9,5 +9,4 @@ columns:
 
 # Example Board
 
-A minimal board to try the plugin. Copy the `examples/` folder into your vault, then run
-**“Open Kanban board”**. Cards live in `examples/Cards`; columns are the `columns` list above.
+A minimal board to try the plugin. Copy the `examples/` folder into your vault, then run **“Open Kanban board”**. Cards live in `examples/Cards`; columns are the `columns` list above.
