@@ -6,10 +6,20 @@
 
 import type { Board, BoardConfig, Card, CardFrontmatter } from "./types";
 
-/** Resolve a wikilink target to a card path by basename. */
-function resolveLink(link: string, byBasename: Map<string, string>): string | null {
-  const base = link.split("/").pop()!.replace(/\.md$/i, "").split("#")[0].split("|")[0].trim();
-  return byBasename.get(base) ?? null;
+/**
+ * Resolve a wikilink target to a card path. Prefers an exact path when the link carries a
+ * folder segment; otherwise matches by basename, but only when that basename is unambiguous
+ * (duplicate basenames across folders resolve to nothing rather than silently binding the wrong one).
+ */
+function resolveLink(link: string, byBasename: Map<string, string[]>, byPath: Record<string, Card>): string | null {
+  const raw = link.split("#")[0].split("|")[0].trim();
+  if (raw.includes("/")) {
+    const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
+    if (byPath[withMd]) return withMd;
+  }
+  const base = raw.split("/").pop()!.replace(/\.md$/i, "").trim();
+  const paths = byBasename.get(base);
+  return paths && paths.length === 1 ? paths[0] : null;
 }
 
 function orderOf(c: Card): number | null {
@@ -19,24 +29,48 @@ function orderOf(c: Card): number | null {
 
 /**
  * Merge ordered + unordered cards into one stable sequence.
- * Cards with an explicit numeric `order` sort by it; cards without get an effective order
- * equal to their alphabetical index, so a card that later receives a fractional order
- * interleaves correctly while every other card stays untouched on disk.
+ * Cards with an explicit numeric `order` sort by it. Cards without one are appended after all
+ * ordered cards (alphabetically), each with a strictly-distinct effective order BEYOND the max
+ * real order — so a synthetic position can never collide with a real `order` value (a collision
+ * would make `computeDropOrder` return a duplicate rank and a drop land in the wrong place).
  */
 export function columnEffectiveOrders(cards: Card[]): { card: Card; eff: number }[] {
-  const ordered = cards.filter((c) => orderOf(c) !== null).map((c) => ({ card: c, eff: orderOf(c)! }));
+  const ordered = cards
+    .filter((c) => orderOf(c) !== null)
+    .map((c) => ({ card: c, eff: orderOf(c)! }))
+    .sort((a, b) => a.eff - b.eff || a.card.basename.localeCompare(b.card.basename));
+  const maxEff = ordered.length ? ordered[ordered.length - 1].eff : -1;
   const unordered = cards
     .filter((c) => orderOf(c) === null)
     .sort((a, b) => a.basename.localeCompare(b.basename))
-    .map((c, i) => ({ card: c, eff: i }));
-  return [...ordered, ...unordered].sort(
-    (a, b) => a.eff - b.eff || a.card.basename.localeCompare(b.card.basename),
-  );
+    .map((c, i) => ({ card: c, eff: maxEff + 1 + i }));
+  return [...ordered, ...unordered];
+}
+
+/**
+ * True when a card is genuinely nested: walking its parent chain bottoms out at a parentless
+ * top-level root. A chain that loops (mutual / cyclic subcard links) returns false, so cycle
+ * members are surfaced as top-level cards instead of silently vanishing from every column.
+ */
+function isGenuinelyNested(path: string, parentOf: Record<string, string>): boolean {
+  let cur: string | undefined = parentOf[path];
+  if (!cur) return false;
+  const seen = new Set<string>([path]);
+  while (cur) {
+    if (seen.has(cur)) return false;
+    seen.add(cur);
+    cur = parentOf[cur];
+  }
+  return true;
 }
 
 export function buildBoard(config: BoardConfig, cards: Card[]): Board {
-  const byBasename = new Map<string, string>();
-  for (const c of cards) byBasename.set(c.basename, c.path);
+  const byBasename = new Map<string, string[]>();
+  for (const c of cards) {
+    const arr = byBasename.get(c.basename);
+    if (arr) arr.push(c.path);
+    else byBasename.set(c.basename, [c.path]);
+  }
 
   const cardsByPath: Record<string, Card> = {};
   for (const c of cards) cardsByPath[c.path] = c;
@@ -44,7 +78,7 @@ export function buildBoard(config: BoardConfig, cards: Card[]): Board {
   const parentOf: Record<string, string> = {};
   for (const c of cards) {
     for (const link of c.childLinks) {
-      const childPath = resolveLink(link, byBasename);
+      const childPath = resolveLink(link, byBasename, cardsByPath);
       if (childPath && childPath !== c.path && !parentOf[childPath]) {
         parentOf[childPath] = c.path;
       }
@@ -56,7 +90,7 @@ export function buildBoard(config: BoardConfig, cards: Card[]): Board {
   const groups: Record<string, Card[]> = {};
   for (const col of config.columns) groups[col.id] = [];
   for (const c of cards) {
-    if (parentOf[c.path]) continue; // subcards are not on the board top level
+    if (isGenuinelyNested(c.path, parentOf)) continue; // real subcards are not on the board top level
     const st = String(c.frontmatter.status ?? "");
     const target = colIds.has(st) ? st : firstCol;
     if (target) groups[target].push(c);

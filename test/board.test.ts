@@ -41,6 +41,14 @@ describe("buildBoard", () => {
     expect(b.columns.todo).toEqual(["Tasks/Parent.md"]); // Child is nested, not top-level
     expect(b.parentOf["Tasks/Child.md"]).toBe("Tasks/Parent.md");
   });
+
+  it("surfaces cards in a mutual/cyclic subcard link as top-level instead of dropping them", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo" }, ["B"]),
+      card("B", { status: "todo" }, ["A"]), // A<->B cycle: neither has a real top-level root
+    ]);
+    expect(b.columns.todo.sort()).toEqual(["Tasks/A.md", "Tasks/B.md"]); // nothing vanishes
+  });
 });
 
 describe("ordering", () => {
@@ -49,10 +57,12 @@ describe("ordering", () => {
     expect(ranked.map((r) => r.card.basename)).toEqual(["Alpha", "Bravo", "Charlie"]);
   });
 
-  it("interleaves a fractional order among unordered cards", () => {
-    // A,B,C unordered (eff 0,1,2); D has order 1.5 -> between B and C
+  it("places ordered cards first, then unordered alphabetically (no synthetic/real collisions)", () => {
+    // D has order 1.5 (sorts first); A,B,C unordered get distinct effs beyond the max real order.
     const ranked = columnEffectiveOrders([card("A"), card("B"), card("C"), card("D", { order: 1.5 })]);
-    expect(ranked.map((r) => r.card.basename)).toEqual(["A", "B", "D", "C"]);
+    expect(ranked.map((r) => r.card.basename)).toEqual(["D", "A", "B", "C"]);
+    // every effective order is distinct, so a drop can never resolve to a duplicate rank
+    expect(new Set(ranked.map((r) => r.eff)).size).toBe(ranked.length);
   });
 
   it("computeDropOrder returns midpoints / edges", () => {

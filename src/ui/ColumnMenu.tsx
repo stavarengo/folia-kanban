@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import type { ColumnDef } from "../model/types";
 import { useBoardActions } from "./context";
 import { Icon } from "./icons";
+
+const MENU_W = 224;
 
 const COLORS = ["#4c9aff", "#8fd14f", "#ffab00", "#9c8cff", "#ff5c5c", "#57d9a3", "#f78fb3", "#9aa0a6"];
 
@@ -9,23 +12,40 @@ interface Props {
   column: ColumnDef;
   isFirst: boolean;
   isLast: boolean;
+  triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }
 
-export function ColumnMenu({ column, isFirst, isLast, onClose }: Props) {
+export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose }: Props) {
   const a = useBoardActions();
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState(column.title);
   const [wip, setWip] = useState(column.limit != null ? String(column.limit) : "");
   const [confirmDel, setConfirmDel] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Fixed-position + portalled to <body> so the popover is never clipped by the column's
+  // `overflow: hidden` (which would hide Move/Delete on a short column).
+  useLayoutEffect(() => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.min(Math.max(8, r.right - MENU_W), window.innerWidth - MENU_W - 8);
+    setPos({ top: Math.round(r.bottom + 4), left: Math.round(left) });
+  }, [triggerRef]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const t = e.target as Node;
+      // Ignore clicks on the trigger button — it toggles the menu itself; closing here would
+      // race its onClick and immediately reopen the menu.
+      if (ref.current && !ref.current.contains(t) && !triggerRef.current?.contains(t)) onClose();
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
+
+  // Return focus to the trigger when the menu closes (keyboard users aren't dropped to <body>).
+  useEffect(() => () => triggerRef.current?.focus?.(), [triggerRef]);
 
   const commitName = () => {
     const t = name.trim();
@@ -43,8 +63,15 @@ export function ColumnMenu({ column, isFirst, isLast, onClose }: Props) {
     }
   };
 
-  return (
-    <div className="mdkb-menu" ref={ref} role="menu" aria-label={`Column: ${column.title}`} onKeyDown={onKeyDown}>
+  return createPortal(
+    <div
+      className="mdkb-menu"
+      ref={ref}
+      role="dialog"
+      aria-label={`Column options: ${column.title}`}
+      onKeyDown={onKeyDown}
+      style={pos ? { top: pos.top, left: pos.left } : { visibility: "hidden" }}
+    >
       <div className="mdkb-menu-field">
         <span className="mdkb-menu-label">Title</span>
         <input
@@ -100,16 +127,16 @@ export function ColumnMenu({ column, isFirst, isLast, onClose }: Props) {
       </label>
 
       <div className="mdkb-menu-divider" />
-      <button className="mdkb-menu-item" role="menuitem" disabled={isFirst} onClick={() => { a.moveColumn(column.id, -1); onClose(); }}>
+      <button className="mdkb-menu-item" disabled={isFirst} onClick={() => { a.moveColumn(column.id, -1); onClose(); }}>
         <Icon name="arrow-left" size={14} /> Move left
       </button>
-      <button className="mdkb-menu-item" role="menuitem" disabled={isLast} onClick={() => { a.moveColumn(column.id, 1); onClose(); }}>
+      <button className="mdkb-menu-item" disabled={isLast} onClick={() => { a.moveColumn(column.id, 1); onClose(); }}>
         <Icon name="arrow-right" size={14} /> Move right
       </button>
 
       <div className="mdkb-menu-divider" />
       {!confirmDel ? (
-        <button className="mdkb-menu-item mdkb-menu-danger" role="menuitem" onClick={() => setConfirmDel(true)}>
+        <button className="mdkb-menu-item mdkb-menu-danger" onClick={() => setConfirmDel(true)}>
           <Icon name="trash" size={14} /> Delete column
         </button>
       ) : (
@@ -121,6 +148,7 @@ export function ColumnMenu({ column, isFirst, isLast, onClose }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

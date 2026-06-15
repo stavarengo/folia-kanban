@@ -4,13 +4,17 @@ A real, interactive Kanban board for [Obsidian](https://obsidian.md) — columns
 
 ## Features
 
-- **Columns** defined in a board note's frontmatter (`columns`, `card-folder`).
-- **Drag-and-drop that persists** — dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
-- **Card detail panel** — edit description, status, priority and due date inline.
-- **Subtasks & subcards in one checklist** — a plain `- [ ] todo`, or `- [ ] [[Child]]` which is a full child card with its own board data: **infinite nesting** (cycles guarded).
-- **Comments** and **history**, appended to the card file with timestamps.
+- **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
+- **Quick actions on every card** — mark done, open the note, or delete (with confirm), straight from the board.
+- **Card detail panel** — a dialog (takes focus on open, Escape closes and restores focus) to edit description, status, priority and due date, manage subtasks/subcards, and add comments. Priority accepts any scale (`A`/`B`/`C`/`D` or `urgent`/`high`/`medium`/`low`).
+- **Search & quick filters** — press `/` to search by title, tag or priority; one-click **Overdue** / **Due soon** filters.
+- **Soft WIP limits** — set a per-column limit; the board nudges (never blocks) when you go over.
+- **In-app column management** — add, rename, recolour, set limits, reorder and delete columns; changes are written back to the board note's `columns` frontmatter.
+- **Subtasks & subcards in one checklist** — a plain `- [ ] todo`, or `- [ ] [[Child]]` which is a full child card with its own board data, navigable from the detail panel.
+- **Relative due dates** — *Today*, *Tomorrow*, *in 3d*, *Yesterday*, with overdue cards flagged.
+- **Comments** and auto-generated **history**, appended to the card file with timestamps.
 - **Live reload** when files change outside the board, with a self-write echo guard.
-- Styled with Obsidian's own CSS variables, so it matches your theme.
+- **Accessible & themed** — keyboard-navigable, ARIA roles and focus management throughout; styled with Obsidian's own CSS variables (light + dark) for a clean, shadcn-grade look.
 
 ## How a card looks on disk
 
@@ -54,7 +58,10 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 2. Put card notes (each with a `status` matching a column) in that folder.
 3. Run the command **“Open Kanban board”** or click the layout-grid ribbon icon.
 
-Columns are edited in the board note's `columns` property; the plugin reads and writes that list (there is no add-column button yet — it's frontmatter-driven).
+Columns can be edited by hand in the board note's `columns` property, or managed in-app from each
+column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add column** button — the
+plugin reads and writes that frontmatter list either way. A column entry may be a plain string
+(`- todo`) or an object (`{ id, title, color, limit }`).
 
 ## Install
 

@@ -22,11 +22,12 @@ interface Props {
   selectedPath: string | null;
   wipLimits: Record<string, number>;
   filters: BoardFilters;
+  doneColumnId: string | null;
   onMove: (activeId: string, overId: string) => void;
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Board({ board, today, selectedPath, wipLimits, filters, onMove, onAddCard }: Props) {
+export function Board({ board, today, selectedPath, wipLimits, filters, doneColumnId, onMove, onAddCard }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -38,9 +39,26 @@ export function Board({ board, today, selectedPath, wipLimits, filters, onMove, 
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeCard = activeId ? board.cards[activeId] : null;
 
+  // Speak card titles and column names (not file paths / slugs) during a keyboard drag.
+  const labelFor = (id: string) =>
+    board.cards[id]?.basename ?? board.config.columns.find((c) => c.id === id)?.title ?? id;
+  const announcements = {
+    onDragStart: ({ active }: { active: { id: string | number } }) => `Picked up ${labelFor(String(active.id))}.`,
+    onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+      over ? `${labelFor(String(active.id))} is over ${labelFor(String(over.id))}.` : `${labelFor(String(active.id))} is no longer over a column.`,
+    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+      over ? `Dropped ${labelFor(String(active.id))} into ${labelFor(String(over.id))}.` : `Dropped ${labelFor(String(active.id))}.`,
+    onDragCancel: ({ active }: { active: { id: string | number } }) => `Cancelled. ${labelFor(String(active.id))} was returned.`,
+  };
+  const screenReaderInstructions = {
+    draggable:
+      "Press Space to pick up a card, use the arrow keys to move it between and within columns, Space again to drop, Escape to cancel. Press Enter to open a card.",
+  };
+
   return (
     <DndContext
       sensors={sensors}
+      accessibility={{ announcements, screenReaderInstructions }}
       collisionDetection={closestCorners}
       onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
       onDragEnd={(e: DragEndEvent) => {
@@ -60,6 +78,7 @@ export function Board({ board, today, selectedPath, wipLimits, filters, onMove, 
             selectedPath={selectedPath}
             wipLimit={wipLimits[col.id]}
             filters={filters}
+            doneColumnId={doneColumnId}
             isFirst={i === 0}
             isLast={i === board.config.columns.length - 1}
             onAddCard={onAddCard}
@@ -80,7 +99,7 @@ export function Board({ board, today, selectedPath, wipLimits, filters, onMove, 
             <div className="mdkb-card-main">
               <div className="mdkb-card-title">{activeCard.basename}</div>
               {(() => {
-                const chips = cardChips(activeCard, today);
+                const chips = cardChips(activeCard, today, doneColumnId);
                 return chips.length > 0 ? (
                   <div className="mdkb-chips">
                     {chips.map((c) => (

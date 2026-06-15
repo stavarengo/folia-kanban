@@ -13,6 +13,7 @@
   /* spacing */
   --mdkb-gap: 10px;
   --mdkb-pad: 12px;
+  --mdkb-col-w: 300px; /* single source for column width + drag-overlay width */
 
   /* motion */
   --mdkb-dur-fast: 110ms;
@@ -78,7 +79,6 @@
   gap: 8px;
   padding: 9px 16px;
   border-radius: 999px;
-  background: var(--mdkb-success);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -87,6 +87,8 @@
   pointer-events: none;
   animation: mdkb-toast-in 220ms var(--mdkb-ease);
 }
+.mdkb-toast-success { background: var(--mdkb-success); }
+.mdkb-toast-error { background: var(--mdkb-danger); }
 @keyframes mdkb-toast-in {
   from { opacity: 0; transform: translate(-50%, 12px) scale(0.94); }
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
@@ -197,8 +199,8 @@
 .mdkb-column {
   display: flex;
   flex-direction: column;
-  flex: 0 0 300px;
-  width: 300px;
+  flex: 0 0 var(--mdkb-col-w);
+  width: var(--mdkb-col-w);
   max-height: 100%;
   background: var(--mdkb-col-bg);
   border: 1px solid var(--mdkb-border);
@@ -243,6 +245,9 @@
   text-overflow: ellipsis;
 }
 .mdkb-column-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -250,7 +255,7 @@
   border-radius: 999px;
   padding: 1px 8px;
   min-width: 20px;
-  text-align: center;
+  justify-content: center;
 }
 .mdkb-column-count.is-over-limit {
   color: var(--mdkb-on-accent);
@@ -258,6 +263,9 @@
 }
 .mdkb-column.is-over-limit {
   border-color: color-mix(in srgb, var(--mdkb-danger) 50%, var(--mdkb-border));
+}
+.mdkb-column.is-over-limit .mdkb-column-header {
+  background: color-mix(in srgb, var(--mdkb-danger) 8%, var(--mdkb-col-bg));
 }
 
 .mdkb-column-body {
@@ -317,11 +325,11 @@
 
 /* ------------------------------------------------------------------ column menu popover */
 .mdkb-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 8px;
-  z-index: 20;
+  position: fixed;
+  z-index: 60;
   width: 224px;
+  max-height: min(440px, calc(100vh - 24px));
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -367,19 +375,21 @@
   gap: 6px;
 }
 .mdkb-swatch {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   border: 2px solid transparent;
+  background-clip: padding-box;
   cursor: pointer;
   padding: 0;
-  transition: transform var(--mdkb-dur-fast) ease;
+  transition: transform var(--mdkb-dur-fast) ease, box-shadow var(--mdkb-dur-fast) ease;
 }
 .mdkb-swatch:hover {
-  transform: scale(1.12);
+  transform: scale(1.1);
 }
 .mdkb-swatch.is-active {
-  border-color: var(--text-normal);
+  /* two-tone ring readable over any swatch fill, in either theme */
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
 }
 .mdkb-swatch-none {
   display: grid;
@@ -527,7 +537,7 @@
 }
 .mdkb-card-title {
   font-size: 13.5px;
-  font-weight: 550;
+  font-weight: 600;
   line-height: 1.4;
   color: var(--text-normal);
   display: -webkit-box;
@@ -543,7 +553,8 @@
   box-shadow: var(--mdkb-shadow-overlay);
   border-color: var(--mdkb-accent);
   transform: rotate(1.5deg);
-  width: 284px;
+  /* matches a card's rendered width: column width minus its 1px borders + 8px body padding */
+  width: calc(var(--mdkb-col-w) - 18px);
 }
 
 /* ------------------------------------------------------------------ chips */
@@ -561,17 +572,20 @@
   line-height: 1.5;
   padding: 1px 8px;
   border-radius: 999px;
+  border: 1px solid transparent;
   white-space: nowrap;
   color: var(--text-muted);
   background: var(--background-modifier-hover);
 }
-.mdkb-chip-prio-1 { color: var(--mdkb-prio-1); background: color-mix(in srgb, var(--mdkb-prio-1) 16%, transparent); }
-.mdkb-chip-prio-2 { color: var(--mdkb-prio-2); background: color-mix(in srgb, var(--mdkb-prio-2) 16%, transparent); }
-.mdkb-chip-prio-3 { color: var(--mdkb-prio-3); background: color-mix(in srgb, var(--mdkb-prio-3) 18%, transparent); }
-.mdkb-chip-prio-4 { color: var(--mdkb-prio-4); background: color-mix(in srgb, var(--mdkb-prio-4) 16%, transparent); }
-.mdkb-chip-danger { color: var(--mdkb-danger); background: color-mix(in srgb, var(--mdkb-danger) 18%, transparent); }
-.mdkb-chip-warn { color: var(--mdkb-prio-2); background: color-mix(in srgb, var(--mdkb-prio-2) 16%, transparent); }
-.mdkb-chip-accent { color: var(--mdkb-accent); background: color-mix(in srgb, var(--mdkb-accent) 14%, transparent); }
+/* Chip text is mixed toward --text-normal so it keeps the hue but stays legible (WCAG AA) in
+   BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. */
+.mdkb-chip-prio-1 { color: color-mix(in srgb, var(--mdkb-prio-1) 60%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-prio-1) 20%, transparent); border-color: color-mix(in srgb, var(--mdkb-prio-1) 32%, transparent); }
+.mdkb-chip-prio-2 { color: color-mix(in srgb, var(--mdkb-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--mdkb-prio-2) 32%, transparent); }
+.mdkb-chip-prio-3 { color: color-mix(in srgb, var(--mdkb-prio-3) 58%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-prio-3) 22%, transparent); border-color: color-mix(in srgb, var(--mdkb-prio-3) 34%, transparent); }
+.mdkb-chip-prio-4 { color: color-mix(in srgb, var(--mdkb-prio-4) 60%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-prio-4) 20%, transparent); border-color: color-mix(in srgb, var(--mdkb-prio-4) 32%, transparent); }
+.mdkb-chip-danger { color: color-mix(in srgb, var(--mdkb-danger) 58%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-danger) 22%, transparent); border-color: color-mix(in srgb, var(--mdkb-danger) 36%, transparent); }
+.mdkb-chip-warn { color: color-mix(in srgb, var(--mdkb-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--mdkb-prio-2) 32%, transparent); }
+.mdkb-chip-accent { color: color-mix(in srgb, var(--mdkb-accent) 55%, var(--text-normal)); background: color-mix(in srgb, var(--mdkb-accent) 18%, transparent); border-color: color-mix(in srgb, var(--mdkb-accent) 32%, transparent); }
 .mdkb-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }
 
 /* ------------------------------------------------------------------ progress + meta */
@@ -716,8 +730,8 @@
   color: var(--text-normal);
 }
 .mdkb-mini {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   margin-left: auto;
 }
 
@@ -760,8 +774,9 @@
 .mdkb-detail {
   flex: 0 0 380px;
   width: 380px;
-  border-left: 1px solid var(--mdkb-border);
+  border-left: 1px solid var(--mdkb-border-strong);
   background: var(--mdkb-col-bg);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -894,12 +909,14 @@
 }
 .mdkb-subtask {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* keep checkbox + remove aligned to the first line of wrapped text */
   gap: 8px;
   font-size: 13px;
+  line-height: 1.4;
 }
 .mdkb-subtask input[type="checkbox"] {
   flex: 0 0 auto;
+  margin-top: 2px;
 }
 .mdkb-link {
   background: transparent;
@@ -911,6 +928,12 @@
   padding: 0;
   font: inherit;
   text-align: left;
+}
+.mdkb-link-missing {
+  color: var(--text-muted);
+  text-decoration: underline dashed;
+  text-underline-offset: 2px;
+  cursor: help;
 }
 .mdkb-done {
   text-decoration: line-through;
@@ -948,8 +971,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mdkb-root *,
-  .mdkb-detail {
+  .mdkb-detail,
+  .mdkb-menu,
+  .mdkb-toast {
     transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+  }
+  /* No positional slide/scale for motion-sensitive users — these surfaces just appear. */
+  .mdkb-detail,
+  .mdkb-menu,
+  .mdkb-toast {
+    animation: none !important;
   }
 }

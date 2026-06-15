@@ -186,15 +186,18 @@ export function CardDetail({ path, board, onClose, onNavigate, onChanged }: Prop
               <li key={s.index} className="mdkb-subtask">
                 <input type="checkbox" checked={s.done} aria-label={`Toggle ${s.text}`} onChange={() => void mutate(() => repo.toggleSubtask(path, s.index, !s.done))} />
                 {s.kind === "card" && s.link ? (
-                  <button
-                    className="mdkb-link"
-                    onClick={() => {
-                      const child = resolveBasename(board, s.link!);
-                      if (child) onNavigate(child);
-                    }}
-                  >
-                    {s.link}
-                  </button>
+                  (() => {
+                    const child = resolveBasename(board, s.link);
+                    return child ? (
+                      <button className="mdkb-link" onClick={() => onNavigate(child)}>
+                        {s.link}
+                      </button>
+                    ) : (
+                      <span className="mdkb-link-missing" title="No card with this name on the board">
+                        {s.link}
+                      </span>
+                    );
+                  })()
                 ) : (
                   <span className={s.done ? "mdkb-done" : ""}>{s.text}</span>
                 )}

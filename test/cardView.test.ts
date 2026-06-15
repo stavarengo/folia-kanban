@@ -47,20 +47,26 @@ describe("cardMatches", () => {
   const today = "2026-06-16";
   it("matches search text against title, priority and tags", () => {
     const c = card({ priority: "high", area: "garden-prep" }, "Apply the mulch");
-    expect(cardMatches(c, today, { text: "apply", due: "" })).toBe(true);
-    expect(cardMatches(c, today, { text: "high", due: "" })).toBe(true);
-    expect(cardMatches(c, today, { text: "garden-prep", due: "" })).toBe(true);
-    expect(cardMatches(c, today, { text: "nope", due: "" })).toBe(false);
+    expect(cardMatches(c, today, { text: "apply", due: "" }, "done")).toBe(true);
+    expect(cardMatches(c, today, { text: "high", due: "" }, "done")).toBe(true);
+    expect(cardMatches(c, today, { text: "garden-prep", due: "" }, "done")).toBe(true);
+    expect(cardMatches(c, today, { text: "nope", due: "" }, "done")).toBe(false);
   });
   it("filters by overdue / soon", () => {
     const overdue = card({ due: "2026-06-10" });
     const soon = card({ due: "2026-06-17" });
     const far = card({ due: "2026-08-01" });
-    expect(cardMatches(overdue, today, { text: "", due: "overdue" })).toBe(true);
-    expect(cardMatches(soon, today, { text: "", due: "overdue" })).toBe(false);
-    expect(cardMatches(soon, today, { text: "", due: "soon" })).toBe(true);
-    expect(cardMatches(far, today, { text: "", due: "soon" })).toBe(false);
-    expect(cardMatches(card({}), today, { text: "", due: "soon" })).toBe(false); // no due → excluded
+    expect(cardMatches(overdue, today, { text: "", due: "overdue" }, "done")).toBe(true);
+    expect(cardMatches(soon, today, { text: "", due: "overdue" }, "done")).toBe(false);
+    expect(cardMatches(soon, today, { text: "", due: "soon" }, "done")).toBe(true);
+    expect(cardMatches(far, today, { text: "", due: "soon" }, "done")).toBe(false);
+    expect(cardMatches(card({}), today, { text: "", due: "soon" }, "done")).toBe(false); // no due → excluded
+  });
+  it("respects the resolved done column for due styling (not the literal 'done')", () => {
+    // card in a custom done column 'completed' with a past due is NOT overdue
+    const finished = card({ due: "2026-06-10", status: "completed" });
+    expect(cardMatches(finished, today, { text: "", due: "overdue" }, "completed")).toBe(false);
+    expect(cardMatches(finished, today, { text: "", due: "overdue" }, "done")).toBe(true); // wrong done col → treated as overdue
   });
 });
 

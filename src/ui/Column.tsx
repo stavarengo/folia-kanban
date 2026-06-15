@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { Board, ColumnDef } from "../model/types";
@@ -24,16 +24,18 @@ interface Props {
   selectedPath: string | null;
   wipLimit?: number;
   filters: BoardFilters;
+  doneColumnId: string | null;
   isFirst: boolean;
   isLast: boolean;
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filters, isFirst, isLast, onAddCard }: Props) {
+export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filters, doneColumnId, isFirst, isLast, onAddCard }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   const submit = (keepOpen: boolean) => {
     const t = title.trim();
@@ -44,7 +46,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
 
   const allPaths = cardPaths.filter((p) => board.cards[p]);
   const filtering = hasActiveFilter(filters);
-  const paths = filtering ? allPaths.filter((p) => cardMatches(board.cards[p], today, filters)) : allPaths;
+  const paths = filtering ? allPaths.filter((p) => cardMatches(board.cards[p], today, filters, doneColumnId)) : allPaths;
   const overLimit = wipLimit != null && allPaths.length > wipLimit;
   const accent = column.color || autoColor(column.id);
 
@@ -60,20 +62,37 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
         <span className="mdkb-column-title">{column.title}</span>
         <span
           className={"mdkb-column-count" + (overLimit ? " is-over-limit" : "")}
-          title={wipLimit != null ? `${allPaths.length} of ${wipLimit} (WIP limit)` : `${allPaths.length} cards`}
+          title={
+            overLimit
+              ? `${allPaths.length} of ${wipLimit} — over the WIP limit`
+              : wipLimit != null
+                ? `${allPaths.length} of ${wipLimit} (WIP limit)`
+                : `${allPaths.length} cards`
+          }
+          aria-label={
+            overLimit
+              ? `${allPaths.length} of ${wipLimit}, over the WIP limit`
+              : wipLimit != null
+                ? `${allPaths.length} of ${wipLimit} cards`
+                : `${allPaths.length} cards`
+          }
         >
+          {overLimit && <Icon name="alert" size={12} />}
           {wipLimit != null ? `${allPaths.length}/${wipLimit}` : allPaths.length}
         </span>
         <button
+          ref={menuBtnRef}
           className="mdkb-icon-btn mdkb-column-menu-btn"
           aria-label={`Column options for ${column.title}`}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
         >
           <Icon name="more" size={16} />
         </button>
-        {menuOpen && <ColumnMenu column={column} isFirst={isFirst} isLast={isLast} onClose={() => setMenuOpen(false)} />}
+        {menuOpen && (
+          <ColumnMenu column={column} isFirst={isFirst} isLast={isLast} triggerRef={menuBtnRef} onClose={() => setMenuOpen(false)} />
+        )}
       </header>
       <div ref={setNodeRef} className={"mdkb-column-body" + (isOver ? " is-over" : "")}>
         <SortableContext items={paths} strategy={verticalListSortingStrategy}>

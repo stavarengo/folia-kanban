@@ -34,13 +34,24 @@ function titleCase(id: string): string {
 
 function normalizeColumns(raw: unknown): ColumnDef[] {
   if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_COLUMNS;
-  return raw.map((c): ColumnDef => {
-    if (typeof c === "string") return { id: c, title: titleCase(c) };
-    const col: ColumnDef = { id: String(c.id), title: c.title ?? titleCase(String(c.id)) };
-    if (typeof c.color === "string") col.color = c.color;
-    if (typeof c.limit === "number" && Number.isFinite(c.limit)) col.limit = c.limit;
-    return col;
-  });
+  const cols: ColumnDef[] = [];
+  for (const c of raw) {
+    if (typeof c === "string") {
+      if (c.trim()) cols.push({ id: c, title: titleCase(c) });
+      continue;
+    }
+    if (c === null || typeof c !== "object") continue; // skip null / number / other malformed entries
+    const obj = c as { id?: unknown; title?: unknown; color?: unknown; limit?: unknown };
+    if (obj.id == null || String(obj.id).trim() === "") continue; // a column needs a usable id
+    const col: ColumnDef = {
+      id: String(obj.id),
+      title: typeof obj.title === "string" && obj.title ? obj.title : titleCase(String(obj.id)),
+    };
+    if (typeof obj.color === "string") col.color = obj.color;
+    if (typeof obj.limit === "number" && Number.isFinite(obj.limit)) col.limit = obj.limit;
+    cols.push(col);
+  }
+  return cols.length ? cols : DEFAULT_COLUMNS;
 }
 
 function sanitizeFilename(title: string): string {
@@ -170,7 +181,8 @@ export class VaultRepository implements CardRepository {
   }
 
   async addSubcard(parentPath: string, title: string): Promise<string> {
-    const parentFm = this.frontmatterOf(this.file(parentPath));
+    // Read the parent status from write-fresh text (metadataCache can lag a just-written status).
+    const parentFm = parseFrontmatter(await this.app.vault.cachedRead(this.file(parentPath)));
     const childPath = await this.createCard(title, String(parentFm.status ?? "todo"));
     const childBase = childPath.split("/").pop()!.replace(/\.md$/i, "");
     await this.editBody(parentPath, (t) => addSubcardText(t, childBase));
@@ -200,21 +212,34 @@ export class VaultRepository implements CardRepository {
 
   onChange(cb: () => void): () => void {
     let timer: number | null = null;
-    const fire = (path: string) => {
-      const last = this.recentWrites.get(path);
-      if (last && Date.now() - last < 2500) return; // ignore our own writes (echo guard)
+    const schedule = () => {
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(cb, 150);
     };
-    const refs = [
-      this.app.vault.on("modify", (f) => fire(f.path)),
-      this.app.vault.on("create", (f) => fire(f.path)),
-      this.app.vault.on("delete", (f) => fire(f.path)),
-      this.app.vault.on("rename", (f) => fire(f.path)),
+    const fireVault = (path: string) => {
+      const last = this.recentWrites.get(path);
+      if (last !== undefined) {
+        if (Date.now() - last < 2500) return; // our own write — we reload explicitly
+        this.recentWrites.delete(path); // prune the stale echo-guard entry
+      }
+      schedule();
+    };
+    const vaultRefs = [
+      this.app.vault.on("modify", (f) => fireVault(f.path)),
+      this.app.vault.on("create", (f) => fireVault(f.path)),
+      this.app.vault.on("delete", (f) => fireVault(f.path)),
+      this.app.vault.on("rename", (f) => fireVault(f.path)),
     ];
+    // The metadataCache catches up a tick after our own processFrontMatter write; reconcile
+    // then (only for files we just wrote) so an in-app move/edit can't visually snap back to
+    // its old slot while the cache is stale. External edits are handled by the vault events.
+    const metaRef = this.app.metadataCache.on("changed", (f) => {
+      if (this.recentWrites.has(f.path)) schedule();
+    });
     return () => {
       if (timer !== null) window.clearTimeout(timer);
-      for (const ref of refs) this.app.vault.offref(ref);
+      for (const ref of vaultRefs) this.app.vault.offref(ref);
+      this.app.metadataCache.offref(metaRef);
     };
   }
 }

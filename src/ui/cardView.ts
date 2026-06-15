@@ -106,7 +106,7 @@ export function hasActiveFilter(f: BoardFilters): boolean {
 }
 
 /** Pure predicate: does a card pass the current search text + due filter? */
-export function cardMatches(card: Card, today: string, f: BoardFilters): boolean {
+export function cardMatches(card: Card, today: string, f: BoardFilters, doneColumnId: string | null): boolean {
   const q = f.text.trim().toLowerCase();
   if (q) {
     const hay = [card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)].join(" ").toLowerCase();
@@ -115,14 +115,14 @@ export function cardMatches(card: Card, today: string, f: BoardFilters): boolean
   if (f.due) {
     const due = card.frontmatter.due;
     if (typeof due !== "string" || !due) return false;
-    const u = dueInfo(due, today, card.frontmatter.status === "done").urgency;
+    const u = dueInfo(due, today, card.frontmatter.status === doneColumnId).urgency;
     if (f.due === "overdue" && u !== "overdue") return false;
     if (f.due === "soon" && u !== "overdue" && u !== "today" && u !== "soon") return false;
   }
   return true;
 }
 
-export function cardChips(card: Card, today: string): CardChip[] {
+export function cardChips(card: Card, today: string, doneColumnId: string | null): CardChip[] {
   const fm = card.frontmatter;
   const chips: CardChip[] = [];
 
@@ -133,7 +133,7 @@ export function cardChips(card: Card, today: string): CardChip[] {
     chips.push({ key: "tag-" + i, label: tag, tone: "muted", title: "Tag" });
   }
   if (typeof fm.due === "string" && fm.due) {
-    const done = fm.status === "done";
+    const done = fm.status === doneColumnId;
     const info = dueInfo(fm.due, today, done);
     const tone: ChipTone =
       info.urgency === "overdue" ? "danger" : info.urgency === "today" || info.urgency === "soon" ? "warn" : "muted";

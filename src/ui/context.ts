@@ -13,8 +13,6 @@ export function useRepo(): CardRepository {
 export interface BoardActions {
   /** Open the card's detail panel. */
   open(path: string): void;
-  /** Move a card to a column (writes status + order + history). */
-  move(path: string, columnId: string): void;
   /** Move a card to the board's "done" column, if one exists. */
   complete(path: string): void;
   /** Trash the card's note (after confirmation in the UI). */

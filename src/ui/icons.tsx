@@ -10,21 +10,13 @@ export type IconName =
   | "search"
   | "check"
   | "check-circle"
-  | "list-checks"
   | "git-branch"
   | "message"
-  | "grip"
-  | "chevron-down"
-  | "chevron-right"
   | "arrow-right"
   | "arrow-left"
   | "calendar"
   | "alert"
   | "more"
-  | "flag"
-  | "palette"
-  | "pencil"
-  | "x-circle"
   | "inbox";
 
 const PATHS: Record<IconName, JSX.Element> = {
@@ -57,13 +49,6 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="m9 11 3 3L22 4" />
     </>
   ),
-  "list-checks": (
-    <>
-      <path d="m3 8 2 2 4-4" />
-      <path d="m3 18 2 2 4-4" />
-      <path d="M13 8h8M13 18h8" />
-    </>
-  ),
   "git-branch": (
     <>
       <path d="M6 3v12" />
@@ -73,18 +58,6 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
-  grip: (
-    <>
-      <circle cx="9" cy="6" r="1" />
-      <circle cx="9" cy="12" r="1" />
-      <circle cx="9" cy="18" r="1" />
-      <circle cx="15" cy="6" r="1" />
-      <circle cx="15" cy="12" r="1" />
-      <circle cx="15" cy="18" r="1" />
-    </>
-  ),
-  "chevron-down": <path d="m6 9 6 6 6-6" />,
-  "chevron-right": <path d="m9 18 6-6-6-6" />,
   "arrow-right": <path d="M5 12h14M12 5l7 7-7 7" />,
   "arrow-left": <path d="M19 12H5M12 19l-7-7 7-7" />,
   calendar: (
@@ -105,33 +78,6 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="1" />
       <circle cx="19" cy="12" r="1" />
       <circle cx="5" cy="12" r="1" />
-    </>
-  ),
-  flag: (
-    <>
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <path d="M4 22v-7" />
-    </>
-  ),
-  palette: (
-    <>
-      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-    </>
-  ),
-  pencil: (
-    <>
-      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-      <path d="m15 5 4 4" />
-    </>
-  ),
-  "x-circle": (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15 9-6 6M9 9l6 6" />
     </>
   ),
   inbox: (

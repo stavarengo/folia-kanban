@@ -32,16 +32,20 @@ export function App({ repo, today }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<number | null>(null);
   const todayValue = useMemo(() => today ?? dateOnly(), [today]);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
+  const showToast = useCallback((text: string, tone: "success" | "error" = "success") => {
+    setToast({ text, tone });
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 2200);
+    toastTimer.current = window.setTimeout(() => setToast(null), tone === "error" ? 4000 : 2200);
   }, []);
+  const reportError = useCallback(
+    (e: unknown) => showToast(e instanceof Error ? e.message : String(e), "error"),
+    [showToast],
+  );
   useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
   // Latest board for stable callbacks — lets the actions object stay referentially stable
   // across single-card edits so memoized cards don't all re-render.
@@ -121,17 +125,19 @@ export function App({ repo, today }: Props) {
   const actions = useMemo<BoardActions>(
     () => ({
       open: (path) => setSelected(path),
-      move: (path, columnId) => void moveTo(path, columnId),
       complete: (path) => {
         if (!doneColumnId) return;
         const title = boardRef.current?.cards[path]?.basename ?? "Card";
-        void moveTo(path, doneColumnId);
-        showToast(`${title} — done!`);
+        void moveTo(path, doneColumnId)
+          .then(() => showToast(`${title} — done!`))
+          .catch(reportError);
       },
       remove: (path) => {
         void (async () => {
           try {
             await repo.deleteCard(path);
+          } catch (e) {
+            reportError(e);
           } finally {
             setSelected((cur) => (cur === path ? null : cur));
             await load();
@@ -204,7 +210,7 @@ export function App({ repo, today }: Props) {
         void setColumnsAndReload([...b.config.columns, { id, title: t }]);
       },
     }),
-    [moveTo, doneColumnId, repo, load, setColumnsAndReload, showToast],
+    [moveTo, doneColumnId, repo, load, setColumnsAndReload, showToast, reportError],
   );
 
   const wipLimits = useMemo<Record<string, number>>(() => {
@@ -222,12 +228,12 @@ export function App({ repo, today }: Props) {
           const c = board.cards[p];
           if (!c) continue;
           total++;
-          if (cardMatches(c, todayValue, filters)) match++;
+          if (cardMatches(c, todayValue, filters, doneColumnId)) match++;
         }
       }
     }
     return { total, match };
-  }, [board, filters, todayValue]);
+  }, [board, filters, todayValue, doneColumnId]);
 
   // "/" focuses search (when not already typing in a field).
   const onRootKeyDown = (e: KeyboardEvent) => {
@@ -257,6 +263,7 @@ export function App({ repo, today }: Props) {
               selectedPath={selected}
               wipLimits={wipLimits}
               filters={filters}
+              doneColumnId={doneColumnId}
               onMove={onMove}
               onAddCard={onAddCard}
             />
@@ -271,9 +278,9 @@ export function App({ repo, today }: Props) {
             )}
           </div>
           {toast && (
-            <div className="mdkb-toast" role="status" aria-live="polite">
-              <Icon name="check-circle" size={16} />
-              {toast}
+            <div className={"mdkb-toast mdkb-toast-" + toast.tone} role="status" aria-live="polite">
+              <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
+              {toast.text}
             </div>
           )}
         </div>

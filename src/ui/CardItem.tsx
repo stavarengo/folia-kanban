@@ -22,7 +22,7 @@ function CardItemInner({ card, today, selected }: Props) {
     transform: CSS.Translate.toString(transform),
     transition,
   };
-  const chips = cardChips(card, today);
+  const chips = cardChips(card, today, actions.doneColumnId);
   const stats = card.stats;
   const fm = card.frontmatter;
   const prio = typeof fm.priority === "string" && fm.priority ? priorityTone(fm.priority) : null;
@@ -60,6 +60,7 @@ function CardItemInner({ card, today, selected }: Props) {
         onClick={open}
         onKeyDown={onKeyDown}
         aria-label={card.basename}
+        aria-current={selected ? "true" : undefined}
       >
         <div className="mdkb-card-title">{card.basename}</div>
         {chips.length > 0 && (
@@ -73,7 +74,11 @@ function CardItemInner({ card, today, selected }: Props) {
           </div>
         )}
         {stats && stats.todos > 0 && (
-          <div className={"mdkb-progress" + (allDone ? " is-complete" : "")} title={`${stats.todosDone} of ${stats.todos} subtasks done`}>
+          <div
+            className={"mdkb-progress" + (allDone ? " is-complete" : "")}
+            title={`${stats.todosDone} of ${stats.todos} subtasks done`}
+            aria-label={`${stats.todosDone} of ${stats.todos} subtasks done`}
+          >
             <div className="mdkb-progress-track">
               <div className="mdkb-progress-fill" style={{ width: `${(stats.todosDone / stats.todos) * 100}%` }} />
             </div>
@@ -86,12 +91,12 @@ function CardItemInner({ card, today, selected }: Props) {
         {stats && (stats.subcards > 0 || stats.comments > 0) && (
           <div className="mdkb-card-meta">
             {stats.subcards > 0 && (
-              <span title="Subcards">
+              <span title="Subcards" aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}>
                 <Icon name="git-branch" size={13} /> {stats.subcards}
               </span>
             )}
             {stats.comments > 0 && (
-              <span title="Comments">
+              <span title="Comments" aria-label={`${stats.comments} comment${stats.comments === 1 ? "" : "s"}`}>
                 <Icon name="message" size={13} /> {stats.comments}
               </span>
             )}
