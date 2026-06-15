@@ -82,13 +82,6 @@ export interface BoardConfig {
   cardFolder: string;
 }
 
-/** A node in the board's card tree (top-level card or nested subcard). */
-export interface BoardCardNode {
-  card: Card;
-  /** Resolved child nodes (subcards), in checklist order. Cycles are broken. */
-  children: BoardCardNode[];
-}
-
 export interface Board {
   config: BoardConfig;
   /** Top-level card paths per column id, sorted by order. */

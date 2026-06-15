@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
 import { moveCard, resolveDrop } from "../model/board";
+import { dateOnly } from "../model/dates";
 import type { CardRepository } from "../obsidian/repo";
 import { BoardActionsContext, RepoContext, type BoardActions } from "./context";
 import { Board } from "./Board";
 import { CardDetail } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { cardMatches, EMPTY_FILTERS, type BoardFilters } from "./cardView";
-
-function todayStr(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
 
@@ -36,7 +32,11 @@ export function App({ repo, today }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
-  const todayValue = useMemo(() => today ?? todayStr(), [today]);
+  const todayValue = useMemo(() => today ?? dateOnly(), [today]);
+  // Latest board for stable callbacks — lets the actions object stay referentially stable
+  // across single-card edits so memoized cards don't all re-render.
+  const boardRef = useRef<BoardModel | null>(null);
+  boardRef.current = board;
 
   const load = useCallback(async () => {
     try {
@@ -55,10 +55,11 @@ export function App({ repo, today }: Props) {
 
   const onMove = useCallback(
     async (activeId: string, overId: string) => {
-      if (!board) return;
-      const drop = resolveDrop(board, activeId, overId);
+      const b = boardRef.current;
+      if (!b) return;
+      const drop = resolveDrop(b, activeId, overId);
       if (!drop) return;
-      const mut = moveCard(board, activeId, drop.columnId, drop.index);
+      const mut = moveCard(b, activeId, drop.columnId, drop.index);
       if (!mut) return;
       try {
         await repo.applyMove(mut);
@@ -66,7 +67,7 @@ export function App({ repo, today }: Props) {
         await load();
       }
     },
-    [board, repo, load],
+    [repo, load],
   );
 
   const onAddCard = useCallback(
@@ -82,9 +83,10 @@ export function App({ repo, today }: Props) {
 
   const moveTo = useCallback(
     async (path: string, columnId: string) => {
-      if (!board) return;
-      const target = (board.columns[columnId] ?? []).filter((p) => p !== path).length;
-      const mut = moveCard(board, path, columnId, target);
+      const b = boardRef.current;
+      if (!b) return;
+      const target = (b.columns[columnId] ?? []).filter((p) => p !== path).length;
+      const mut = moveCard(b, path, columnId, target);
       if (!mut) return;
       try {
         await repo.applyMove(mut);
@@ -92,7 +94,7 @@ export function App({ repo, today }: Props) {
         await load();
       }
     },
-    [board, repo, load],
+    [repo, load],
   );
 
   const setColumnsAndReload = useCallback(
@@ -126,22 +128,26 @@ export function App({ repo, today }: Props) {
       openNote: (path) => void repo.openCard(path),
       doneColumnId,
       renameColumn: (id, title) => {
+        const b = boardRef.current;
         const t = title.trim();
-        if (!board || !t) return;
-        void setColumnsAndReload(board.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)));
+        if (!b || !t) return;
+        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)));
       },
       setColumnColor: (id, color) => {
-        if (!board) return;
-        void setColumnsAndReload(board.config.columns.map((c) => (c.id === id ? { ...c, color: color ?? undefined } : c)));
+        const b = boardRef.current;
+        if (!b) return;
+        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, color: color ?? undefined } : c)));
       },
       setColumnLimit: (id, limit) => {
-        if (!board) return;
+        const b = boardRef.current;
+        if (!b) return;
         const lim = limit == null || limit <= 0 ? undefined : Math.floor(limit);
-        void setColumnsAndReload(board.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)));
+        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)));
       },
       moveColumn: (id, dir) => {
-        if (!board) return;
-        const cols = [...board.config.columns];
+        const b = boardRef.current;
+        if (!b) return;
+        const cols = [...b.config.columns];
         const i = cols.findIndex((c) => c.id === id);
         const j = i + dir;
         if (i < 0 || j < 0 || j >= cols.length) return;
@@ -149,15 +155,17 @@ export function App({ repo, today }: Props) {
         void setColumnsAndReload(cols);
       },
       deleteColumn: (id) => {
-        if (!board) return;
-        const cols = board.config.columns;
+        const b = boardRef.current;
+        if (!b) return;
+        const cols = b.config.columns;
         if (cols.length <= 1) return; // keep at least one column
         const idx = cols.findIndex((c) => c.id === id);
         if (idx < 0) return;
         const neighbor = cols[idx - 1] ?? cols[idx + 1];
+        const orphans = b.columns[id] ?? [];
         void (async () => {
-          // Reassign this column's cards to a neighbor so none are orphaned.
-          for (const p of board.columns[id] ?? []) {
+          // Reassign this column's cards to a neighbour so none are orphaned.
+          for (const p of orphans) {
             try {
               await repo.setFrontmatter(p, { status: neighbor.id });
             } catch {
@@ -172,17 +180,18 @@ export function App({ repo, today }: Props) {
         })();
       },
       addColumn: (title) => {
+        const b = boardRef.current;
         const t = title.trim();
-        if (!board || !t) return;
-        const existing = new Set(board.config.columns.map((c) => c.id));
+        if (!b || !t) return;
+        const existing = new Set(b.config.columns.map((c) => c.id));
         const base = t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "column";
         let id = base;
         let n = 1;
         while (existing.has(id)) id = `${base}-${n++}`;
-        void setColumnsAndReload([...board.config.columns, { id, title: t }]);
+        void setColumnsAndReload([...b.config.columns, { id, title: t }]);
       },
     }),
-    [moveTo, doneColumnId, repo, load, board, setColumnsAndReload],
+    [moveTo, doneColumnId, repo, load, setColumnsAndReload],
   );
 
   const wipLimits = useMemo<Record<string, number>>(() => {

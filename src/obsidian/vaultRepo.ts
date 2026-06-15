@@ -2,6 +2,7 @@ import { App, TFile, normalizePath } from "obsidian";
 import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef } from "../model/types";
 import type { CardMutation } from "../model/board";
 import { buildBoard } from "../model/board";
+import { dateOnly, stamp } from "../model/dates";
 import {
   addSubcard as addSubcardText,
   addTodo as addTodoText,
@@ -40,16 +41,6 @@ function normalizeColumns(raw: unknown): ColumnDef[] {
     if (typeof c.limit === "number" && Number.isFinite(c.limit)) col.limit = c.limit;
     return col;
   });
-}
-
-function stamp(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-function dateOnly(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function sanitizeFilename(title: string): string {
@@ -166,9 +157,15 @@ export class VaultRepository implements CardRepository {
     const config = await this.readConfig();
     await this.ensureFolder(config.cardFolder);
     const path = await this.uniquePath(config.cardFolder, title);
-    const content = `---\ntype: task\nstatus: ${status}\ncreated: ${dateOnly()}\n---\n\n# ${title}\n`;
     this.markWrite(path);
-    await this.app.vault.create(path, content);
+    // Create the body first, then let Obsidian serialize the frontmatter — never hand-build
+    // YAML (an odd column id / title could otherwise produce malformed frontmatter).
+    const file = await this.app.vault.create(path, `# ${title}\n`);
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      fm.type = "task";
+      fm.status = status;
+      fm.created = dateOnly();
+    });
     return path;
   }
 

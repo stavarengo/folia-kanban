@@ -1,7 +1,7 @@
-import { useState, type KeyboardEvent } from "react";
+import { memo, useState, type KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card } from "../model/types";
+import type { Card, CardStats } from "../model/types";
 import { cardChips, priorityTone } from "./cardView";
 import { useBoardActions } from "./context";
 import { Icon } from "./icons";
@@ -12,7 +12,7 @@ interface Props {
   selected: boolean;
 }
 
-export function CardItem({ card, today, selected }: Props) {
+function CardItemInner({ card, today, selected }: Props) {
   const actions = useBoardActions();
   const [confirming, setConfirming] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -168,3 +168,22 @@ export function CardItem({ card, today, selected }: Props) {
     </div>
   );
 }
+
+function sameStats(a?: CardStats, b?: CardStats): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.todos === b.todos && a.todosDone === b.todosDone && a.subcards === b.subcards && a.comments === b.comments;
+}
+
+// A board reload rebuilds Card objects, but an unchanged card keeps the same frontmatter
+// reference (Obsidian's metadataCache) — so only genuinely-changed cards re-render.
+export const CardItem = memo(
+  CardItemInner,
+  (a, b) =>
+    a.selected === b.selected &&
+    a.today === b.today &&
+    a.card.path === b.card.path &&
+    a.card.basename === b.card.basename &&
+    a.card.frontmatter === b.card.frontmatter &&
+    sameStats(a.card.stats, b.card.stats),
+);

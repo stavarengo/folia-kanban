@@ -1,12 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildBoard,
-  columnEffectiveOrders,
-  computeDropOrder,
-  childPaths,
-  subtreePaths,
-  moveCard,
-} from "../src/model/board";
+import { buildBoard, columnEffectiveOrders, computeDropOrder, moveCard } from "../src/model/board";
 import type { BoardConfig, Card } from "../src/model/types";
 
 const config: BoardConfig = {
@@ -47,7 +40,6 @@ describe("buildBoard", () => {
     ]);
     expect(b.columns.todo).toEqual(["Tasks/Parent.md"]); // Child is nested, not top-level
     expect(b.parentOf["Tasks/Child.md"]).toBe("Tasks/Parent.md");
-    expect(childPaths(b, "Tasks/Parent.md")).toEqual(["Tasks/Child.md"]);
   });
 });
 
@@ -103,12 +95,3 @@ describe("moveCard mutation", () => {
   });
 });
 
-describe("cycle safety", () => {
-  it("subtreePaths does not loop on a cycle", () => {
-    const b = buildBoard(config, [
-      card("A", { status: "todo" }, ["B"]),
-      card("B", { status: "todo" }, ["A"]), // B links back to A
-    ]);
-    expect(subtreePaths(b, "Tasks/A.md").sort()).toEqual(["Tasks/A.md", "Tasks/B.md"]);
-  });
-});

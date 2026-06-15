@@ -70,31 +70,6 @@ export function buildBoard(config: BoardConfig, cards: Card[]): Board {
   return { config, columns, cards: cardsByPath, parentOf };
 }
 
-/** Child card paths of a card, in checklist order, existing-only. */
-export function childPaths(board: Board, path: string): string[] {
-  const card = board.cards[path];
-  if (!card) return [];
-  const byBasename = new Map<string, string>();
-  for (const p in board.cards) byBasename.set(board.cards[p].basename, p);
-  const out: string[] = [];
-  for (const link of card.childLinks) {
-    const child = resolveLink(link, byBasename);
-    if (child && child !== path) out.push(child);
-  }
-  return out;
-}
-
-/** Cycle-safe depth-first collection of a card and all its descendants. */
-export function subtreePaths(board: Board, path: string, visited = new Set<string>()): string[] {
-  if (visited.has(path)) return [];
-  visited.add(path);
-  const out = [path];
-  for (const child of childPaths(board, path)) {
-    out.push(...subtreePaths(board, child, visited));
-  }
-  return out;
-}
-
 // ---------------------------------------------------------------------------
 // Drag reducer
 // ---------------------------------------------------------------------------
