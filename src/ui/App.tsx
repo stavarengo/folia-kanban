@@ -7,6 +7,7 @@ import { BoardActionsContext, RepoContext, type BoardActions } from "./context";
 import { Board } from "./Board";
 import { CardDetail } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
+import { Icon } from "./icons";
 import { cardMatches, EMPTY_FILTERS, type BoardFilters } from "./cardView";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
@@ -31,8 +32,17 @@ export function App({ repo, today }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
+  const [toast, setToast] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const toastTimer = useRef<number | null>(null);
   const todayValue = useMemo(() => today ?? dateOnly(), [today]);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2200);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
   // Latest board for stable callbacks — lets the actions object stay referentially stable
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
@@ -113,7 +123,10 @@ export function App({ repo, today }: Props) {
       open: (path) => setSelected(path),
       move: (path, columnId) => void moveTo(path, columnId),
       complete: (path) => {
-        if (doneColumnId) void moveTo(path, doneColumnId);
+        if (!doneColumnId) return;
+        const title = boardRef.current?.cards[path]?.basename ?? "Card";
+        void moveTo(path, doneColumnId);
+        showToast(`${title} — done!`);
       },
       remove: (path) => {
         void (async () => {
@@ -191,7 +204,7 @@ export function App({ repo, today }: Props) {
         void setColumnsAndReload([...b.config.columns, { id, title: t }]);
       },
     }),
-    [moveTo, doneColumnId, repo, load, setColumnsAndReload],
+    [moveTo, doneColumnId, repo, load, setColumnsAndReload, showToast],
   );
 
   const wipLimits = useMemo<Record<string, number>>(() => {
@@ -257,6 +270,12 @@ export function App({ repo, today }: Props) {
               />
             )}
           </div>
+          {toast && (
+            <div className="mdkb-toast" role="status" aria-live="polite">
+              <Icon name="check-circle" size={16} />
+              {toast}
+            </div>
+          )}
         </div>
       </BoardActionsContext.Provider>
     </RepoContext.Provider>

@@ -7,6 +7,15 @@ import { ColumnMenu } from "./ColumnMenu";
 import { Icon } from "./icons";
 import { cardMatches, hasActiveFilter, type BoardFilters } from "./cardView";
 
+// Stable per-column accent when the board hasn't assigned a color, so even a plain
+// `columns: [todo, doing, done]` board reads as colour-coded (easier to scan at a glance).
+const COLUMN_PALETTE = ["#4c9aff", "#8fd14f", "#ffab00", "#9c8cff", "#ff5c5c", "#57d9a3", "#f78fb3", "#9aa0a6"];
+function autoColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return COLUMN_PALETTE[h % COLUMN_PALETTE.length];
+}
+
 interface Props {
   column: ColumnDef;
   cardPaths: string[];
@@ -37,7 +46,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   const filtering = hasActiveFilter(filters);
   const paths = filtering ? allPaths.filter((p) => cardMatches(board.cards[p], today, filters)) : allPaths;
   const overLimit = wipLimit != null && allPaths.length > wipLimit;
-  const accent = column.color || "var(--interactive-accent)";
+  const accent = column.color || autoColor(column.id);
 
   return (
     <section

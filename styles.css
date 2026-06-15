@@ -59,11 +59,37 @@
   min-height: 0;
   background: var(--background-primary);
   font-size: var(--font-ui-small, 13px);
+  position: relative;
 }
 .mdkb-main {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* completion celebration */
+.mdkb-toast {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--mdkb-success);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--mdkb-shadow-overlay);
+  z-index: 50;
+  pointer-events: none;
+  animation: mdkb-toast-in 220ms var(--mdkb-ease);
+}
+@keyframes mdkb-toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
 /* ------------------------------------------------------------------ toolbar */
