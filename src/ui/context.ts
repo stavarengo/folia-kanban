@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type { CardRepository } from "../obsidian/repo";
-import type { ContextConfig } from "../model/types";
+import type { ColumnDef, ContextConfig } from "../model/types";
 import type { KanbanSettings } from "../settings";
 
 export const RepoContext = createContext<CardRepository | null>(null);
@@ -73,6 +73,12 @@ export interface BoardActions {
   renameColumn(id: string, title: string): void;
   setColumnColor(id: string, color: string | null): void;
   setColumnLimit(id: string, limit: number | null): void;
+  /**
+   * Patch any subset of a column's editable fields in one write (#8). The "Edit column" modal
+   * builds the full patch; renameColumn/setColumnColor/setColumnLimit remain for the inline menu.
+   * Routes through the same `setColumns` byte-stable path.
+   */
+  updateColumn(id: string, patch: Partial<ColumnDef>): void;
   moveColumn(id: string, dir: -1 | 1): void;
   deleteColumn(id: string): void;
   addColumn(title: string): void;

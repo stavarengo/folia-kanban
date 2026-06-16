@@ -1279,16 +1279,176 @@
   outline-offset: -2px;
 }
 
+/* ================================================================== col-config (#1,#6,#8,#10) */
+
+/* #6 — in-column grouping. A group heading (only rendered when grouped) reads as a quiet
+   section label; a single ungrouped group renders no heading, so a plain column is unchanged. */
+.mdkb-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mdkb-card-group + .mdkb-card-group {
+  margin-top: 4px;
+}
+.mdkb-card-group-heading {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint, var(--text-muted));
+  padding: 2px 2px 0;
+}
+
+/* #10 — per-column de-emphasis. opacity fades the resting column; on hover it reveals to
+   --mdkb-col-hover-opacity (default 1). The transition makes the reveal feel intentional. */
+.mdkb-column {
+  transition: opacity var(--mdkb-dur) var(--mdkb-ease), margin var(--mdkb-dur) var(--mdkb-ease);
+}
+.mdkb-column.is-faded {
+  opacity: var(--mdkb-col-opacity, 1);
+}
+.mdkb-column.is-faded:hover,
+.mdkb-column.is-faded:focus-within {
+  opacity: var(--mdkb-col-hover-opacity, 1);
+}
+/* #10 — parked: shove the column to the far right with a large left margin so a rabbit-hole
+   column hides off-screen. Flex `order` moves it visually last without reordering the board's
+   logical column array (which still drives Move-left/right + dnd). */
+.mdkb-column.is-parked {
+  order: 1;
+  margin-left: var(--mdkb-col-park-margin, 60vw);
+}
+
+/* #8 — Edit-column modal. A centered dialog over a dimming backdrop, portalled to <body>. */
+.mdkb-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  animation: mdkb-fade-in var(--mdkb-dur-fast) ease;
+}
+@keyframes mdkb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.mdkb-modal {
+  width: min(440px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--background-primary);
+  border: 1px solid var(--mdkb-border);
+  border-radius: var(--mdkb-r-lg);
+  box-shadow: var(--mdkb-shadow-pop);
+  animation: mdkb-pop var(--mdkb-dur-fast) var(--mdkb-ease);
+}
+.mdkb-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--mdkb-border);
+}
+.mdkb-modal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.mdkb-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.mdkb-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--mdkb-border);
+}
+.mdkb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mdkb-field-row {
+  display: flex;
+  gap: 12px;
+}
+.mdkb-field-row .mdkb-field {
+  flex: 1 1 0;
+}
+.mdkb-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint, var(--text-muted));
+}
+.mdkb-field-hint {
+  font-size: 11px;
+  color: var(--text-faint, var(--text-muted));
+}
+.mdkb-field input[type="text"],
+.mdkb-field input:not([type]),
+.mdkb-field input[type="number"],
+.mdkb-field select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--mdkb-border);
+  border-radius: var(--mdkb-r-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.mdkb-field input:focus,
+.mdkb-field select:focus {
+  outline: none;
+  border-color: var(--mdkb-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mdkb-accent) 30%, transparent);
+}
+.mdkb-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--mdkb-accent);
+}
+.mdkb-field-toggle {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
+}
+.mdkb-field-toggle input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--mdkb-accent);
+}
+.mdkb-field-toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mdkb-root *,
   .mdkb-detail,
   .mdkb-menu,
+  .mdkb-modal,
+  .mdkb-modal-backdrop,
   .mdkb-toast {
     transition-duration: 0.01ms !important;
   }
   /* No positional slide/scale for motion-sensitive users — these surfaces just appear. */
   .mdkb-detail,
   .mdkb-menu,
+  .mdkb-modal,
+  .mdkb-modal-backdrop,
   .mdkb-toast {
     animation: none !important;
   }

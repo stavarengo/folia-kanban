@@ -147,6 +147,53 @@ describe("round-trip: normalize(serialize(x)) is identity on the def shape", () 
   });
 });
 
+describe("updateColumn write path is byte-stable (#8 — the modal patch must not leak defaults)", () => {
+  // The exact patch ColumnEditModal.save() builds for a NO-OP save on a plain {id,title} column.
+  // FakeRepo.setColumns doesn't round-trip through serialize, so this guards the real risk: the
+  // editor sneaking an all-defaults patch that serializeColumns would still emit (invariant 5).
+  const noopPatch = {
+    title: "Todo",
+    color: undefined,
+    limit: undefined,
+    filter: undefined,
+    group: "none" as const,
+    sort: "manual" as const,
+    opacity: 1,
+    hoverOpacity: undefined,
+    parked: false,
+  };
+
+  it("a no-op save on a plain column serializes back to exactly {id,title}", () => {
+    const merged: ColumnDef = { id: "todo", ...noopPatch };
+    expect(serializeColumns([merged])).toEqual([{ id: "todo", title: "Todo" }]);
+  });
+
+  it("a no-op save round-trips to the original plain def (no key churn)", () => {
+    const original: ColumnDef = { id: "todo", title: "Todo" };
+    // updateColumn merges patch onto the existing def: { ...c, ...patch }. The patch wins.
+    const merged: ColumnDef = { id: original.id, ...noopPatch };
+    expect(normalizeColumns(serializeColumns([merged]))).toEqual([original]);
+  });
+
+  it("non-default edits persist exactly through the same write path", () => {
+    const merged: ColumnDef = {
+      id: "research",
+      title: "Research",
+      color: undefined,
+      limit: 3,
+      filter: "area:research status:todo",
+      group: "due",
+      sort: "priority",
+      opacity: 0.5,
+      hoverOpacity: 0.8,
+      parked: true,
+    };
+    expect(normalizeColumns(serializeColumns([merged]))).toEqual([
+      { id: "research", title: "Research", limit: 3, filter: "area:research status:todo", group: "due", sort: "priority", opacity: 0.5, hoverOpacity: 0.8, parked: true },
+    ]);
+  });
+});
+
 describe("titleCase", () => {
   it("turns ids into human titles", () => {
     expect(titleCase("in-progress")).toBe("In Progress");

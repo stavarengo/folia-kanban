@@ -1,7 +1,7 @@
 // Pure helpers that turn a card's data into the little chips shown on its board card.
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D) or a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones.
-import type { Card } from "../model/types";
+import type { Card, ColumnGroup, ColumnSort } from "../model/types";
 import type { IconName } from "./icons";
 
 export type ChipTone =
@@ -291,6 +291,115 @@ export function cardMatches(card: Card, today: string, f: BoardFilters, doneColu
     tokens: f.due ? [{ key: "due", value: f.due }] : [],
   };
   return matchCard(card, filter, { today, doneColumnId });
+}
+
+// ---------------------------------------------------------------------------
+// In-column grouping + sorting (#6). Pure, render-time transform over the cards a
+// column already holds (in board order). It lives here, not in `src/model/`, because
+// grouping reuses `dueInfo` and priority sorting reuses `priorityTone` — both UI-resident.
+// Defaults (`group: "none"`, `sort: "manual"`) reproduce today's flat, board-ordered list
+// 1:1, so an un-grouped/un-sorted column renders byte-identical to before.
+// ---------------------------------------------------------------------------
+
+/** One rendered group of cards: a heading key + label, plus the ordered cards in it. */
+export interface CardGroup {
+  /** Stable key for React + tests, e.g. a due-bucket id or "" for the single no-grouping group. */
+  key: string;
+  /** Human heading shown above the group (empty when ungrouped → no heading rendered). */
+  label: string;
+  cards: Card[];
+}
+
+// Higher number = higher urgency, so a descending sort floats the most pressing card up.
+const DUE_BUCKET_RANK: Record<DueUrgency, number> = { overdue: 4, today: 3, soon: 2, future: 1, done: 0 };
+// Lower number = higher priority (prio-1 is the strongest tone). "muted"/unknown sinks last.
+const PRIORITY_RANK: Record<ChipTone, number> = {
+  "prio-1": 0,
+  "prio-2": 1,
+  "prio-3": 2,
+  "prio-4": 3,
+  danger: 4,
+  warn: 4,
+  accent: 4,
+  muted: 5,
+};
+
+/** Urgency bucket of a card's due date (or "none" when it has no due date). */
+function dueBucket(card: Card, today: string, doneColumnId: string | null): DueUrgency | "none" {
+  const due = card.frontmatter.due;
+  if (typeof due !== "string" || due === "") return "none";
+  return dueInfo(due, today, card.frontmatter.status === doneColumnId).urgency;
+}
+
+const DUE_GROUP_ORDER: (DueUrgency | "none")[] = ["overdue", "today", "soon", "future", "none", "done"];
+const DUE_GROUP_LABEL: Record<DueUrgency | "none", string> = {
+  overdue: "Overdue",
+  today: "Today",
+  soon: "Soon",
+  future: "Later",
+  none: "No due date",
+  done: "Done",
+};
+
+function priorityRank(card: Card): number {
+  const p = card.frontmatter.priority;
+  return typeof p === "string" && p ? PRIORITY_RANK[priorityTone(p)] : PRIORITY_RANK.muted;
+}
+
+/**
+ * Stable comparator for a `sort` mode. Returns 0 for `manual` (callers must keep the input order,
+ * which is the board's fractional order). `priority`/`due` sort by urgency then fall back to the
+ * incoming index so equal-key cards keep their board order (a stable sort).
+ */
+function dueRank(card: Card, today: string, doneColumnId: string | null): number {
+  const b = dueBucket(card, today, doneColumnId);
+  return DUE_BUCKET_RANK[b === "none" ? "future" : b];
+}
+
+function sortCards(cards: Card[], sort: ColumnSort, today: string, doneColumnId: string | null): Card[] {
+  if (sort === "manual") return cards;
+  const ranked = cards.map((card, i) => ({ card, i }));
+  ranked.sort((a, b) => {
+    // priority: low rank first (prio-1 strongest). due: high rank first (overdue most pressing).
+    const d =
+      sort === "priority"
+        ? priorityRank(a.card) - priorityRank(b.card)
+        : dueRank(b.card, today, doneColumnId) - dueRank(a.card, today, doneColumnId);
+    return d !== 0 ? d : a.i - b.i; // stable: equal keys keep their incoming (board) order
+  });
+  return ranked.map((r) => r.card);
+}
+
+/**
+ * Group + sort a column's cards for rendering (#6). `cards` arrives in board order.
+ * - `group: "none"` → a single group (key/label "") so the column body renders a flat list.
+ * - `group: "due"`  → buckets by due urgency (Overdue/Today/Soon/Later/No due date/Done), each in a
+ *   fixed, scannable order; empty buckets are omitted.
+ * Within every group, `sort` orders the cards (`manual` keeps board order; stable for ties).
+ */
+export function groupAndSortCards(
+  cards: Card[],
+  group: ColumnGroup,
+  sort: ColumnSort,
+  today: string,
+  doneColumnId: string | null,
+): CardGroup[] {
+  if (group !== "due") {
+    return [{ key: "", label: "", cards: sortCards(cards, sort, today, doneColumnId) }];
+  }
+  const buckets = new Map<DueUrgency | "none", Card[]>();
+  for (const c of cards) {
+    const b = dueBucket(c, today, doneColumnId);
+    (buckets.get(b) ?? buckets.set(b, []).get(b)!).push(c);
+  }
+  const out: CardGroup[] = [];
+  for (const b of DUE_GROUP_ORDER) {
+    const inBucket = buckets.get(b);
+    if (inBucket && inBucket.length) {
+      out.push({ key: b, label: DUE_GROUP_LABEL[b], cards: sortCards(inBucket, sort, today, doneColumnId) });
+    }
+  }
+  return out;
 }
 
 export function cardChips(card: Card, today: string, doneColumnId: string | null): CardChip[] {

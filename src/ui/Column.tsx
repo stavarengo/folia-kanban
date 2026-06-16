@@ -1,12 +1,13 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { Board, ColumnDef } from "../model/types";
 import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
+import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
 import { useBoardActions, useSettings } from "./context";
-import { cardMatches, hasActiveFilter, type BoardFilters } from "./cardView";
+import { cardMatches, groupAndSortCards, hasActiveFilter, matchCard, parseFilter, type BoardFilters } from "./cardView";
 
 // Render a card's subtree of genuinely-nested children as a bordered group. Recursive: each child
 // renders a nested (non-sortable) CardItem and then, if it has its own children, its own group.
@@ -72,6 +73,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // 'detail' flow opens the create form in the detail panel; 'inline'/'inline-edit' use the composer.
@@ -88,17 +90,52 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   };
 
   const allPaths = cardPaths.filter((p) => board.cards[p]);
-  const filtering = hasActiveFilter(filters);
-  const paths = filtering ? allPaths.filter((p) => cardMatches(board.cards[p], today, filters, doneColumnId)) : allPaths;
+  const globalFiltering = hasActiveFilter(filters);
+  // #1 — a column-scoped filter rule auto-populates the lane: only top-level cards matching the
+  // rule render. ANDed with the global search filter. A column with no rule is byte-identical to
+  // before (columnFilter is null → the `.filter` step is skipped entirely).
+  const columnFilter = column.filter ? parseFilter(column.filter) : null;
+  const matchCtx = { today, doneColumnId };
+  let paths = allPaths;
+  if (columnFilter) paths = paths.filter((p) => matchCard(board.cards[p], columnFilter, matchCtx));
+  if (globalFiltering) paths = paths.filter((p) => cardMatches(board.cards[p], today, filters, doneColumnId));
+  const filtering = globalFiltering || columnFilter != null;
+
+  // #6 — group + sort the rendered cards. Defaults (none/manual) yield a single unlabeled group
+  // holding the cards in board order, so an un-configured column renders exactly as before.
+  const groups = groupAndSortCards(
+    paths.map((p) => board.cards[p]),
+    column.group ?? "none",
+    column.sort ?? "manual",
+    today,
+    doneColumnId,
+  );
+
+  // Flat list of rendered top-level paths in display order — the SortableContext item set (so dnd
+  // sortable identity matches what the user sees, even when grouped/sorted).
+  const orderedPaths = groups.flatMap((g) => g.cards.map((c) => c.path));
+
   const overLimit = wipLimit != null && allPaths.length > wipLimit;
   const accent = column.color || autoColor(column.id);
 
+  // #10 — de-emphasis. opacity fades the resting column; hoverOpacity reveals it on hover (default:
+  // reveal to full when faded). parked shoves the column to the far right (flex `order`) with a
+  // large left margin so a rabbit-hole column hides off-screen. All purely presentational.
+  const opacity = typeof column.opacity === "number" ? column.opacity : 1;
+  const faded = opacity < 1;
+  const parked = column.parked === true;
+  const style: Record<string, string | number> = { ["--mdkb-col-accent" as string]: accent };
+  if (faded) {
+    style["--mdkb-col-opacity"] = opacity;
+    style["--mdkb-col-hover-opacity"] = typeof column.hoverOpacity === "number" ? column.hoverOpacity : 1;
+  }
+
   return (
     <section
-      className={"mdkb-column" + (overLimit ? " is-over-limit" : "")}
+      className={"mdkb-column" + (overLimit ? " is-over-limit" : "") + (faded ? " is-faded" : "") + (parked ? " is-parked" : "")}
       data-testid="column"
       data-column={column.id}
-      style={{ ["--mdkb-col-accent" as string]: accent }}
+      style={style as CSSProperties}
     >
       <header className="mdkb-column-header">
         <span className="mdkb-column-dot" aria-hidden="true" />
@@ -134,15 +171,27 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
           <Icon name="more" size={16} />
         </button>
         {menuOpen && (
-          <ColumnMenu column={column} isFirst={isFirst} isLast={isLast} triggerRef={menuBtnRef} onClose={() => setMenuOpen(false)} />
+          <ColumnMenu
+            column={column}
+            isFirst={isFirst}
+            isLast={isLast}
+            triggerRef={menuBtnRef}
+            onClose={() => setMenuOpen(false)}
+            onEdit={() => setEditing(true)}
+          />
         )}
       </header>
       <div ref={setNodeRef} className={"mdkb-column-body" + (isOver ? " is-over" : "")}>
-        <SortableContext items={paths} strategy={verticalListSortingStrategy}>
-          {paths.map((p) => (
-            <div key={p} className="mdkb-card-tree">
-              <CardItem card={board.cards[p]} today={today} selected={p === selectedPath} />
-              <SubcardGroup parentPath={p} board={board} today={today} selectedPath={selectedPath} seen={new Set([p])} />
+        <SortableContext items={orderedPaths} strategy={verticalListSortingStrategy}>
+          {groups.map((g) => (
+            <div key={g.key || "_"} className="mdkb-card-group" data-group={g.key || undefined}>
+              {g.label && <div className="mdkb-card-group-heading">{g.label}</div>}
+              {g.cards.map((c) => (
+                <div key={c.path} className="mdkb-card-tree">
+                  <CardItem card={c} today={today} selected={c.path === selectedPath} />
+                  <SubcardGroup parentPath={c.path} board={board} today={today} selectedPath={selectedPath} seen={new Set([c.path])} />
+                </div>
+              ))}
             </div>
           ))}
         </SortableContext>
@@ -194,6 +243,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
           Add a card
         </button>
       )}
+      {editing && <ColumnEditModal column={column} onClose={() => setEditing(false)} />}
     </section>
   );
 }

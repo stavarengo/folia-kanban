@@ -14,9 +14,12 @@ interface Props {
   isLast: boolean;
   triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  /** Open the full "Edit column" modal (#8). The menu closes first so its outside-click teardown
+   *  doesn't race the modal — the modal's open-state lives in the parent Column, not here. */
+  onEdit: () => void;
 }
 
-export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose }: Props) {
+export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdit }: Props) {
   const a = useBoardActions();
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState(column.title);
@@ -125,6 +128,11 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose }: Pro
           onBlur={commitWip}
         />
       </label>
+
+      <div className="mdkb-menu-divider" />
+      <button className="mdkb-menu-item" onClick={() => { onClose(); onEdit(); }}>
+        <Icon name="pencil" size={14} /> Edit column…
+      </button>
 
       <div className="mdkb-menu-divider" />
       <button className="mdkb-menu-item" disabled={isFirst} onClick={() => { a.moveColumn(column.id, -1); onClose(); }}>

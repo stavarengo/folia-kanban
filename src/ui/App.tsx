@@ -303,6 +303,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const lim = limit == null || limit <= 0 ? undefined : Math.floor(limit);
         void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)));
       },
+      updateColumn: (id, patch) => {
+        const b = boardRef.current;
+        if (!b) return;
+        // Merge the patch onto the current def; serializeColumns then drops anything equal to its
+        // default (group:"none", sort:"manual", opacity:1, parked:false) or blank, so the write
+        // stays byte-stable. We pass the merged def straight through and let §2 do the pruning.
+        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+      },
       moveColumn: (id, dir) => {
         const b = boardRef.current;
         if (!b) return;

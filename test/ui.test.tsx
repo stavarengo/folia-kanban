@@ -588,6 +588,119 @@ describe("card context menu", () => {
   });
 });
 
+describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/parked)", () => {
+  const openColumnMenu = async (columnTitle: string) => {
+    const trigger = await screen.findByRole("button", { name: `Column options for ${columnTitle}` });
+    fireEvent.click(trigger);
+    return screen.findByRole("dialog", { name: `Column options: ${columnTitle}` });
+  };
+
+  it("the column menu has an Edit column entry that opens the full editor modal", async () => {
+    render_(makeRepo());
+    const menu = await openColumnMenu("Todo");
+    const user = userEvent.setup();
+    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
+    const modal = await screen.findByRole("dialog", { name: "Edit column: Todo" });
+    // Every editable ColumnDef property is present.
+    expect(within(modal).getByLabelText("Column title")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("WIP limit")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Filter rule")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Group by")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Sort by")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Opacity")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Park aside")).toBeInTheDocument();
+  });
+
+  it("saving the editor persists all fields via setColumns in one write", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const menu = await openColumnMenu("Todo");
+    const user = userEvent.setup();
+    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
+    const modal = await screen.findByRole("dialog", { name: "Edit column: Todo" });
+
+    const title = within(modal).getByLabelText("Column title") as HTMLInputElement;
+    await user.clear(title);
+    await user.type(title, "Backlog");
+    await user.type(within(modal).getByLabelText("Filter rule"), "area:home");
+    await user.selectOptions(within(modal).getByLabelText("Group by"), "due");
+    await user.selectOptions(within(modal).getByLabelText("Sort by"), "priority");
+    fireEvent.change(within(modal).getByLabelText("Opacity"), { target: { value: "0.5" } });
+    await user.click(within(modal).getByLabelText("Park aside"));
+    await user.click(within(modal).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const col = repo.config.columns.find((c) => c.id === "todo")!;
+      expect(col).toMatchObject({
+        id: "todo",
+        title: "Backlog",
+        filter: "area:home",
+        group: "due",
+        sort: "priority",
+        opacity: 0.5,
+        parked: true,
+      });
+    });
+    // The modal closes after saving.
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit column: Backlog" })).toBeNull());
+  });
+
+  it("an empty title is rejected (the editor stays open, no write)", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const menu = await openColumnMenu("Doing");
+    const user = userEvent.setup();
+    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
+    const modal = await screen.findByRole("dialog", { name: "Edit column: Doing" });
+    await user.clear(within(modal).getByLabelText("Column title"));
+    await user.click(within(modal).getByRole("button", { name: "Save" }));
+    // Still open; title unchanged in the repo.
+    expect(screen.getByRole("dialog", { name: "Edit column: Doing" })).toBeInTheDocument();
+    expect(repo.config.columns.find((c) => c.id === "doing")!.title).toBe("Doing");
+  });
+
+  it("#1 a column filter rule shows only matching cards (ANDs with nothing here)", async () => {
+    const repo = new FakeRepo(
+      { ...config, columns: [{ id: "todo", title: "Todo", filter: "area:home" }, { id: "done", title: "Done" }] },
+      {
+        "Tasks/Home.md": { fm: { type: "task", status: "todo", area: "home" }, body: "\n# Home\n" },
+        "Tasks/Work.md": { fm: { type: "task", status: "todo", area: "work" }, body: "\n# Work\n" },
+      },
+    );
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Home")).toBeInTheDocument();
+    expect(within(todoCol).queryByText("Work")).toBeNull();
+  });
+
+  it("#6 group:due renders bucket headings within the column", async () => {
+    const repo = new FakeRepo(
+      { ...config, columns: [{ id: "todo", title: "Todo", group: "due" }, { id: "done", title: "Done" }] },
+      {
+        "Tasks/Late.md": { fm: { type: "task", status: "todo", due: "2026-06-01" }, body: "\n# Late\n" },
+        "Tasks/Soon.md": { fm: { type: "task", status: "todo", due: "2026-06-13" }, body: "\n# Soon\n" },
+      },
+    );
+    render_(repo); // today=2026-06-13 → Late overdue, Soon today
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const headings = [...todoCol.querySelectorAll(".mdkb-card-group-heading")].map((h) => h.textContent);
+    expect(headings).toEqual(["Overdue", "Today"]);
+  });
+
+  it("#10 a faded + parked column gets the de-emphasis classes and CSS vars", async () => {
+    const repo = new FakeRepo(
+      { ...config, columns: [{ id: "todo", title: "Todo" }, { id: "rabbit", title: "Rabbit", opacity: 0.4, hoverOpacity: 0.8, parked: true }] },
+      { "Tasks/Solo.md": { fm: { type: "task", status: "todo" }, body: "\n# Solo\n" } },
+    );
+    render_(repo);
+    const rabbit = (await screen.findByText("Rabbit")).closest("section") as HTMLElement;
+    expect(rabbit).toHaveClass("is-faded");
+    expect(rabbit).toHaveClass("is-parked");
+    expect(rabbit.style.getPropertyValue("--mdkb-col-opacity")).toBe("0.4");
+    expect(rabbit.style.getPropertyValue("--mdkb-col-hover-opacity")).toBe("0.8");
+  });
+});
+
 describe("settings context", () => {
   it("exposes the provided settings via useSettings()", () => {
     function Probe() {

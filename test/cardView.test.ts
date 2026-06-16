@@ -8,6 +8,7 @@ import {
   matchQuery,
   isEmptyFilter,
   EMPTY_FILTER,
+  groupAndSortCards,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
 import type { Card } from "../src/model/types";
@@ -208,6 +209,74 @@ describe("matchCard", () => {
 
   it("matchQuery parses + matches in one call", () => {
     expect(matchQuery(card({ area: "research" }), "area:research", ctx)).toBe(true);
+  });
+});
+
+describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
+  const today = "2026-06-16";
+  const done = "done";
+  const names = (g: { cards: Card[] }) => g.cards.map((c) => c.basename);
+
+  it("defaults (none/manual) reproduce the flat input order in one unlabeled group", () => {
+    const cards = [card({}, "A"), card({}, "B"), card({}, "C")];
+    const out = groupAndSortCards(cards, "none", "manual", today, done);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ key: "", label: "" });
+    expect(names(out[0])).toEqual(["A", "B", "C"]);
+  });
+
+  it("sort: priority orders strongest-first and is stable for ties", () => {
+    const cards = [
+      card({ priority: "low" }, "Low1"),
+      card({ priority: "urgent" }, "Urg"),
+      card({}, "None"),
+      card({ priority: "low" }, "Low2"),
+      card({ priority: "medium" }, "Med"),
+    ];
+    const out = groupAndSortCards(cards, "none", "priority", today, done);
+    expect(names(out[0])).toEqual(["Urg", "Med", "Low1", "Low2", "None"]);
+  });
+
+  it("sort: due orders most-pressing-first; no-due cards rank as future", () => {
+    const cards = [
+      card({ due: "2026-06-20" }, "Future"),
+      card({ due: "2026-06-10" }, "Overdue"),
+      card({}, "NoDue"),
+      card({ due: "2026-06-16" }, "Today"),
+    ];
+    const out = groupAndSortCards(cards, "none", "due", today, done);
+    // overdue > today > future; NoDue ties with Future (both rank "future") and keeps board order.
+    expect(names(out[0])).toEqual(["Overdue", "Today", "Future", "NoDue"]);
+  });
+
+  it("group: due buckets cards in a fixed scannable order, omitting empty buckets", () => {
+    const cards = [
+      card({ due: "2026-06-20" }, "Later1"),
+      card({ due: "2026-06-10" }, "Over1"),
+      card({}, "NoDue1"),
+      card({ due: "2026-06-16" }, "Today1"),
+    ];
+    const out = groupAndSortCards(cards, "due", "manual", today, done);
+    expect(out.map((g) => g.key)).toEqual(["overdue", "today", "future", "none"]);
+    expect(out.map((g) => g.label)).toEqual(["Overdue", "Today", "Later", "No due date"]);
+    expect(names(out[0])).toEqual(["Over1"]);
+    expect(names(out[3])).toEqual(["NoDue1"]);
+  });
+
+  it("group + sort combine: each bucket is independently sorted", () => {
+    const cards = [
+      card({ due: "2026-06-10", priority: "low" }, "OverLow"),
+      card({ due: "2026-06-10", priority: "urgent" }, "OverUrg"),
+    ];
+    const out = groupAndSortCards(cards, "due", "priority", today, done);
+    expect(out).toHaveLength(1);
+    expect(names(out[0])).toEqual(["OverUrg", "OverLow"]);
+  });
+
+  it("a done card never lands in the overdue bucket (delegates to dueInfo)", () => {
+    const cards = [card({ due: "2026-06-10", status: "done" }, "Finished")];
+    const out = groupAndSortCards(cards, "due", "manual", today, done);
+    expect(out.map((g) => g.key)).toEqual(["done"]);
   });
 });
 
