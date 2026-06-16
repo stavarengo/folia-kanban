@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildBoard, columnEffectiveOrders, computeDropOrder, deriveContext, moveCard } from "../src/model/board";
-import type { BoardConfig, Card } from "../src/model/types";
+import { buildBoard, columnEffectiveOrders, computeDropOrder, deriveContext, moveCard, moveColumn } from "../src/model/board";
+import type { BoardConfig, Card, ColumnDef } from "../src/model/types";
 
 const config: BoardConfig = {
   path: "Board.md",
@@ -148,7 +148,6 @@ describe("moveCard mutation", () => {
   });
 });
 
-
 describe("deriveContext (#14)", () => {
   it("returns the immediate subfolder for a card nested under the card folder", () => {
     expect(deriveContext("Tasks", "Tasks/Acme/Foo.md")).toBe("Acme");
@@ -189,5 +188,52 @@ describe("buildBoard context derivation (#14)", () => {
     ]);
     expect(b.contexts).toEqual({});
     expect(b.cards["Tasks/B.md"].context).toBeUndefined();
+  });
+});
+
+describe("moveColumn", () => {
+  const cols: ColumnDef[] = [
+    { id: "todo", title: "Todo" },
+    { id: "doing", title: "Doing" },
+    { id: "done", title: "Done" },
+  ];
+  const ids = (c: ColumnDef[]) => c.map((x) => x.id);
+
+  it("moves a column left to the slot held by the target", () => {
+    expect(ids(moveColumn(cols, "done", "todo"))).toEqual(["done", "todo", "doing"]);
+  });
+
+  it("moves a column right to the slot held by the target", () => {
+    expect(ids(moveColumn(cols, "todo", "done"))).toEqual(["doing", "done", "todo"]);
+  });
+
+  it("swaps two adjacent columns", () => {
+    expect(ids(moveColumn(cols, "todo", "doing"))).toEqual(["doing", "todo", "done"]);
+  });
+
+  it("returns the input unchanged when dropped onto itself", () => {
+    expect(moveColumn(cols, "doing", "doing")).toBe(cols);
+  });
+
+  it("returns the input unchanged for an unknown active or over id", () => {
+    expect(moveColumn(cols, "ghost", "todo")).toBe(cols);
+    expect(moveColumn(cols, "todo", "ghost")).toBe(cols);
+  });
+
+  it("does not mutate the input array", () => {
+    const before = ids(cols);
+    moveColumn(cols, "done", "todo");
+    expect(ids(cols)).toEqual(before);
+  });
+
+  it("preserves the full ColumnDef (not just the id) when reordering", () => {
+    const rich: ColumnDef[] = [
+      { id: "a", title: "A", color: "#fff", limit: 3 },
+      { id: "b", title: "B" },
+    ];
+    expect(moveColumn(rich, "b", "a")).toEqual([
+      { id: "b", title: "B" },
+      { id: "a", title: "A", color: "#fff", limit: 3 },
+    ]);
   });
 });

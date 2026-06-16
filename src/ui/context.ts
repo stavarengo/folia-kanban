@@ -80,6 +80,8 @@ export interface BoardActions {
    */
   updateColumn(id: string, patch: Partial<ColumnDef>): void;
   moveColumn(id: string, dir: -1 | 1): void;
+  /** Reorder columns by dropping column `activeId` onto the slot held by `overId` (header drag). */
+  reorderColumns(activeId: string, overId: string): void;
   deleteColumn(id: string): void;
   addColumn(title: string): void;
 }

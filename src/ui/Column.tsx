@@ -1,6 +1,6 @@
-import { useRef, useState, type CSSProperties } from "react";
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Board, ColumnDef } from "../model/types";
 import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
@@ -67,14 +67,66 @@ interface Props {
 }
 
 export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filters, doneColumnId, isFirst, isLast, onAddCard }: Props) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  // The column is itself a sortable item (header drag-reorder, #2). Its sortable id IS column.id,
+  // which doubles as the body's droppable id — so a card dropped on this column still reports
+  // over.id === column.id and resolveDrop keeps bucketing card drops unchanged. (No separate
+  // useDroppable: that would register a second droppable under the same id and collide.)
+  const { setNodeRef, setActivatorNodeRef, listeners, attributes, transform, transition, isOver, isDragging } =
+    useSortable({ id: column.id });
   const settings = useSettings();
   const actions = useBoardActions();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
+  // colcfg #8 — the full "Edit column" modal (distinct from the #7 inline title `editing` below).
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Inline title edit (#7). A click on the title (no meaningful drag movement) enters edit mode;
+  // the ≥5px movement threshold that distinguishes drag from click is the dnd sensor's own
+  // activationConstraint (distance: 5) — once it fires, dnd takes the pointer and the click never
+  // arrives, so click === "did not drag". `justDragged` is a belt-and-braces guard against a
+  // trailing click some browsers synthesize after a completed drag.
+  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(column.title);
+  const justDragged = useRef(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isDragging) justDragged.current = true;
+  }, [isDragging]);
+
+  // Reset the draft if the column title changes underneath us (e.g. a rename from the menu).
+  useEffect(() => {
+    if (!editing) setTitleDraft(column.title);
+  }, [column.title, editing]);
+
+  const enterEdit = () => {
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    setTitleDraft(column.title);
+    setEditing(true);
+  };
+  const commitTitle = () => {
+    if (!editing) return;
+    const t = titleDraft.trim();
+    if (t && t !== column.title) actions.renameColumn(column.id, t);
+    setEditing(false);
+  };
+  const cancelEdit = () => {
+    setTitleDraft(column.title);
+    setEditing(false);
+  };
+
+  useEffect(() => {
+    if (editing) {
+      const el = titleInputRef.current;
+      el?.focus();
+      el?.select();
+    }
+  }, [editing]);
 
   // 'detail' flow opens the create form in the detail panel; 'inline'/'inline-edit' use the composer.
   const onAddClick = () => {
@@ -145,7 +197,13 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   const opacity = typeof column.opacity === "number" ? column.opacity : 1;
   const faded = opacity < 1;
   const parked = column.parked === true;
-  const style: Record<string, string | number> = { ["--mdkb-col-accent" as string]: accent };
+  const style: Record<string, string | number | undefined> = {
+    ["--mdkb-col-accent" as string]: accent,
+    // Header drag-reorder (#2): the sortable's live transform/transition move the column as it
+    // drags. `transition` is undefined when idle, which React simply omits.
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
   if (faded) {
     style["--mdkb-col-opacity"] = opacity;
     style["--mdkb-col-hover-opacity"] = typeof column.hoverOpacity === "number" ? column.hoverOpacity : 1;
@@ -153,14 +211,74 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
 
   return (
     <section
-      className={"mdkb-column" + (overLimit ? " is-over-limit" : "") + (faded ? " is-faded" : "") + (parked ? " is-parked" : "")}
+      // The column root IS the sortable node (header drag-reorder, #2) AND carries colcfg's #10
+      // de-emphasis. setNodeRef is the sortable's droppable ref too, so a card dropped on this
+      // column still reports over.id === column.id (no separate useDroppable).
+      ref={setNodeRef}
+      className={
+        "mdkb-column" +
+        (overLimit ? " is-over-limit" : "") +
+        (faded ? " is-faded" : "") +
+        (parked ? " is-parked" : "") +
+        (isDragging ? " is-dragging" : "")
+      }
       data-testid="column"
       data-column={column.id}
       style={style as CSSProperties}
     >
       <header className="mdkb-column-header">
         <span className="mdkb-column-dot" aria-hidden="true" />
-        <span className="mdkb-column-title">{column.title}</span>
+        {editing ? (
+          <input
+            ref={titleInputRef}
+            className="mdkb-column-title-input"
+            value={titleDraft}
+            aria-label={`Rename column ${column.title}`}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitTitle();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelEdit();
+              }
+            }}
+          />
+        ) : (
+          // ONE header DOM, two intents (§4): the title span is the drag handle (activator +
+          // listeners) AND the click target for inline edit. dnd's distance:5 sensor decides:
+          // ≥5px movement → drag (the click never fires); a clean click → enterEdit.
+          <span
+            ref={setActivatorNodeRef}
+            className="mdkb-column-title"
+            title="Drag to reorder, click to rename"
+            {...attributes}
+            {...listeners}
+            // Clear any stale post-drag guard at the very start of a fresh gesture, THEN hand the
+            // event to dnd's own pointerdown listener. If a real drag follows, the isDragging
+            // effect re-arms the flag; if it's a clean click, the flag stays false and the click
+            // enters edit. This prevents a suppressed trailing click from eating a later genuine one.
+            onPointerDown={(e) => {
+              justDragged.current = false;
+              listeners?.onPointerDown?.(e);
+            }}
+            onClick={enterEdit}
+            onKeyDown={(e) => {
+              // Keyboard affordance for rename (Enter/Space) — the drag listeners own Space for
+              // pickup, so only act on a key we add here without breaking the dnd keyboard sensor.
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setTitleDraft(column.title);
+                setEditing(true);
+              }
+            }}
+          >
+            {column.title}
+          </span>
+        )}
         <span
           className={"mdkb-column-count" + (overLimit ? " is-over-limit" : "")}
           title={
@@ -187,7 +305,13 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
           aria-label={`Column options for ${column.title}`}
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((o) => !o)}
+          // Keep the menu button out of the header's drag/edit gesture (§4.5): swallow the
+          // pointerdown so the column sortable never arms, and toggle the menu on click.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((o) => !o);
+          }}
         >
           <Icon name="more" size={16} />
         </button>
@@ -198,11 +322,14 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
             isLast={isLast}
             triggerRef={menuBtnRef}
             onClose={() => setMenuOpen(false)}
-            onEdit={() => setEditing(true)}
+            onEdit={() => setEditModalOpen(true)}
           />
         )}
       </header>
-      <div ref={setNodeRef} className={"mdkb-column-body" + (isOver ? " is-over" : "")}>
+      {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
+          card dropped anywhere on the column still reports over.id === column.id. `isOver` comes
+          from useSortable and still drives the body drop highlight. */}
+      <div className={"mdkb-column-body" + (isOver ? " is-over" : "")}>
         <SortableContext items={orderedPaths} strategy={verticalListSortingStrategy}>
           {groups.map((g) => (
             <div key={g.key || "_"} className="mdkb-card-group" data-group={g.key || undefined}>
@@ -264,7 +391,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
           Add a card
         </button>
       )}
-      {editing && <ColumnEditModal column={column} onClose={() => setEditing(false)} />}
+      {editModalOpen && <ColumnEditModal column={column} onClose={() => setEditModalOpen(false)} />}
     </section>
   );
 }

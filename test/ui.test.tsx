@@ -691,13 +691,13 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
       },
     );
     render_(repo);
-    const pipCol = (await screen.findByText("Research")).closest("section") as HTMLElement;
+    const researchCol = (await screen.findByText("Research")).closest("section") as HTMLElement;
     // Both research cards appear in the lane although neither has status == "research".
-    expect(within(pipCol).getByText("ResearchA")).toBeInTheDocument();
-    expect(within(pipCol).getByText("ResearchB")).toBeInTheDocument();
-    expect(within(pipCol).queryByText("Other")).toBeNull();
+    expect(within(researchCol).getByText("ResearchA")).toBeInTheDocument();
+    expect(within(researchCol).getByText("ResearchB")).toBeInTheDocument();
+    expect(within(researchCol).queryByText("Other")).toBeNull();
     // The lane badge counts the matched cards actually shown (2), not the (empty) "research" status bucket.
-    expect(within(pipCol).getByText("2", { selector: ".mdkb-column-count" })).toBeInTheDocument();
+    expect(within(researchCol).getByText("2", { selector: ".mdkb-column-count" })).toBeInTheDocument();
     // The pulled cards still ALSO render in their own status columns (no cross-column de-dupe).
     const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
     expect(within(todoCol).getByText("ResearchA")).toBeInTheDocument();
@@ -793,5 +793,83 @@ describe("context grouping marker (#14)", () => {
     // ...but with no color/label configured, neither the colored strip nor a chip renders.
     expect(b.querySelector(".mdkb-card-context")).toBeNull();
     expect(b.style.getPropertyValue("--mdkb-ctx-color")).toBe("");
+  });
+});
+
+describe("inline column-title edit (#7)", () => {
+  const user = userEvent.setup();
+
+  const titleSpan = (text: string) =>
+    screen.getByText(text, { selector: ".mdkb-column-title" });
+
+  it("clicking a column title swaps in an input seeded with the current title, selected", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    await user.click(titleSpan("Todo"));
+    const input = screen.getByLabelText("Rename column Todo") as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+    expect(input.value).toBe("Todo");
+    // Seeded text is selected so typing replaces it.
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe("Todo".length);
+  });
+
+  it("commits the rename on Enter (persists via setColumns) and re-renders the new title", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(titleSpan("Todo"));
+    const input = screen.getByLabelText("Rename column Todo");
+    await user.clear(input);
+    await user.type(input, "Backlog{Enter}");
+    expect(await screen.findByText("Backlog", { selector: ".mdkb-column-title" })).toBeInTheDocument();
+    expect(repo.config.columns.find((c) => c.id === "todo")?.title).toBe("Backlog");
+  });
+
+  it("commits the rename on blur", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(titleSpan("Doing"));
+    const input = screen.getByLabelText("Rename column Doing");
+    await user.clear(input);
+    await user.type(input, "In progress");
+    fireEvent.blur(input);
+    expect(await screen.findByText("In progress", { selector: ".mdkb-column-title" })).toBeInTheDocument();
+    expect(repo.config.columns.find((c) => c.id === "doing")?.title).toBe("In progress");
+  });
+
+  it("cancels on Escape: reverts to the old title with no write", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(titleSpan("Done"));
+    const input = screen.getByLabelText("Rename column Done");
+    await user.clear(input);
+    await user.type(input, "Shipped{Escape}");
+    expect(await screen.findByText("Done", { selector: ".mdkb-column-title" })).toBeInTheDocument();
+    expect(screen.queryByText("Shipped", { selector: ".mdkb-column-title" })).toBeNull();
+    expect(repo.config.columns.find((c) => c.id === "done")?.title).toBe("Done");
+  });
+
+  it("rejects an empty/whitespace title: keeps the old title, no write", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(titleSpan("Todo"));
+    const input = screen.getByLabelText("Rename column Todo");
+    await user.clear(input);
+    await user.type(input, "   {Enter}");
+    expect(await screen.findByText("Todo", { selector: ".mdkb-column-title" })).toBeInTheDocument();
+    expect(repo.config.columns.find((c) => c.id === "todo")?.title).toBe("Todo");
+  });
+
+  it("does not arm the inline editor when the column menu button is clicked", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    // The menu opens (its own Title field appears) and the header title stays a span, not an input.
+    expect(screen.getByLabelText("Rename column")).toBeInTheDocument(); // ColumnMenu's field
+    expect(screen.queryByLabelText("Rename column Todo")).toBeNull(); // inline editor not armed
   });
 });

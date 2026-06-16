@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
-import { columnOf, moveCard, resolveDrop } from "../model/board";
+import { columnOf, moveCard, moveColumn, resolveDrop } from "../model/board";
 import { dateOnly } from "../model/dates";
 import type { CardRepository } from "../obsidian/repo";
 import type { KanbanSettings } from "../settings";
@@ -320,6 +320,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         if (i < 0 || j < 0 || j >= cols.length) return;
         [cols[i], cols[j]] = [cols[j], cols[i]];
         void setColumnsAndReload(cols);
+      },
+      reorderColumns: (activeId, overId) => {
+        const b = boardRef.current;
+        if (!b) return;
+        const next = moveColumn(b.config.columns, activeId, overId);
+        if (next === b.config.columns) return; // no-op (same slot / unknown id)
+        void setColumnsAndReload(next);
       },
       deleteColumn: (id) => {
         const b = boardRef.current;

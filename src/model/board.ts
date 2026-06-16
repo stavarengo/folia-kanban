@@ -4,7 +4,7 @@
 // checklist links to it (`- [ ] [[Child]]`). We invert those links to derive parent-of and
 // the top-level set. No `parent` frontmatter, so re-parenting is one write and can't desync.
 
-import type { Board, BoardConfig, Card, CardFrontmatter, ContextConfig } from "./types";
+import type { Board, BoardConfig, Card, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
 
 /**
  * The context (#14) a card belongs to, derived purely from its path: the immediate subfolder of
@@ -172,6 +172,23 @@ export interface CardMutation {
 
 function columnTitle(config: BoardConfig, id: string): string {
   return config.columns.find((c) => c.id === id)?.title ?? id;
+}
+
+/**
+ * Reorder columns by moving the column `activeId` to the slot currently held by `overId`.
+ * Pure: returns a new array, leaving the input untouched. A drop onto itself, an unknown id,
+ * or a no-op move returns the original order (referentially the same array when nothing moves).
+ * Drives the header drag-reorder (#2); the menu's step-wise move stays a separate path.
+ */
+export function moveColumn(columns: ColumnDef[], activeId: string, overId: string): ColumnDef[] {
+  if (activeId === overId) return columns;
+  const from = columns.findIndex((c) => c.id === activeId);
+  const to = columns.findIndex((c) => c.id === overId);
+  if (from < 0 || to < 0 || from === to) return columns;
+  const next = columns.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
 }
 
 /** Column id that currently contains `path`, or null. */
