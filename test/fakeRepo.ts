@@ -188,6 +188,28 @@ export class FakeRepo implements CardRepository {
     this.files.delete(path);
   }
 
+  async renameCard(path: string, newTitle: string): Promise<string> {
+    const e = this.entry(path);
+    const base = sanitizeFilename(newTitle);
+    if (base === e.basename) return path; // unchanged after sanitize
+    const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    const prefix = folder ? `${folder}/` : "";
+    let dest = `${prefix}${base}.md`;
+    let n = 1;
+    while (this.files.has(dest) && dest !== path) dest = `${prefix}${base} ${n++}.md`;
+    if (dest === path) return path;
+    // Move the map entry under its new basename...
+    this.files.delete(path);
+    this.files.set(dest, { ...e, basename: base });
+    // ...and rewrite every inbound `[[OldBasename]]` wikilink so parentage follows (mirrors
+    // Obsidian's link-aware fileManager.renameFile, keeping buildBoard's `## Subtasks` graph correct).
+    const oldBase = e.basename;
+    for (const other of this.files.values()) {
+      other.body = rewriteWikilinks(other.body, oldBase, base);
+    }
+    return dest;
+  }
+
   async openCard(path: string): Promise<void> {
     this.opened.push(path);
   }
@@ -210,4 +232,23 @@ export class FakeRepo implements CardRepository {
 
 function basename(path: string): string {
   return path.split("/").pop()!.replace(/\.md$/i, "");
+}
+
+// Mirrors VaultRepository.sanitizeFilename so the fake derives the same basename for a rename.
+function sanitizeFilename(title: string): string {
+  return title.replace(/[\\/:*?"<>|#^[\]]/g, "").replace(/\s+/g, " ").trim() || "Untitled card";
+}
+
+/** Rewrite `[[old]]` / `[[old|alias]]` / `[[old#heading]]` wikilink targets to `new`, by basename. */
+function rewriteWikilinks(body: string, oldBase: string, newBase: string): string {
+  return body.replace(/\[\[([^\]]+)\]\]/g, (whole, inner: string) => {
+    const [targetAndHash, ...aliasParts] = inner.split("|");
+    const [target, hash] = targetAndHash.split("#", 2);
+    const t = target.trim();
+    const tBase = t.split("/").pop()!.replace(/\.md$/i, "");
+    if (tBase !== oldBase) return whole;
+    const folder = t.includes("/") ? t.slice(0, t.lastIndexOf("/") + 1) : "";
+    const rebuilt = folder + newBase + (hash !== undefined ? "#" + hash : "");
+    return `[[${rebuilt}${aliasParts.length ? "|" + aliasParts.join("|") : ""}]]`;
+  });
 }

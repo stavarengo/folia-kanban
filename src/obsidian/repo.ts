@@ -39,6 +39,13 @@ export interface CardRepository {
   addSubcard(parentPath: string, title: string): Promise<string>;
   /** Move a card's note to the trash. */
   deleteCard(path: string): Promise<void>;
+  /**
+   * Rename a card by renaming its `.md` file (the basename IS the board's card title). Goes
+   * through Obsidian's link-aware rename so every inbound `[[wikilink]]` (e.g. a parent's
+   * `## Subtasks` link) is rewritten to follow. Returns the card's new path. A blank/unchanged
+   * title is a no-op that returns the original path.
+   */
+  renameCard(path: string, newTitle: string): Promise<string>;
 
   /** Persist column definitions to the board note frontmatter. */
   setColumns(columns: ColumnDef[]): Promise<void>;

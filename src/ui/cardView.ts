@@ -89,6 +89,20 @@ export function dueInfo(due: string, today: string, done: boolean): DueInfo {
   return { label: due.slice(5), urgency: "future" }; // MM-DD for far-out dates
 }
 
+/**
+ * #3 card-level urgency cue. Returns the at-a-glance urgency bucket that should tint the WHOLE
+ * card, or null when no cue should show. Reuses `dueInfo` so it never diverges from the due chip
+ * or the `due:` filter: a done card and a far-future card both yield no cue. The render layer maps
+ * `overdue`/`today`/`soon` to a `data-urgency` attribute (styled in styles.css); `future`/`done`/
+ * no-date all return null so the card stays neutral (invariant 4: default = current behavior).
+ */
+export function cardUrgency(card: Card, today: string, doneColumnId: string | null): "overdue" | "today" | "soon" | null {
+  const due = card.frontmatter.due;
+  if (typeof due !== "string" || due === "") return null;
+  const u = dueInfo(due, today, card.frontmatter.status === doneColumnId).urgency;
+  return u === "overdue" || u === "today" || u === "soon" ? u : null;
+}
+
 export function tagValues(card: Card): string[] {
   const fm = card.frontmatter;
   const out: string[] = [];

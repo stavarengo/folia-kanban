@@ -21,10 +21,13 @@ interface Props {
   isDone: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** Enter inline title-rename on the card (#12). Single click can't trigger it — that opens the
+   *  detail — so the rename gesture lives here in the context menu (card owns it). */
+  onRename: () => void;
   onClose: () => void;
 }
 
-export function CardContextMenu({ target, path, priority, isDone, canMoveUp, canMoveDown, onClose }: Props) {
+export function CardContextMenu({ target, path, priority, isDone, canMoveUp, canMoveDown, onRename, onClose }: Props) {
   const a = useBoardActions();
   const ref = useRef<HTMLDivElement>(null);
   // True once an item was activated. On dismissal (Escape / outside-click) we restore focus to the
@@ -115,6 +118,7 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
       ) : (
         <>
           {item("Open details", "external-link", () => a.open(path))}
+          {item("Rename", "pencil", onRename)}
           {!isDone && item("Mark done", "check-circle", () => a.complete(path))}
           {item("Open note", "external-link", () => a.openNote(path))}
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   priorityTone,
   dueInfo,
+  cardUrgency,
   cardMatches,
   parseFilter,
   matchCard,
@@ -277,6 +278,25 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     const cards = [card({ due: "2026-06-10", status: "done" }, "Finished")];
     const out = groupAndSortCards(cards, "due", "manual", today, done);
     expect(out.map((g) => g.key)).toEqual(["done"]);
+  });
+});
+
+describe("cardUrgency (#3 card-level cue)", () => {
+  const today = "2026-06-16";
+  it("returns the urgency bucket for overdue / today / soon", () => {
+    expect(cardUrgency(card({ due: "2026-06-10" }), today, "done")).toBe("overdue");
+    expect(cardUrgency(card({ due: "2026-06-16" }), today, "done")).toBe("today");
+    expect(cardUrgency(card({ due: "2026-06-18" }), today, "done")).toBe("soon"); // in 2d
+  });
+  it("returns null for far-future, no due date, and unparseable dates", () => {
+    expect(cardUrgency(card({ due: "2026-07-30" }), today, "done")).toBeNull(); // > 7d out
+    expect(cardUrgency(card({}), today, "done")).toBeNull();
+    expect(cardUrgency(card({ due: "" }), today, "done")).toBeNull();
+  });
+  it("never cues a done card (mirrors the chip / due filter via dueInfo)", () => {
+    const finished = card({ due: "2026-06-10", status: "completed" });
+    expect(cardUrgency(finished, today, "completed")).toBeNull(); // resolved done column → no cue
+    expect(cardUrgency(finished, today, "done")).toBe("overdue"); // not the done column → overdue
   });
 });
 

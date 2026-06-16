@@ -1,8 +1,8 @@
-import { memo, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
-import { cardChips, priorityTone } from "./cardView";
+import { cardChips, cardUrgency, priorityTone } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
 import { useBoardActions, useContexts, useSettings } from "./context";
 import { Icon } from "./icons";
@@ -22,6 +22,9 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
   const { cardNextTodos } = useSettings();
   const [confirming, setConfirming] = useState(false);
   const [menu, setMenu] = useState<ContextTarget | null>(null);
+  // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
+  const [editing, setEditing] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   // Hooks can't be conditional, so always call useSortable — but disable it for nested children so
   // they aren't draggable and aren't registered as drop targets in the parent's SortableContext.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -42,9 +45,14 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
   const ctx = typeof card.context === "string" ? contexts[card.context] : undefined;
   const ctxColor = ctx?.color;
   const ctxLabel = ctx?.label;
+  // #3 card-level urgency cue (distinct from the due chip): tints the whole card as the due date
+  // nears, strongest when overdue. null = no cue (future / done / no date), keeping defaults neutral.
+  const urgency = cardUrgency(card, today, actions.doneColumnId);
 
   const allDone = !!stats && stats.checklist > 0 && stats.checklistDone === stats.checklist;
-  const showActions = !confirming;
+  // Hide the hover-action cluster while renaming: focus-within would otherwise reveal it over the
+  // full-width title <input> (which has no right gutter), letting buttons cover the caret/text.
+  const showActions = !confirming && editing == null;
   const canComplete = actions.doneColumnId != null && fm.status !== actions.doneColumnId;
 
   const open = () => {
@@ -73,6 +81,35 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
     (listeners as { onKeyDown?: (e: KeyboardEvent) => void } | undefined)?.onKeyDown?.(e);
   };
 
+  // #12 inline title edit. Entered via the right-click menu's "Rename" (a single title click can't
+  // trigger it — that opens the detail), which calls setEditing(basename) to swap in the <input>.
+  const commitEdit = () => {
+    if (editing == null) return;
+    const next = editing.trim();
+    // Rename only on a real change; empty/whitespace is rejected (revert). renameCard renames the
+    // .md file via the link-aware path so the board title (= basename) updates and wikilinks follow.
+    if (next && next !== card.basename) actions.renameCard(card.path, next);
+    setEditing(null);
+  };
+  const onEditKeyDown = (e: KeyboardEvent) => {
+    e.stopPropagation(); // keep typing (incl. Space) out of the dnd keyboard sensor
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditing(null); // cancel — no write
+    }
+  };
+  // Focus + select-all once the input mounts.
+  useEffect(() => {
+    if (editing != null) {
+      const el = titleInputRef.current;
+      el?.focus();
+      el?.select();
+    }
+  }, [editing != null]);
+
   return (
     <div
       ref={setNodeRef}
@@ -88,6 +125,7 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
       data-path={card.path}
       data-prio={prio ?? undefined}
       data-context={card.context ?? undefined}
+      data-urgency={urgency ?? undefined}
       onContextMenu={onContextMenu}
     >
       {/* #14 context grouping: a left accent strip, shown only when the context defines a color
@@ -104,7 +142,22 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
         aria-label={card.basename}
         aria-current={selected ? "true" : undefined}
       >
-        <div className="mdkb-card-title">{card.basename}</div>
+        {editing != null ? (
+          <input
+            ref={titleInputRef}
+            className="mdkb-card-title-input"
+            value={editing}
+            aria-label="Card title"
+            // Stop the parent's click/pointer/keyboard handlers (open, drag) from firing while editing.
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onChange={(e) => setEditing(e.target.value)}
+            onKeyDown={onEditKeyDown}
+            onBlur={commitEdit}
+          />
+        ) : (
+          <div className="mdkb-card-title">{card.basename}</div>
+        )}
         {(ctxLabel || chips.length > 0) && (
           <div className="mdkb-chips">
             {ctxLabel && (
@@ -245,6 +298,7 @@ function CardItemInner({ card, today, selected, nested = false }: Props) {
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
               canMoveDown={edges.canMoveDown}
+              onRename={() => setEditing(card.basename)}
               onClose={() => setMenu(null)}
             />
           );

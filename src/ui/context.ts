@@ -58,6 +58,11 @@ export interface BoardActions {
   openNote(path: string): void;
   /** Set a card's priority frontmatter (empty string clears it). */
   setPriority(path: string, value: string): void;
+  /**
+   * Rename a card in place (#12): renames the `.md` file (the board's card title is the basename),
+   * link-aware so inbound wikilinks follow. No-op for a blank/unchanged title.
+   */
+  renameCard(path: string, title: string): void;
   /** Reorder a card one step within its current column (-1 up, +1 down); a no-op at the edges. */
   moveWithinColumn(path: string, dir: -1 | 1): void;
   /** Whether the card can move up/down within its column (false at the respective edge). */

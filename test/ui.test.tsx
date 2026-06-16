@@ -385,6 +385,89 @@ describe("creating cards", () => {
   });
 });
 
+describe("inline card title edit (#12)", () => {
+  // Enter inline edit via the right-click menu's "Rename" (single click opens the detail, so the
+  // rename gesture lives in the context menu). Returns the live <input>.
+  const startRename = async (user: ReturnType<typeof userEvent.setup>, scope: HTMLElement, cardName: string) => {
+    const card = (within(scope).getAllByText(cardName)[0]).closest(".mdkb-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector(".mdkb-card-title")!);
+    await user.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rename/ }));
+    return within(scope).getByLabelText("Card title") as HTMLInputElement;
+  };
+
+  it("renames the card file (basename) via renameCard, link-aware, and the board label follows", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const input = await startRename(user, todoCol, "Alpha");
+    expect(input.value).toBe("Alpha");
+    await user.clear(input);
+    await user.type(input, "Renamed Alpha{Enter}");
+    // The file was renamed (basename is the source of truth for the board title).
+    expect(await within(todoCol).findByText("Renamed Alpha")).toBeInTheDocument();
+    expect(repo.files.has("Tasks/Renamed Alpha.md")).toBe(true);
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
+  });
+
+  it("keeps subcard parentage after a rename by rewriting inbound wikilinks", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    // Beta is a subcard of Alpha (Alpha's ## Subtasks links [[Beta]]). Rename Beta.
+    const input = await startRename(user, todoCol, "Beta");
+    await user.clear(input);
+    await user.type(input, "Beta Renamed{Enter}");
+    // Beta still nests under Alpha (the parent's wikilink was rewritten), not surfaced top-level.
+    const alphaTree = (await within(todoCol).findByText("Alpha")).closest(".mdkb-card-tree") as HTMLElement;
+    const group = alphaTree.querySelector(".mdkb-subcard-group") as HTMLElement;
+    expect(within(group).getByText("Beta Renamed")).toBeInTheDocument();
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("[[Beta Renamed]]");
+  });
+
+  it("Escape cancels with no write; an empty/whitespace title is rejected", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    // Escape → revert, no rename.
+    const input1 = await startRename(user, todoCol, "Alpha");
+    await user.type(input1, "ignored{Escape}");
+    expect(within(todoCol).getByText("Alpha")).toBeInTheDocument();
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(true);
+    // Empty title → rejected (revert to old name), no rename.
+    const input2 = await startRename(user, todoCol, "Alpha");
+    await user.clear(input2);
+    await user.type(input2, "{Enter}");
+    expect(await within(todoCol).findByText("Alpha")).toBeInTheDocument();
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(true);
+  });
+});
+
+describe("urgency cue (#3)", () => {
+  it("marks overdue / today / soon cards with data-urgency and leaves others neutral", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Over.md": { fm: { type: "task", status: "todo", due: "2026-06-10" }, body: "\n# Over\n" },
+      "Tasks/Now.md": { fm: { type: "task", status: "todo", due: "2026-06-13" }, body: "\n# Now\n" },
+      "Tasks/Soon.md": { fm: { type: "task", status: "todo", due: "2026-06-15" }, body: "\n# Soon\n" },
+      "Tasks/Far.md": { fm: { type: "task", status: "todo", due: "2026-12-01" }, body: "\n# Far\n" },
+      "Tasks/Plain.md": { fm: { type: "task", status: "todo" }, body: "\n# Plain\n" },
+      "Tasks/Finished.md": { fm: { type: "task", status: "done", due: "2026-06-10" }, body: "\n# Finished\n" },
+    });
+    render_(repo); // today = 2026-06-13
+    await screen.findByText("Over");
+    const cardOf = (name: string) => screen.getByText(name).closest(".mdkb-card") as HTMLElement;
+    expect(cardOf("Over").dataset.urgency).toBe("overdue");
+    expect(cardOf("Now").dataset.urgency).toBe("today");
+    expect(cardOf("Soon").dataset.urgency).toBe("soon");
+    expect(cardOf("Far").dataset.urgency).toBeUndefined();
+    expect(cardOf("Plain").dataset.urgency).toBeUndefined();
+    // A done card carries no urgency cue (mirrors "no cue when done").
+    expect(cardOf("Finished").dataset.urgency).toBeUndefined();
+  });
+});
+
 describe("live reload", () => {
   it("reflects an external change after onChange fires", async () => {
     const repo = makeRepo();
@@ -489,6 +572,7 @@ describe("card context menu", () => {
   it("opens a card menu with the expected items on right-click", async () => {
     const { menu } = await openCardMenu("First");
     expect(within(menu).getByRole("menuitem", { name: /Open details/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Rename/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Mark done/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Open note/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Move up/ })).toBeInTheDocument();

@@ -550,6 +550,35 @@
 .mdkb-card[data-prio="prio-3"]::before { background: var(--mdkb-prio-3); }
 .mdkb-card[data-prio="prio-4"]::before { background: var(--mdkb-prio-4); }
 
+/* #3 urgency cue — a whole-card, at-a-glance signal that intensifies as the due date nears
+   (strongest when overdue), for fast visual scanning. It is distinct from the easy-to-miss due chip.
+   Edge allocation (BATCH2-CONTRACT §6): priority owns the left strip (::before), the future #14
+   context marker owns the left edge too — so urgency takes the TOP edge + a faint background tint,
+   keeping the three signals on three non-colliding treatments. No `future`/`done`/no-date cue
+   (those carry no data-urgency), so default cards stay neutral. */
+   Drawn entirely via `background` (a 3px top accent band + a flat tint) layered over the card bg, so
+   it adds NO layout shift and never fights the card's border/box-shadow (which toggle on hover/drag). */
+.mdkb-card[data-urgency] {
+  background:
+    /* top accent band */
+    linear-gradient(var(--mdkb-urgency-color), var(--mdkb-urgency-color)) top / 100% 3px no-repeat,
+    /* flat background tint over the whole card */
+    linear-gradient(var(--mdkb-urgency-tint, transparent), var(--mdkb-urgency-tint, transparent)),
+    var(--mdkb-card-bg);
+}
+.mdkb-card[data-urgency="overdue"] {
+  --mdkb-urgency-color: var(--mdkb-danger);
+  --mdkb-urgency-tint: color-mix(in srgb, var(--mdkb-danger) 10%, transparent);
+}
+.mdkb-card[data-urgency="today"] {
+  --mdkb-urgency-color: var(--mdkb-prio-2);
+  --mdkb-urgency-tint: color-mix(in srgb, var(--mdkb-prio-2) 9%, transparent);
+}
+.mdkb-card[data-urgency="soon"] {
+  /* medium: amber top band, no background tint */
+  --mdkb-urgency-color: var(--mdkb-prio-2);
+}
+
 .mdkb-card:hover {
   border-color: var(--mdkb-border-strong);
   box-shadow: var(--mdkb-shadow-card-hover);
@@ -590,10 +619,29 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  /* Permanent gutter clears the (up to 3-button) hover action cluster: 3×26px buttons + 2×1px gaps
-     + 4px container padding + 6px right offset = 90px, plus 2px breathing space. A permanent reserve
-     (vs. only on hover) keeps the layout from jumping when the cluster appears. */
+  /* #11 full-width title + right gutter: the title text uses the FULL card width, and a permanent
+     right gutter clears the (up to 3-button) hover action cluster so the buttons never overlap the
+     first line: 3×26px buttons + 2×1px gaps + 4px container padding + 6px right offset = 90px, plus
+     2px breathing space. A permanent reserve (vs. only on hover) keeps the layout from jumping when
+     the cluster appears. */
   padding-right: 92px;
+}
+
+/* #12 inline title edit — the <input> that replaces the title in place. Inherits the title's
+   metrics so swapping in/out doesn't shift the card; keeps the same right gutter as the title. */
+.mdkb-card-title-input {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  width: 100%;
+  margin: 0;
+  padding: 1px 4px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--mdkb-accent);
+  border-radius: var(--mdkb-r-sm);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mdkb-accent) 25%, transparent);
 }
 
 /* ------------------------------------------------------------ subcard groups

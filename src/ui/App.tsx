@@ -231,6 +231,22 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           }
         })();
       },
+      renameCard: (path, title) => {
+        const t = title.trim();
+        if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
+        void (async () => {
+          try {
+            const newPath = await repo.renameCard(path, t);
+            // The board's card title IS the basename, so a rename can change the path. If the
+            // renamed card was selected, follow it to its new path so the detail/selection holds.
+            if (newPath !== path) setSelected((cur) => (cur === path ? newPath : cur));
+          } catch (e) {
+            reportError(e);
+          } finally {
+            await load();
+          }
+        })();
+      },
       moveWithinColumn: (path, dir) => {
         const b = boardRef.current;
         if (!b) return;

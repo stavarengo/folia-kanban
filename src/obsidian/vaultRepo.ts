@@ -259,6 +259,20 @@ export class VaultRepository implements CardRepository {
     await this.app.fileManager.trashFile(this.file(path));
   }
 
+  async renameCard(path: string, newTitle: string): Promise<string> {
+    const file = this.file(path);
+    const base = sanitizeFilename(newTitle);
+    if (base === file.basename) return path; // unchanged (after sanitize) — no write
+    const folder = file.parent?.path ?? "";
+    const dest = await this.uniquePath(folder === "/" ? "" : folder, base);
+    if (dest === path) return path;
+    this.markWrite(path);
+    this.markWrite(dest);
+    // fileManager.renameFile rewrites inbound [[links]] (the parent's ## Subtasks link survives).
+    await this.app.fileManager.renameFile(file, dest);
+    return dest;
+  }
+
   async openCard(path: string): Promise<void> {
     await this.app.workspace.getLeaf(false).openFile(this.file(path));
   }
