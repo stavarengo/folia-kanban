@@ -10,6 +10,8 @@ import {
   isEmptyFilter,
   EMPTY_FILTER,
   groupAndSortCards,
+  hasToken,
+  toggleToken,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
 import type { Card } from "../src/model/types";
@@ -297,6 +299,42 @@ describe("cardUrgency (#3 card-level cue)", () => {
     const finished = card({ due: "2026-06-10", status: "completed" });
     expect(cardUrgency(finished, today, "completed")).toBeNull(); // resolved done column → no cue
     expect(cardUrgency(finished, today, "done")).toBe("overdue"); // not the done column → overdue
+  });
+});
+
+describe("toggleToken / hasToken (search-as-single-source chips)", () => {
+  it("hasToken detects a present token case-insensitively", () => {
+    expect(hasToken("due:overdue", "due", "overdue")).toBe(true);
+    expect(hasToken("DUE:OVERDUE", "due", "overdue")).toBe(true);
+    expect(hasToken("area:garden-prep due:soon", "due", "soon")).toBe(true);
+    expect(hasToken("area:garden-prep", "due", "soon")).toBe(false);
+    // a substring is not a token match
+    expect(hasToken("urgent", "due", "overdue")).toBe(false);
+  });
+
+  it("appends the token when absent, onto an empty or non-empty query", () => {
+    expect(toggleToken("", "due", "overdue")).toBe("due:overdue");
+    expect(toggleToken("area:garden-prep", "due", "soon")).toBe("area:garden-prep due:soon");
+    expect(toggleToken("buy milk", "due", "overdue")).toBe("buy milk due:overdue");
+  });
+
+  it("removes the token when present, leaving the rest intact (no double spaces)", () => {
+    expect(toggleToken("due:overdue", "due", "overdue")).toBe("");
+    expect(toggleToken("area:garden-prep due:soon", "due", "soon")).toBe("area:garden-prep");
+    expect(toggleToken("due:soon area:garden-prep", "due", "soon")).toBe("area:garden-prep");
+    expect(toggleToken("a due:overdue b", "due", "overdue")).toBe("a b");
+  });
+
+  it("does not clip inside another term that merely contains the value", () => {
+    // "overdueish" is a free-text term, not the due:overdue token — toggling appends, not edits.
+    expect(toggleToken("overdueish", "due", "overdue")).toBe("overdueish due:overdue");
+  });
+
+  it("round-trips: toggle on then off returns to the original trimmed query", () => {
+    const q = "area:garden-prep urgent";
+    const on = toggleToken(q, "due", "overdue");
+    expect(hasToken(on, "due", "overdue")).toBe(true);
+    expect(toggleToken(on, "due", "overdue")).toBe(q);
   });
 });
 

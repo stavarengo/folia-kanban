@@ -10,7 +10,7 @@ import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
-import { cardMatches, EMPTY_FILTERS, type BoardFilters } from "./cardView";
+import { matchCard, parseFilter } from "./cardView";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
 
@@ -61,7 +61,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
   const [focusAddSubcard, setFocusAddSubcard] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
+  // #9: the search input is the SINGLE source of truth for board filtering. The board's active
+  // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
+  const [query, setQuery] = useState("");
   const [toast, setToast] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -398,21 +400,25 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const contextsKey = JSON.stringify(contextsValue);
   const stableContexts = useMemo(() => contextsValue, [contextsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Parse the query once per change; Board/Column filter with this same parsed §1 Filter.
+  const filter = useMemo(() => parseFilter(query), [query]);
+
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
     if (board) {
+      const ctx = { today: todayValue, doneColumnId };
       for (const col of board.config.columns) {
         for (const p of board.columns[col.id] ?? []) {
           const c = board.cards[p];
           if (!c) continue;
           total++;
-          if (cardMatches(c, todayValue, filters, doneColumnId)) match++;
+          if (matchCard(c, filter, ctx)) match++;
         }
       }
     }
     return { total, match };
-  }, [board, filters, todayValue, doneColumnId]);
+  }, [board, filter, todayValue, doneColumnId]);
 
   // "/" focuses search (when not already typing in a field).
   const onRootKeyDown = (e: KeyboardEvent) => {
@@ -482,14 +488,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             <ContextsContext.Provider value={stableContexts}>
             {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
             <div className="mdkb-root" ref={rootRef} onKeyDown={onRootKeyDown}>
-              <Toolbar ref={searchRef} filters={filters} onChange={setFilters} matchCount={counts.match} totalCount={counts.total} />
+              <Toolbar ref={searchRef} query={query} onChange={setQuery} matchCount={counts.match} totalCount={counts.total} />
               <div className="mdkb-main">
                 <Board
                   board={board}
                   today={todayValue}
                   selectedPath={selected}
                   wipLimits={wipLimits}
-                  filters={filters}
+                  filter={filter}
                   doneColumnId={doneColumnId}
                   onMove={onMove}
                   onAddCard={onAddCard}

@@ -881,6 +881,88 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
   });
 });
 
+describe("search filter (single source of truth)", () => {
+  it("free-text in the search box filters the board's cards", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards");
+    await user.type(search, "alpha");
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Alpha")).toBeInTheDocument();
+    // Gamma is in Doing and doesn't match "alpha" → filtered out.
+    const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
+    expect(within(doingCol).queryByText("Gamma")).toBeNull();
+    // match count reflects the filtered set
+    expect(screen.getByText(/of/, { selector: ".mdkb-toolbar-status span" })).toHaveTextContent("1 of");
+  });
+
+  it("the Overdue chip populates the input with due:overdue and filters to overdue cards", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    await user.click(screen.getByRole("button", { name: "Overdue" }));
+    // The chip wrote the token into the one source of truth — the search input.
+    expect(screen.getByLabelText("Search cards")).toHaveValue("due:overdue");
+    // Gamma (due 2026-06-01, today 2026-06-13) is overdue → kept; Alpha (no due) → filtered out.
+    const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
+    expect(within(doingCol).getByText("Gamma")).toBeInTheDocument();
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).queryByText("Alpha")).toBeNull();
+  });
+
+  it("clicking an active chip again removes its token from the input (toggle)", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    const chip = screen.getByRole("button", { name: "Overdue" });
+    await user.click(chip);
+    expect(screen.getByLabelText("Search cards")).toHaveValue("due:overdue");
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    await user.click(chip);
+    expect(screen.getByLabelText("Search cards")).toHaveValue("");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    // back to unfiltered: Alpha is visible again
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Alpha")).toBeInTheDocument();
+  });
+
+  it("a typed key:value token filters via the §1 grammar", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    await user.type(screen.getByLabelText("Search cards"), "area:home");
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Alpha")).toBeInTheDocument(); // area=home
+    const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
+    expect(within(doingCol).queryByText("Gamma")).toBeNull(); // no area
+  });
+
+  it("offers filter-key autocomplete and inserting a key fills the input", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards");
+    await user.type(search, "ar");
+    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
+    const option = within(list).getByRole("option", { name: /area:/ });
+    await user.click(option);
+    expect(search).toHaveValue("area:");
+  });
+
+  it("suggests due: values once a due token is being typed", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards");
+    await user.type(search, "due:o");
+    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
+    expect(within(list).getByRole("option", { name: /due:overdue/ })).toBeInTheDocument();
+    await user.click(within(list).getByRole("option", { name: /due:overdue/ }));
+    expect(search).toHaveValue("due:overdue ");
+  });
+});
+
 describe("settings context", () => {
   it("exposes the provided settings via useSettings()", () => {
     function Probe() {

@@ -8,7 +8,7 @@ import { ColumnMenu } from "./ColumnMenu";
 import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
 import { useBoardActions, useSettings } from "./context";
-import { cardMatches, groupAndSortCards, hasActiveFilter, matchCard, parseFilter, type BoardFilters } from "./cardView";
+import { groupAndSortCards, isEmptyFilter, matchCard, parseFilter, type Filter } from "./cardView";
 
 // Render a card's subtree of genuinely-nested children as a bordered group. Recursive: each child
 // renders a nested (non-sortable) CardItem and then, if it has its own children, its own group.
@@ -60,14 +60,14 @@ interface Props {
   today: string;
   selectedPath: string | null;
   wipLimit?: number;
-  filters: BoardFilters;
+  filter: Filter;
   doneColumnId: string | null;
   isFirst: boolean;
   isLast: boolean;
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filters, doneColumnId, isFirst, isLast, onAddCard }: Props) {
+export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filter, doneColumnId, isFirst, isLast, onAddCard }: Props) {
   // The column is itself a sortable item (header drag-reorder, #2). Its sortable id IS column.id,
   // which doubles as the body's droppable id — so a card dropped on this column still reports
   // over.id === column.id and resolveDrop keeps bucketing card drops unchanged. (No separate
@@ -143,7 +143,8 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   };
 
   const allPaths = cardPaths.filter((p) => board.cards[p]);
-  const globalFiltering = hasActiveFilter(filters);
+  // #9: the global search is the single source of truth — a parsed §1 Filter (empty = no filtering).
+  const globalFiltering = !isEmptyFilter(filter);
   const columnFilter = column.filter ? parseFilter(column.filter) : null;
   const matchCtx = { today, doneColumnId };
 
@@ -161,9 +162,10 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   const lanePaths = columnFilter
     ? topLevelPaths.filter((p) => matchCard(board.cards[p], columnFilter, matchCtx))
     : allPaths;
-  // The rendered set additionally ANDs the global search filter on top of the lane.
+  // The rendered set additionally ANDs the global search filter (parsed §1 Filter) on top of the
+  // lane — net per column: (lane-pull OR status-bucket) AND (empty global OR global matchCard).
   let paths = lanePaths;
-  if (globalFiltering) paths = paths.filter((p) => cardMatches(board.cards[p], today, filters, doneColumnId));
+  if (globalFiltering) paths = paths.filter((p) => matchCard(board.cards[p], filter, matchCtx));
   const filtering = globalFiltering || columnFilter != null;
 
   // Count + WIP reflect the lane's matched cards for a filter-lane (#1.4), the status bucket otherwise.

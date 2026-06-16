@@ -18,7 +18,7 @@ import { planDrop, splitCardDragId } from "../model/board";
 import { Column } from "./Column";
 import { AddColumn } from "./AddColumn";
 import { useBoardActions, useSettings } from "./context";
-import { cardChips, priorityTone, type BoardFilters } from "./cardView";
+import { cardChips, priorityTone, type Filter } from "./cardView";
 
 // The pan gesture and the card-drag sensor share the same pointer, so exactly one must claim a given
 // press. The live pan mode (settings.boardPan) decides which — but dnd-kit instantiates the sensor
@@ -49,13 +49,13 @@ interface Props {
   today: string;
   selectedPath: string | null;
   wipLimits: Record<string, number>;
-  filters: BoardFilters;
+  filter: Filter;
   doneColumnId: string | null;
   onMove: (activeId: string, overId: string) => void;
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Board({ board, today, selectedPath, wipLimits, filters, doneColumnId, onMove, onAddCard }: Props) {
+export function Board({ board, today, selectedPath, wipLimits, filter, doneColumnId, onMove, onAddCard }: Props) {
   const actions = useBoardActions();
   const { boardPan } = useSettings();
   // Keep the module-scoped ref the sensor (and the pan handler below) reads in sync with the live
@@ -248,7 +248,7 @@ export function Board({ board, today, selectedPath, wipLimits, filters, doneColu
               today={today}
               selectedPath={selectedPath}
               wipLimit={wipLimits[col.id]}
-              filters={filters}
+              filter={filter}
               doneColumnId={doneColumnId}
               isFirst={i === 0}
               isLast={i === board.config.columns.length - 1}

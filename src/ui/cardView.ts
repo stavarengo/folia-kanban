@@ -292,6 +292,37 @@ export function matchQuery(card: Card, query: string, ctx: MatchContext): boolea
   return matchCard(card, parseFilter(query), ctx);
 }
 
+/** True when the query already carries the exact `key:value` token (case-insensitive). */
+export function hasToken(query: string, key: FilterKey, value: string): boolean {
+  const want = value.toLowerCase();
+  return parseFilter(query).tokens.some((t) => t.key === key && t.value === want);
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Toggle a simple (space-free) `key:value` token in a raw query string, treating the search input
+ * as the single source of truth (#9). Used by the preset chips so they hold no state of their own —
+ * clicking a chip just edits the one query string. When the token is already present it is removed
+ * (every OTHER term is left byte-for-byte intact, including quoted phrases — only the toggled token
+ * and its surrounding whitespace are touched); when absent it is appended.
+ *
+ * Only call this with values that contain no spaces (the chips use `due:overdue` / `due:soon`).
+ */
+export function toggleToken(query: string, key: FilterKey, value: string): string {
+  const want = value.toLowerCase();
+  // Match the whole-word token (case-insensitive key & value) with any flanking whitespace, so
+  // removing it doesn't leave a double space. \S-anchored so we never clip inside another term.
+  const re = new RegExp(`(^|\\s)${escapeRegExp(key)}:${escapeRegExp(want)}(?=\\s|$)`, "i");
+  if (hasToken(query, key, value)) {
+    return query.replace(re, "").replace(/\s{2,}/g, " ").trim();
+  }
+  const base = query.trim();
+  return base ? `${base} ${key}:${want}` : `${key}:${want}`;
+}
+
 /**
  * Pure predicate: does a card pass the legacy search text + due filter?
  * Preserved as a thin superset over `matchCard`. The legacy `text` is treated as ONE free-text
