@@ -91,15 +91,35 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
 
   const allPaths = cardPaths.filter((p) => board.cards[p]);
   const globalFiltering = hasActiveFilter(filters);
-  // #1 — a column-scoped filter rule auto-populates the lane: only top-level cards matching the
-  // rule render. ANDed with the global search filter. A column with no rule is byte-identical to
-  // before (columnFilter is null → the `.filter` step is skipped entirely).
   const columnFilter = column.filter ? parseFilter(column.filter) : null;
   const matchCtx = { today, doneColumnId };
-  let paths = allPaths;
-  if (columnFilter) paths = paths.filter((p) => matchCard(board.cards[p], columnFilter, matchCtx));
+
+  // #1 — an area-filtered column is an AUTO-POPULATED LANE, not a within-status filter. When a
+  // column carries a non-empty `filter` rule it pulls EVERY top-level card on the board matching
+  // the rule (cross-board — status need not equal this column's id), so e.g. `area:research status:todo`
+  // surfaces matching cards wherever they live. A card may appear in several lanes and/or in its
+  // status column too; we deliberately do NOT de-dupe across columns. A column with no rule keeps
+  // showing exactly its own status bucket (`cardPaths`), byte-identical to before.
+  const topLevelPaths = columnFilter
+    ? board.config.columns.flatMap((c) => board.columns[c.id] ?? []).filter((p) => board.cards[p])
+    : allPaths;
+  // The lane's own population (matched by the rule) — what the count badge + WIP reflect for a
+  // filter-lane. For a plain column this is just the status bucket.
+  const lanePaths = columnFilter
+    ? topLevelPaths.filter((p) => matchCard(board.cards[p], columnFilter, matchCtx))
+    : allPaths;
+  // The rendered set additionally ANDs the global search filter on top of the lane.
+  let paths = lanePaths;
   if (globalFiltering) paths = paths.filter((p) => cardMatches(board.cards[p], today, filters, doneColumnId));
   const filtering = globalFiltering || columnFilter != null;
+
+  // Count + WIP reflect the lane's matched cards for a filter-lane (#1.4), the status bucket otherwise.
+  const countPaths = lanePaths;
+
+  // Drop INTO a filter-lane stays minimal: the existing move path (App.onMove → moveCard) still sets
+  // the dropped card's `status` to THIS column's id, exactly as for a normal column. If the lane's
+  // rule keys off a different status the card may immediately fall out of the lane again — accepted
+  // (#1.6); the lane is a view, not an owner of membership. No special-casing here.
 
   // #6 — group + sort the rendered cards. Defaults (none/manual) yield a single unlabeled group
   // holding the cards in board order, so an un-configured column renders exactly as before.
@@ -115,7 +135,8 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   // sortable identity matches what the user sees, even when grouped/sorted).
   const orderedPaths = groups.flatMap((g) => g.cards.map((c) => c.path));
 
-  const overLimit = wipLimit != null && allPaths.length > wipLimit;
+  const count = countPaths.length;
+  const overLimit = wipLimit != null && count > wipLimit;
   const accent = column.color || autoColor(column.id);
 
   // #10 — de-emphasis. opacity fades the resting column; hoverOpacity reveals it on hover (default:
@@ -144,21 +165,21 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
           className={"mdkb-column-count" + (overLimit ? " is-over-limit" : "")}
           title={
             overLimit
-              ? `${allPaths.length} of ${wipLimit} — over the WIP limit`
+              ? `${count} of ${wipLimit} — over the WIP limit`
               : wipLimit != null
-                ? `${allPaths.length} of ${wipLimit} (WIP limit)`
-                : `${allPaths.length} cards`
+                ? `${count} of ${wipLimit} (WIP limit)`
+                : `${count} cards`
           }
           aria-label={
             overLimit
-              ? `${allPaths.length} of ${wipLimit}, over the WIP limit`
+              ? `${count} of ${wipLimit}, over the WIP limit`
               : wipLimit != null
-                ? `${allPaths.length} of ${wipLimit} cards`
-                : `${allPaths.length} cards`
+                ? `${count} of ${wipLimit} cards`
+                : `${count} cards`
           }
         >
           {overLimit && <Icon name="alert" size={12} />}
-          {wipLimit != null ? `${allPaths.length}/${wipLimit}` : allPaths.length}
+          {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
         <button
           ref={menuBtnRef}

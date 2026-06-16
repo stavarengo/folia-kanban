@@ -673,6 +673,36 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     expect(within(todoCol).queryByText("Work")).toBeNull();
   });
 
+  it("#1 a filter-lane pulls matching cards CROSS-BOARD (status need not equal the lane id)", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "doing", title: "Doing" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        // Two area:research cards living in OTHER columns + one non-matching card.
+        "Tasks/ResearchA.md": { fm: { type: "task", status: "todo", area: "research" }, body: "\n# ResearchA\n" },
+        "Tasks/ResearchB.md": { fm: { type: "task", status: "doing", area: "research" }, body: "\n# ResearchB\n" },
+        "Tasks/Other.md": { fm: { type: "task", status: "todo", area: "home" }, body: "\n# Other\n" },
+      },
+    );
+    render_(repo);
+    const pipCol = (await screen.findByText("Research")).closest("section") as HTMLElement;
+    // Both research cards appear in the lane although neither has status == "research".
+    expect(within(pipCol).getByText("ResearchA")).toBeInTheDocument();
+    expect(within(pipCol).getByText("ResearchB")).toBeInTheDocument();
+    expect(within(pipCol).queryByText("Other")).toBeNull();
+    // The lane badge counts the matched cards actually shown (2), not the (empty) "research" status bucket.
+    expect(within(pipCol).getByText("2", { selector: ".mdkb-column-count" })).toBeInTheDocument();
+    // The pulled cards still ALSO render in their own status columns (no cross-column de-dupe).
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("ResearchA")).toBeInTheDocument();
+  });
+
   it("#6 group:due renders bucket headings within the column", async () => {
     const repo = new FakeRepo(
       { ...config, columns: [{ id: "todo", title: "Todo", group: "due" }, { id: "done", title: "Done" }] },
