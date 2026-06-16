@@ -186,24 +186,35 @@ describe("cardStats — progress counts EVERY checklist line by its checkbox", (
 });
 
 describe("nextTodos — undone plain todos, in order, capped at 5", () => {
-  it("excludes done todos and subcard-links, preserves order", () => {
+  it("excludes done todos and subcard-links, carrying each todo's checklist index", () => {
     const text = [
       "# C",
       "",
       "## Subtasks",
-      "- [ ] alpha",
-      "- [x] beta", // done → excluded
-      "- [ ] [[Child]]", // subcard-link → excluded
-      "- [ ] gamma",
+      "- [ ] alpha", // index 0
+      "- [x] beta", // index 1, done → excluded
+      "- [ ] [[Child]]", // index 2, subcard-link → excluded
+      "- [ ] gamma", // index 3
       "",
     ].join("\n");
-    expect(cardStats(text).nextTodos).toEqual(["alpha", "gamma"]);
+    // `index` is the SubItem.index (0-based among ALL checklist lines), NOT the filtered position —
+    // so gamma keeps index 3 even though it's the 2nd surviving todo (the handle D2 toggles).
+    expect(cardStats(text).nextTodos).toEqual([
+      { text: "alpha", index: 0 },
+      { text: "gamma", index: 3 },
+    ]);
   });
 
   it("caps at the first 5 undone todos", () => {
     const text =
       "# C\n\n## Subtasks\n" + Array.from({ length: 8 }, (_, i) => `- [ ] t${i}`).join("\n") + "\n";
-    expect(cardStats(text).nextTodos).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+    expect(cardStats(text).nextTodos).toEqual([
+      { text: "t0", index: 0 },
+      { text: "t1", index: 1 },
+      { text: "t2", index: 2 },
+      { text: "t3", index: 3 },
+      { text: "t4", index: 4 },
+    ]);
   });
 });
 

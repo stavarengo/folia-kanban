@@ -198,6 +198,10 @@
   height: 100%;
   scrollbar-width: thin;
 }
+.mdkb-board.is-pan-scrolling {
+  cursor: grabbing;
+  user-select: none;
+}
 
 .mdkb-column {
   display: flex;
@@ -549,6 +553,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+  /* Permanent gutter clears the (up to 3-button) hover action cluster: 3×26px buttons + 2×1px gaps
+     + 4px container padding + 6px right offset = 90px, plus 2px breathing space. A permanent reserve
+     (vs. only on hover) keeps the layout from jumping when the cluster appears. */
+  padding-right: 92px;
 }
 
 /* drag overlay (the lifted ghost) */
@@ -636,6 +644,36 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+/* ------------------------------------------------------------------ next todos (inline preview) */
+.mdkb-card-next-todos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mdkb-card-next-todo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.mdkb-card-next-todo-mark {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--text-faint, var(--text-muted));
+  border-radius: 3px;
+}
+.mdkb-card-next-todo-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ------------------------------------------------------------------ card quick actions + confirm */

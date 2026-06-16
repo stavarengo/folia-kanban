@@ -54,8 +54,9 @@ export interface CardStats {
   /** Subcard-link checklist lines only (git-branch info). */
   subcards: number;
   comments: number;
-  /** Texts of the undone plain todos in document order, capped at the first 5 (inline display). */
-  nextTodos: string[];
+  /** The undone plain todos in document order, capped at the first 5 (inline display). `index` is
+   *  the `SubItem.index` (0-based among ALL checklist lines) so a rendered row can be toggled later. */
+  nextTodos: { text: string; index: number }[];
 }
 
 /** How aggressively non-move mutations append `## History` lines. Default `'moves'`. */

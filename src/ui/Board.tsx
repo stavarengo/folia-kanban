@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,18 @@ import { Column } from "./Column";
 import { AddColumn } from "./AddColumn";
 import { cardChips, priorityTone, type BoardFilters } from "./cardView";
 
+// Shift+drag (and middle-button drag) are reserved for panning the board horizontally, so the
+// card-drag activator bows out for them — leaving plain left-drag for dnd-kit as before.
+class ShiftAwarePointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: "onPointerDown" as const,
+      handler: ({ nativeEvent }: { nativeEvent: PointerEvent }) =>
+        nativeEvent.isPrimary && !nativeEvent.shiftKey && nativeEvent.button === 0,
+    },
+  ];
+}
+
 interface Props {
   board: BoardModel;
   today: string;
@@ -29,7 +41,7 @@ interface Props {
 
 export function Board({ board, today, selectedPath, wipLimits, filters, doneColumnId, onMove, onAddCard }: Props) {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(ShiftAwarePointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
       // Space picks up / drops; Enter is left free for opening a focused card.
@@ -38,6 +50,76 @@ export function Board({ board, today, selectedPath, wipLimits, filters, doneColu
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeCard = activeId ? board.cards[activeId] : null;
+
+  // Shift+drag (or middle-button drag) pans the board horizontally. The card-drag sensor ignores
+  // these gestures (see ShiftAwarePointerSensor), so the two never fight over the same pointer.
+  const boardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    let startX = 0;
+    let startScroll = 0;
+    let panning = false;
+    // True once a pan has actually moved past the threshold. preventDefault() on pointerdown does NOT
+    // suppress the high-level `click` the browser later synthesizes, so a shift-press that begins and
+    // ends on a card would still fire the card's click-to-open. We track the real pan and swallow that
+    // click in the capture phase below.
+    let didPan = false;
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Reset unconditionally (before the gesture guard) so every gesture starts clean — a middle-button
+      // pan emits `auxclick` (never `click`), so its didPan would otherwise go stale and eat the next
+      // legitimate left-click.
+      didPan = false;
+      if (!(e.shiftKey || e.button === 1)) return;
+      panning = true;
+      startX = e.clientX;
+      startScroll = board.scrollLeft;
+      board.classList.add("is-pan-scrolling");
+      // Capture keeps move/up events flowing to the board even if the pointer leaves it. Guard the
+      // call: a pointer can be absent in odd states (e.g. already released), and a throw here would
+      // abort the gesture mid-pan.
+      try {
+        board.setPointerCapture(e.pointerId);
+      } catch {
+        /* no active pointer to capture — pan still works via the board-level listeners */
+      }
+      e.preventDefault();
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!panning) return;
+      // Match the card-drag sensor's 5px distance so jitter on a shift-click isn't mistaken for a pan.
+      if (Math.abs(e.clientX - startX) > 5) didPan = true;
+      board.scrollLeft = startScroll - (e.clientX - startX);
+    };
+    const end = (e: PointerEvent) => {
+      if (!panning) return;
+      panning = false;
+      board.classList.remove("is-pan-scrolling");
+      if (board.hasPointerCapture(e.pointerId)) board.releasePointerCapture(e.pointerId);
+    };
+    // Capture phase fires before the event bubbles to React's delegated root container, so this blocks
+    // the card's onClick when a pan ended on it.
+    const onClickCapture = (e: MouseEvent) => {
+      if (!didPan) return;
+      e.stopPropagation();
+      e.preventDefault();
+      didPan = false;
+    };
+
+    board.addEventListener("pointerdown", onPointerDown);
+    board.addEventListener("pointermove", onPointerMove);
+    board.addEventListener("pointerup", end);
+    board.addEventListener("pointercancel", end);
+    board.addEventListener("click", onClickCapture, { capture: true });
+    return () => {
+      board.removeEventListener("pointerdown", onPointerDown);
+      board.removeEventListener("pointermove", onPointerMove);
+      board.removeEventListener("pointerup", end);
+      board.removeEventListener("pointercancel", end);
+      board.removeEventListener("click", onClickCapture, { capture: true });
+    };
+  }, []);
 
   // Speak card titles and column names (not file paths / slugs) during a keyboard drag.
   const labelFor = (id: string) =>
@@ -67,7 +149,7 @@ export function Board({ board, today, selectedPath, wipLimits, filters, doneColu
       }}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="mdkb-board">
+      <div className="mdkb-board" ref={boardRef}>
         {board.config.columns.map((col, i) => (
           <Column
             key={col.id}

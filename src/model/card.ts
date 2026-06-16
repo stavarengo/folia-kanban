@@ -168,8 +168,8 @@ export function cardStats(text: string): CardStats {
     comments: b.comments.length,
     nextTodos: b.subtasks
       .filter((s) => s.kind === "todo" && !s.done)
-      .map((s) => s.text)
-      .slice(0, 5),
+      .slice(0, 5)
+      .map((s) => ({ text: s.text, index: s.index })),
   };
 }
 

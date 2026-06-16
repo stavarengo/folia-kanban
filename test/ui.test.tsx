@@ -249,6 +249,74 @@ describe("live reload", () => {
   });
 });
 
+describe("next todos on cards", () => {
+  // A dedicated card whose first checklist line is DONE, so the undone todos carry indices 1 and 2
+  // (not 0 and 1) — proving the rendered data-todo-index is the SubItem.index, the D2 toggle handle.
+  const nextTodosRepo = () =>
+    new FakeRepo(config, {
+      "Tasks/WithTodos.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# WithTodos\n\n## Subtasks\n- [x] done one\n- [ ] real one\n- [ ] real two\n",
+      },
+    });
+
+  it("renders up to cardNextTodos rows with the SubItem index as data-todo-index", async () => {
+    render_(nextTodosRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("WithTodos")).closest(".mdkb-card") as HTMLElement;
+    const rows = card.querySelectorAll(".mdkb-card-next-todo");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("real one");
+    expect(rows[0].getAttribute("data-todo-index")).toBe("1");
+    expect(rows[1]).toHaveTextContent("real two");
+    expect(rows[1].getAttribute("data-todo-index")).toBe("2");
+  });
+
+  it("renders no next-todo rows when cardNextTodos is 0", async () => {
+    render_(nextTodosRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 0 });
+    const card = (await screen.findByText("WithTodos")).closest(".mdkb-card") as HTMLElement;
+    expect(card.querySelectorAll(".mdkb-card-next-todo")).toHaveLength(0);
+  });
+
+  it("caps the rendered rows at cardNextTodos even with more undone todos", async () => {
+    // 3 undone todos with cardNextTodos:2 exercises the render-time slice(0, N) — a regression that
+    // dropped the slice would render all 3.
+    const repo = new FakeRepo(config, {
+      "Tasks/ThreeTodos.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# ThreeTodos\n\n## Subtasks\n- [ ] a\n- [ ] b\n- [ ] c\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("ThreeTodos")).closest(".mdkb-card") as HTMLElement;
+    const rows = card.querySelectorAll(".mdkb-card-next-todo");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("a");
+    expect(rows[1]).toHaveTextContent("b");
+  });
+});
+
+describe("board pan-scroll", () => {
+  // jsdom has no layout, so board.scrollLeft always reads back 0 — we can only assert the
+  // is-pan-scrolling class lifecycle here. The click-hijack suppression and actual scroll offset
+  // need the live test-vault verification (compat-clicks / pointer capture aren't simulated in jsdom).
+  // jsdom has no PointerEvent and RTL's pointer fireEvent drops the init props (shiftKey/button), so
+  // we dispatch native MouseEvents — jsdom does carry shiftKey/button on those — at the pointer-named
+  // event types the board's native listeners are bound to.
+  const dispatchPointer = (el: HTMLElement, type: string, init: MouseEventInit) =>
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, ...init }));
+
+  it("toggles is-pan-scrolling on a shift pan and clears it on pointerup", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    const board = document.querySelector(".mdkb-board") as HTMLElement;
+    dispatchPointer(board, "pointerdown", { shiftKey: true, button: 0, clientX: 100 });
+    expect(board).toHaveClass("is-pan-scrolling");
+    dispatchPointer(board, "pointermove", { clientX: 60 });
+    dispatchPointer(board, "pointerup", { clientX: 60 });
+    expect(board).not.toHaveClass("is-pan-scrolling");
+  });
+});
+
 describe("settings context", () => {
   it("exposes the provided settings via useSettings()", () => {
     function Probe() {

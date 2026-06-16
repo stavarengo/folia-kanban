@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
 import { cardChips, priorityTone } from "./cardView";
-import { useBoardActions } from "./context";
+import { useBoardActions, useSettings } from "./context";
 import { Icon } from "./icons";
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
 
 function CardItemInner({ card, today, selected }: Props) {
   const actions = useBoardActions();
+  const { cardNextTodos } = useSettings();
   const [confirming, setConfirming] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.path,
@@ -90,6 +91,16 @@ function CardItemInner({ card, today, selected }: Props) {
               {stats.checklistDone}/{stats.checklist}
             </span>
           </div>
+        )}
+        {stats && cardNextTodos > 0 && stats.nextTodos.length > 0 && (
+          <ul className="mdkb-card-next-todos">
+            {stats.nextTodos.slice(0, cardNextTodos).map((t) => (
+              <li key={t.index} className="mdkb-card-next-todo" data-todo-index={t.index}>
+                <span className="mdkb-card-next-todo-mark" aria-hidden="true" />
+                <span className="mdkb-card-next-todo-text">{t.text}</span>
+              </li>
+            ))}
+          </ul>
         )}
         {stats && (stats.subcards > 0 || stats.comments > 0) && (
           <div className="mdkb-card-meta">
@@ -185,7 +196,8 @@ function sameStats(a?: CardStats, b?: CardStats): boolean {
     a.checklistDone === b.checklistDone &&
     a.subcards === b.subcards &&
     a.comments === b.comments &&
-    a.nextTodos.join("\n") === b.nextTodos.join("\n")
+    a.nextTodos.map((t) => `${t.index}:${t.text}`).join("\n") ===
+      b.nextTodos.map((t) => `${t.index}:${t.text}`).join("\n")
   );
 }
 
