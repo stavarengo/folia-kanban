@@ -27,7 +27,7 @@ function CardItemInner({ card, today, selected }: Props) {
   const fm = card.frontmatter;
   const prio = typeof fm.priority === "string" && fm.priority ? priorityTone(fm.priority) : null;
 
-  const allDone = !!stats && stats.todos > 0 && stats.todosDone === stats.todos;
+  const allDone = !!stats && stats.checklist > 0 && stats.checklistDone === stats.checklist;
   const showActions = !confirming;
   const canComplete = actions.doneColumnId != null && fm.status !== actions.doneColumnId;
 
@@ -73,18 +73,21 @@ function CardItemInner({ card, today, selected }: Props) {
             ))}
           </div>
         )}
-        {stats && stats.todos > 0 && (
+        {stats && stats.checklist > 0 && (
           <div
             className={"mdkb-progress" + (allDone ? " is-complete" : "")}
-            title={`${stats.todosDone} of ${stats.todos} subtasks done`}
-            aria-label={`${stats.todosDone} of ${stats.todos} subtasks done`}
+            title={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
+            aria-label={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
           >
             <div className="mdkb-progress-track">
-              <div className="mdkb-progress-fill" style={{ width: `${(stats.todosDone / stats.todos) * 100}%` }} />
+              <div
+                className="mdkb-progress-fill"
+                style={{ width: `${(stats.checklistDone / stats.checklist) * 100}%` }}
+              />
             </div>
             <span className="mdkb-progress-label">
               {allDone ? <Icon name="check" size={12} /> : null}
-              {stats.todosDone}/{stats.todos}
+              {stats.checklistDone}/{stats.checklist}
             </span>
           </div>
         )}
@@ -177,7 +180,13 @@ function CardItemInner({ card, today, selected }: Props) {
 function sameStats(a?: CardStats, b?: CardStats): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.todos === b.todos && a.todosDone === b.todosDone && a.subcards === b.subcards && a.comments === b.comments;
+  return (
+    a.checklist === b.checklist &&
+    a.checklistDone === b.checklistDone &&
+    a.subcards === b.subcards &&
+    a.comments === b.comments &&
+    a.nextTodos.join("\n") === b.nextTodos.join("\n")
+  );
 }
 
 // A board reload rebuilds Card objects, but an unchanged card keeps the same frontmatter

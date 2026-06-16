@@ -3,9 +3,10 @@
 // exercise genuine parse/mutate logic without Obsidian.
 
 import type { CardRepository } from "../src/obsidian/repo";
-import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef } from "../src/model/types";
+import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef, HistoryScope } from "../src/model/types";
 import { buildBoard } from "../src/model/board";
 import {
+  SECTION,
   addSubcard,
   addTodo,
   appendComment,
@@ -14,9 +15,24 @@ import {
   parseBody,
   parseSubtasks,
   removeSubtask,
+  removeTimestampedLine,
   setDescription,
   setSubtaskDone,
+  updateTimestampedLine,
 } from "../src/model/card";
+import {
+  commentAddedLine,
+  commentEditedLine,
+  commentRemovedLine,
+  dueLine,
+  historyAllows,
+  priorityLine,
+  statusLine,
+  subtaskAddedLine,
+  subtaskDoneLine,
+  subtaskReopenedLine,
+  subtaskRemovedLine,
+} from "../src/model/history";
 
 interface Entry {
   basename: string;
@@ -35,10 +51,17 @@ export class FakeRepo implements CardRepository {
   constructor(
     public config: BoardConfig,
     initial: Record<string, { fm: CardFrontmatter; body: string }> = {},
+    public getHistoryScope: () => HistoryScope = () => "moves",
   ) {
     for (const [path, e] of Object.entries(initial)) {
       this.files.set(path, { basename: basename(path), fm: { ...e.fm }, body: e.body });
     }
+  }
+
+  private maybeHistory(path: string, kind: Parameters<typeof historyAllows>[1], line: string) {
+    if (!historyAllows(this.getHistoryScope(), kind)) return;
+    const e = this.entry(path);
+    e.body = appendHistory(e.body, line, this.ts);
   }
 
   private toCard(path: string, e: Entry): Card {
@@ -65,6 +88,15 @@ export class FakeRepo implements CardRepository {
 
   async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
     Object.assign(this.entry(path).fm, patch);
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === "priority") this.maybeHistory(path, "priority", priorityLine(String(v)));
+      else if (k === "due") this.maybeHistory(path, "due", dueLine(String(v)));
+      else if (k === "status") this.maybeHistory(path, "status", statusLine(String(v)));
+    }
+  }
+
+  async unsetFrontmatterKey(path: string, key: string): Promise<void> {
+    delete this.entry(path).fm[key];
   }
 
   async applyMove(mutation: { path: string; setFrontmatter?: Partial<CardFrontmatter>; history?: string }) {
@@ -80,15 +112,29 @@ export class FakeRepo implements CardRepository {
   }
   async addComment(path: string, text: string) {
     this.entry(path).body = appendComment(this.entry(path).body, text, this.ts);
+    this.maybeHistory(path, "comment", commentAddedLine());
+  }
+  async updateComment(path: string, index: number, text: string) {
+    this.entry(path).body = updateTimestampedLine(this.entry(path).body, SECTION.comments, index, text);
+    this.maybeHistory(path, "comment", commentEditedLine());
+  }
+  async removeComment(path: string, index: number) {
+    this.entry(path).body = removeTimestampedLine(this.entry(path).body, SECTION.comments, index);
+    this.maybeHistory(path, "comment", commentRemovedLine());
   }
   async addTodo(path: string, text: string) {
     this.entry(path).body = addTodo(this.entry(path).body, text);
+    this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
   async toggleSubtask(path: string, index: number, done: boolean) {
+    const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
     this.entry(path).body = setSubtaskDone(this.entry(path).body, index, done);
+    this.maybeHistory(path, "subtask", done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText));
   }
   async removeSubtask(path: string, index: number) {
+    const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
     this.entry(path).body = removeSubtask(this.entry(path).body, index);
+    this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
   }
 
   async createCard(title: string, status: string): Promise<string> {

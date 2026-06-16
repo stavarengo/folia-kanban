@@ -1,9 +1,10 @@
 import { App, TFile, normalizePath } from "obsidian";
-import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef } from "../model/types";
+import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef, HistoryScope } from "../model/types";
 import type { CardMutation } from "../model/board";
 import { buildBoard } from "../model/board";
 import { dateOnly, stamp } from "../model/dates";
 import {
+  SECTION,
   addSubcard as addSubcardText,
   addTodo as addTodoText,
   appendComment,
@@ -13,9 +14,24 @@ import {
   parseFrontmatter,
   parseSubtasks,
   removeSubtask as removeSubtaskText,
+  removeTimestampedLine,
   setDescription as setDescriptionText,
   setSubtaskDone,
+  updateTimestampedLine,
 } from "../model/card";
+import {
+  commentAddedLine,
+  commentEditedLine,
+  commentRemovedLine,
+  dueLine,
+  historyAllows,
+  priorityLine,
+  statusLine,
+  subtaskAddedLine,
+  subtaskDoneLine,
+  subtaskReopenedLine,
+  subtaskRemovedLine,
+} from "../model/history";
 import type { CardRepository } from "./repo";
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
@@ -64,7 +80,15 @@ export class VaultRepository implements CardRepository {
   constructor(
     private app: App,
     private boardPath: string,
+    /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
+    public getHistoryScope: () => HistoryScope = () => "moves",
   ) {}
+
+  /** Append a history line for `kind` only when the current scope allows it. */
+  private async maybeHistory(path: string, kind: Parameters<typeof historyAllows>[1], line: string): Promise<void> {
+    if (!historyAllows(this.getHistoryScope(), kind)) return;
+    await this.editBody(path, (t) => appendHistory(t, line, stamp()));
+  }
 
   private file(path: string): TFile {
     const f = this.app.vault.getAbstractFileByPath(path);
@@ -115,10 +139,30 @@ export class VaultRepository implements CardRepository {
     return parseBody(await this.app.vault.cachedRead(this.file(path)));
   }
 
-  async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
+  // Raw frontmatter write — NO history. The move path (applyMove) uses this so it never
+  // double-emits a structural line on top of its own "Moved …" entry.
+  private async writeFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
     this.markWrite(path);
     await this.app.fileManager.processFrontMatter(this.file(path), (fm) => {
       for (const [k, v] of Object.entries(patch)) fm[k] = v;
+    });
+  }
+
+  async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
+    await this.writeFrontmatter(path, patch);
+    // One concise line per meaningful changed key the policy recognizes. `order` is move-managed
+    // and has no field-edit history string, so it's skipped here.
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === "priority") await this.maybeHistory(path, "priority", priorityLine(String(v)));
+      else if (k === "due") await this.maybeHistory(path, "due", dueLine(String(v)));
+      else if (k === "status") await this.maybeHistory(path, "status", statusLine(String(v)));
+    }
+  }
+
+  async unsetFrontmatterKey(path: string, key: string): Promise<void> {
+    this.markWrite(path);
+    await this.app.fileManager.processFrontMatter(this.file(path), (fm) => {
+      delete fm[key];
     });
   }
 
@@ -128,24 +172,40 @@ export class VaultRepository implements CardRepository {
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
-    if (mutation.setFrontmatter) await this.setFrontmatter(mutation.path, mutation.setFrontmatter);
+    if (mutation.setFrontmatter) await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
     if (mutation.history) await this.editBody(mutation.path, (t) => appendHistory(t, mutation.history!, stamp()));
   }
 
   setDescription(path: string, description: string): Promise<void> {
+    // No history kind maps to a description edit, so this stays ungated.
     return this.editBody(path, (t) => setDescriptionText(t, description));
   }
-  addComment(path: string, text: string): Promise<void> {
-    return this.editBody(path, (t) => appendComment(t, text, stamp()));
+  async addComment(path: string, text: string): Promise<void> {
+    await this.editBody(path, (t) => appendComment(t, text, stamp()));
+    await this.maybeHistory(path, "comment", commentAddedLine());
   }
-  addTodo(path: string, text: string): Promise<void> {
-    return this.editBody(path, (t) => addTodoText(t, text));
+  async updateComment(path: string, index: number, text: string): Promise<void> {
+    await this.editBody(path, (t) => updateTimestampedLine(t, SECTION.comments, index, text));
+    await this.maybeHistory(path, "comment", commentEditedLine());
   }
-  toggleSubtask(path: string, index: number, done: boolean): Promise<void> {
-    return this.editBody(path, (t) => setSubtaskDone(t, index, done));
+  async removeComment(path: string, index: number): Promise<void> {
+    await this.editBody(path, (t) => removeTimestampedLine(t, SECTION.comments, index));
+    await this.maybeHistory(path, "comment", commentRemovedLine());
   }
-  removeSubtask(path: string, index: number): Promise<void> {
-    return this.editBody(path, (t) => removeSubtaskText(t, index));
+  async addTodo(path: string, text: string): Promise<void> {
+    await this.editBody(path, (t) => addTodoText(t, text));
+    await this.maybeHistory(path, "subtask", subtaskAddedLine(text));
+  }
+  async toggleSubtask(path: string, index: number, done: boolean): Promise<void> {
+    // Capture the item text BEFORE the splice so the history line can name it.
+    const itemText = parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
+    await this.editBody(path, (t) => setSubtaskDone(t, index, done));
+    await this.maybeHistory(path, "subtask", done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText));
+  }
+  async removeSubtask(path: string, index: number): Promise<void> {
+    const itemText = parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
+    await this.editBody(path, (t) => removeSubtaskText(t, index));
+    await this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
   }
 
   private async uniquePath(folder: string, title: string): Promise<string> {

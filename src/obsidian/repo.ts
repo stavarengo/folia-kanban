@@ -15,8 +15,14 @@ export interface CardRepository {
   applyMove(mutation: CardMutation): Promise<void>;
 
   setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void>;
+  /** Remove a single frontmatter key (byte-stable for the other keys + their order). */
+  unsetFrontmatterKey(path: string, key: string): Promise<void>;
   setDescription(path: string, description: string): Promise<void>;
   addComment(path: string, text: string): Promise<void>;
+  /** Replace the text of the index-th comment, keeping its timestamp + every other byte. */
+  updateComment(path: string, index: number, text: string): Promise<void>;
+  /** Delete the index-th comment line only. */
+  removeComment(path: string, index: number): Promise<void>;
   addTodo(path: string, text: string): Promise<void>;
   toggleSubtask(path: string, index: number, done: boolean): Promise<void>;
   removeSubtask(path: string, index: number): Promise<void>;

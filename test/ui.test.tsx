@@ -46,7 +46,7 @@ describe("board rendering", () => {
     render_(makeRepo());
     const alpha = (await screen.findByText("Alpha")).closest(".mdkb-card") as HTMLElement;
     expect(within(alpha).getByText("A")).toBeInTheDocument(); // priority chip
-    expect(within(alpha).getByText("1/2")).toBeInTheDocument(); // 1 of 2 todos done (progress)
+    expect(within(alpha).getByText("1/3")).toBeInTheDocument(); // 1 of 3 checklist lines done (2 todos + 1 subcard)
     expect(within(alpha).getByTitle("Subcards")).toHaveTextContent("1"); // 1 subcard
     expect(within(alpha).getByTitle("Comments")).toHaveTextContent("1"); // 1 comment
 

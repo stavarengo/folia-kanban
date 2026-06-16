@@ -47,11 +47,19 @@ export interface CardBody {
 
 /** Cheap display counters, precomputed while bodies are read during load. */
 export interface CardStats {
-  todos: number;
-  todosDone: number;
+  /** Every `## Subtasks` checklist line — plain todos AND subcard-links — counted by line. */
+  checklist: number;
+  /** Of those checklist lines, how many are checked. */
+  checklistDone: number;
+  /** Subcard-link checklist lines only (git-branch info). */
   subcards: number;
   comments: number;
+  /** Texts of the undone plain todos in document order, capped at the first 5 (inline display). */
+  nextTodos: string[];
 }
+
+/** How aggressively non-move mutations append `## History` lines. Default `'moves'`. */
+export type HistoryScope = "moves" | "structural" | "all";
 
 /** A card as the board needs it: identity + frontmatter + the child links it declares. */
 export interface Card {

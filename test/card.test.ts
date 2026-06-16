@@ -13,7 +13,12 @@ import {
   setSubtaskDone,
   removeSubtask,
   setDescription,
+  cardStats,
+  updateTimestampedLine,
+  removeTimestampedLine,
+  SECTION,
 } from "../src/model/card";
+import { historyAllows } from "../src/model/history";
 
 const SAMPLE_CARD = `---
 type: task
@@ -138,6 +143,160 @@ describe("setDescription", () => {
     expect(b.description).toBe("A brand new description.");
     expect(b.comments).toEqual([{ timestamp: "2026-06-13 10:00", text: "keep me" }]);
     expect(splitFrontmatter(t).fmText).toBe(splitFrontmatter(SAMPLE_CARD).fmText);
+  });
+});
+
+describe("cardStats — progress counts EVERY checklist line by its checkbox", () => {
+  // 13 plain todos (3 done) + 1 done subcard-link → 4/14 (the live NAS bug).
+  const NAS = [
+    "---",
+    "status: doing",
+    "---",
+    "",
+    "# NAS",
+    "",
+    "## Subtasks",
+    ...Array.from({ length: 13 }, (_, i) => `- [${i < 3 ? "x" : " "}] todo ${i + 1}`),
+    "- [x] [[adf]]",
+    "",
+  ].join("\n");
+
+  it("counts plain todos AND subcard-links by line (NAS → 4/14)", () => {
+    const s = cardStats(NAS);
+    expect(s.checklist).toBe(14);
+    expect(s.checklistDone).toBe(4);
+    expect(s.subcards).toBe(1); // git-branch count is kept separate
+  });
+
+  it("duplicate-titled lines each count once by their own line", () => {
+    const text = "# C\n\n## Subtasks\n- [ ] Foo\n- [x] [[Foo]]\n";
+    const s = cardStats(text);
+    expect(s.checklist).toBe(2);
+    expect(s.checklistDone).toBe(1); // only the subcard line is done — not collapsed by title
+    expect(s.subcards).toBe(1);
+  });
+
+  it("toggling the subcard line moves checklistDone", () => {
+    const text = "# C\n\n## Subtasks\n- [ ] plain\n- [ ] [[Child]]\n";
+    expect(cardStats(text).checklistDone).toBe(0);
+    const toggled = setSubtaskDone(text, 1, true); // the subcard-link line
+    expect(cardStats(toggled).checklistDone).toBe(1);
+    expect(cardStats(toggled).checklist).toBe(2);
+  });
+});
+
+describe("nextTodos — undone plain todos, in order, capped at 5", () => {
+  it("excludes done todos and subcard-links, preserves order", () => {
+    const text = [
+      "# C",
+      "",
+      "## Subtasks",
+      "- [ ] alpha",
+      "- [x] beta", // done → excluded
+      "- [ ] [[Child]]", // subcard-link → excluded
+      "- [ ] gamma",
+      "",
+    ].join("\n");
+    expect(cardStats(text).nextTodos).toEqual(["alpha", "gamma"]);
+  });
+
+  it("caps at the first 5 undone todos", () => {
+    const text =
+      "# C\n\n## Subtasks\n" + Array.from({ length: 8 }, (_, i) => `- [ ] t${i}`).join("\n") + "\n";
+    expect(cardStats(text).nextTodos).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+  });
+});
+
+describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comments", () => {
+  const withThreeComments = (() => {
+    let t = appendComment(SAMPLE_CARD, "one", "2026-06-13 10:00");
+    t = appendComment(t, "two", "2026-06-13 11:00");
+    t = appendComment(t, "three", "2026-06-13 12:00");
+    return t;
+  })();
+
+  it("updateComment edits only comment 2: timestamp preserved, others byte-identical", () => {
+    const out = updateTimestampedLine(withThreeComments, SECTION.comments, 1, "edited two");
+    const comments = parseBody(out).comments;
+    expect(comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
+    expect(comments[1].timestamp).toBe("2026-06-13 11:00"); // timestamp kept
+    // every byte except comment 2's text is identical: rebuild expected from the original.
+    const expected = withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] edited two");
+    expect(out).toBe(expected);
+    expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(withThreeComments).fmText);
+  });
+
+  it("removeTimestampedLine deletes only its line", () => {
+    const out = removeTimestampedLine(withThreeComments, SECTION.comments, 1);
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);
+    const expected = withThreeComments.replace("- [2026-06-13 11:00] two\n", "");
+    expect(out).toBe(expected);
+  });
+
+  it("updateTimestampedLine edits a bare-bullet (no timestamp) comment, not just timestamped ones", () => {
+    const body = "# C\n\n## Comments\n- [2026-06-13 10:00] one\n- bare note\n- [2026-06-13 12:00] three\n";
+    const out = updateTimestampedLine(body, SECTION.comments, 1, "edited bare");
+    expect(out).toBe(body.replace("- bare note", "- edited bare"));
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "edited bare", "three"]);
+  });
+
+  it("updateTimestampedLine collapses an embedded newline so the index walk can't desync", () => {
+    const out = updateTimestampedLine(withThreeComments, SECTION.comments, 1, "line1\nline2");
+    expect(out).toBe(withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] line1 line2"));
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "line1 line2", "three"]);
+  });
+});
+
+describe("CRLF files round-trip byte-stably (only the touched line changes)", () => {
+  // A \r\n fixture with 3 comments. The model splits on "\n", so each segment keeps a trailing
+  // \r; the edit/remove must preserve those CRs everywhere — including on the line it touches.
+  const crlf = [
+    "---\r",
+    "status: doing\r",
+    "---\r",
+    "\r",
+    "# C\r",
+    "\r",
+    "## Comments\r",
+    "- [2026-06-13 10:00] one\r",
+    "- [2026-06-13 11:00] two\r",
+    "- [2026-06-13 12:00] three\r",
+    "",
+  ].join("\n");
+
+  const everyLineKeepsCRLF = (s: string) => {
+    const segs = s.split("\n");
+    // Every segment except the final (post-trailing-\n) empty one must end with \r.
+    for (let i = 0; i < segs.length - 1; i++) expect(segs[i].endsWith("\r")).toBe(true);
+  };
+
+  it("updateComment edits comment 2 of 3 with the CR preserved on that line", () => {
+    const out = updateTimestampedLine(crlf, SECTION.comments, 1, "edited two");
+    const expected = crlf.replace("- [2026-06-13 11:00] two\r", "- [2026-06-13 11:00] edited two\r");
+    expect(out).toBe(expected); // whole file byte-identical except the intended change
+    everyLineKeepsCRLF(out);
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
+  });
+
+  it("removeComment removes only comment 2 of 3, leaving the rest CRLF-intact", () => {
+    const out = removeTimestampedLine(crlf, SECTION.comments, 1);
+    const expected = crlf.replace("- [2026-06-13 11:00] two\r\n", "");
+    expect(out).toBe(expected);
+    everyLineKeepsCRLF(out);
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);
+  });
+});
+
+describe("historyAllows — scope policy", () => {
+  it("structural keys need >= structural; comment/subtask need 'all'; nothing emits under 'moves'", () => {
+    expect(historyAllows("moves", "priority")).toBe(false);
+    expect(historyAllows("moves", "status")).toBe(false);
+    expect(historyAllows("structural", "priority")).toBe(true);
+    expect(historyAllows("structural", "due")).toBe(true);
+    expect(historyAllows("structural", "status")).toBe(true);
+    expect(historyAllows("structural", "comment")).toBe(false);
+    expect(historyAllows("all", "comment")).toBe(true);
+    expect(historyAllows("all", "subtask")).toBe(true);
   });
 });
 

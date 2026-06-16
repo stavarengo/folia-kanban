@@ -159,12 +159,17 @@ export function parseBody(text: string): CardBody {
 
 export function cardStats(text: string): CardStats {
   const b = parseBody(text);
-  const todos = b.subtasks.filter((s) => s.kind === "todo");
+  // Progress counts EVERY checklist line by its own checkbox — plain todos AND subcard-links —
+  // keyed by line, never collapsed by title. `subcards` stays a separate git-branch counter.
   return {
-    todos: todos.length,
-    todosDone: todos.filter((s) => s.done).length,
+    checklist: b.subtasks.length,
+    checklistDone: b.subtasks.filter((s) => s.done).length,
     subcards: b.subtasks.filter((s) => s.kind === "card").length,
     comments: b.comments.length,
+    nextTodos: b.subtasks
+      .filter((s) => s.kind === "todo" && !s.done)
+      .map((s) => s.text)
+      .slice(0, 5),
   };
 }
 
@@ -224,6 +229,65 @@ export function removeSubtask(text: string, index: number): string {
     let n = 0;
     for (let i = start + 1; i < end; i++) {
       if (!CHECKBOX_RE.test(lines[i])) continue;
+      if (n === index) {
+        lines.splice(i, 1);
+        break;
+      }
+      n++;
+    }
+    return lines.join("\n");
+  });
+}
+
+const TS_PREFIX_RE = /^(\s*[-*]\s+\[[^\]]+\]\s+)([\s\S]*)$/;
+const BULLET_RE = /^\s*[-*]\s+/;
+
+/**
+ * Replace ONLY the text after `[timestamp] ` of the index-th bullet line in a timestamped
+ * section (Comments / History). The bullet prefix + timestamp stay byte-identical. Index is
+ * 0-based among the section's bullet lines (matching `parseTimestamped`'s walk).
+ */
+export function updateTimestampedLine(text: string, section: string, index: number, newText: string): string {
+  // Comments are single-line; collapse any embedded newline so it can't desync the index walk.
+  const safeText = newText.replace(/[\r\n]+/g, " ");
+  return withBody(text, (body) => {
+    const lines = body.split("\n");
+    const start = headingIndex(lines, section);
+    if (start === -1) return body;
+    const end = sectionEnd(lines, start);
+    let n = 0;
+    for (let i = start + 1; i < end; i++) {
+      if (!BULLET_RE.test(lines[i])) continue;
+      if (n === index) {
+        // `split("\n")` leaves a trailing CR on CRLF files; re-attach it so the edited line keeps
+        // the same line ending as its siblings (byte-stable).
+        const cr = lines[i].endsWith("\r") ? "\r" : "";
+        const m = TS_PREFIX_RE.exec(lines[i]);
+        if (m) {
+          lines[i] = `${m[1]}${safeText}${cr}`;
+        } else {
+          // Bullet with no `[timestamp]` (a bare `- text`): replace only the post-bullet text.
+          const bm = BULLET_RE.exec(lines[i]);
+          if (bm) lines[i] = `${bm[0]}${safeText}${cr}`;
+        }
+        break;
+      }
+      n++;
+    }
+    return lines.join("\n");
+  });
+}
+
+/** Delete ONLY the index-th bullet line of a timestamped section; every other byte passes through. */
+export function removeTimestampedLine(text: string, section: string, index: number): string {
+  return withBody(text, (body) => {
+    const lines = body.split("\n");
+    const start = headingIndex(lines, section);
+    if (start === -1) return body;
+    const end = sectionEnd(lines, start);
+    let n = 0;
+    for (let i = start + 1; i < end; i++) {
+      if (!BULLET_RE.test(lines[i])) continue;
       if (n === index) {
         lines.splice(i, 1);
         break;
