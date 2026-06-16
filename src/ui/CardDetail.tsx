@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import type { Board, CardBody } from "../model/types";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
@@ -101,6 +101,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
   const panelRef = useRef<HTMLElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
+  const descViewRef = useRef<HTMLDivElement | null>(null);
   const subcardRef = useRef<HTMLInputElement | null>(null);
   // Synchronous in-flight guard for the create form: blocks a second submit (rapid Enter, or
   // Enter-then-click) during the async createCard window before onCreated unmounts this branch.
@@ -118,6 +119,12 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
   const [newPropVal, setNewPropVal] = useState("");
   // Width override only while a resize drag is in flight; otherwise the panel reads settings.detailWidth.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
+  // Height the rendered preview occupied right before flipping to the raw editor, so the textarea
+  // adopts it (min-height) and the panel doesn't jump on preview↔edit toggle. Null = no carry-over.
+  const [preservedDescHeight, setPreservedDescHeight] = useState<number | null>(null);
+  // Viewport-derived ceiling for the rendered preview so a long description scrolls internally
+  // instead of pushing the panel past the screen. Re-measured on mount and window resize.
+  const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
@@ -164,6 +171,39 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
   useEffect(() => {
     if (editingDesc) descRef.current?.focus();
   }, [editingDesc]);
+
+  // Cap the rendered preview to the space between its top and the viewport bottom (leaving a small
+  // gutter), but never below a readable floor. Works across split/float/modal: it measures the
+  // preview's own on-screen position, so the modal's max-height and the side panel's scroll both
+  // resolve to a sensible ceiling. Re-runs on mount, when the preview (re)appears, and on resize.
+  useLayoutEffect(() => {
+    if (isCreate || editingDesc) return;
+    const measure = () => {
+      const el = descViewRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const avail = window.innerHeight - top - 24; // 24px gutter to the viewport edge
+      setDescMaxHeight(Math.max(160, Math.round(avail)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [isCreate, editingDesc, path, body]);
+
+  // Leaving the editor (save/cancel/navigation) drops any carried-over preview height so the
+  // preview returns to the viewport-measured behavior.
+  useEffect(() => {
+    if (!editingDesc) setPreservedDescHeight(null);
+  }, [editingDesc]);
+
+  // Flip to the raw editor, first capturing the rendered preview's current height so the textarea
+  // can adopt it (min-height) and the panel doesn't jump. Used by both the click-to-edit surface
+  // and the pencil button; the empty-state / fresh-card paths have no preview, so they skip this.
+  const beginEditDesc = () => {
+    const h = descViewRef.current?.offsetHeight;
+    if (h) setPreservedDescHeight(h);
+    setEditingDesc(true);
+  };
 
   // The "Add subcard" context-menu action opens this card and lands focus on its subcard input,
   // letting the user type the title there (the input's Enter handler calls repo.addSubcard).
@@ -430,6 +470,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
                 className="mdkb-desc"
                 value={descDraft}
                 aria-label="Edit description"
+                style={preservedDescHeight != null ? { minHeight: `${preservedDescHeight}px` } : undefined}
                 onChange={(e) => setDescDraft(e.target.value)}
                 placeholder="Add a description…"
                 onKeyDown={(e) => {
@@ -448,9 +489,14 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
             </>
           ) : body && body.description.trim() ? (
             // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-            <div className="mdkb-desc-view" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) return; setEditingDesc(true); }}>
+            <div
+              ref={descViewRef}
+              className="mdkb-desc-view"
+              style={descMaxHeight != null ? ({ "--mdkb-desc-max-h": `${descMaxHeight}px` } as CSSProperties) : undefined}
+              onClick={(e) => { if ((e.target as HTMLElement).closest("a")) return; beginEditDesc(); }}
+            >
               <Markdown markdown={body.description} sourcePath={path} className="mdkb-desc-rendered" />
-              <button className="mdkb-icon-btn mdkb-mini mdkb-desc-edit" aria-label="Edit description" title="Edit" onClick={(e) => { e.stopPropagation(); setEditingDesc(true); }}><Icon name="pencil" size={13} /></button>
+              <button className="mdkb-icon-btn mdkb-mini mdkb-desc-edit" aria-label="Edit description" title="Edit" onClick={(e) => { e.stopPropagation(); beginEditDesc(); }}><Icon name="pencil" size={13} /></button>
             </div>
           ) : (
             <button className="mdkb-desc-empty mdkb-muted" aria-label="Edit description" onClick={() => setEditingDesc(true)}>Add a description…</button>

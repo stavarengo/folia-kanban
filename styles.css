@@ -1240,6 +1240,18 @@
   margin: 0 -6px;
   transition: background var(--mdkb-dur-fast) ease, border-color var(--mdkb-dur-fast) ease;
 }
+
+/* #15: cap the rendered prose to the viewport-derived height (set inline as --mdkb-desc-max-h on
+   mount/resize) and scroll it internally, so a long description never grows the panel past the
+   screen. The fallback caps at calc(100vh - chrome) for the first paint before the measured value
+   lands. Scroll lives on the prose (not .mdkb-desc-view), so the pencil button — absolutely
+   positioned against the non-scrolling view box — stays pinned while the text scrolls. Works across
+   split/float/modal: the measured value reflects each presentation's on-screen position. */
+.mdkb-desc-view .mdkb-desc-rendered {
+  max-height: var(--mdkb-desc-max-h, calc(100vh - 220px));
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 .mdkb-desc-view:hover {
   background: var(--background-modifier-hover);
   border-color: var(--mdkb-border);

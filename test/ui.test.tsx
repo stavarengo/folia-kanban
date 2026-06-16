@@ -134,6 +134,48 @@ describe("card detail", () => {
     expect(await within(detail).findByText("Brand new body")).toBeInTheDocument();
   });
 
+  it("caps the rendered preview with a viewport-derived max-height var (#15)", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const view = (await within(detail).findByText("Desc A")).closest(".mdkb-desc-view") as HTMLElement;
+    // The layout effect measures the preview's position against the viewport and writes the ceiling
+    // as a CSS var; assert it wired through (px value, robust to the test viewport's innerHeight).
+    await waitFor(() => expect(view.style.getPropertyValue("--mdkb-desc-max-h")).toMatch(/^\d+px$/));
+  });
+
+  it("preserves the rendered preview's height as the textarea's min-height when entering edit (#15)", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const rendered = await within(detail).findByText("Desc A");
+    // jsdom reports 0 for layout; stub the preview wrapper's measured height so the capture is real.
+    const view = rendered.closest(".mdkb-desc-view") as HTMLElement;
+    Object.defineProperty(view, "offsetHeight", { configurable: true, value: 247 });
+    await user.click(rendered);
+    const box = within(detail).getByRole("textbox", { name: "Edit description" });
+    expect(box.style.minHeight).toBe("247px"); // panel keeps its height, no jump
+  });
+
+  it("drops the carried-over height after leaving edit mode (#15)", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const rendered = await within(detail).findByText("Desc A");
+    Object.defineProperty(rendered.closest(".mdkb-desc-view") as HTMLElement, "offsetHeight", { configurable: true, value: 247 });
+    await user.click(rendered);
+    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe("247px");
+    // Revert returns to view mode; re-entering with no measured height carries nothing over.
+    await user.click(within(detail).getByRole("button", { name: "Revert" }));
+    const back = await within(detail).findByText("Desc A");
+    Object.defineProperty(back.closest(".mdkb-desc-view") as HTMLElement, "offsetHeight", { configurable: true, value: 0 });
+    await user.click(back);
+    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe("");
+  });
+
   it("renders each comment's text through the markdown component", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
