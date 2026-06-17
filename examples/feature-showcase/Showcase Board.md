@@ -1,6 +1,6 @@
 ---
 folia-board: true
-card-folder: examples/feature-showcase/Cards
+card-folder: feature-showcase/Cards
 columns:
   - todo
   - id: next

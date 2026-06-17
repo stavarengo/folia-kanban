@@ -1,6 +1,6 @@
 ---
 folia-board: true
-card-folder: examples/basic/Cards
+card-folder: basic/Cards
 columns:
   - todo
   - doing
