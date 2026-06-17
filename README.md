@@ -82,7 +82,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 
 ## Set up a board
 
-1. Make a **board note** — any note with this frontmatter (see `examples/Example Board.md`):
+1. Make a **board note** — any note with this frontmatter (see `examples/basic/` for a minimal board, or `examples/feature-showcase/` for one that exercises every feature):
    ```yaml
    kanban-board: true
    card-folder: Cards      # folder holding the card notes
