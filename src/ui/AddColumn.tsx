@@ -40,10 +40,20 @@ export function AddColumn() {
         }}
       />
       <div className="folia-row-actions">
-        <button className="folia-btn folia-btn-primary" onMouseDown={(e) => e.preventDefault()} onClick={submit}>
+        <button
+          className="folia-btn folia-btn-primary"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={submit}
+        >
           Add
         </button>
-        <button className="folia-btn" onClick={() => { setAdding(false); setTitle(""); }}>
+        <button
+          className="folia-btn"
+          onClick={() => {
+            setAdding(false);
+            setTitle("");
+          }}
+        >
           Cancel
         </button>
       </div>

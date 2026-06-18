@@ -61,7 +61,11 @@ function suggestionsFor(fragment: string): Suggestion[] {
 }
 
 /** Replace the caret's fragment (last run since the previous space) with `insert`. */
-function applySuggestion(query: string, caret: number, insert: string): { query: string; caret: number } {
+function applySuggestion(
+  query: string,
+  caret: number,
+  insert: string,
+): { query: string; caret: number } {
   const before = query.slice(0, caret);
   const after = query.slice(caret);
   const start = before.lastIndexOf(" ") + 1; // 0 when no space → fragment starts at 0
@@ -162,7 +166,9 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
-          aria-activedescendant={showList && suggestions.length > 0 ? `${listId}-opt-${highlight}` : undefined}
+          aria-activedescendant={
+            showList && suggestions.length > 0 ? `${listId}-opt-${highlight}` : undefined
+          }
           aria-autocomplete="list"
           autoComplete="off"
           spellCheck={false}
@@ -176,12 +182,22 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
           onKeyDown={onKeyDown}
         />
         {query && (
-          <button className="folia-icon-btn folia-mini" aria-label="Clear search" title="Clear" onClick={() => onChange("")}>
+          <button
+            className="folia-icon-btn folia-mini"
+            aria-label="Clear search"
+            title="Clear"
+            onClick={() => onChange("")}
+          >
             <Icon name="close" size={13} />
           </button>
         )}
         {showList && (
-          <ul className="folia-filter-suggest" id={listId} role="listbox" aria-label="Filter suggestions">
+          <ul
+            className="folia-filter-suggest"
+            id={listId}
+            role="listbox"
+            aria-label="Filter suggestions"
+          >
             {suggestions.map((s, i) => (
               <li key={s.insert}>
                 <button

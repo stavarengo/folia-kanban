@@ -119,7 +119,10 @@ describe("parseFilter", () => {
   });
 
   it('honors "double quotes" for values and phrases with spaces', () => {
-    expect(parseFilter('area:"garden prep"')).toEqual({ text: [], tokens: [{ key: "area", value: "garden prep" }] });
+    expect(parseFilter('area:"garden prep"')).toEqual({
+      text: [],
+      tokens: [{ key: "area", value: "garden prep" }],
+    });
     expect(parseFilter('"buy milk"')).toEqual({ text: ["buy milk"], tokens: [] });
   });
 
@@ -160,7 +163,9 @@ describe("matchCard", () => {
 
   it("context token reads the card's context frontmatter (string or array)", () => {
     expect(matchCard(card({ context: "acme" }), parseFilter("context:acme"), ctx)).toBe(true);
-    expect(matchCard(card({ context: ["acme", "beta"] }), parseFilter("context:beta"), ctx)).toBe(true);
+    expect(matchCard(card({ context: ["acme", "beta"] }), parseFilter("context:beta"), ctx)).toBe(
+      true,
+    );
     expect(matchCard(card({ context: ["acme"] }), parseFilter("context:none"), ctx)).toBe(false);
     expect(matchCard(card({}), parseFilter("context:acme"), ctx)).toBe(false);
   });
@@ -200,8 +205,18 @@ describe("matchCard", () => {
 
   it("a done card is never overdue (delegates to dueInfo with the resolved done column)", () => {
     const finished = card({ due: "2026-06-10", status: "completed" });
-    expect(matchCard(finished, parseFilter("due:overdue"), { today: "2026-06-16", doneColumnId: "completed" })).toBe(false);
-    expect(matchCard(finished, parseFilter("due:overdue"), { today: "2026-06-16", doneColumnId: "done" })).toBe(true);
+    expect(
+      matchCard(finished, parseFilter("due:overdue"), {
+        today: "2026-06-16",
+        doneColumnId: "completed",
+      }),
+    ).toBe(false);
+    expect(
+      matchCard(finished, parseFilter("due:overdue"), {
+        today: "2026-06-16",
+        doneColumnId: "done",
+      }),
+    ).toBe(true);
   });
 
   it("ANDs tokens with free text", () => {

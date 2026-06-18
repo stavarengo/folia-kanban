@@ -92,17 +92,23 @@ for (const file of files) {
 if (active.length) {
   console.log(`check-waivers: ${active.length} active waiver(s):`);
   for (const w of active) {
-    console.log(`  - ${w.file} (status: ${w.status}, expiry: ${w.expiry}, ${w.daysRemaining} day(s) remaining)`);
+    console.log(
+      `  - ${w.file} (status: ${w.status}, expiry: ${w.expiry}, ${w.daysRemaining} day(s) remaining)`,
+    );
   }
 }
 
 if (expired.length || malformed.length) {
   console.error("check-waivers: FAIL");
   for (const w of expired) {
-    console.error(`  - EXPIRED: ${w.file} (status: ${w.status}, expiry: ${w.expiry}, ${-w.daysRemaining} day(s) past due) — blocks merge (§13.7)`);
+    console.error(
+      `  - EXPIRED: ${w.file} (status: ${w.status}, expiry: ${w.expiry}, ${-w.daysRemaining} day(s) past due) — blocks merge (§13.7)`,
+    );
   }
   for (const w of malformed) {
-    console.error(`  - MALFORMED: ${w.file} (missing ${w.missing} field) — a waiver must declare Status and Expiry`);
+    console.error(
+      `  - MALFORMED: ${w.file} (missing ${w.missing} field) — a waiver must declare Status and Expiry`,
+    );
   }
   process.exit(1);
 }

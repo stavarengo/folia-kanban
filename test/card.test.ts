@@ -232,7 +232,10 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
     expect(comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
     expect(comments[1].timestamp).toBe("2026-06-13 11:00"); // timestamp kept
     // every byte except comment 2's text is identical: rebuild expected from the original.
-    const expected = withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] edited two");
+    const expected = withThreeComments.replace(
+      "- [2026-06-13 11:00] two",
+      "- [2026-06-13 11:00] edited two",
+    );
     expect(out).toBe(expected);
     expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(withThreeComments).fmText);
   });
@@ -245,7 +248,8 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
   });
 
   it("updateTimestampedLine edits a bare-bullet (no timestamp) comment, not just timestamped ones", () => {
-    const body = "# C\n\n## Comments\n- [2026-06-13 10:00] one\n- bare note\n- [2026-06-13 12:00] three\n";
+    const body =
+      "# C\n\n## Comments\n- [2026-06-13 10:00] one\n- bare note\n- [2026-06-13 12:00] three\n";
     const out = updateTimestampedLine(body, SECTION.comments, 1, "edited bare");
     expect(out).toBe(body.replace("- bare note", "- edited bare"));
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "edited bare", "three"]);
@@ -253,7 +257,9 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
 
   it("updateTimestampedLine collapses an embedded newline so the index walk can't desync", () => {
     const out = updateTimestampedLine(withThreeComments, SECTION.comments, 1, "line1\nline2");
-    expect(out).toBe(withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] line1 line2"));
+    expect(out).toBe(
+      withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] line1 line2"),
+    );
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "line1 line2", "three"]);
   });
 });
@@ -283,7 +289,10 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
 
   it("updateComment edits comment 2 of 3 with the CR preserved on that line", () => {
     const out = updateTimestampedLine(crlf, SECTION.comments, 1, "edited two");
-    const expected = crlf.replace("- [2026-06-13 11:00] two\r", "- [2026-06-13 11:00] edited two\r");
+    const expected = crlf.replace(
+      "- [2026-06-13 11:00] two\r",
+      "- [2026-06-13 11:00] edited two\r",
+    );
     expect(out).toBe(expected); // whole file byte-identical except the intended change
     everyLineKeepsCRLF(out);
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
@@ -340,9 +349,18 @@ describe("round-trip on fixture cards", () => {
       expect(after.title).toBe(before.title);
       expect(after.description).toBe(before.description);
       // Nothing lost: every pre-existing item survives, plus exactly the new ones appended.
-      expect(after.comments.map((c) => c.text)).toEqual([...before.comments.map((c) => c.text), "verification comment"]);
-      expect(after.history.map((h) => h.text)).toEqual([...before.history.map((h) => h.text), "Verified by test"]);
-      expect(after.subtasks.map((s) => s.text)).toEqual([...before.subtasks.map((s) => s.text), "a subtask"]);
+      expect(after.comments.map((c) => c.text)).toEqual([
+        ...before.comments.map((c) => c.text),
+        "verification comment",
+      ]);
+      expect(after.history.map((h) => h.text)).toEqual([
+        ...before.history.map((h) => h.text),
+        "Verified by test",
+      ]);
+      expect(after.subtasks.map((s) => s.text)).toEqual([
+        ...before.subtasks.map((s) => s.text),
+        "a subtask",
+      ]);
     });
   }
 });

@@ -218,12 +218,18 @@ function CardItemInner({ card, columnId, today, selected, nested = false }: Prop
         {stats && (stats.subcards > 0 || stats.comments > 0) && (
           <div className="folia-card-meta">
             {stats.subcards > 0 && (
-              <span title="Subcards" aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}>
+              <span
+                title="Subcards"
+                aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}
+              >
                 <Icon name="git-branch" size={13} /> {stats.subcards}
               </span>
             )}
             {stats.comments > 0 && (
-              <span title="Comments" aria-label={`${stats.comments} comment${stats.comments === 1 ? "" : "s"}`}>
+              <span
+                title="Comments"
+                aria-label={`${stats.comments} comment${stats.comments === 1 ? "" : "s"}`}
+              >
                 <Icon name="message" size={13} /> {stats.comments}
               </span>
             )}
@@ -272,7 +278,11 @@ function CardItemInner({ card, columnId, today, selected, nested = false }: Prop
       )}
 
       {confirming && (
-        <div className="folia-card-confirm" role="alertdialog" aria-label={`Delete ${card.basename}?`}>
+        <div
+          className="folia-card-confirm"
+          role="alertdialog"
+          aria-label={`Delete ${card.basename}?`}
+        >
           <span>Delete card?</span>
           <div className="folia-row-actions">
             <button

@@ -24,7 +24,10 @@ function makeRepo() {
       body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
     },
     "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "\n# Beta\n" },
-    "Tasks/Gamma.md": { fm: { type: "task", status: "doing", due: "2026-06-01" }, body: "\n# Gamma\n" },
+    "Tasks/Gamma.md": {
+      fm: { type: "task", status: "doing", due: "2026-06-01" },
+      body: "\n# Gamma\n",
+    },
   });
 }
 
@@ -39,7 +42,9 @@ describe("board rendering", () => {
     const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
     expect(within(todoCol).getByText("Alpha")).toBeInTheDocument();
     // Beta is a subcard: it renders nested under Alpha (not standalone) and doesn't bump the count.
-    expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass("folia-card--nested");
+    expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass(
+      "folia-card--nested",
+    );
     expect(within(todoCol).getByTitle("1 cards")).toHaveTextContent("1"); // count = top-level only
 
     const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
@@ -63,8 +68,14 @@ describe("board rendering", () => {
 
   it("renders a grandchild recursively so a 2-level subtree never vanishes", async () => {
     const repo = new FakeRepo(config, {
-      "Tasks/Root.md": { fm: { type: "task", status: "todo" }, body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n" },
-      "Tasks/Mid.md": { fm: { type: "task", status: "doing" }, body: "\n# Mid\n\n## Subtasks\n- [ ] [[Leaf]]\n" },
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n",
+      },
+      "Tasks/Mid.md": {
+        fm: { type: "task", status: "doing" },
+        body: "\n# Mid\n\n## Subtasks\n- [ ] [[Leaf]]\n",
+      },
       "Tasks/Leaf.md": { fm: { type: "task", status: "done" }, body: "\n# Leaf\n" },
     });
     render_(repo);
@@ -73,8 +84,12 @@ describe("board rendering", () => {
     expect(within(tree).getByText("Mid")).toBeInTheDocument();
     expect(within(tree).getByText("Leaf")).toBeInTheDocument();
     // Neither Mid (doing) nor Leaf (done) leaks into its own status column.
-    expect(within(screen.getByText("Doing").closest("section") as HTMLElement).queryByText("Mid")).toBeNull();
-    expect(within(screen.getByText("Done").closest("section") as HTMLElement).queryByText("Leaf")).toBeNull();
+    expect(
+      within(screen.getByText("Doing").closest("section") as HTMLElement).queryByText("Mid"),
+    ).toBeNull();
+    expect(
+      within(screen.getByText("Done").closest("section") as HTMLElement).queryByText("Leaf"),
+    ).toBeNull();
   });
 
   it("shows chips and subtask/subcard/comment stats on a card", async () => {
@@ -114,7 +129,9 @@ describe("card detail", () => {
     expect(within(detail).queryByRole("textbox", { name: "Edit description" })).toBeNull();
     // Clicking the rendered area flips to the raw textarea.
     await user.click(rendered);
-    expect(await within(detail).findByRole("textbox", { name: "Edit description" })).toHaveValue("Desc A");
+    expect(await within(detail).findByRole("textbox", { name: "Edit description" })).toHaveValue(
+      "Desc A",
+    );
   });
 
   it("saves an edited description via setDescription and returns to view", async () => {
@@ -130,7 +147,9 @@ describe("card detail", () => {
     await user.click(within(detail).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("Brand new body"));
     // Back in view mode: the textarea is gone and the new text renders.
-    await waitFor(() => expect(within(detail).queryByRole("textbox", { name: "Edit description" })).toBeNull());
+    await waitFor(() =>
+      expect(within(detail).queryByRole("textbox", { name: "Edit description" })).toBeNull(),
+    );
     expect(await within(detail).findByText("Brand new body")).toBeInTheDocument();
   });
 
@@ -139,10 +158,14 @@ describe("card detail", () => {
     render_(makeRepo());
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    const view = (await within(detail).findByText("Desc A")).closest(".folia-desc-view") as HTMLElement;
+    const view = (await within(detail).findByText("Desc A")).closest(
+      ".folia-desc-view",
+    ) as HTMLElement;
     // The layout effect measures the preview's position against the viewport and writes the ceiling
     // as a CSS var; assert it wired through (px value, robust to the test viewport's innerHeight).
-    await waitFor(() => expect(view.style.getPropertyValue("--folia-desc-max-h")).toMatch(/^\d+px$/));
+    await waitFor(() =>
+      expect(view.style.getPropertyValue("--folia-desc-max-h")).toMatch(/^\d+px$/),
+    );
   });
 
   it("preserves the rendered preview's height as the textarea's min-height when entering edit (#15)", async () => {
@@ -165,15 +188,25 @@ describe("card detail", () => {
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     const rendered = await within(detail).findByText("Desc A");
-    Object.defineProperty(rendered.closest(".folia-desc-view") as HTMLElement, "offsetHeight", { configurable: true, value: 247 });
+    Object.defineProperty(rendered.closest(".folia-desc-view") as HTMLElement, "offsetHeight", {
+      configurable: true,
+      value: 247,
+    });
     await user.click(rendered);
-    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe("247px");
+    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe(
+      "247px",
+    );
     // Revert returns to view mode; re-entering with no measured height carries nothing over.
     await user.click(within(detail).getByRole("button", { name: "Revert" }));
     const back = await within(detail).findByText("Desc A");
-    Object.defineProperty(back.closest(".folia-desc-view") as HTMLElement, "offsetHeight", { configurable: true, value: 0 });
+    Object.defineProperty(back.closest(".folia-desc-view") as HTMLElement, "offsetHeight", {
+      configurable: true,
+      value: 0,
+    });
     await user.click(back);
-    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe("");
+    expect(within(detail).getByRole("textbox", { name: "Edit description" }).style.minHeight).toBe(
+      "",
+    );
   });
 
   it("renders each comment's text through the markdown component", async () => {
@@ -355,7 +388,9 @@ describe("creating cards", () => {
     await screen.findByText("Alpha");
     await user.click(screen.getByLabelText("Add card to Done"));
     await user.type(screen.getByLabelText("New card title"), "Fresh card{Enter}");
-    const doneCol = screen.getAllByTestId("column").find((c) => (c as HTMLElement).dataset.column === "done")!;
+    const doneCol = screen
+      .getAllByTestId("column")
+      .find((c) => (c as HTMLElement).dataset.column === "done")!;
     expect(await within(doneCol).findByText("Fresh card")).toBeInTheDocument();
     // 'inline' is add-only: the detail must NOT open.
     expect(screen.queryByTestId("card-detail")).toBeNull();
@@ -369,7 +404,9 @@ describe("creating cards", () => {
     await user.click(screen.getByLabelText("Add card to Done"));
     await user.type(screen.getByLabelText("New card title"), "Fresh card{Enter}");
     expect(await screen.findByRole("heading", { name: "Fresh card" })).toBeInTheDocument();
-    const doneCol = screen.getAllByTestId("column").find((c) => (c as HTMLElement).dataset.column === "done")!;
+    const doneCol = screen
+      .getAllByTestId("column")
+      .find((c) => (c as HTMLElement).dataset.column === "done")!;
     expect(within(doneCol).getByText("Fresh card")).toBeInTheDocument();
   });
 
@@ -397,7 +434,9 @@ describe("creating cards", () => {
     // createCard called with the column preset as status, then the created card's detail opens.
     expect(created).toContainEqual(["Made via detail", "done"]);
     expect(await screen.findByRole("heading", { name: "Made via detail" })).toBeInTheDocument();
-    const doneCol = screen.getAllByTestId("column").find((c) => (c as HTMLElement).dataset.column === "done")!;
+    const doneCol = screen
+      .getAllByTestId("column")
+      .find((c) => (c as HTMLElement).dataset.column === "done")!;
     expect(within(doneCol).getByText("Made via detail")).toBeInTheDocument();
   });
 
@@ -410,7 +449,9 @@ describe("creating cards", () => {
     let release: () => void = () => {};
     repo.createCard = async (title: string, status: string) => {
       created.push([title, status]);
-      await new Promise<void>((r) => { release = r; });
+      await new Promise<void>((r) => {
+        release = r;
+      });
       return origCreate(title, status);
     };
     render_(repo, { ...DEFAULT_SETTINGS, addCardFlow: "detail" });
@@ -430,10 +471,16 @@ describe("creating cards", () => {
 describe("inline card title edit (#12)", () => {
   // Enter inline edit via the right-click menu's "Rename" (single click opens the detail, so the
   // rename gesture lives in the context menu). Returns the live <input>.
-  const startRename = async (user: ReturnType<typeof userEvent.setup>, scope: HTMLElement, cardName: string) => {
-    const card = (within(scope).getAllByText(cardName)[0]).closest(".folia-card") as HTMLElement;
+  const startRename = async (
+    user: ReturnType<typeof userEvent.setup>,
+    scope: HTMLElement,
+    cardName: string,
+  ) => {
+    const card = within(scope).getAllByText(cardName)[0].closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
-    await user.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rename/ }));
+    await user.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rename/ }),
+    );
     return within(scope).getByLabelText("Card title") as HTMLInputElement;
   };
 
@@ -462,7 +509,9 @@ describe("inline card title edit (#12)", () => {
     await user.clear(input);
     await user.type(input, "Beta Renamed{Enter}");
     // Beta still nests under Alpha (the parent's wikilink was rewritten), not surfaced top-level.
-    const alphaTree = (await within(todoCol).findByText("Alpha")).closest(".folia-card-tree") as HTMLElement;
+    const alphaTree = (await within(todoCol).findByText("Alpha")).closest(
+      ".folia-card-tree",
+    ) as HTMLElement;
     const group = alphaTree.querySelector(".folia-subcard-group") as HTMLElement;
     expect(within(group).getByText("Beta Renamed")).toBeInTheDocument();
     expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("[[Beta Renamed]]");
@@ -490,12 +539,27 @@ describe("inline card title edit (#12)", () => {
 describe("urgency cue (#3)", () => {
   it("marks overdue / today / soon cards with data-urgency and leaves others neutral", async () => {
     const repo = new FakeRepo(config, {
-      "Tasks/Over.md": { fm: { type: "task", status: "todo", due: "2026-06-10" }, body: "\n# Over\n" },
-      "Tasks/Now.md": { fm: { type: "task", status: "todo", due: "2026-06-13" }, body: "\n# Now\n" },
-      "Tasks/Soon.md": { fm: { type: "task", status: "todo", due: "2026-06-15" }, body: "\n# Soon\n" },
-      "Tasks/Far.md": { fm: { type: "task", status: "todo", due: "2026-12-01" }, body: "\n# Far\n" },
+      "Tasks/Over.md": {
+        fm: { type: "task", status: "todo", due: "2026-06-10" },
+        body: "\n# Over\n",
+      },
+      "Tasks/Now.md": {
+        fm: { type: "task", status: "todo", due: "2026-06-13" },
+        body: "\n# Now\n",
+      },
+      "Tasks/Soon.md": {
+        fm: { type: "task", status: "todo", due: "2026-06-15" },
+        body: "\n# Soon\n",
+      },
+      "Tasks/Far.md": {
+        fm: { type: "task", status: "todo", due: "2026-12-01" },
+        body: "\n# Far\n",
+      },
       "Tasks/Plain.md": { fm: { type: "task", status: "todo" }, body: "\n# Plain\n" },
-      "Tasks/Finished.md": { fm: { type: "task", status: "done", due: "2026-06-10" }, body: "\n# Finished\n" },
+      "Tasks/Finished.md": {
+        fm: { type: "task", status: "done", due: "2026-06-10" },
+        body: "\n# Finished\n",
+      },
     });
     render_(repo); // today = 2026-06-13
     await screen.findByText("Over");
@@ -664,7 +728,10 @@ describe("card context menu", () => {
     expect(within(menu).getByRole("menuitem", { name: /Delete card/ })).toBeInTheDocument();
     // Change priority group with selectable options (current value highlighted).
     expect(within(menu).getByRole("group", { name: "Change priority" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitemradio", { name: "low" })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getByRole("menuitemradio", { name: "low" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 
   it("disables Move up at the top of the column and Move down at the bottom", async () => {
@@ -678,7 +745,9 @@ describe("card context menu", () => {
     const user = userEvent.setup();
     await user.click(within(menu).getByRole("menuitem", { name: /Move down/ }));
     // First now sorts after Second: its order is bumped past Second's (order 2).
-    await waitFor(() => expect(Number(repo.files.get("Tasks/First.md")!.fm.order)).toBeGreaterThan(2));
+    await waitFor(() =>
+      expect(Number(repo.files.get("Tasks/First.md")!.fm.order)).toBeGreaterThan(2),
+    );
   });
 
   it("Change priority sets the chosen priority via the repo", async () => {
@@ -757,7 +826,9 @@ describe("card context menu", () => {
 
 describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/parked)", () => {
   const openColumnMenu = async (columnTitle: string) => {
-    const trigger = await screen.findByRole("button", { name: `Column options for ${columnTitle}` });
+    const trigger = await screen.findByRole("button", {
+      name: `Column options for ${columnTitle}`,
+    });
     fireEvent.click(trigger);
     return screen.findByRole("dialog", { name: `Column options: ${columnTitle}` });
   };
@@ -809,7 +880,9 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
       });
     });
     // The modal closes after saving.
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit column: Backlog" })).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Edit column: Backlog" })).toBeNull(),
+    );
   });
 
   it("an empty title is rejected (the editor stays open, no write)", async () => {
@@ -828,7 +901,13 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
 
   it("#1 a column filter rule shows only matching cards (ANDs with nothing here)", async () => {
     const repo = new FakeRepo(
-      { ...config, columns: [{ id: "todo", title: "Todo", filter: "area:home" }, { id: "done", title: "Done" }] },
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo", filter: "area:home" },
+          { id: "done", title: "Done" },
+        ],
+      },
       {
         "Tasks/Home.md": { fm: { type: "task", status: "todo", area: "home" }, body: "\n# Home\n" },
         "Tasks/Work.md": { fm: { type: "task", status: "todo", area: "work" }, body: "\n# Work\n" },
@@ -852,9 +931,18 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
       },
       {
         // Two area:research cards living in OTHER columns + one non-matching card.
-        "Tasks/ResearchA.md": { fm: { type: "task", status: "todo", area: "research" }, body: "\n# ResearchA\n" },
-        "Tasks/ResearchB.md": { fm: { type: "task", status: "doing", area: "research" }, body: "\n# ResearchB\n" },
-        "Tasks/Other.md": { fm: { type: "task", status: "todo", area: "home" }, body: "\n# Other\n" },
+        "Tasks/ResearchA.md": {
+          fm: { type: "task", status: "todo", area: "research" },
+          body: "\n# ResearchA\n",
+        },
+        "Tasks/ResearchB.md": {
+          fm: { type: "task", status: "doing", area: "research" },
+          body: "\n# ResearchB\n",
+        },
+        "Tasks/Other.md": {
+          fm: { type: "task", status: "todo", area: "home" },
+          body: "\n# Other\n",
+        },
       },
     );
     render_(repo);
@@ -864,7 +952,9 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     expect(within(researchCol).getByText("ResearchB")).toBeInTheDocument();
     expect(within(researchCol).queryByText("Other")).toBeNull();
     // The lane badge counts the matched cards actually shown (2), not the (empty) "research" status bucket.
-    expect(within(researchCol).getByText("2", { selector: ".folia-column-count" })).toBeInTheDocument();
+    expect(
+      within(researchCol).getByText("2", { selector: ".folia-column-count" }),
+    ).toBeInTheDocument();
     // The pulled cards still ALSO render in their own status columns (no cross-column de-dupe).
     const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
     expect(within(todoCol).getByText("ResearchA")).toBeInTheDocument();
@@ -879,7 +969,12 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
           { id: "research", title: "Research", filter: "area:research" },
         ],
       },
-      { "Tasks/ResearchA.md": { fm: { type: "task", status: "todo", area: "research" }, body: "\n# ResearchA\n" } },
+      {
+        "Tasks/ResearchA.md": {
+          fm: { type: "task", status: "todo", area: "research" },
+          body: "\n# ResearchA\n",
+        },
+      },
     );
     render_(repo);
     await screen.findByText("Research");
@@ -897,21 +992,41 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
 
   it("#6 group:due renders bucket headings within the column", async () => {
     const repo = new FakeRepo(
-      { ...config, columns: [{ id: "todo", title: "Todo", group: "due" }, { id: "done", title: "Done" }] },
       {
-        "Tasks/Late.md": { fm: { type: "task", status: "todo", due: "2026-06-01" }, body: "\n# Late\n" },
-        "Tasks/Soon.md": { fm: { type: "task", status: "todo", due: "2026-06-13" }, body: "\n# Soon\n" },
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo", group: "due" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Late.md": {
+          fm: { type: "task", status: "todo", due: "2026-06-01" },
+          body: "\n# Late\n",
+        },
+        "Tasks/Soon.md": {
+          fm: { type: "task", status: "todo", due: "2026-06-13" },
+          body: "\n# Soon\n",
+        },
       },
     );
     render_(repo); // today=2026-06-13 → Late overdue, Soon today
     const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
-    const headings = [...todoCol.querySelectorAll(".folia-card-group-heading")].map((h) => h.textContent);
+    const headings = [...todoCol.querySelectorAll(".folia-card-group-heading")].map(
+      (h) => h.textContent,
+    );
     expect(headings).toEqual(["Overdue", "Today"]);
   });
 
   it("#10 a faded + parked column gets the de-emphasis classes and CSS vars", async () => {
     const repo = new FakeRepo(
-      { ...config, columns: [{ id: "todo", title: "Todo" }, { id: "rabbit", title: "Rabbit", opacity: 0.4, hoverOpacity: 0.8, parked: true }] },
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "rabbit", title: "Rabbit", opacity: 0.4, hoverOpacity: 0.8, parked: true },
+        ],
+      },
       { "Tasks/Solo.md": { fm: { type: "task", status: "todo" }, body: "\n# Solo\n" } },
     );
     render_(repo);
@@ -936,7 +1051,9 @@ describe("search filter (single source of truth)", () => {
     const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
     expect(within(doingCol).queryByText("Gamma")).toBeNull();
     // match count reflects the filtered set
-    expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent("1 of");
+    expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
+      "1 of",
+    );
   });
 
   it("pressing '/' (focus not in a field) focuses the search input, as the placeholder promises", async () => {
@@ -1024,9 +1141,16 @@ describe("settings context", () => {
   it("exposes the provided settings via useSettings()", () => {
     function Probe() {
       const settings = useSettings();
-      return <span data-testid="probe">{settings.detailPresentation}/{settings.cardNextTodos}</span>;
+      return (
+        <span data-testid="probe">
+          {settings.detailPresentation}/{settings.cardNextTodos}
+        </span>
+      );
     }
-    const value = { settings: { ...DEFAULT_SETTINGS, detailPresentation: "modal" as const, cardNextTodos: 3 }, update: () => {} };
+    const value = {
+      settings: { ...DEFAULT_SETTINGS, detailPresentation: "modal" as const, cardNextTodos: 3 },
+      update: () => {},
+    };
     render(
       <SettingsContext.Provider value={value}>
         <Probe />
@@ -1088,8 +1212,7 @@ describe("context grouping marker (#14)", () => {
 describe("inline column-title edit (#7)", () => {
   const user = userEvent.setup();
 
-  const titleSpan = (text: string) =>
-    screen.getByText(text, { selector: ".folia-column-title" });
+  const titleSpan = (text: string) => screen.getByText(text, { selector: ".folia-column-title" });
 
   it("clicking a column title swaps in an input seeded with the current title, selected", async () => {
     render_(makeRepo());
@@ -1111,7 +1234,9 @@ describe("inline column-title edit (#7)", () => {
     const input = screen.getByLabelText("Rename column Todo");
     await user.clear(input);
     await user.type(input, "Backlog{Enter}");
-    expect(await screen.findByText("Backlog", { selector: ".folia-column-title" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Backlog", { selector: ".folia-column-title" }),
+    ).toBeInTheDocument();
     expect(repo.config.columns.find((c) => c.id === "todo")?.title).toBe("Backlog");
   });
 
@@ -1124,7 +1249,9 @@ describe("inline column-title edit (#7)", () => {
     await user.clear(input);
     await user.type(input, "In progress");
     fireEvent.blur(input);
-    expect(await screen.findByText("In progress", { selector: ".folia-column-title" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("In progress", { selector: ".folia-column-title" }),
+    ).toBeInTheDocument();
     expect(repo.config.columns.find((c) => c.id === "doing")?.title).toBe("In progress");
   });
 
@@ -1136,7 +1263,9 @@ describe("inline column-title edit (#7)", () => {
     const input = screen.getByLabelText("Rename column Done");
     await user.clear(input);
     await user.type(input, "Shipped{Escape}");
-    expect(await screen.findByText("Done", { selector: ".folia-column-title" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Done", { selector: ".folia-column-title" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Shipped", { selector: ".folia-column-title" })).toBeNull();
     expect(repo.config.columns.find((c) => c.id === "done")?.title).toBe("Done");
   });
@@ -1149,7 +1278,9 @@ describe("inline column-title edit (#7)", () => {
     const input = screen.getByLabelText("Rename column Todo");
     await user.clear(input);
     await user.type(input, "   {Enter}");
-    expect(await screen.findByText("Todo", { selector: ".folia-column-title" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Todo", { selector: ".folia-column-title" }),
+    ).toBeInTheDocument();
     expect(repo.config.columns.find((c) => c.id === "todo")?.title).toBe("Todo");
   });
 

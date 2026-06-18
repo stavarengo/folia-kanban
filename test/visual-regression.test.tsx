@@ -37,7 +37,10 @@ function makeRepo() {
       fm: { type: "task", status: "todo", priority: "A", area: "home" },
       body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
     },
-    "Tasks/Gamma.md": { fm: { type: "task", status: "doing", due: "2026-06-01" }, body: "\n# Gamma\n" },
+    "Tasks/Gamma.md": {
+      fm: { type: "task", status: "doing", due: "2026-06-01" },
+      body: "\n# Gamma\n",
+    },
   });
 }
 
@@ -58,8 +61,9 @@ describe("structural visual-regression snapshots", () => {
   it("a column header keeps its structural shape (.folia-column-header)", async () => {
     render_(makeRepo());
     await screen.findByText("Alpha");
-    const header = (await screen.findByText("Todo", { selector: ".folia-column-title" }))
-      .closest(".folia-column-header") as HTMLElement;
+    const header = (await screen.findByText("Todo", { selector: ".folia-column-title" })).closest(
+      ".folia-column-header",
+    ) as HTMLElement;
     expect(stable(header)).toMatchSnapshot();
   });
 });

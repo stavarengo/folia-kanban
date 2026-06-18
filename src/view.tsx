@@ -78,10 +78,18 @@ export class KanbanView extends ItemView {
     // The repo reads the history scope live via the getter, so settings changes don't
     // require rebuilding it — only a boardPath change does (handled in setState).
     if (!this.repo)
-      this.repo = new VaultRepository(this.app, this.boardPath, () => this.getSettings().historyScope);
+      this.repo = new VaultRepository(
+        this.app,
+        this.boardPath,
+        () => this.getSettings().historyScope,
+      );
     this.root.render(
       <StrictMode>
-        <BoardApp repo={this.repo} settings={this.getSettings()} onUpdateSettings={this.updateSettings} />
+        <BoardApp
+          repo={this.repo}
+          settings={this.getSettings()}
+          onUpdateSettings={this.updateSettings}
+        />
       </StrictMode>,
     );
   }

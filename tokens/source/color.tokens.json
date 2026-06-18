@@ -42,12 +42,24 @@
     "danger": {
       "$value": "{color.primitive.red}",
       "$type": "color",
-      "$extensions": { "folia": { "cssVar": "--folia-danger", "live": true, "resolvedValue": "var(--color-red, #e5534b)" } }
+      "$extensions": {
+        "folia": {
+          "cssVar": "--folia-danger",
+          "live": true,
+          "resolvedValue": "var(--color-red, #e5534b)"
+        }
+      }
     },
     "success": {
       "$value": "{color.primitive.green}",
       "$type": "color",
-      "$extensions": { "folia": { "cssVar": "--folia-success", "live": true, "resolvedValue": "var(--color-green, #4caf7d)" } }
+      "$extensions": {
+        "folia": {
+          "cssVar": "--folia-success",
+          "live": true,
+          "resolvedValue": "var(--color-green, #4caf7d)"
+        }
+      }
     },
     "scrim": {
       "$description": "Modal/side-panel backdrop. NEW token home — appears raw at styles.css:1071 and :1487; no --folia-* var defined yet (CSS adoption pending).",
@@ -60,22 +72,46 @@
       "1": {
         "$value": "{color.primitive.red}",
         "$type": "color",
-        "$extensions": { "folia": { "cssVar": "--folia-prio-1", "live": true, "resolvedValue": "var(--color-red, #e5534b)" } }
+        "$extensions": {
+          "folia": {
+            "cssVar": "--folia-prio-1",
+            "live": true,
+            "resolvedValue": "var(--color-red, #e5534b)"
+          }
+        }
       },
       "2": {
         "$value": "{color.primitive.orange}",
         "$type": "color",
-        "$extensions": { "folia": { "cssVar": "--folia-prio-2", "live": true, "resolvedValue": "var(--color-orange, #d9882f)" } }
+        "$extensions": {
+          "folia": {
+            "cssVar": "--folia-prio-2",
+            "live": true,
+            "resolvedValue": "var(--color-orange, #d9882f)"
+          }
+        }
       },
       "3": {
         "$value": "{color.primitive.yellow}",
         "$type": "color",
-        "$extensions": { "folia": { "cssVar": "--folia-prio-3", "live": true, "resolvedValue": "var(--color-yellow, #c2a312)" } }
+        "$extensions": {
+          "folia": {
+            "cssVar": "--folia-prio-3",
+            "live": true,
+            "resolvedValue": "var(--color-yellow, #c2a312)"
+          }
+        }
       },
       "4": {
         "$value": "{color.primitive.blue}",
         "$type": "color",
-        "$extensions": { "folia": { "cssVar": "--folia-prio-4", "live": true, "resolvedValue": "var(--color-blue, #5b8def)" } }
+        "$extensions": {
+          "folia": {
+            "cssVar": "--folia-prio-4",
+            "live": true,
+            "resolvedValue": "var(--color-blue, #5b8def)"
+          }
+        }
       }
     },
     "column": {

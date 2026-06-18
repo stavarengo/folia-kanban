@@ -28,7 +28,9 @@ function SubcardGroup({
   selectedPath: string | null;
   seen: ReadonlySet<string>;
 }) {
-  const children = (board.childrenOf[parentPath] ?? []).filter((p) => board.cards[p] && !seen.has(p));
+  const children = (board.childrenOf[parentPath] ?? []).filter(
+    (p) => board.cards[p] && !seen.has(p),
+  );
   if (children.length === 0) return null;
   return (
     <div className="folia-subcard-group">
@@ -37,7 +39,13 @@ function SubcardGroup({
         return (
           <div key={p} className="folia-subcard">
             <CardItem card={board.cards[p]} today={today} selected={p === selectedPath} nested />
-            <SubcardGroup parentPath={p} board={board} today={today} selectedPath={selectedPath} seen={next} />
+            <SubcardGroup
+              parentPath={p}
+              board={board}
+              today={today}
+              selectedPath={selectedPath}
+              seen={next}
+            />
           </div>
         );
       })}
@@ -67,13 +75,33 @@ interface Props {
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Column({ column, cardPaths, board, today, selectedPath, wipLimit, filter, doneColumnId, isFirst, isLast, onAddCard }: Props) {
+export function Column({
+  column,
+  cardPaths,
+  board,
+  today,
+  selectedPath,
+  wipLimit,
+  filter,
+  doneColumnId,
+  isFirst,
+  isLast,
+  onAddCard,
+}: Props) {
   // The column is itself a sortable item (header drag-reorder, #2). Its sortable id IS column.id,
   // which doubles as the body's droppable id — so a card dropped on this column still reports
   // over.id === column.id and resolveDrop keeps bucketing card drops unchanged. (No separate
   // useDroppable: that would register a second droppable under the same id and collide.)
-  const { setNodeRef, setActivatorNodeRef, listeners, attributes, transform, transition, isOver, isDragging } =
-    useSortable({ id: column.id });
+  const {
+    setNodeRef,
+    setActivatorNodeRef,
+    listeners,
+    attributes,
+    transform,
+    transition,
+    isOver,
+    isDragging,
+  } = useSortable({ id: column.id });
   const settings = useSettings();
   const actions = useBoardActions();
   const [adding, setAdding] = useState(false);
@@ -190,7 +218,9 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   // set (so dnd sortable identity matches what the user sees, even when grouped/sorted). Each id is
   // namespaced by THIS column (`col::path`) so a card mirrored into a cross-board lane (#1) and its
   // status column register two distinct, non-colliding sortables. CardItem builds the matching id.
-  const orderedDragIds = groups.flatMap((g) => g.cards.map((c) => makeCardDragId(column.id, c.path)));
+  const orderedDragIds = groups.flatMap((g) =>
+    g.cards.map((c) => makeCardDragId(column.id, c.path)),
+  );
 
   const count = countPaths.length;
   const overLimit = wipLimit != null && count > wipLimit;
@@ -211,7 +241,8 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
   };
   if (faded) {
     style["--folia-col-opacity"] = opacity;
-    style["--folia-col-hover-opacity"] = typeof column.hoverOpacity === "number" ? column.hoverOpacity : 1;
+    style["--folia-col-hover-opacity"] =
+      typeof column.hoverOpacity === "number" ? column.hoverOpacity : 1;
   }
 
   return (
@@ -343,15 +374,27 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
               {g.label && <div className="folia-card-group-heading">{g.label}</div>}
               {g.cards.map((c) => (
                 <div key={c.path} className="folia-card-tree">
-                  <CardItem card={c} columnId={column.id} today={today} selected={c.path === selectedPath} />
-                  <SubcardGroup parentPath={c.path} board={board} today={today} selectedPath={selectedPath} seen={new Set([c.path])} />
+                  <CardItem
+                    card={c}
+                    columnId={column.id}
+                    today={today}
+                    selected={c.path === selectedPath}
+                  />
+                  <SubcardGroup
+                    parentPath={c.path}
+                    board={board}
+                    today={today}
+                    selectedPath={selectedPath}
+                    seen={new Set([c.path])}
+                  />
                 </div>
               ))}
             </div>
           ))}
         </SortableContext>
-        {paths.length === 0 && !adding && (
-          filtering ? (
+        {paths.length === 0 &&
+          !adding &&
+          (filtering ? (
             <div className="folia-column-empty is-filtered">
               <span>No matches</span>
             </div>
@@ -360,8 +403,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
               <Icon name="inbox" size={20} />
               <span>Nothing here</span>
             </div>
-          )
-        )}
+          ))}
         {adding && (
           <div className="folia-add-card">
             <textarea
@@ -382,10 +424,20 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
               }}
             />
             <div className="folia-row-actions">
-              <button className="folia-btn folia-btn-primary" onMouseDown={(e) => e.preventDefault()} onClick={() => submit(false)}>
+              <button
+                className="folia-btn folia-btn-primary"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => submit(false)}
+              >
                 Add card
               </button>
-              <button className="folia-btn" onClick={() => { setAdding(false); setTitle(""); }}>
+              <button
+                className="folia-btn"
+                onClick={() => {
+                  setAdding(false);
+                  setTitle("");
+                }}
+              >
                 Cancel
               </button>
             </div>
@@ -393,7 +445,11 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
         )}
       </div>
       {!adding && (
-        <button className="folia-column-add" aria-label={`Add card to ${column.title}`} onClick={onAddClick}>
+        <button
+          className="folia-column-add"
+          aria-label={`Add card to ${column.title}`}
+          onClick={onAddClick}
+        >
           <Icon name="plus" size={15} />
           Add a card
         </button>

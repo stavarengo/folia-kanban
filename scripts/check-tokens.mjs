@@ -105,7 +105,9 @@ for (const { file, path, node } of allTokens) {
     continue;
   }
   if (!cssVars.has(cssVar)) {
-    errors.push(`[${file}] token ${path} expects ${cssVar} in the .folia-root block, but it is missing`);
+    errors.push(
+      `[${file}] token ${path} expects ${cssVar} in the .folia-root block, but it is missing`,
+    );
     continue;
   }
   const declared = cssVars.get(cssVar);
@@ -142,7 +144,9 @@ if (!arrayMatch) {
   } else {
     columnTokens.forEach((hex, i) => {
       if (hex !== codeColors[i]) {
-        errors.push(`[color.column.${i + 1}] mismatch: JSON ${hex} vs COLUMN_COLORS ${codeColors[i]}`);
+        errors.push(
+          `[color.column.${i + 1}] mismatch: JSON ${hex} vs COLUMN_COLORS ${codeColors[i]}`,
+        );
       }
     });
   }
@@ -154,4 +158,6 @@ if (errors.length) {
   for (const e of errors) console.error("  - " + e);
   process.exit(1);
 }
-console.log(`check-tokens: OK (${liveVarNames.size} live tokens ↔ ${cssVars.size} declarations, ${columnTokens.length} column colors)`);
+console.log(
+  `check-tokens: OK (${liveVarNames.size} live tokens ↔ ${cssVars.size} declarations, ${columnTokens.length} column colors)`,
+);

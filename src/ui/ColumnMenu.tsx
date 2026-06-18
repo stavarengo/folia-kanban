@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import type { ColumnDef } from "../model/types";
 import { useBoardActions } from "./context";
@@ -98,13 +105,21 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdi
           {COLUMN_COLORS.map((c) => (
             <button
               key={c}
-              className={"folia-swatch" + (column.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")}
+              className={
+                "folia-swatch" +
+                (column.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
+              }
               style={{ background: c }}
               aria-label={`Set color ${c}`}
               onClick={() => a.setColumnColor(column.id, c)}
             />
           ))}
-          <button className="folia-swatch folia-swatch-none" aria-label="Clear color" title="No color" onClick={() => a.setColumnColor(column.id, null)}>
+          <button
+            className="folia-swatch folia-swatch-none"
+            aria-label="Clear color"
+            title="No color"
+            onClick={() => a.setColumnColor(column.id, null)}
+          >
             <Icon name="close" size={11} />
           </button>
         </div>
@@ -130,15 +145,35 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdi
       </label>
 
       <div className="folia-menu-divider" />
-      <button className="folia-menu-item" onClick={() => { onClose(); onEdit(); }}>
+      <button
+        className="folia-menu-item"
+        onClick={() => {
+          onClose();
+          onEdit();
+        }}
+      >
         <Icon name="pencil" size={14} /> Edit column…
       </button>
 
       <div className="folia-menu-divider" />
-      <button className="folia-menu-item" disabled={isFirst} onClick={() => { a.moveColumn(column.id, -1); onClose(); }}>
+      <button
+        className="folia-menu-item"
+        disabled={isFirst}
+        onClick={() => {
+          a.moveColumn(column.id, -1);
+          onClose();
+        }}
+      >
         <Icon name="arrow-left" size={14} /> Move left
       </button>
-      <button className="folia-menu-item" disabled={isLast} onClick={() => { a.moveColumn(column.id, 1); onClose(); }}>
+      <button
+        className="folia-menu-item"
+        disabled={isLast}
+        onClick={() => {
+          a.moveColumn(column.id, 1);
+          onClose();
+        }}
+      >
         <Icon name="arrow-right" size={14} /> Move right
       </button>
 
@@ -151,8 +186,18 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdi
         <div className="folia-menu-confirm" role="alertdialog" aria-label="Confirm delete column">
           <span>Delete “{column.title}”? Its cards move to a neighbouring column.</span>
           <div className="folia-row-actions">
-            <button className="folia-btn folia-btn-danger" onClick={() => { a.deleteColumn(column.id); onClose(); }}>Delete</button>
-            <button className="folia-btn" autoFocus onClick={() => setConfirmDel(false)}>Cancel</button>
+            <button
+              className="folia-btn folia-btn-danger"
+              onClick={() => {
+                a.deleteColumn(column.id);
+                onClose();
+              }}
+            >
+              Delete
+            </button>
+            <button className="folia-btn" autoFocus onClick={() => setConfirmDel(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       )}

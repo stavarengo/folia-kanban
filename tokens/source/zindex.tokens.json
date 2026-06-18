@@ -2,14 +2,41 @@
   "$description": "NEW category. Captures the z-index ladder currently raw in src/styles.css (values 1, 2, 30, 50, 55, 60, 70, 80, 90) as a named scale by stacking role. The --folia-* z-index vars are now defined in the .folia-root token block; these tokens are byte-matched against it.",
   "z-index": {
     "$type": "number",
-    "base": { "$value": "1", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-base" } } },
-    "raised": { "$value": "2", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-raised" } } },
-    "sticky": { "$value": "30", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-sticky" } } },
-    "toast": { "$value": "50", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-toast" } } },
-    "scrim": { "$value": "55", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-scrim" } } },
-    "menu": { "$value": "60", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-menu" } } },
-    "popover": { "$value": "70", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-popover" } } },
-    "modal": { "$value": "80", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-modal" } } },
-    "top": { "$value": "90", "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-top" } } }
+    "base": {
+      "$value": "1",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-base" } }
+    },
+    "raised": {
+      "$value": "2",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-raised" } }
+    },
+    "sticky": {
+      "$value": "30",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-sticky" } }
+    },
+    "toast": {
+      "$value": "50",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-toast" } }
+    },
+    "scrim": {
+      "$value": "55",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-scrim" } }
+    },
+    "menu": {
+      "$value": "60",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-menu" } }
+    },
+    "popover": {
+      "$value": "70",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-popover" } }
+    },
+    "modal": {
+      "$value": "80",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-modal" } }
+    },
+    "top": {
+      "$value": "90",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-top" } }
+    }
   }
 }

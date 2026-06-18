@@ -64,19 +64,31 @@ describe("normalizeColumns — reading the board frontmatter", () => {
   it("gracefully ignores invalid enum/filter values and clamps opacity to [0,1]", () => {
     const cols = normalizeColumns([
       // opacity:5 clamps to 1, which equals the default → dropped. hoverOpacity:-2 clamps to 0 (kept).
-      { id: "c", title: "C", group: "weekly", sort: "alpha", filter: "   ", opacity: 5, hoverOpacity: -2 },
+      {
+        id: "c",
+        title: "C",
+        group: "weekly",
+        sort: "alpha",
+        filter: "   ",
+        opacity: 5,
+        hoverOpacity: -2,
+      },
     ]);
     expect(cols[0]).toEqual({ id: "c", title: "C", hoverOpacity: 0 });
   });
 
   it("keeps a clamped opacity that lands on a non-default value", () => {
-    expect(normalizeColumns([{ id: "c", title: "C", opacity: 0.3 }])[0]).toEqual({ id: "c", title: "C", opacity: 0.3 });
+    expect(normalizeColumns([{ id: "c", title: "C", opacity: 0.3 }])[0]).toEqual({
+      id: "c",
+      title: "C",
+      opacity: 0.3,
+    });
   });
 
   it("skips entries without a usable id", () => {
-    expect(normalizeColumns([{ title: "no id" }, { id: "  " }, { id: "ok", title: "OK" }])).toEqual([
-      { id: "ok", title: "OK" },
-    ]);
+    expect(normalizeColumns([{ title: "no id" }, { id: "  " }, { id: "ok", title: "OK" }])).toEqual(
+      [{ id: "ok", title: "OK" }],
+    );
   });
 });
 
@@ -95,7 +107,14 @@ describe("serializeColumns — byte-stability protection", () => {
 
   it("does NOT emit a key whose value equals its default", () => {
     const out = serializeColumns([
-      { id: "c", title: "C", group: COLUMN_DEFAULTS.group, sort: COLUMN_DEFAULTS.sort, opacity: 1, parked: false },
+      {
+        id: "c",
+        title: "C",
+        group: COLUMN_DEFAULTS.group,
+        sort: COLUMN_DEFAULTS.sort,
+        opacity: 1,
+        parked: false,
+      },
     ]);
     expect(out).toEqual([{ id: "c", title: "C" }]);
   });
@@ -140,7 +159,16 @@ describe("round-trip: normalize(serialize(x)) is identity on the def shape", () 
 
   it("(b) each new field persists and reloads correctly through a round-trip", () => {
     const original: ColumnDef[] = [
-      { id: "research", title: "Research", filter: "area:research status:todo", group: "due", sort: "priority", opacity: 0.5, hoverOpacity: 0.9, parked: true },
+      {
+        id: "research",
+        title: "Research",
+        filter: "area:research status:todo",
+        group: "due",
+        sort: "priority",
+        opacity: 0.5,
+        hoverOpacity: 0.9,
+        parked: true,
+      },
       { id: "todo", title: "Todo" },
     ];
     expect(normalizeColumns(serializeColumns(original))).toEqual(original);
@@ -189,7 +217,17 @@ describe("updateColumn write path is byte-stable (#8 — the modal patch must no
       parked: true,
     };
     expect(normalizeColumns(serializeColumns([merged]))).toEqual([
-      { id: "research", title: "Research", limit: 3, filter: "area:research status:todo", group: "due", sort: "priority", opacity: 0.5, hoverOpacity: 0.8, parked: true },
+      {
+        id: "research",
+        title: "Research",
+        limit: 3,
+        filter: "area:research status:todo",
+        group: "due",
+        sort: "priority",
+        opacity: 0.5,
+        hoverOpacity: 0.8,
+        parked: true,
+      },
     ]);
   });
 });

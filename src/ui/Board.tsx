@@ -12,7 +12,11 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
 import type { Board as BoardModel } from "../model/types";
 import { planDrop, splitCardDragId } from "../model/board";
 import { Column } from "./Column";
@@ -55,7 +59,16 @@ interface Props {
   onAddCard: (columnId: string, title: string) => void;
 }
 
-export function Board({ board, today, selectedPath, wipLimits, filter, doneColumnId, onMove, onAddCard }: Props) {
+export function Board({
+  board,
+  today,
+  selectedPath,
+  wipLimits,
+  filter,
+  doneColumnId,
+  onMove,
+  onAddCard,
+}: Props) {
   const actions = useBoardActions();
   const { boardPan } = useSettings();
   // Keep the module-scoped ref the sensor (and the pan handler below) reads in sync with the live
@@ -81,8 +94,11 @@ export function Board({ board, today, selectedPath, wipLimits, filter, doneColum
   // lane (#1) and its status column don't collide on one id. A column drag's active id is the bare
   // column id. Resolve the active card by parsing the path back out (column ids have no `::`).
   const activeColumnDrag = activeId != null && columnIds.includes(activeId);
-  const activeColumn = activeColumnDrag ? board.config.columns.find((c) => c.id === activeId) ?? null : null;
-  const activeCard = activeId && !activeColumnDrag ? board.cards[splitCardDragId(activeId).path] : null;
+  const activeColumn = activeColumnDrag
+    ? (board.config.columns.find((c) => c.id === activeId) ?? null)
+    : null;
+  const activeCard =
+    activeId && !activeColumnDrag ? board.cards[splitCardDragId(activeId).path] : null;
 
   // Columns and cards share one DndContext, so both are registered droppables. When a COLUMN is
   // being dragged, restrict collision to column droppables only — otherwise closestCorners can
@@ -93,7 +109,9 @@ export function Board({ board, today, selectedPath, wipLimits, filter, doneColum
       if (activeId && columnIds.includes(activeId)) {
         return closestCorners({
           ...args,
-          droppableContainers: args.droppableContainers.filter((c) => columnIds.includes(String(c.id))),
+          droppableContainers: args.droppableContainers.filter((c) =>
+            columnIds.includes(String(c.id)),
+          ),
         });
       }
       return closestCorners(args);
@@ -128,7 +146,10 @@ export function Board({ board, today, selectedPath, wipLimits, filter, doneColum
     // are its children, so a press whose closest interactive ancestor is the board itself is "empty".)
     const isEmptyBackground = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
-      return !!t && !t.closest(".folia-column, .folia-add-column, button, a, input, textarea, [role='button']");
+      return (
+        !!t &&
+        !t.closest(".folia-column, .folia-add-column, button, a, input, textarea, [role='button']")
+      );
     };
 
     const shouldPan = (e: PointerEvent) => {
@@ -207,12 +228,30 @@ export function Board({ board, today, selectedPath, wipLimits, filter, doneColum
     return board.cards[splitCardDragId(id).path]?.basename ?? id;
   };
   const announcements = {
-    onDragStart: ({ active }: { active: { id: string | number } }) => `Picked up ${labelFor(String(active.id))}.`,
-    onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-      over ? `${labelFor(String(active.id))} is over ${labelFor(String(over.id))}.` : `${labelFor(String(active.id))} is no longer over a column.`,
-    onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-      over ? `Dropped ${labelFor(String(active.id))} into ${labelFor(String(over.id))}.` : `Dropped ${labelFor(String(active.id))}.`,
-    onDragCancel: ({ active }: { active: { id: string | number } }) => `Cancelled. ${labelFor(String(active.id))} was returned.`,
+    onDragStart: ({ active }: { active: { id: string | number } }) =>
+      `Picked up ${labelFor(String(active.id))}.`,
+    onDragOver: ({
+      active,
+      over,
+    }: {
+      active: { id: string | number };
+      over: { id: string | number } | null;
+    }) =>
+      over
+        ? `${labelFor(String(active.id))} is over ${labelFor(String(over.id))}.`
+        : `${labelFor(String(active.id))} is no longer over a column.`,
+    onDragEnd: ({
+      active,
+      over,
+    }: {
+      active: { id: string | number };
+      over: { id: string | number } | null;
+    }) =>
+      over
+        ? `Dropped ${labelFor(String(active.id))} into ${labelFor(String(over.id))}.`
+        : `Dropped ${labelFor(String(active.id))}.`,
+    onDragCancel: ({ active }: { active: { id: string | number } }) =>
+      `Cancelled. ${labelFor(String(active.id))} was returned.`,
   };
   const screenReaderInstructions = {
     draggable:
@@ -264,13 +303,18 @@ export function Board({ board, today, selectedPath, wipLimits, filter, doneColum
           easing: "cubic-bezier(0.16, 1, 0.3, 1)",
           // Briefly dim the overlay as it settles into the placeholder, so the lift visibly "lands"
           // rather than blinking out.
-          sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "var(--folia-opacity-faint)" } } }),
+          sideEffects: defaultDropAnimationSideEffects({
+            styles: { active: { opacity: "var(--folia-opacity-faint)" } },
+          }),
         }}
       >
         {activeColumn ? (
           // #1 (fix) — a dragged COLUMN gets a real lifted ghost too (col-header gave columns a
           // sortable but no overlay). A header-only ghost reads as "this column, picked up".
-          <div className="folia-column folia-column-overlay" style={{ ["--folia-col-accent" as string]: activeColumn.color || undefined }}>
+          <div
+            className="folia-column folia-column-overlay"
+            style={{ ["--folia-col-accent" as string]: activeColumn.color || undefined }}
+          >
             <div className="folia-column-header">
               <span className="folia-column-dot" aria-hidden="true" />
               <span className="folia-column-title">{activeColumn.title}</span>

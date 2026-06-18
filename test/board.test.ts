@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { buildBoard, columnEffectiveOrders, computeDropOrder, deriveContext, isComputedOrder, makeCardDragId, moveCard, moveColumn, planDrop, splitCardDragId } from "../src/model/board";
+import {
+  buildBoard,
+  columnEffectiveOrders,
+  computeDropOrder,
+  deriveContext,
+  isComputedOrder,
+  makeCardDragId,
+  moveCard,
+  moveColumn,
+  planDrop,
+  splitCardDragId,
+} from "../src/model/board";
 import type { BoardConfig, Card, ColumnDef } from "../src/model/types";
 
 const config: BoardConfig = {
@@ -12,7 +23,11 @@ const config: BoardConfig = {
   ],
 };
 
-function card(basename: string, fm: Partial<Card["frontmatter"]> = {}, childLinks: string[] = []): Card {
+function card(
+  basename: string,
+  fm: Partial<Card["frontmatter"]> = {},
+  childLinks: string[] = [],
+): Card {
   return { path: `Tasks/${basename}.md`, basename, frontmatter: fm, childLinks };
 }
 
@@ -64,7 +79,11 @@ describe("childrenOf (nested subcard rendering)", () => {
       card("Echo", { status: "todo", order: 1 }),
     ]);
     // Echo (order 1) then Yankee (order 2) then the unordered Zeta — same ranking columns use.
-    expect(b.childrenOf["Tasks/Parent.md"]).toEqual(["Tasks/Echo.md", "Tasks/Yankee.md", "Tasks/Zeta.md"]);
+    expect(b.childrenOf["Tasks/Parent.md"]).toEqual([
+      "Tasks/Echo.md",
+      "Tasks/Yankee.md",
+      "Tasks/Zeta.md",
+    ]);
   });
 
   it("nests a grandchild under its parent and keeps it out of every column", () => {
@@ -102,7 +121,12 @@ describe("ordering", () => {
 
   it("places ordered cards first, then unordered alphabetically (no synthetic/real collisions)", () => {
     // D has order 1.5 (sorts first); A,B,C unordered get distinct effs beyond the max real order.
-    const ranked = columnEffectiveOrders([card("A"), card("B"), card("C"), card("D", { order: 1.5 })]);
+    const ranked = columnEffectiveOrders([
+      card("A"),
+      card("B"),
+      card("C"),
+      card("D", { order: 1.5 }),
+    ]);
     expect(ranked.map((r) => r.card.basename)).toEqual(["D", "A", "B", "C"]);
     // every effective order is distinct, so a drop can never resolve to a duplicate rank
     expect(new Set(ranked.map((r) => r.eff)).size).toBe(ranked.length);
@@ -119,22 +143,28 @@ describe("ordering", () => {
   it("a move writes exactly one order and lands in the right spot", () => {
     const cards = [card("A"), card("B"), card("C")];
     // move C to the very top of its column
-    const b = buildBoard(config, cards.map((c) => ({ ...c, frontmatter: { status: "todo" } })));
+    const b = buildBoard(
+      config,
+      cards.map((c) => ({ ...c, frontmatter: { status: "todo" } })),
+    );
     const mut = moveCard(b, "Tasks/C.md", "todo", 0)!;
     expect(mut.setFrontmatter).toEqual({ status: "todo", order: -1 });
     // apply and rebuild: C now first
     const moved = cards.map((c) =>
-      c.basename === "C" ? card("C", { status: "todo", order: -1 }) : card(c.basename, { status: "todo" }),
+      c.basename === "C"
+        ? card("C", { status: "todo", order: -1 })
+        : card(c.basename, { status: "todo" }),
     );
-    expect(buildBoard(config, moved).columns.todo).toEqual(["Tasks/C.md", "Tasks/A.md", "Tasks/B.md"]);
+    expect(buildBoard(config, moved).columns.todo).toEqual([
+      "Tasks/C.md",
+      "Tasks/A.md",
+      "Tasks/B.md",
+    ]);
   });
 });
 
 describe("moveCard mutation", () => {
-  const b = buildBoard(config, [
-    card("A", { status: "todo" }),
-    card("B", { status: "doing" }),
-  ]);
+  const b = buildBoard(config, [card("A", { status: "todo" }), card("B", { status: "doing" })]);
 
   it("describes a cross-column move in history", () => {
     const mut = moveCard(b, "Tasks/A.md", "doing", 0)!;
@@ -174,7 +204,15 @@ describe("buildBoard context derivation (#14)", () => {
         { path: "Tasks/Acme/A.md", basename: "A", frontmatter: { status: "todo" }, childLinks: [] },
         { path: "Tasks/B.md", basename: "B", frontmatter: { status: "todo" }, childLinks: [] },
       ],
-      { Acme: { name: "Acme Corp", color: "#5b8def", label: "client", body: "Home page", folder: "Acme" } },
+      {
+        Acme: {
+          name: "Acme Corp",
+          color: "#5b8def",
+          label: "client",
+          body: "Home page",
+          folder: "Acme",
+        },
+      },
     );
     expect(b.cards["Tasks/Acme/A.md"].context).toBe("Acme");
     expect(b.cards["Tasks/B.md"].context).toBeUndefined();
@@ -270,7 +308,11 @@ describe("planDrop (drag routing — #2 namespacing + #3 computed-order guard)",
 
   it("routes a bare column active id to a column reorder", () => {
     const b = buildBoard(config, [card("A", { status: "todo" })]);
-    expect(planDrop(b, "doing", "todo", colIds)).toEqual({ kind: "reorderColumns", activeId: "doing", overId: "todo" });
+    expect(planDrop(b, "doing", "todo", colIds)).toEqual({
+      kind: "reorderColumns",
+      activeId: "doing",
+      overId: "todo",
+    });
   });
 
   it("unwraps a namespaced card drop onto a column to a card move with the real ids", () => {
@@ -292,14 +334,28 @@ describe("planDrop (drag routing — #2 namespacing + #3 computed-order guard)",
   });
 
   it("#3 no-ops a same-column reorder when the column is grouped (computed order)", () => {
-    const cfg = { ...config, columns: [{ id: "todo", title: "Todo", group: "due" as const }, { id: "done", title: "Done" }] };
+    const cfg = {
+      ...config,
+      columns: [
+        { id: "todo", title: "Todo", group: "due" as const },
+        { id: "done", title: "Done" },
+      ],
+    };
     const b = buildBoard(cfg, [card("A", { status: "todo" }), card("B", { status: "todo" })]);
     // Same-column drop on a grouped column → no-op (the order is recomputed every render).
-    expect(planDrop(b, "todo::Tasks/A.md", "todo::Tasks/B.md", ["todo", "done"])).toEqual({ kind: "noop" });
+    expect(planDrop(b, "todo::Tasks/A.md", "todo::Tasks/B.md", ["todo", "done"])).toEqual({
+      kind: "noop",
+    });
   });
 
   it("#3 STILL allows a cross-column move out of a computed-order column", () => {
-    const cfg = { ...config, columns: [{ id: "todo", title: "Todo", sort: "priority" as const }, { id: "done", title: "Done" }] };
+    const cfg = {
+      ...config,
+      columns: [
+        { id: "todo", title: "Todo", sort: "priority" as const },
+        { id: "done", title: "Done" },
+      ],
+    };
     const b = buildBoard(cfg, [card("A", { status: "todo" })]);
     expect(planDrop(b, "todo::Tasks/A.md", "done", ["todo", "done"])).toEqual({
       kind: "moveCard",

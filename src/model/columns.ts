@@ -41,11 +41,15 @@ function clamp01(value: unknown): number | undefined {
 }
 
 function asGroup(value: unknown): ColumnGroup | undefined {
-  return typeof value === "string" && (GROUPS as readonly string[]).includes(value) ? (value as ColumnGroup) : undefined;
+  return typeof value === "string" && (GROUPS as readonly string[]).includes(value)
+    ? (value as ColumnGroup)
+    : undefined;
 }
 
 function asSort(value: unknown): ColumnSort | undefined {
-  return typeof value === "string" && (SORTS as readonly string[]).includes(value) ? (value as ColumnSort) : undefined;
+  return typeof value === "string" && (SORTS as readonly string[]).includes(value)
+    ? (value as ColumnSort)
+    : undefined;
 }
 
 /**
@@ -101,7 +105,8 @@ export function serializeColumns(columns: ColumnDef[]): Record<string, unknown>[
     if (typeof c.filter === "string" && c.filter.trim()) out.filter = c.filter;
     if (c.group && c.group !== COLUMN_DEFAULTS.group) out.group = c.group;
     if (c.sort && c.sort !== COLUMN_DEFAULTS.sort) out.sort = c.sort;
-    if (typeof c.opacity === "number" && c.opacity !== COLUMN_DEFAULTS.opacity) out.opacity = c.opacity;
+    if (typeof c.opacity === "number" && c.opacity !== COLUMN_DEFAULTS.opacity)
+      out.opacity = c.opacity;
     if (typeof c.hoverOpacity === "number") out.hoverOpacity = c.hoverOpacity;
     if (c.parked === true) out.parked = true;
     return out;

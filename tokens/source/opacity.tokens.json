@@ -2,9 +2,21 @@
   "$description": "NEW category. Captures the standalone UI opacity literals currently raw in src/styles.css (0.7, 0.6, 0.5, 0.4) as named tokens by intended usage. Keyframe endpoints (0/1) are animation states, not design tokens, and are intentionally excluded. The --folia-* opacity vars are now defined in the .folia-root token block; these tokens are byte-matched against it.",
   "opacity": {
     "$type": "number",
-    "muted": { "$value": "0.7", "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-muted" } } },
-    "subtle": { "$value": "0.6", "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-subtle" } } },
-    "faint": { "$value": "0.5", "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-faint" } } },
-    "disabled": { "$value": "0.4", "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-disabled" } } }
+    "muted": {
+      "$value": "0.7",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-muted" } }
+    },
+    "subtle": {
+      "$value": "0.6",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-subtle" } }
+    },
+    "faint": {
+      "$value": "0.5",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-faint" } }
+    },
+    "disabled": {
+      "$value": "0.4",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-opacity-disabled" } }
+    }
   }
 }

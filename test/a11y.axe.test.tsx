@@ -31,7 +31,10 @@ function makeRepo() {
       body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
     },
     "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "\n# Beta\n" },
-    "Tasks/Gamma.md": { fm: { type: "task", status: "doing", due: "2026-06-01" }, body: "\n# Gamma\n" },
+    "Tasks/Gamma.md": {
+      fm: { type: "task", status: "doing", due: "2026-06-01" },
+      body: "\n# Gamma\n",
+    },
   });
 }
 
@@ -45,30 +48,27 @@ const run = (el: Element) => axe(el, { rules: { "color-contrast": { enabled: fal
 // Greppable one-line summary per violation, so a failure prints something actionable instead of a bare
 // length mismatch.
 const summarize = (violations: Awaited<ReturnType<typeof axe>>["violations"]) =>
-  violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, target: v.nodes[0]?.target?.join(" ") }));
+  violations.map((v) => ({
+    id: v.id,
+    impact: v.impact,
+    nodes: v.nodes.length,
+    target: v.nodes[0]?.target?.join(" "),
+  }));
 
 describe("a11y axe gate (no violations)", () => {
-  it(
-    "board view (columns + cards) has no axe violations",
-    async () => {
-      render_(makeRepo());
-      await screen.findByText("Alpha"); // board fully painted
-      const { violations } = await run(document.body);
-      expect(summarize(violations)).toEqual([]);
-    },
-    30000,
-  );
+  it("board view (columns + cards) has no axe violations", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha"); // board fully painted
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
 
-  it(
-    "card detail panel open has no axe violations",
-    async () => {
-      const user = userEvent.setup();
-      render_(makeRepo());
-      await user.click(await screen.findByText("Alpha"));
-      await screen.findByTestId("card-detail"); // detail surface mounted
-      const { violations } = await run(document.body);
-      expect(summarize(violations)).toEqual([]);
-    },
-    30000,
-  );
+  it("card detail panel open has no axe violations", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    await screen.findByTestId("card-detail"); // detail surface mounted
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
 });

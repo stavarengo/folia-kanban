@@ -3,19 +3,52 @@
   "font-size": {
     "$type": "dimension",
     "$description": "Distinct font-size literals in styles.css: 10, 10.5, 11, 12, 12.5, 13, 13.5, 15, 16 px.",
-    "xxs": { "$value": "10px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xxs" } } },
-    "xxs-plus": { "$value": "10.5px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xxs-plus" } } },
-    "xs": { "$value": "11px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xs" } } },
-    "sm": { "$value": "12px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-sm" } } },
-    "sm-plus": { "$value": "12.5px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-sm-plus" } } },
-    "md": { "$value": "13px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-md" } } },
-    "md-plus": { "$value": "13.5px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-md-plus" } } },
-    "lg": { "$value": "15px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-lg" } } },
-    "xl": { "$value": "16px", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xl" } } }
+    "xxs": {
+      "$value": "10px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xxs" } }
+    },
+    "xxs-plus": {
+      "$value": "10.5px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xxs-plus" } }
+    },
+    "xs": {
+      "$value": "11px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xs" } }
+    },
+    "sm": {
+      "$value": "12px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-sm" } }
+    },
+    "sm-plus": {
+      "$value": "12.5px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-sm-plus" } }
+    },
+    "md": {
+      "$value": "13px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-md" } }
+    },
+    "md-plus": {
+      "$value": "13.5px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-md-plus" } }
+    },
+    "lg": {
+      "$value": "15px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-lg" } }
+    },
+    "xl": {
+      "$value": "16px",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-size-xl" } }
+    }
   },
   "font-weight": {
     "$type": "fontWeight",
-    "medium": { "$value": "500", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-weight-medium" } } },
-    "semibold": { "$value": "600", "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-weight-semibold" } } }
+    "medium": {
+      "$value": "500",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-weight-medium" } }
+    },
+    "semibold": {
+      "$value": "600",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-font-weight-semibold" } }
+    }
   }
 }

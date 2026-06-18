@@ -27,7 +27,16 @@ interface Props {
   onClose: () => void;
 }
 
-export function CardContextMenu({ target, path, priority, isDone, canMoveUp, canMoveDown, onRename, onClose }: Props) {
+export function CardContextMenu({
+  target,
+  path,
+  priority,
+  isDone,
+  canMoveUp,
+  canMoveDown,
+  onRename,
+  onClose,
+}: Props) {
   const a = useBoardActions();
   const ref = useRef<HTMLDivElement>(null);
   // True once an item was activated. On dismissal (Escape / outside-click) we restore focus to the
@@ -54,7 +63,9 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     ref.current?.querySelector<HTMLButtonElement>(".folia-menu-item:not(:disabled)")?.focus();
-    return () => { if (!actioned.current) opener?.focus?.(); };
+    return () => {
+      if (!actioned.current) opener?.focus?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -84,7 +95,12 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
     items[next].focus();
   };
 
-  const item = (label: string, icon: IconName, onClick: () => void, opts?: { disabled?: boolean; danger?: boolean }) => (
+  const item = (
+    label: string,
+    icon: IconName,
+    onClick: () => void,
+    opts?: { disabled?: boolean; danger?: boolean },
+  ) => (
     <button
       className={"folia-menu-item" + (opts?.danger ? " folia-menu-danger" : "")}
       role="menuitem"
@@ -112,7 +128,9 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
       {target.kind === "todo" ? (
         <>
           {item("Mark done", "check-circle", () => a.toggleTodo(path, target.todoIndex!, true))}
-          {item("Remove todo", "trash", () => a.removeTodo(path, target.todoIndex!), { danger: true })}
+          {item("Remove todo", "trash", () => a.removeTodo(path, target.todoIndex!), {
+            danger: true,
+          })}
           <div className="folia-menu-divider" />
           {item("Open card", "external-link", () => a.open(path))}
         </>
@@ -129,7 +147,11 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
             {priorityOptions(priority).map((p) => (
               <button
                 key={p}
-                className={"folia-menu-prio folia-chip-" + priorityTone(p) + (p === priority ? " is-active" : "")}
+                className={
+                  "folia-menu-prio folia-chip-" +
+                  priorityTone(p) +
+                  (p === priority ? " is-active" : "")
+                }
                 role="menuitemradio"
                 aria-checked={p === priority}
                 onClick={() => {
@@ -142,7 +164,9 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
               </button>
             ))}
             <button
-              className={"folia-menu-prio folia-menu-prio-none" + (priority === "" ? " is-active" : "")}
+              className={
+                "folia-menu-prio folia-menu-prio-none" + (priority === "" ? " is-active" : "")
+              }
               role="menuitemradio"
               aria-checked={priority === ""}
               aria-label="No priority"
@@ -158,8 +182,12 @@ export function CardContextMenu({ target, path, priority, isDone, canMoveUp, can
           </div>
 
           <div className="folia-menu-divider" />
-          {item("Move up", "arrow-left", () => a.moveWithinColumn(path, -1), { disabled: !canMoveUp })}
-          {item("Move down", "arrow-right", () => a.moveWithinColumn(path, 1), { disabled: !canMoveDown })}
+          {item("Move up", "arrow-left", () => a.moveWithinColumn(path, -1), {
+            disabled: !canMoveUp,
+          })}
+          {item("Move down", "arrow-right", () => a.moveWithinColumn(path, 1), {
+            disabled: !canMoveDown,
+          })}
 
           <div className="folia-menu-divider" />
           {item("Add subcard", "git-branch", () => a.addSubcard(path))}

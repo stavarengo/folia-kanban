@@ -137,7 +137,7 @@ export function parseBody(text: string): CardBody {
   const title = h1 === -1 ? "" : lines[h1].replace(/^#\s+/, "").trim();
 
   let descEnd = lines.length;
-  for (let i = (h1 === -1 ? 0 : h1 + 1); i < lines.length; i++) {
+  for (let i = h1 === -1 ? 0 : h1 + 1; i < lines.length; i++) {
     if (/^##\s+/.test(lines[i])) {
       descEnd = i;
       break;
@@ -247,7 +247,12 @@ const BULLET_RE = /^\s*[-*]\s+/;
  * section (Comments / History). The bullet prefix + timestamp stay byte-identical. Index is
  * 0-based among the section's bullet lines (matching `parseTimestamped`'s walk).
  */
-export function updateTimestampedLine(text: string, section: string, index: number, newText: string): string {
+export function updateTimestampedLine(
+  text: string,
+  section: string,
+  index: number,
+  newText: string,
+): string {
   // Comments are single-line; collapse any embedded newline so it can't desync the index walk.
   const safeText = newText.replace(/[\r\n]+/g, " ");
   return withBody(text, (body) => {

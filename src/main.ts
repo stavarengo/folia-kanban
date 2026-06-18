@@ -1,6 +1,19 @@
-import { FuzzySuggestModal, Notice, Plugin, PluginSettingTab, Setting, TFile, type App } from "obsidian";
+import {
+  FuzzySuggestModal,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TFile,
+  type App,
+} from "obsidian";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
-import { DEFAULT_SETTINGS, DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, type KanbanSettings } from "./settings";
+import {
+  DEFAULT_SETTINGS,
+  DETAIL_WIDTH_MAX,
+  DETAIL_WIDTH_MIN,
+  type KanbanSettings,
+} from "./settings";
 
 export default class FoliaKanbanPlugin extends Plugin {
   settings: KanbanSettings = DEFAULT_SETTINGS;
@@ -10,7 +23,12 @@ export default class FoliaKanbanPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_KANBAN,
-      (leaf) => new KanbanView(leaf, () => this.settings, (p) => void this.updateSettings(p)),
+      (leaf) =>
+        new KanbanView(
+          leaf,
+          () => this.settings,
+          (p) => void this.updateSettings(p),
+        ),
     );
 
     this.addRibbonIcon("layout-grid", "Open Folia Kanban board", () => void this.activateView());
@@ -104,7 +122,9 @@ class BoardChooserModal extends FuzzySuggestModal<TFile> {
 
   // Disambiguate same-named boards in different folders by showing the parent path.
   getItemText(file: TFile): string {
-    return file.parent && file.parent.path !== "/" ? `${file.basename}  (${file.parent.path})` : file.basename;
+    return file.parent && file.parent.path !== "/"
+      ? `${file.basename}  (${file.parent.path})`
+      : file.basename;
   }
 
   onChooseItem(file: TFile): void {
@@ -135,7 +155,9 @@ class KanbanSettingTab extends PluginSettingTab {
           .setValue(s.detailPresentation)
           .onChange((v) => {
             // Re-render the tab so the side-panel layout row enables/disables to match.
-            void this.plugin.updateSettings({ detailPresentation: v as KanbanSettings["detailPresentation"] }).then(() => this.display());
+            void this.plugin
+              .updateSettings({ detailPresentation: v as KanbanSettings["detailPresentation"] })
+              .then(() => this.display());
           }),
       );
 
@@ -149,7 +171,12 @@ class KanbanSettingTab extends PluginSettingTab {
           .addOption("float", "Float (overlay the columns)")
           .setValue(s.sidePanelMode)
           .setDisabled(s.detailPresentation === "modal")
-          .onChange((v) => void this.plugin.updateSettings({ sidePanelMode: v as KanbanSettings["sidePanelMode"] })),
+          .onChange(
+            (v) =>
+              void this.plugin.updateSettings({
+                sidePanelMode: v as KanbanSettings["sidePanelMode"],
+              }),
+          ),
       );
 
     new Setting(containerEl)
@@ -165,7 +192,9 @@ class KanbanSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Add-card button — flow")
-      .setDesc("Inline adds a card in place; inline-edit then opens the new card's details; detail opens the details to create.")
+      .setDesc(
+        "Inline adds a card in place; inline-edit then opens the new card's details; detail opens the details to create.",
+      )
       .addDropdown((d) =>
         d
           .addOption("inline", "Inline")
@@ -174,7 +203,9 @@ class KanbanSettingTab extends PluginSettingTab {
           .setValue(s.addCardFlow)
           .onChange((v) => {
             // Re-render so the "open new card's details as" row enables/disables to match.
-            void this.plugin.updateSettings({ addCardFlow: v as KanbanSettings["addCardFlow"] }).then(() => this.display());
+            void this.plugin
+              .updateSettings({ addCardFlow: v as KanbanSettings["addCardFlow"] })
+              .then(() => this.display());
           }),
       );
 
@@ -190,7 +221,12 @@ class KanbanSettingTab extends PluginSettingTab {
           .addOption("side-split", "Side panel (split)")
           .setValue(s.addCardOpenMode)
           .setDisabled(s.addCardFlow === "inline")
-          .onChange((v) => void this.plugin.updateSettings({ addCardOpenMode: v as KanbanSettings["addCardOpenMode"] })),
+          .onChange(
+            (v) =>
+              void this.plugin.updateSettings({
+                addCardOpenMode: v as KanbanSettings["addCardOpenMode"],
+              }),
+          ),
       );
 
     new Setting(containerEl)
@@ -206,25 +242,36 @@ class KanbanSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("History — what to record")
-      .setDesc("moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.")
+      .setDesc(
+        "moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",
+      )
       .addDropdown((d) =>
         d
           .addOption("moves", "Moves only")
           .addOption("structural", "Structural changes")
           .addOption("all", "Everything")
           .setValue(s.historyScope)
-          .onChange((v) => void this.plugin.updateSettings({ historyScope: v as KanbanSettings["historyScope"] })),
+          .onChange(
+            (v) =>
+              void this.plugin.updateSettings({
+                historyScope: v as KanbanSettings["historyScope"],
+              }),
+          ),
       );
 
     new Setting(containerEl)
       .setName("Board — horizontal drag")
-      .setDesc("How to pan the board sideways. Shift+drag pans from anywhere (incl. over cards); click and drag pans only from empty board space, leaving cards and columns free. Middle-button drag always pans.")
+      .setDesc(
+        "How to pan the board sideways. Shift+drag pans from anywhere (incl. over cards); click and drag pans only from empty board space, leaving cards and columns free. Middle-button drag always pans.",
+      )
       .addDropdown((d) =>
         d
           .addOption("shift", "Shift + click and drag")
           .addOption("empty", "Click and drag (empty space only)")
           .setValue(s.boardPan)
-          .onChange((v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] })),
+          .onChange(
+            (v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] }),
+          ),
       );
   }
 }

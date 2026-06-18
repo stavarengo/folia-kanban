@@ -65,14 +65,21 @@ describe("comment edit/delete are byte-stable", () => {
     "\n# A\n\n## Comments\n- [2026-06-13 10:00] one\n- [2026-06-13 11:00] two\n- [2026-06-13 12:00] three\n";
 
   it("updateComment edits comment 2 of 3, keeps timestamp, leaves every other byte identical", async () => {
-    const repo = new FakeRepo(config, { "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 } });
+    const repo = new FakeRepo(config, {
+      "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 },
+    });
     await repo.updateComment("Tasks/A.md", 1, "edited two");
-    const expected = bodyWith3.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] edited two");
+    const expected = bodyWith3.replace(
+      "- [2026-06-13 11:00] two",
+      "- [2026-06-13 11:00] edited two",
+    );
     expect(repo.files.get("Tasks/A.md")!.body).toBe(expected);
   });
 
   it("removeComment removes only its line", async () => {
-    const repo = new FakeRepo(config, { "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 } });
+    const repo = new FakeRepo(config, {
+      "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 },
+    });
     await repo.removeComment("Tasks/A.md", 0);
     const expected = bodyWith3.replace("- [2026-06-13 10:00] one\n", "");
     expect(repo.files.get("Tasks/A.md")!.body).toBe(expected);
@@ -82,7 +89,10 @@ describe("comment edit/delete are byte-stable", () => {
 describe("unsetFrontmatterKey removes only that key", () => {
   it("drops the key and keeps the other keys", async () => {
     const repo = new FakeRepo(config, {
-      "Tasks/A.md": { fm: { type: "task", status: "todo", area: "docs", priority: "B" }, body: "\n# A\n" },
+      "Tasks/A.md": {
+        fm: { type: "task", status: "todo", area: "docs", priority: "B" },
+        body: "\n# A\n",
+      },
     });
     await repo.unsetFrontmatterKey("Tasks/A.md", "area");
     const fm = repo.files.get("Tasks/A.md")!.fm;
@@ -157,7 +167,9 @@ describe("contexts (#14)", () => {
     // The real card derives its context from the folder; the loose card has none.
     expect(board.cards["Tasks/Acme/A.md"].context).toBe("Acme");
     expect(board.cards["Tasks/Loose.md"].context).toBeUndefined();
-    expect(board.columns.todo).toEqual(expect.arrayContaining(["Tasks/Acme/A.md", "Tasks/Loose.md"]));
+    expect(board.columns.todo).toEqual(
+      expect.arrayContaining(["Tasks/Acme/A.md", "Tasks/Loose.md"]),
+    );
   });
 
   it("loadContexts reads the _context.md frontmatter + body", async () => {

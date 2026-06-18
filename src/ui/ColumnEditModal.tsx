@@ -32,7 +32,8 @@ function toDraft(c: ColumnDef): Draft {
     group: c.group ?? "none",
     sort: c.sort ?? "manual",
     opacity: typeof c.opacity === "number" ? c.opacity : 1,
-    hoverOpacity: typeof c.hoverOpacity === "number" ? String(Math.round(c.hoverOpacity * 100)) : "",
+    hoverOpacity:
+      typeof c.hoverOpacity === "number" ? String(Math.round(c.hoverOpacity * 100)) : "",
     parked: c.parked === true,
   };
 }
@@ -56,7 +57,8 @@ export function ColumnEditModal({ column, onClose }: Props) {
     titleRef.current?.select();
   }, []);
 
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    setDraft((d) => ({ ...d, [key]: value }));
 
   const save = () => {
     const title = draft.title.trim();
@@ -65,10 +67,14 @@ export function ColumnEditModal({ column, onClose }: Props) {
       titleRef.current?.focus();
       return;
     }
-    const limit = draft.limit.trim() === "" ? undefined : Math.max(0, Math.floor(Number(draft.limit) || 0)) || undefined;
+    const limit =
+      draft.limit.trim() === ""
+        ? undefined
+        : Math.max(0, Math.floor(Number(draft.limit) || 0)) || undefined;
     const filter = draft.filter.trim();
     const hoverPct = draft.hoverOpacity.trim();
-    const hoverOpacity = hoverPct === "" ? undefined : Math.min(1, Math.max(0, Number(hoverPct) / 100));
+    const hoverOpacity =
+      hoverPct === "" ? undefined : Math.min(1, Math.max(0, Number(hoverPct) / 100));
     const patch: Partial<ColumnDef> = {
       title,
       color: draft.color ?? undefined,
@@ -94,7 +100,12 @@ export function ColumnEditModal({ column, onClose }: Props) {
   const faded = draft.opacity < 1;
 
   return createPortal(
-    <div className="folia-modal-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="folia-modal-backdrop"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog surface: onKeyDown drives Escape on a role=dialog + aria-modal + focus-managed modal */}
       <div
         className="folia-modal folia-col-edit"
@@ -119,7 +130,9 @@ export function ColumnEditModal({ column, onClose }: Props) {
               value={draft.title}
               aria-label="Column title"
               onChange={(e) => set("title", e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+              }}
             />
           </label>
 
@@ -130,7 +143,10 @@ export function ColumnEditModal({ column, onClose }: Props) {
                 <button
                   key={c}
                   type="button"
-                  className={"folia-swatch" + (draft.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")}
+                  className={
+                    "folia-swatch" +
+                    (draft.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
+                  }
                   style={{ background: c }}
                   aria-label={`Set color ${c}`}
                   aria-pressed={draft.color?.toLowerCase() === c.toLowerCase()}
@@ -169,20 +185,30 @@ export function ColumnEditModal({ column, onClose }: Props) {
               aria-label="Filter rule"
               onChange={(e) => set("filter", e.target.value)}
             />
-            <span className="folia-field-hint">Shows only cards matching this query. Leave blank to show all.</span>
+            <span className="folia-field-hint">
+              Shows only cards matching this query. Leave blank to show all.
+            </span>
           </label>
 
           <div className="folia-field-row">
             <label className="folia-field">
               <span className="folia-field-label">Group by</span>
-              <select aria-label="Group by" value={draft.group} onChange={(e) => set("group", e.target.value as ColumnGroup)}>
+              <select
+                aria-label="Group by"
+                value={draft.group}
+                onChange={(e) => set("group", e.target.value as ColumnGroup)}
+              >
                 <option value="none">None</option>
                 <option value="due">Due date</option>
               </select>
             </label>
             <label className="folia-field">
               <span className="folia-field-label">Sort by</span>
-              <select aria-label="Sort by" value={draft.sort} onChange={(e) => set("sort", e.target.value as ColumnSort)}>
+              <select
+                aria-label="Sort by"
+                value={draft.sort}
+                onChange={(e) => set("sort", e.target.value as ColumnSort)}
+              >
                 <option value="manual">Manual</option>
                 <option value="priority">Priority</option>
                 <option value="due">Due date</option>
@@ -205,7 +231,10 @@ export function ColumnEditModal({ column, onClose }: Props) {
 
           {faded && (
             <label className="folia-field">
-              <span className="folia-field-label">Reveal on hover — {draft.hoverOpacity.trim() === "" ? "full" : `${draft.hoverOpacity}%`}</span>
+              <span className="folia-field-label">
+                Reveal on hover —{" "}
+                {draft.hoverOpacity.trim() === "" ? "full" : `${draft.hoverOpacity}%`}
+              </span>
               <input
                 type="range"
                 min="0"
@@ -227,14 +256,20 @@ export function ColumnEditModal({ column, onClose }: Props) {
             />
             <span>
               <span className="folia-field-label">Park aside</span>
-              <span className="folia-field-hint">Move this column off to the far right (de-emphasise a rabbit-hole column).</span>
+              <span className="folia-field-hint">
+                Move this column off to the far right (de-emphasise a rabbit-hole column).
+              </span>
             </span>
           </label>
         </div>
 
         <footer className="folia-modal-footer">
-          <button className="folia-btn" onClick={onClose}>Cancel</button>
-          <button className="folia-btn folia-btn-primary" onClick={save}>Save</button>
+          <button className="folia-btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="folia-btn folia-btn-primary" onClick={save}>
+            Save
+          </button>
         </footer>
       </div>
     </div>,

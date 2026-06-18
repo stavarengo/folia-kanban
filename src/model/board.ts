@@ -26,7 +26,11 @@ export function deriveContext(cardFolder: string, path: string): string | undefi
  * folder segment; otherwise matches by basename, but only when that basename is unambiguous
  * (duplicate basenames across folders resolve to nothing rather than silently binding the wrong one).
  */
-function resolveLink(link: string, byBasename: Map<string, string[]>, byPath: Record<string, Card>): string | null {
+function resolveLink(
+  link: string,
+  byBasename: Map<string, string[]>,
+  byPath: Record<string, Card>,
+): string | null {
   const raw = link.split("#")[0].split("|")[0].trim();
   if (raw.includes("/")) {
     const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
@@ -182,8 +186,8 @@ function between(prev: number | null, next: number | null): number {
 /** New fractional order for a card dropped at `dropIndex` among `colCards` (moving card excluded). */
 export function computeDropOrder(colCards: Card[], dropIndex: number): number {
   const eff = columnEffectiveOrders(colCards).map((x) => x.eff);
-  const prev = dropIndex > 0 ? eff[dropIndex - 1] ?? null : null;
-  const next = dropIndex < eff.length ? eff[dropIndex] ?? null : null;
+  const prev = dropIndex > 0 ? (eff[dropIndex - 1] ?? null) : null;
+  const next = dropIndex < eff.length ? (eff[dropIndex] ?? null) : null;
   return between(prev, next);
 }
 
@@ -240,7 +244,12 @@ export type DropPlan =
  *    when the order is grouped/sorted; cross-column moves still flow through);
  *  - otherwise → a card move, with the real path + the real (un-namespaced) over id for resolveDrop.
  */
-export function planDrop(board: Board, rawActiveId: string, rawOverId: string, columnIds: string[]): DropPlan {
+export function planDrop(
+  board: Board,
+  rawActiveId: string,
+  rawOverId: string,
+  columnIds: string[],
+): DropPlan {
   if (columnIds.includes(rawActiveId)) {
     return { kind: "reorderColumns", activeId: rawActiveId, overId: rawOverId };
   }
