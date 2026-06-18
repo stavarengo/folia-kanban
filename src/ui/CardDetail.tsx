@@ -98,7 +98,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
   const updateSettings = useSettingsUpdater();
   const card = board.cards[path];
   const isCreate = createColumn != null;
-  const panelRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
   const descViewRef = useRef<HTMLDivElement | null>(null);
@@ -281,7 +281,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
     };
     return (
       // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog surface: onKeyDown drives Escape/keyboard on a role=dialog + aria-modal + focus-managed panel
-      <aside
+      <div
         className={"folia-detail" + modeClass}
         data-testid="card-detail"
         role="dialog"
@@ -295,14 +295,14 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
         {isSide && (
           <div className="folia-detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize panel" onPointerDown={onResizeStart} />
         )}
-        <header className="folia-detail-header">
+        <div className="folia-detail-header">
           <h2 className="folia-detail-title">New card in {columnTitle}</h2>
           <div className="folia-row-actions">
             <button className="folia-icon-btn" aria-label="Close" title="Close (Esc)" onClick={onClose}>
               <Icon name="close" />
             </button>
           </div>
-        </header>
+        </div>
         <div className="folia-detail-body">
           <section className="folia-section">
             <label>
@@ -325,19 +325,19 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
             </div>
           </section>
         </div>
-      </aside>
+      </div>
     );
   }
 
   if (!card) {
     return (
       // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog surface: onKeyDown drives Escape on a role=dialog + aria-modal + focus-managed panel
-      <aside className={"folia-detail" + modeClass} role="dialog" aria-modal={mode === "modal"} aria-label="Card not found" ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} style={panelStyle}>
-        <header className="folia-detail-header">
+      <div className={"folia-detail" + modeClass} role="dialog" aria-modal={mode === "modal"} aria-label="Card not found" ref={panelRef} tabIndex={-1} onKeyDown={onKeyDown} style={panelStyle}>
+        <div className="folia-detail-header">
           <span>Card not found</span>
           <button className="folia-icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
-        </header>
-      </aside>
+        </div>
+      </div>
     );
   }
 
@@ -349,7 +349,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
 
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog surface: onKeyDown drives Escape/keyboard on a role=dialog + aria-modal + focus-managed panel
-    <aside
+    <div
       className={"folia-detail" + modeClass}
       data-testid="card-detail"
       role="dialog"
@@ -364,7 +364,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div className="folia-detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize panel" onPointerDown={onResizeStart} />
       )}
-      <header className="folia-detail-header">
+      <div className="folia-detail-header">
         <h2 className="folia-detail-title">{card.basename}</h2>
         <div className="folia-row-actions">
           {actions.doneColumnId && fm.status !== actions.doneColumnId && (
@@ -382,7 +382,7 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
             <Icon name="close" />
           </button>
         </div>
-      </header>
+      </div>
 
       {confirmDelete && (
         <div className="folia-detail-confirm" role="alertdialog" aria-label="Confirm delete">
@@ -604,6 +604,6 @@ export function CardDetail({ path, board, mode, onClose, onNavigate, onChanged, 
           </ul>
         </section>
       </div>
-    </aside>
+    </div>
   );
 }

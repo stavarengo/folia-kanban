@@ -104,12 +104,12 @@ export function ColumnEditModal({ column, onClose }: Props) {
         aria-label={`Edit column: ${column.title}`}
         onKeyDown={onKeyDown}
       >
-        <header className="folia-modal-header">
+        <div className="folia-modal-header">
           <h2 className="folia-modal-title">Edit column</h2>
           <button className="folia-icon-btn" aria-label="Close" onClick={onClose}>
             <Icon name="close" size={16} />
           </button>
-        </header>
+        </div>
 
         <div className="folia-modal-body">
           <label className="folia-field">

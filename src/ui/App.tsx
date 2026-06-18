@@ -499,7 +499,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             <ContextsContext.Provider value={stableContexts}>
             <div className="folia-root" ref={rootRef}>
               <Toolbar ref={searchRef} query={query} onChange={setQuery} matchCount={counts.match} totalCount={counts.total} />
-              <div className="folia-main">
+              <div className="folia-main" role="region" aria-label="Board">
                 <Board
                   board={board}
                   today={todayValue}

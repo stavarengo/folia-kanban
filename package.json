@@ -17,8 +17,9 @@
     "tokens:check": "node scripts/check-tokens.mjs",
     "audit:raw-values": "node scripts/audit-raw-values.mjs",
     "waivers:check": "node scripts/check-waivers.mjs",
-    "ds:check": "pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm lint:a11y",
+    "ds:check": "pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm lint:a11y && pnpm test:a11y",
     "lint:a11y": "eslint src",
+    "test:a11y": "vitest run test/a11y.axe.test.tsx",
     "prepare": "lefthook install"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "@types/node": "^22.5.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
+    "axe-core": "^4.12.1",
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.23.1",
     "eslint": "^10.5.0",
@@ -50,6 +52,7 @@
     "release-it": "19.2.2",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.61.1",
-    "vitest": "^2.1.1"
+    "vitest": "^2.1.1",
+    "vitest-axe": "^0.1.0"
   }
 }

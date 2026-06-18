@@ -287,6 +287,7 @@ export function Column({ column, cardPaths, board, today, selectedPath, wipLimit
         )}
         <span
           className={"folia-column-count" + (overLimit ? " is-over-limit" : "")}
+          role="img"
           title={
             overLimit
               ? `${count} of ${wipLimit} — over the WIP limit`

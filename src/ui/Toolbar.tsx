@@ -150,7 +150,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
   };
 
   return (
-    <div className="folia-toolbar">
+    <div className="folia-toolbar" role="search" aria-label="Filter board">
       <div className="folia-search">
         <Icon name="search" size={15} />
         <input
