@@ -151,7 +151,7 @@ function CommentItem({
 }
 
 function resolveBasename(board: Board, link: string): string | null {
-  for (const p in board.cards) if (board.cards[p].basename === link) return p;
+  for (const p in board.cards) if (board.cards[p]?.basename === link) return p;
   return null;
 }
 

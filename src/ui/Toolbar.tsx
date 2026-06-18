@@ -133,7 +133,10 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        choose(suggestions[Math.min(highlight, suggestions.length - 1)]);
+        {
+          const s = suggestions[Math.min(highlight, suggestions.length - 1)];
+          if (s) choose(s);
+        }
         return;
       }
       if (e.key === "Escape") {

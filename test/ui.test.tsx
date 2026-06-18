@@ -63,7 +63,7 @@ describe("board rendering", () => {
     const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
     const betaCards = within(todoCol).getAllByText("Beta");
     expect(betaCards).toHaveLength(1);
-    expect(betaCards[0].closest(".folia-card-tree > .folia-card")).toBeNull();
+    expect(betaCards[0]?.closest(".folia-card-tree > .folia-card")).toBeNull();
   });
 
   it("renders a grandchild recursively so a 2-level subtree never vanishes", async () => {
@@ -332,7 +332,7 @@ describe("card detail", () => {
     await user.type(within(detail).getByLabelText("New property name"), "energy");
     await user.type(within(detail).getByLabelText("New property value"), "low");
     await user.click(within(detail).getByLabelText("Add property"));
-    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.energy).toBe("low"));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["energy"]).toBe("low"));
   });
 });
 
@@ -390,7 +390,7 @@ describe("creating cards", () => {
     await user.type(screen.getByLabelText("New card title"), "Fresh card{Enter}");
     const doneCol = screen
       .getAllByTestId("column")
-      .find((c) => (c as HTMLElement).dataset.column === "done")!;
+      .find((c) => (c as HTMLElement).dataset["column"] === "done")!;
     expect(await within(doneCol).findByText("Fresh card")).toBeInTheDocument();
     // 'inline' is add-only: the detail must NOT open.
     expect(screen.queryByTestId("card-detail")).toBeNull();
@@ -406,7 +406,7 @@ describe("creating cards", () => {
     expect(await screen.findByRole("heading", { name: "Fresh card" })).toBeInTheDocument();
     const doneCol = screen
       .getAllByTestId("column")
-      .find((c) => (c as HTMLElement).dataset.column === "done")!;
+      .find((c) => (c as HTMLElement).dataset["column"] === "done")!;
     expect(within(doneCol).getByText("Fresh card")).toBeInTheDocument();
   });
 
@@ -436,7 +436,7 @@ describe("creating cards", () => {
     expect(await screen.findByRole("heading", { name: "Made via detail" })).toBeInTheDocument();
     const doneCol = screen
       .getAllByTestId("column")
-      .find((c) => (c as HTMLElement).dataset.column === "done")!;
+      .find((c) => (c as HTMLElement).dataset["column"] === "done")!;
     expect(within(doneCol).getByText("Made via detail")).toBeInTheDocument();
   });
 
@@ -476,7 +476,8 @@ describe("inline card title edit (#12)", () => {
     scope: HTMLElement,
     cardName: string,
   ) => {
-    const card = within(scope).getAllByText(cardName)[0].closest(".folia-card") as HTMLElement;
+    const matches = within(scope).getAllByText(cardName);
+    const card = matches[0]?.closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     await user.click(
       within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rename/ }),
@@ -564,13 +565,13 @@ describe("urgency cue (#3)", () => {
     render_(repo); // today = 2026-06-13
     await screen.findByText("Over");
     const cardOf = (name: string) => screen.getByText(name).closest(".folia-card") as HTMLElement;
-    expect(cardOf("Over").dataset.urgency).toBe("overdue");
-    expect(cardOf("Now").dataset.urgency).toBe("today");
-    expect(cardOf("Soon").dataset.urgency).toBe("soon");
-    expect(cardOf("Far").dataset.urgency).toBeUndefined();
-    expect(cardOf("Plain").dataset.urgency).toBeUndefined();
+    expect(cardOf("Over").dataset["urgency"]).toBe("overdue");
+    expect(cardOf("Now").dataset["urgency"]).toBe("today");
+    expect(cardOf("Soon").dataset["urgency"]).toBe("soon");
+    expect(cardOf("Far").dataset["urgency"]).toBeUndefined();
+    expect(cardOf("Plain").dataset["urgency"]).toBeUndefined();
     // A done card carries no urgency cue (mirrors "no cue when done").
-    expect(cardOf("Finished").dataset.urgency).toBeUndefined();
+    expect(cardOf("Finished").dataset["urgency"]).toBeUndefined();
   });
 });
 
@@ -605,10 +606,11 @@ describe("next todos on cards", () => {
     const card = (await screen.findByText("WithTodos")).closest(".folia-card") as HTMLElement;
     const rows = card.querySelectorAll(".folia-card-next-todo");
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent("real one");
-    expect(rows[0].getAttribute("data-todo-index")).toBe("1");
-    expect(rows[1]).toHaveTextContent("real two");
-    expect(rows[1].getAttribute("data-todo-index")).toBe("2");
+    const [row0, row1] = Array.from(rows);
+    expect(row0).toHaveTextContent("real one");
+    expect(row0?.getAttribute("data-todo-index")).toBe("1");
+    expect(row1).toHaveTextContent("real two");
+    expect(row1?.getAttribute("data-todo-index")).toBe("2");
   });
 
   it("renders no next-todo rows when cardNextTodos is 0", async () => {

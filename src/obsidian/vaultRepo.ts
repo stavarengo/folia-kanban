@@ -1,4 +1,5 @@
-import { App, Component, MarkdownRenderer, TFile, TFolder, normalizePath } from "obsidian";
+import type { App } from "obsidian";
+import { Component, MarkdownRenderer, TFile, TFolder, normalizePath } from "obsidian";
 import type {
   Board,
   BoardConfig,
@@ -85,7 +86,7 @@ export class VaultRepository implements CardRepository {
 
   private frontmatterOf(file: TFile): CardFrontmatter {
     const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    return (cached ?? {}) as CardFrontmatter;
+    return cached ?? {};
   }
 
   private markWrite(path: string) {
@@ -117,10 +118,11 @@ export class VaultRepository implements CardRepository {
     for (const f of files) {
       let fm = this.frontmatterOf(f);
       const text = await this.app.vault.cachedRead(f);
-      if (Object.keys(fm).length === 0) fm = parseFrontmatter(text) as CardFrontmatter;
+      if (Object.keys(fm).length === 0) fm = parseFrontmatter(text);
       const childLinks = parseSubtasks(text)
         .filter((s) => s.kind === "card" && s.link)
-        .map((s) => s.link!);
+        .map((s) => s.link ?? "")
+        .filter((l) => l !== "");
       cards.push({
         path: f.path,
         basename: f.basename,
@@ -157,7 +159,13 @@ export class VaultRepository implements CardRepository {
           typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
         const label =
           typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
-        config = { name, color, label, body: splitFrontmatter(text).body, folder };
+        config = {
+          name,
+          ...(color !== undefined ? { color } : {}),
+          ...(label !== undefined ? { label } : {}),
+          body: splitFrontmatter(text).body,
+          folder,
+        };
       }
       out[folder] = config;
     }
@@ -172,9 +180,12 @@ export class VaultRepository implements CardRepository {
   // double-emits a structural line on top of its own "Moved …" entry.
   private async writeFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
     this.markWrite(path);
-    await this.app.fileManager.processFrontMatter(this.file(path), (fm) => {
-      for (const [k, v] of Object.entries(patch)) fm[k] = v;
-    });
+    await this.app.fileManager.processFrontMatter(
+      this.file(path),
+      (fm: Record<string, unknown>) => {
+        for (const [k, v] of Object.entries(patch)) fm[k] = v;
+      },
+    );
   }
 
   async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
@@ -190,9 +201,12 @@ export class VaultRepository implements CardRepository {
 
   async unsetFrontmatterKey(path: string, key: string): Promise<void> {
     this.markWrite(path);
-    await this.app.fileManager.processFrontMatter(this.file(path), (fm) => {
-      delete fm[key];
-    });
+    await this.app.fileManager.processFrontMatter(
+      this.file(path),
+      (fm: Record<string, unknown>) => {
+        delete fm[key];
+      },
+    );
   }
 
   private async editBody(path: string, fn: (text: string) => string): Promise<void> {
@@ -203,8 +217,10 @@ export class VaultRepository implements CardRepository {
   async applyMove(mutation: CardMutation): Promise<void> {
     if (mutation.setFrontmatter)
       await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
-    if (mutation.history)
-      await this.editBody(mutation.path, (t) => appendHistory(t, mutation.history!, stamp()));
+    if (mutation.history) {
+      const historyLine = mutation.history;
+      await this.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));
+    }
   }
 
   setDescription(path: string, description: string): Promise<void> {
@@ -269,10 +285,10 @@ export class VaultRepository implements CardRepository {
     // Create the body first, then let Obsidian serialize the frontmatter — never hand-build
     // YAML (an odd column id / title could otherwise produce malformed frontmatter).
     const file = await this.app.vault.create(path, `# ${title}\n`);
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      fm.type = "task";
-      fm.status = status;
-      fm.created = dateOnly();
+    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+      fm["type"] = "task";
+      fm["status"] = status;
+      fm["created"] = dateOnly();
     });
     return path;
   }
@@ -280,17 +296,20 @@ export class VaultRepository implements CardRepository {
   async addSubcard(parentPath: string, title: string): Promise<string> {
     // Read the parent status from write-fresh text (metadataCache can lag a just-written status).
     const parentFm = parseFrontmatter(await this.app.vault.cachedRead(this.file(parentPath)));
-    const childPath = await this.createCard(title, String(parentFm.status ?? "todo"));
-    const childBase = childPath.split("/").pop()!.replace(/\.md$/i, "");
+    const childPath = await this.createCard(title, String(parentFm["status"] ?? "todo"));
+    const childBase = (childPath.split("/").pop() ?? "").replace(/\.md$/i, "");
     await this.editBody(parentPath, (t) => addSubcardText(t, childBase));
     return childPath;
   }
 
   async setColumns(columns: ColumnDef[]): Promise<void> {
     this.markWrite(this.boardPath);
-    await this.app.fileManager.processFrontMatter(this.file(this.boardPath), (fm) => {
-      fm["columns"] = serializeColumns(columns);
-    });
+    await this.app.fileManager.processFrontMatter(
+      this.file(this.boardPath),
+      (fm: Record<string, unknown>) => {
+        fm["columns"] = serializeColumns(columns);
+      },
+    );
   }
 
   async deleteCard(path: string): Promise<void> {

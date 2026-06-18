@@ -36,7 +36,7 @@ const panModeRef = { current: "shift" as "shift" | "empty" };
 // cards drag on a plain left-press as usual; panning only kicks in on empty board background (handled
 // by the pointer listeners below, which never see a press that lands on a draggable card).
 class PanAwarePointerSensor extends PointerSensor {
-  static activators = [
+  static override activators = [
     {
       eventName: "onPointerDown" as const,
       handler: ({ nativeEvent }: { nativeEvent: PointerEvent }) => {
@@ -286,7 +286,7 @@ export function Board({
               board={board}
               today={today}
               selectedPath={selectedPath}
-              wipLimit={wipLimits[col.id]}
+              {...(wipLimits[col.id] !== undefined ? { wipLimit: wipLimits[col.id] } : {})}
               filter={filter}
               doneColumnId={doneColumnId}
               isFirst={i === 0}

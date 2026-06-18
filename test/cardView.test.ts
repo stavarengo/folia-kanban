@@ -239,6 +239,7 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     const cards = [card({}, "A"), card({}, "B"), card({}, "C")];
     const out = groupAndSortCards(cards, "none", "manual", today, done);
     expect(out).toHaveLength(1);
+    if (!out[0]) throw new Error("expected group at index 0");
     expect(out[0]).toMatchObject({ key: "", label: "" });
     expect(names(out[0])).toEqual(["A", "B", "C"]);
   });
@@ -252,6 +253,7 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
       card({ priority: "medium" }, "Med"),
     ];
     const out = groupAndSortCards(cards, "none", "priority", today, done);
+    if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["Urg", "Med", "Low1", "Low2", "None"]);
   });
 
@@ -264,6 +266,7 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     ];
     const out = groupAndSortCards(cards, "none", "due", today, done);
     // overdue > today > future; NoDue ties with Future (both rank "future") and keeps board order.
+    if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["Overdue", "Today", "Future", "NoDue"]);
   });
 
@@ -277,7 +280,9 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     const out = groupAndSortCards(cards, "due", "manual", today, done);
     expect(out.map((g) => g.key)).toEqual(["overdue", "today", "future", "none"]);
     expect(out.map((g) => g.label)).toEqual(["Overdue", "Today", "Later", "No due date"]);
+    if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["Over1"]);
+    if (!out[3]) throw new Error("expected group at index 3");
     expect(names(out[3])).toEqual(["NoDue1"]);
   });
 
@@ -288,6 +293,7 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     ];
     const out = groupAndSortCards(cards, "due", "priority", today, done);
     expect(out).toHaveLength(1);
+    if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["OverUrg", "OverLow"]);
   });
 

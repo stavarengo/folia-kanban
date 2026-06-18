@@ -38,14 +38,14 @@ describe("buildBoard", () => {
       card("B", { status: "doing" }),
       card("C", { status: "done" }),
     ]);
-    expect(b.columns.todo).toEqual(["Tasks/A.md"]);
-    expect(b.columns.doing).toEqual(["Tasks/B.md"]);
-    expect(b.columns.done).toEqual(["Tasks/C.md"]);
+    expect(b.columns["todo"]).toEqual(["Tasks/A.md"]);
+    expect(b.columns["doing"]).toEqual(["Tasks/B.md"]);
+    expect(b.columns["done"]).toEqual(["Tasks/C.md"]);
   });
 
   it("places cards with an unknown status into the first column (nothing lost)", () => {
     const b = buildBoard(config, [card("X", { status: "weird" })]);
-    expect(b.columns.todo).toEqual(["Tasks/X.md"]);
+    expect(b.columns["todo"]).toEqual(["Tasks/X.md"]);
   });
 
   it("excludes subcards (linked by a parent) from the board top level", () => {
@@ -53,7 +53,7 @@ describe("buildBoard", () => {
       card("Parent", { status: "todo" }, ["Child"]),
       card("Child", { status: "todo" }),
     ]);
-    expect(b.columns.todo).toEqual(["Tasks/Parent.md"]); // Child is nested, not top-level
+    expect(b.columns["todo"]).toEqual(["Tasks/Parent.md"]); // Child is nested, not top-level
     expect(b.parentOf["Tasks/Child.md"]).toBe("Tasks/Parent.md");
   });
 
@@ -62,7 +62,7 @@ describe("buildBoard", () => {
       card("A", { status: "todo" }, ["B"]),
       card("B", { status: "todo" }, ["A"]), // A<->B cycle: neither has a real top-level root
     ]);
-    expect(b.columns.todo.sort()).toEqual(["Tasks/A.md", "Tasks/B.md"]); // nothing vanishes
+    expect((b.columns["todo"] ?? []).sort()).toEqual(["Tasks/A.md", "Tasks/B.md"]); // nothing vanishes
     // A cycle has no genuine parentage, so neither card is anyone's nested child — childrenOf is
     // empty for both. (Otherwise each would render doubly: top-level AND nested under the other.)
     expect(b.childrenOf["Tasks/A.md"]).toBeUndefined();
@@ -93,9 +93,9 @@ describe("childrenOf (nested subcard rendering)", () => {
       card("Leaf", { status: "done" }),
     ]);
     // Only Root is top-level; Mid and Leaf are nested at depth 1 and 2.
-    expect(b.columns.todo).toEqual(["Tasks/Root.md"]);
-    expect(b.columns.doing).toEqual([]);
-    expect(b.columns.done).toEqual([]);
+    expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(b.columns["doing"]).toEqual([]);
+    expect(b.columns["done"]).toEqual([]);
     // The full chain is reachable via childrenOf so recursive rendering surfaces every card once.
     expect(b.childrenOf["Tasks/Root.md"]).toEqual(["Tasks/Mid.md"]);
     expect(b.childrenOf["Tasks/Mid.md"]).toEqual(["Tasks/Leaf.md"]);
@@ -108,7 +108,7 @@ describe("childrenOf (nested subcard rendering)", () => {
       card("B", { status: "todo" }, ["C"]),
       card("C", { status: "todo" }, ["A"]),
     ]);
-    expect(b.columns.todo.sort()).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
+    expect((b.columns["todo"] ?? []).sort()).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
     expect(Object.keys(b.childrenOf)).toEqual([]);
   });
 });
@@ -155,7 +155,7 @@ describe("ordering", () => {
         ? card("C", { status: "todo", order: -1 })
         : card(c.basename, { status: "todo" }),
     );
-    expect(buildBoard(config, moved).columns.todo).toEqual([
+    expect(buildBoard(config, moved).columns["todo"]).toEqual([
       "Tasks/C.md",
       "Tasks/A.md",
       "Tasks/B.md",
@@ -214,18 +214,18 @@ describe("buildBoard context derivation (#14)", () => {
         },
       },
     );
-    expect(b.cards["Tasks/Acme/A.md"].context).toBe("Acme");
-    expect(b.cards["Tasks/B.md"].context).toBeUndefined();
-    expect(b.contexts.Acme.name).toBe("Acme Corp");
+    expect(b.cards["Tasks/Acme/A.md"]?.context).toBe("Acme");
+    expect(b.cards["Tasks/B.md"]?.context).toBeUndefined();
+    expect(b.contexts["Acme"]?.name).toBe("Acme Corp");
     // A folder-context card is still bucketed by status, exactly like any other card.
-    expect(b.columns.todo).toEqual(expect.arrayContaining(["Tasks/Acme/A.md", "Tasks/B.md"]));
+    expect(b.columns["todo"]).toEqual(expect.arrayContaining(["Tasks/Acme/A.md", "Tasks/B.md"]));
   });
   it("defaults to an empty contexts map (boards with no subfolders behave as today)", () => {
     const b = buildBoard(config, [
       { path: "Tasks/B.md", basename: "B", frontmatter: { status: "todo" }, childLinks: [] },
     ]);
     expect(b.contexts).toEqual({});
-    expect(b.cards["Tasks/B.md"].context).toBeUndefined();
+    expect(b.cards["Tasks/B.md"]?.context).toBeUndefined();
   });
 });
 

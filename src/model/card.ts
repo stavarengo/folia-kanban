@@ -10,7 +10,7 @@
 // vault.process(file, text => ...).
 
 import yaml from "js-yaml";
-import type { CardBody, CardStats, Comment, HistoryEntry, SubItem } from "./types";
+import type { CardBody, CardStats, SubItem } from "./types";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
 const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
@@ -30,7 +30,8 @@ export const SECTION = {
 export function splitFrontmatter(text: string): { fmText: string; body: string } {
   const m = FRONTMATTER_RE.exec(text);
   if (!m) return { fmText: "", body: text };
-  return { fmText: m[1], body: text.slice(m[1].length) };
+  const fmText = m[1] ?? "";
+  return { fmText, body: text.slice(fmText.length) };
 }
 
 export function parseFrontmatter(text: string): Record<string, unknown> {
@@ -57,7 +58,8 @@ function headingIndex(lines: string[], name: string): number {
 /** Index of the line that ends the section started at `start` (next H1/H2, or EOF). */
 function sectionEnd(lines: string[], start: number): number {
   for (let i = start + 1; i < lines.length; i++) {
-    if (/^#{1,2}\s+/.test(lines[i])) return i;
+    const line = lines[i];
+    if (line !== undefined && /^#{1,2}\s+/.test(line)) return i;
   }
   return lines.length;
 }
@@ -80,7 +82,7 @@ function appendToSection(body: string, name: string, line: string): string {
   }
   const end = sectionEnd(lines, start);
   let insert = end;
-  while (insert - 1 > start && lines[insert - 1].trim() === "") insert--;
+  while (insert - 1 > start && lines[insert - 1]?.trim() === "") insert--;
   lines.splice(insert, 0, line);
   return lines.join("\n");
 }
@@ -101,7 +103,8 @@ function parseSubItem(rawText: string, index: number, done: boolean): SubItem {
   const trimmed = rawText.trim();
   const m = WIKILINK_ONLY_RE.exec(trimmed);
   if (m) {
-    const target = m[1].split("|")[0].split("#")[0].trim();
+    const group1 = m[1] ?? "";
+    const target = group1.split("|")[0]?.split("#")[0]?.trim() ?? "";
     return { kind: "card", text: trimmed, done, link: target, index };
   }
   return { kind: "todo", text: trimmed, done, index };
@@ -114,7 +117,9 @@ export function parseSubtasks(text: string): SubItem[] {
   for (const line of sectionLines(body, SECTION.subtasks)) {
     const m = CHECKBOX_RE.exec(line);
     if (!m) continue;
-    items.push(parseSubItem(m[3], i++, m[2] !== " "));
+    const rawText = m[3] ?? "";
+    const checkChar = m[2] ?? " ";
+    items.push(parseSubItem(rawText, i++, checkChar !== " "));
   }
   return items;
 }
@@ -124,7 +129,7 @@ function parseTimestamped(body: string, name: string): { timestamp: string; text
   for (const line of sectionLines(body, name)) {
     if (!/^\s*[-*]\s+/.test(line)) continue;
     const m = TS_LINE_RE.exec(line);
-    if (m) out.push({ timestamp: m[1].trim(), text: m[2].trim() });
+    if (m) out.push({ timestamp: (m[1] ?? "").trim(), text: (m[2] ?? "").trim() });
     else out.push({ timestamp: "", text: line.replace(/^\s*[-*]\s+/, "").trim() });
   }
   return out;
@@ -134,11 +139,13 @@ export function parseBody(text: string): CardBody {
   const body = splitFrontmatter(text).body;
   const lines = body.split("\n");
   const h1 = lines.findIndex((l) => /^#\s+/.test(l));
-  const title = h1 === -1 ? "" : lines[h1].replace(/^#\s+/, "").trim();
+  const h1Line = h1 === -1 ? "" : (lines[h1] ?? "");
+  const title = h1 === -1 ? "" : h1Line.replace(/^#\s+/, "").trim();
 
   let descEnd = lines.length;
   for (let i = h1 === -1 ? 0 : h1 + 1; i < lines.length; i++) {
-    if (/^##\s+/.test(lines[i])) {
+    const line = lines[i] ?? "";
+    if (/^##\s+/.test(line)) {
       descEnd = i;
       break;
     }
@@ -152,8 +159,8 @@ export function parseBody(text: string): CardBody {
     title,
     description,
     subtasks: parseSubtasks(text),
-    comments: parseTimestamped(body, SECTION.comments) as Comment[],
-    history: parseTimestamped(body, SECTION.history) as HistoryEntry[],
+    comments: parseTimestamped(body, SECTION.comments),
+    history: parseTimestamped(body, SECTION.history),
   };
 }
 
@@ -208,10 +215,10 @@ export function setSubtaskDone(text: string, index: number, done: boolean): stri
     const end = sectionEnd(lines, start);
     let n = 0;
     for (let i = start + 1; i < end; i++) {
-      const m = CHECKBOX_RE.exec(lines[i]);
+      const m = CHECKBOX_RE.exec(lines[i] ?? "");
       if (!m) continue;
       if (n === index) {
-        lines[i] = `${m[1]}[${done ? "x" : " "}] ${m[3]}`;
+        lines[i] = `${m[1] ?? ""}[${done ? "x" : " "}] ${m[3] ?? ""}`;
         break;
       }
       n++;
@@ -228,7 +235,7 @@ export function removeSubtask(text: string, index: number): string {
     const end = sectionEnd(lines, start);
     let n = 0;
     for (let i = start + 1; i < end; i++) {
-      if (!CHECKBOX_RE.test(lines[i])) continue;
+      if (!CHECKBOX_RE.test(lines[i] ?? "")) continue;
       if (n === index) {
         lines.splice(i, 1);
         break;
@@ -262,18 +269,19 @@ export function updateTimestampedLine(
     const end = sectionEnd(lines, start);
     let n = 0;
     for (let i = start + 1; i < end; i++) {
-      if (!BULLET_RE.test(lines[i])) continue;
+      const currentLine = lines[i] ?? "";
+      if (!BULLET_RE.test(currentLine)) continue;
       if (n === index) {
         // `split("\n")` leaves a trailing CR on CRLF files; re-attach it so the edited line keeps
         // the same line ending as its siblings (byte-stable).
-        const cr = lines[i].endsWith("\r") ? "\r" : "";
-        const m = TS_PREFIX_RE.exec(lines[i]);
+        const cr = currentLine.endsWith("\r") ? "\r" : "";
+        const m = TS_PREFIX_RE.exec(currentLine);
         if (m) {
-          lines[i] = `${m[1]}${safeText}${cr}`;
+          lines[i] = `${m[1] ?? ""}${safeText}${cr}`;
         } else {
           // Bullet with no `[timestamp]` (a bare `- text`): replace only the post-bullet text.
-          const bm = BULLET_RE.exec(lines[i]);
-          if (bm) lines[i] = `${bm[0]}${safeText}${cr}`;
+          const bm = BULLET_RE.exec(currentLine);
+          if (bm) lines[i] = `${bm[0] ?? ""}${safeText}${cr}`;
         }
         break;
       }
@@ -292,7 +300,7 @@ export function removeTimestampedLine(text: string, section: string, index: numb
     const end = sectionEnd(lines, start);
     let n = 0;
     for (let i = start + 1; i < end; i++) {
-      if (!BULLET_RE.test(lines[i])) continue;
+      if (!BULLET_RE.test(lines[i] ?? "")) continue;
       if (n === index) {
         lines.splice(i, 1);
         break;
@@ -311,7 +319,8 @@ export function setDescription(text: string, description: string): string {
     const from = h1 === -1 ? 0 : h1 + 1;
     let to = lines.length;
     for (let i = from; i < lines.length; i++) {
-      if (/^##\s+/.test(lines[i])) {
+      const line = lines[i] ?? "";
+      if (/^##\s+/.test(line)) {
         to = i;
         break;
       }

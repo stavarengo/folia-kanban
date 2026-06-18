@@ -26,8 +26,8 @@ describe("drag persistence", () => {
     await repo.applyMove(mut);
 
     board = await repo.loadBoard();
-    expect(board.columns.doing).toContain("Tasks/A.md");
-    expect(board.columns.todo).not.toContain("Tasks/A.md");
+    expect(board.columns["doing"]).toContain("Tasks/A.md");
+    expect(board.columns["todo"]).not.toContain("Tasks/A.md");
     expect(repo.files.get("Tasks/A.md")!.fm.status).toBe("doing");
     expect(repo.files.get("Tasks/A.md")!.body).toContain("## History");
     expect(repo.files.get("Tasks/A.md")!.body).toContain("Moved from Todo to Doing");
@@ -42,7 +42,7 @@ describe("drag persistence", () => {
     const mut = moveCard(board, "Tasks/A.md", drop.columnId, drop.index)!;
     await repo.applyMove(mut);
     board = await repo.loadBoard();
-    expect(board.columns.done).toEqual(["Tasks/A.md"]);
+    expect(board.columns["done"]).toEqual(["Tasks/A.md"]);
   });
 });
 
@@ -53,7 +53,7 @@ describe("subcards", () => {
     });
     const childPath = await repo.addSubcard("Tasks/P.md", "Kid");
     const board = await repo.loadBoard();
-    expect(board.columns.todo).toEqual(["Tasks/P.md"]); // Kid is nested, not top-level
+    expect(board.columns["todo"]).toEqual(["Tasks/P.md"]); // Kid is nested, not top-level
     expect(board.parentOf[childPath]).toBe("Tasks/P.md");
     // parent's body now links the child
     expect(repo.files.get("Tasks/P.md")!.body).toContain("[[Kid]]");
@@ -163,11 +163,11 @@ describe("contexts (#14)", () => {
     const board = await repo.loadBoard();
     // _context.md is config, never a phantom card.
     expect(board.cards["Tasks/Acme/_context.md"]).toBeUndefined();
-    expect(board.columns.todo).not.toContain("Tasks/Acme/_context.md");
+    expect(board.columns["todo"]).not.toContain("Tasks/Acme/_context.md");
     // The real card derives its context from the folder; the loose card has none.
-    expect(board.cards["Tasks/Acme/A.md"].context).toBe("Acme");
-    expect(board.cards["Tasks/Loose.md"].context).toBeUndefined();
-    expect(board.columns.todo).toEqual(
+    expect(board.cards["Tasks/Acme/A.md"]?.context).toBe("Acme");
+    expect(board.cards["Tasks/Loose.md"]?.context).toBeUndefined();
+    expect(board.columns["todo"]).toEqual(
       expect.arrayContaining(["Tasks/Acme/A.md", "Tasks/Loose.md"]),
     );
   });
@@ -181,7 +181,7 @@ describe("contexts (#14)", () => {
       "Tasks/Acme/A.md": { fm: { type: "task", status: "todo" }, body: "\n# A\n" },
     });
     const contexts = await repo.loadContexts();
-    expect(contexts.Acme).toEqual({
+    expect(contexts["Acme"]).toEqual({
       name: "Acme Corp",
       color: "#5b8def",
       label: "client",
@@ -195,9 +195,9 @@ describe("contexts (#14)", () => {
       "Tasks/Beta/B.md": { fm: { type: "task", status: "todo" }, body: "\n# B\n" },
     });
     const contexts = await repo.loadContexts();
-    expect(contexts.Beta).toEqual({ name: "Beta", body: "", folder: "Beta" });
-    expect(contexts.Beta.color).toBeUndefined();
-    expect(contexts.Beta.label).toBeUndefined();
+    expect(contexts["Beta"]).toEqual({ name: "Beta", body: "", folder: "Beta" });
+    expect(contexts["Beta"]?.color).toBeUndefined();
+    expect(contexts["Beta"]?.label).toBeUndefined();
   });
 
   it("a board with no subfolders has an empty contexts map (unchanged behavior)", async () => {

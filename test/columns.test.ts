@@ -96,7 +96,9 @@ describe("serializeColumns — byte-stability protection", () => {
   it("emits ONLY id+title for plain columns (no new keys leak in)", () => {
     const out = serializeColumns([{ id: "todo", title: "Todo" }]);
     expect(out).toEqual([{ id: "todo", title: "Todo" }]);
-    expect(Object.keys(out[0])).toEqual(["id", "title"]);
+    const first = out[0];
+    if (!first) throw new Error("expected at least one serialized column");
+    expect(Object.keys(first)).toEqual(["id", "title"]);
   });
 
   it("emits color + limit when present, in a stable shape", () => {
@@ -179,27 +181,24 @@ describe("updateColumn write path is byte-stable (#8 — the modal patch must no
   // The exact patch ColumnEditModal.save() builds for a NO-OP save on a plain {id,title} column.
   // FakeRepo.setColumns doesn't round-trip through serialize, so this guards the real risk: the
   // editor sneaking an all-defaults patch that serializeColumns would still emit (invariant 5).
-  const noopPatch = {
+  const noopPatch: ColumnDef = {
+    id: "",
     title: "Todo",
-    color: undefined,
-    limit: undefined,
-    filter: undefined,
     group: "none" as const,
     sort: "manual" as const,
     opacity: 1,
-    hoverOpacity: undefined,
     parked: false,
   };
 
   it("a no-op save on a plain column serializes back to exactly {id,title}", () => {
-    const merged: ColumnDef = { id: "todo", ...noopPatch };
+    const merged: ColumnDef = { ...noopPatch, id: "todo" };
     expect(serializeColumns([merged])).toEqual([{ id: "todo", title: "Todo" }]);
   });
 
   it("a no-op save round-trips to the original plain def (no key churn)", () => {
     const original: ColumnDef = { id: "todo", title: "Todo" };
     // updateColumn merges patch onto the existing def: { ...c, ...patch }. The patch wins.
-    const merged: ColumnDef = { id: original.id, ...noopPatch };
+    const merged: ColumnDef = { ...noopPatch, id: original.id };
     expect(normalizeColumns(serializeColumns([merged]))).toEqual([original]);
   });
 
@@ -207,7 +206,6 @@ describe("updateColumn write path is byte-stable (#8 — the modal patch must no
     const merged: ColumnDef = {
       id: "research",
       title: "Research",
-      color: undefined,
       limit: 3,
       filter: "area:research status:todo",
       group: "due",

@@ -92,7 +92,7 @@ export function CardContextMenu({
     const cur = items.indexOf(document.activeElement as HTMLButtonElement);
     const dir = e.key === "ArrowDown" ? 1 : -1;
     const next = (cur + dir + items.length) % items.length;
-    items[next].focus();
+    items[next]?.focus();
   };
 
   const item = (
@@ -127,10 +127,19 @@ export function CardContextMenu({
     >
       {target.kind === "todo" ? (
         <>
-          {item("Mark done", "check-circle", () => a.toggleTodo(path, target.todoIndex!, true))}
-          {item("Remove todo", "trash", () => a.removeTodo(path, target.todoIndex!), {
-            danger: true,
+          {item("Mark done", "check-circle", () => {
+            if (target.todoIndex !== undefined) a.toggleTodo(path, target.todoIndex, true);
           })}
+          {item(
+            "Remove todo",
+            "trash",
+            () => {
+              if (target.todoIndex !== undefined) a.removeTodo(path, target.todoIndex);
+            },
+            {
+              danger: true,
+            },
+          )}
           <div className="folia-menu-divider" />
           {item("Open card", "external-link", () => a.open(path))}
         </>

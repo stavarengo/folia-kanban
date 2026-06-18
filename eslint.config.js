@@ -34,6 +34,37 @@ export default [
     },
   },
   {
+    // Type-aware linting (blueprint §6): forbid silencing the type system. Scoped to the
+    // blueprint's explicit rule list (not full recommended-type-checked) so the guard stays
+    // proportional to a 26-file plugin.
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: { "@typescript-eslint": tseslint.plugin },
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/consistent-type-imports": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        { "ts-ignore": true, "ts-nocheck": true, "ts-expect-error": "allow-with-description" },
+      ],
+    },
+  },
+  {
     // Architecture boundary (blueprint §8/§15): the Obsidian API may be imported only by
     // the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). The domain and
     // the UI go through the CardRepository port (src/model/repo.ts).

@@ -1,4 +1,5 @@
-import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import type { WorkspaceLeaf } from "obsidian";
+import { ItemView, TFile } from "obsidian";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App as BoardApp } from "./ui/App";
@@ -31,12 +32,12 @@ export class KanbanView extends ItemView {
     return `${name} - Folia Kanban`;
   }
 
-  getIcon(): string {
+  override getIcon(): string {
     return "layout-grid";
   }
 
   // Obsidian persists/restores the board path through the view state.
-  async setState(state: unknown, result: { history: boolean }): Promise<void> {
+  override async setState(state: unknown, result: { history: boolean }): Promise<void> {
     const s = state as { boardPath?: string } | null;
     if (s?.boardPath && s.boardPath !== this.boardPath) {
       this.boardPath = s.boardPath;
@@ -46,11 +47,11 @@ export class KanbanView extends ItemView {
     this.renderApp();
   }
 
-  getState(): Record<string, unknown> {
+  override getState(): Record<string, unknown> {
     return { boardPath: this.boardPath };
   }
 
-  async onOpen(): Promise<void> {
+  override async onOpen(): Promise<void> {
     this.renderApp();
   }
 
@@ -59,7 +60,7 @@ export class KanbanView extends ItemView {
     this.renderApp();
   }
 
-  async onClose(): Promise<void> {
+  override async onClose(): Promise<void> {
     this.root?.unmount();
     this.root = null;
   }

@@ -11,6 +11,7 @@ import {
   RepoContext,
   SettingsContext,
   type BoardActions,
+  type ColumnPatch,
 } from "./context";
 import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
@@ -32,7 +33,7 @@ function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | 
       return "float";
     case "side-split":
       return "split";
-    default:
+    case "default":
       return null;
   }
 }
@@ -44,6 +45,24 @@ function findDoneColumn(board: BoardModel): string | null {
   if (exact) return exact.id;
   const fuzzy = cols.find((c) => DONE_RE.test(c.id) || DONE_RE.test(c.title));
   return fuzzy?.id ?? null;
+}
+
+/**
+ * Merge a column edit patch onto the current def. A key set to `undefined` in the patch CLEARS
+ * that field, so it is dropped from the result (serializeColumns prunes defaults/blanks after).
+ */
+function applyColumnPatch(c: ColumnDef, patch: ColumnPatch): ColumnDef {
+  const merged = { ...c, ...patch };
+  const next: ColumnDef = { id: c.id, title: merged.title ?? c.title };
+  if (merged.color !== undefined) next.color = merged.color;
+  if (merged.limit !== undefined) next.limit = merged.limit;
+  if (merged.filter !== undefined) next.filter = merged.filter;
+  if (merged.group !== undefined) next.group = merged.group;
+  if (merged.sort !== undefined) next.sort = merged.sort;
+  if (merged.opacity !== undefined) next.opacity = merged.opacity;
+  if (merged.hoverOpacity !== undefined) next.hoverOpacity = merged.hoverOpacity;
+  if (merged.parked !== undefined) next.parked = merged.parked;
+  return next;
 }
 
 interface Props {
@@ -327,7 +346,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const b = boardRef.current;
         if (!b) return;
         void setColumnsAndReload(
-          b.config.columns.map((c) => (c.id === id ? { ...c, color: color ?? undefined } : c)),
+          b.config.columns.map((c) => {
+            if (c.id !== id) return c;
+            const { color: _old, ...rest } = c;
+            return color != null ? { ...rest, color } : rest;
+          }),
         );
       },
       setColumnLimit: (id, limit) => {
@@ -335,7 +358,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         if (!b) return;
         const lim = limit == null || limit <= 0 ? undefined : Math.floor(limit);
         void setColumnsAndReload(
-          b.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)),
+          b.config.columns.map((c) => {
+            if (c.id !== id) return c;
+            const { limit: _old, ...rest } = c;
+            return lim !== undefined ? { ...rest, limit: lim } : rest;
+          }),
         );
       },
       updateColumn: (id, patch) => {
@@ -345,7 +372,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         // default (group:"none", sort:"manual", opacity:1, parked:false) or blank, so the write
         // stays byte-stable. We pass the merged def straight through and let §2 do the pruning.
         void setColumnsAndReload(
-          b.config.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          b.config.columns.map((c) => (c.id === id ? applyColumnPatch(c, patch) : c)),
         );
       },
       moveColumn: (id, dir) => {
@@ -355,7 +382,10 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const i = cols.findIndex((c) => c.id === id);
         const j = i + dir;
         if (i < 0 || j < 0 || j >= cols.length) return;
-        [cols[i], cols[j]] = [cols[j], cols[i]];
+        const ci = cols[i];
+        const cj = cols[j];
+        if (!ci || !cj) return;
+        [cols[i], cols[j]] = [cj, ci];
         void setColumnsAndReload(cols);
       },
       reorderColumns: (activeId, overId) => {
@@ -373,6 +403,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const idx = cols.findIndex((c) => c.id === id);
         if (idx < 0) return;
         const neighbor = cols[idx - 1] ?? cols[idx + 1];
+        if (!neighbor) return;
         const orphans = b.columns[id] ?? [];
         void (async () => {
           // Reassign this column's cards to a neighbour so none are orphaned.
@@ -502,7 +533,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
 
   const detail = detailOpen ? (
     <CardDetail
-      path={selected!}
+      path={selected}
       board={board}
       mode={detailMode}
       focusNew={focusNew}
@@ -516,7 +547,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       path=""
       board={board}
       mode={detailMode}
-      createColumn={createColumn!}
+      createColumn={createColumn}
       onClose={closeDetail}
       onChanged={load}
       onCreated={(newPath) => {

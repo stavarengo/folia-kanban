@@ -26,12 +26,13 @@ export interface SubItem {
   index: number;
 }
 
-export interface Comment {
+// Only referenced by CardBody below (not imported elsewhere), so kept module-private.
+interface Comment {
   timestamp: string;
   text: string;
 }
 
-export interface HistoryEntry {
+interface HistoryEntry {
   timestamp: string;
   text: string;
 }

@@ -113,10 +113,11 @@ function tagValues(card: Card): string[] {
   const fm = card.frontmatter;
   const out: string[] = [];
   if (typeof fm.area === "string" && fm.area) out.push(fm.area);
-  if (Array.isArray(fm.tags)) {
-    for (const t of fm.tags) if (typeof t === "string" && t) out.push(t);
-  } else if (typeof fm.tags === "string" && fm.tags) {
-    out.push(fm.tags);
+  const fmTags = fm["tags"];
+  if (Array.isArray(fmTags)) {
+    for (const t of fmTags) if (typeof t === "string" && t) out.push(t);
+  } else if (typeof fmTags === "string" && fmTags) {
+    out.push(fmTags);
   }
   return out;
 }
@@ -186,8 +187,8 @@ function tokenizeQuery(query: string): string[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(query)) !== null) {
     if (m[2] !== undefined)
-      out.push(m[1] + m[2]); // prefix (maybe "key:") + unquoted value
-    else out.push(m[3]);
+      out.push((m[1] ?? "") + m[2]); // prefix (maybe "key:") + unquoted value
+    else if (m[3] !== undefined) out.push(m[3]);
   }
   return out;
 }
@@ -275,7 +276,7 @@ function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean 
       // §1/§9/§14 on one notion of context so the filter token stays truthful for folder contexts.
       return (
         (typeof card.context === "string" && card.context.toLowerCase() === token.value) ||
-        listValues(fm.context).includes(token.value)
+        listValues(fm["context"]).includes(token.value)
       );
     case "due":
       return matchDue(card, token.value, ctx);
@@ -466,7 +467,12 @@ export function groupAndSortCards(
   const buckets = new Map<DueUrgency | "none", Card[]>();
   for (const c of cards) {
     const b = dueBucket(c, today, doneColumnId);
-    (buckets.get(b) ?? buckets.set(b, []).get(b)!).push(c);
+    let bucket = buckets.get(b);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(b, bucket);
+    }
+    bucket.push(c);
   }
   const out: CardGroup[] = [];
   for (const b of DUE_GROUP_ORDER) {

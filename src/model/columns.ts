@@ -68,24 +68,27 @@ export function normalizeColumns(raw: unknown): ColumnDef[] {
     }
     if (c === null || typeof c !== "object") continue; // skip null / number / other malformed entries
     const obj = c as Record<string, unknown>;
-    if (obj.id == null || String(obj.id).trim() === "") continue; // a column needs a usable id
+    if (obj["id"] == null || String(obj["id"]).trim() === "") continue; // a column needs a usable id
     const col: ColumnDef = {
-      id: String(obj.id),
-      title: typeof obj.title === "string" && obj.title ? obj.title : titleCase(String(obj.id)),
+      id: String(obj["id"]),
+      title:
+        typeof obj["title"] === "string" && obj["title"]
+          ? obj["title"]
+          : titleCase(String(obj["id"])),
     };
-    if (typeof obj.color === "string") col.color = obj.color;
-    if (typeof obj.limit === "number" && Number.isFinite(obj.limit)) col.limit = obj.limit;
+    if (typeof obj["color"] === "string") col.color = obj["color"];
+    if (typeof obj["limit"] === "number" && Number.isFinite(obj["limit"])) col.limit = obj["limit"];
 
-    if (typeof obj.filter === "string" && obj.filter.trim()) col.filter = obj.filter;
-    const group = asGroup(obj.group);
+    if (typeof obj["filter"] === "string" && obj["filter"].trim()) col.filter = obj["filter"];
+    const group = asGroup(obj["group"]);
     if (group && group !== COLUMN_DEFAULTS.group) col.group = group;
-    const sort = asSort(obj.sort);
+    const sort = asSort(obj["sort"]);
     if (sort && sort !== COLUMN_DEFAULTS.sort) col.sort = sort;
-    const opacity = clamp01(obj.opacity);
+    const opacity = clamp01(obj["opacity"]);
     if (opacity !== undefined && opacity !== COLUMN_DEFAULTS.opacity) col.opacity = opacity;
-    const hoverOpacity = clamp01(obj.hoverOpacity);
+    const hoverOpacity = clamp01(obj["hoverOpacity"]);
     if (hoverOpacity !== undefined) col.hoverOpacity = hoverOpacity;
-    if (obj.parked === true) col.parked = true;
+    if (obj["parked"] === true) col.parked = true;
 
     cols.push(col);
   }
@@ -100,15 +103,15 @@ export function normalizeColumns(raw: unknown): ColumnDef[] {
 export function serializeColumns(columns: ColumnDef[]): Record<string, unknown>[] {
   return columns.map((c) => {
     const out: Record<string, unknown> = { id: c.id, title: c.title };
-    if (c.color) out.color = c.color;
-    if (typeof c.limit === "number") out.limit = c.limit;
-    if (typeof c.filter === "string" && c.filter.trim()) out.filter = c.filter;
-    if (c.group && c.group !== COLUMN_DEFAULTS.group) out.group = c.group;
-    if (c.sort && c.sort !== COLUMN_DEFAULTS.sort) out.sort = c.sort;
-    if (typeof c.opacity === "number" && c.opacity !== COLUMN_DEFAULTS.opacity)
-      out.opacity = c.opacity;
-    if (typeof c.hoverOpacity === "number") out.hoverOpacity = c.hoverOpacity;
-    if (c.parked === true) out.parked = true;
+    if (c["color"]) out["color"] = c["color"];
+    if (typeof c["limit"] === "number") out["limit"] = c["limit"];
+    if (typeof c["filter"] === "string" && c["filter"].trim()) out["filter"] = c["filter"];
+    if (c["group"] && c["group"] !== COLUMN_DEFAULTS.group) out["group"] = c["group"];
+    if (c["sort"] && c["sort"] !== COLUMN_DEFAULTS.sort) out["sort"] = c["sort"];
+    if (typeof c["opacity"] === "number" && c["opacity"] !== COLUMN_DEFAULTS.opacity)
+      out["opacity"] = c["opacity"];
+    if (typeof c["hoverOpacity"] === "number") out["hoverOpacity"] = c["hoverOpacity"];
+    if (c["parked"] === true) out["parked"] = true;
     return out;
   });
 }

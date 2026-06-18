@@ -3,6 +3,13 @@ import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
 import type { KanbanSettings } from "../settings";
 
+/**
+ * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
+ * CLEAR that field (the column editor sets a cleared color/limit/filter/hover to `undefined`).
+ * `applyColumnPatch` in App.tsx merges this onto the current def and drops the cleared keys.
+ */
+export type ColumnPatch = { [K in keyof ColumnDef]?: ColumnDef[K] | undefined };
+
 export const RepoContext = createContext<CardRepository | null>(null);
 
 /**
@@ -83,7 +90,7 @@ export interface BoardActions {
    * builds the full patch; renameColumn/setColumnColor/setColumnLimit remain for the inline menu.
    * Routes through the same `setColumns` byte-stable path.
    */
-  updateColumn(id: string, patch: Partial<ColumnDef>): void;
+  updateColumn(id: string, patch: ColumnPatch): void;
   moveColumn(id: string, dir: -1 | 1): void;
   /** Reorder columns by dropping column `activeId` onto the slot held by `overId` (header drag). */
   reorderColumns(activeId: string, overId: string): void;

@@ -109,7 +109,13 @@ export class FakeRepo implements CardRepository {
           typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
         const label =
           typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
-        out[folder] = { name, color, label, body: e.body, folder };
+        out[folder] = {
+          name,
+          ...(color !== undefined ? { color } : {}),
+          ...(label !== undefined ? { label } : {}),
+          body: e.body,
+          folder,
+        };
       }
     }
     return out;
@@ -278,7 +284,9 @@ function sanitizeFilename(title: string): string {
 function rewriteWikilinks(body: string, oldBase: string, newBase: string): string {
   return body.replace(/\[\[([^\]]+)\]\]/g, (whole, inner: string) => {
     const [targetAndHash, ...aliasParts] = inner.split("|");
+    if (targetAndHash === undefined) return whole;
     const [target, hash] = targetAndHash.split("#", 2);
+    if (target === undefined) return whole;
     const t = target.trim();
     const tBase = t.split("/").pop()!.replace(/\.md$/i, "");
     if (tBase !== oldBase) return whole;

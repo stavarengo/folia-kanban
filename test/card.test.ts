@@ -40,9 +40,9 @@ Cover installation and creating a first board.
 describe("frontmatter", () => {
   it("parses scalar, list and date fields", () => {
     const fm = parseFrontmatter(SAMPLE_CARD);
-    expect(fm.status).toBe("doing");
-    expect(fm.priority).toBe("B");
-    expect(fm.projects).toEqual(["docs"]);
+    expect(fm["status"]).toBe("doing");
+    expect(fm["priority"]).toBe("B");
+    expect(fm["projects"]).toEqual(["docs"]);
   });
 
   it("returns {} when there is no frontmatter", () => {
@@ -118,11 +118,14 @@ describe("subtasks: todos vs subcards", () => {
     out = addTodo(out, "two");
     out = setSubtaskDone(out, 1, true);
     const subs = parseSubtasks(out);
+    if (!subs[0] || !subs[1]) throw new Error("expected 2 subtasks");
     expect(subs[0].done).toBe(false);
     expect(subs[1].done).toBe(true);
     // toggling back
     out = setSubtaskDone(out, 1, false);
-    expect(parseSubtasks(out)[1].done).toBe(false);
+    const subsAfter = parseSubtasks(out);
+    if (!subsAfter[1]) throw new Error("expected subtask at index 1");
+    expect(subsAfter[1].done).toBe(false);
   });
 
   it("removes the correct subtask by index", () => {
@@ -230,6 +233,7 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
     const out = updateTimestampedLine(withThreeComments, SECTION.comments, 1, "edited two");
     const comments = parseBody(out).comments;
     expect(comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
+    if (!comments[1]) throw new Error("expected comment at index 1");
     expect(comments[1].timestamp).toBe("2026-06-13 11:00"); // timestamp kept
     // every byte except comment 2's text is identical: rebuild expected from the original.
     const expected = withThreeComments.replace(
@@ -284,7 +288,7 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
   const everyLineKeepsCRLF = (s: string) => {
     const segs = s.split("\n");
     // Every segment except the final (post-trailing-\n) empty one must end with \r.
-    for (let i = 0; i < segs.length - 1; i++) expect(segs[i].endsWith("\r")).toBe(true);
+    for (let i = 0; i < segs.length - 1; i++) expect((segs[i] ?? "").endsWith("\r")).toBe(true);
   };
 
   it("updateComment edits comment 2 of 3 with the CR preserved on that line", () => {

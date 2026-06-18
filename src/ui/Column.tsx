@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Board, ColumnDef } from "../model/types";
@@ -35,10 +35,12 @@ function SubcardGroup({
   return (
     <div className="folia-subcard-group">
       {children.map((p) => {
+        const card = board.cards[p];
+        if (!card) return null;
         const next = new Set(seen).add(p);
         return (
           <div key={p} className="folia-subcard">
-            <CardItem card={board.cards[p]} today={today} selected={p === selectedPath} nested />
+            <CardItem card={card} today={today} selected={p === selectedPath} nested />
             <SubcardGroup
               parentPath={p}
               board={board}
@@ -58,7 +60,9 @@ function SubcardGroup({
 function autoColor(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return COLUMN_COLORS[h % COLUMN_COLORS.length];
+  // `h % length` is always in range; the `?? COLUMN_COLORS[0]` only satisfies
+  // noUncheckedIndexedAccess (the const tuple's [0] is a known-defined palette colour).
+  return COLUMN_COLORS[h % COLUMN_COLORS.length] ?? COLUMN_COLORS[0];
 }
 
 interface Props {
@@ -188,12 +192,19 @@ export function Column({
   // The lane's own population (matched by the rule) — what the count badge + WIP reflect for a
   // filter-lane. For a plain column this is just the status bucket.
   const lanePaths = columnFilter
-    ? topLevelPaths.filter((p) => matchCard(board.cards[p], columnFilter, matchCtx))
+    ? topLevelPaths.filter((p) => {
+        const c = board.cards[p];
+        return c != null && matchCard(c, columnFilter, matchCtx);
+      })
     : allPaths;
   // The rendered set additionally ANDs the global search filter (parsed §1 Filter) on top of the
   // lane — net per column: (lane-pull OR status-bucket) AND (empty global OR global matchCard).
   let paths = lanePaths;
-  if (globalFiltering) paths = paths.filter((p) => matchCard(board.cards[p], filter, matchCtx));
+  if (globalFiltering)
+    paths = paths.filter((p) => {
+      const c = board.cards[p];
+      return c != null && matchCard(c, filter, matchCtx);
+    });
   const filtering = globalFiltering || columnFilter != null;
 
   // Count + WIP reflect the lane's matched cards for a filter-lane (#1.4), the status bucket otherwise.
@@ -207,7 +218,10 @@ export function Column({
   // #6 — group + sort the rendered cards. Defaults (none/manual) yield a single unlabeled group
   // holding the cards in board order, so an un-configured column renders exactly as before.
   const groups = groupAndSortCards(
-    paths.map((p) => board.cards[p]),
+    paths.flatMap((p) => {
+      const c = board.cards[p];
+      return c ? [c] : [];
+    }),
     column.group ?? "none",
     column.sort ?? "manual",
     today,
@@ -260,7 +274,7 @@ export function Column({
       }
       data-testid="column"
       data-column={column.id}
-      style={style as CSSProperties}
+      style={style}
     >
       <header className="folia-column-header">
         <span className="folia-column-dot" aria-hidden="true" />
@@ -300,7 +314,7 @@ export function Column({
             // enters edit. This prevents a suppressed trailing click from eating a later genuine one.
             onPointerDown={(e) => {
               justDragged.current = false;
-              listeners?.onPointerDown?.(e);
+              listeners?.["onPointerDown"]?.(e);
             }}
             onClick={enterEdit}
             onKeyDown={(e) => {

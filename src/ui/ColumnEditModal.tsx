@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { ColumnDef, ColumnGroup, ColumnSort } from "../model/types";
-import { useBoardActions } from "./context";
+import { useBoardActions, type ColumnPatch } from "./context";
 import { Icon } from "./icons";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -75,7 +75,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
     const hoverPct = draft.hoverOpacity.trim();
     const hoverOpacity =
       hoverPct === "" ? undefined : Math.min(1, Math.max(0, Number(hoverPct) / 100));
-    const patch: Partial<ColumnDef> = {
+    const patch: ColumnPatch = {
       title,
       color: draft.color ?? undefined,
       limit,
@@ -83,7 +83,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
       group: draft.group,
       sort: draft.sort,
       opacity: Math.min(1, Math.max(0, draft.opacity)),
-      hoverOpacity: Number.isFinite(hoverOpacity as number) ? hoverOpacity : undefined,
+      hoverOpacity: Number.isFinite(hoverOpacity) ? hoverOpacity : undefined,
       parked: draft.parked,
     };
     a.updateColumn(column.id, patch);

@@ -31,14 +31,18 @@ function resolveLink(
   byBasename: Map<string, string[]>,
   byPath: Record<string, Card>,
 ): string | null {
-  const raw = link.split("#")[0].split("|")[0].trim();
+  const noAnchor = link.split("#");
+  const noAlias = (noAnchor[0] ?? link).split("|");
+  const raw = (noAlias[0] ?? "").trim();
   if (raw.includes("/")) {
     const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
     if (byPath[withMd]) return withMd;
   }
-  const base = raw.split("/").pop()!.replace(/\.md$/i, "").trim();
+  const segments = raw.split("/");
+  const last = segments[segments.length - 1];
+  const base = (last ?? raw).replace(/\.md$/i, "").trim();
   const paths = byBasename.get(base);
-  return paths && paths.length === 1 ? paths[0] : null;
+  return paths !== undefined && paths.length === 1 ? (paths[0] ?? null) : null;
 }
 
 function orderOf(c: Card): number | null {
@@ -56,9 +60,14 @@ function orderOf(c: Card): number | null {
 export function columnEffectiveOrders(cards: Card[]): { card: Card; eff: number }[] {
   const ordered = cards
     .filter((c) => orderOf(c) !== null)
-    .map((c) => ({ card: c, eff: orderOf(c)! }))
+    .map((c) => {
+      const eff = orderOf(c);
+      if (eff === null) throw new Error("invariant: filtered null order");
+      return { card: c, eff };
+    })
     .sort((a, b) => a.eff - b.eff || a.card.basename.localeCompare(b.card.basename));
-  const maxEff = ordered.length ? ordered[ordered.length - 1].eff : -1;
+  const lastOrdered = ordered[ordered.length - 1];
+  const maxEff = lastOrdered !== undefined ? lastOrdered.eff : -1;
   const unordered = cards
     .filter((c) => orderOf(c) === null)
     .sort((a, b) => a.basename.localeCompare(b.basename))
@@ -123,12 +132,15 @@ export function buildBoard(
     if (isGenuinelyNested(c.path, parentOf)) continue; // real subcards are not on the board top level
     const st = String(c.frontmatter.status ?? "");
     const target = colIds.has(st) ? st : firstCol;
-    if (target) groups[target].push(c);
+    if (target) {
+      const bucket = groups[target];
+      if (bucket) bucket.push(c);
+    }
   }
 
   const columns: Record<string, string[]> = {};
   for (const col of config.columns) {
-    columns[col.id] = columnEffectiveOrders(groups[col.id]).map((x) => x.card.path);
+    columns[col.id] = columnEffectiveOrders(groups[col.id] ?? []).map((x) => x.card.path);
   }
 
   // Inverse of parentOf, but ONLY for genuinely-nested children — so a card in an A<->B cycle
@@ -142,7 +154,7 @@ export function buildBoard(
   }
   const childrenOf: Record<string, string[]> = {};
   for (const parent in childGroups) {
-    childrenOf[parent] = columnEffectiveOrders(childGroups[parent]).map((x) => x.card.path);
+    childrenOf[parent] = columnEffectiveOrders(childGroups[parent] ?? []).map((x) => x.card.path);
   }
 
   return { config, columns, cards: cardsByPath, parentOf, childrenOf, contexts };
@@ -214,7 +226,9 @@ export function moveColumn(columns: ColumnDef[], activeId: string, overId: strin
   const to = columns.findIndex((c) => c.id === overId);
   if (from < 0 || to < 0 || from === to) return columns;
   const next = columns.slice();
-  const [moved] = next.splice(from, 1);
+  const spliced = next.splice(from, 1);
+  const moved = spliced[0];
+  if (moved === undefined) return columns;
   next.splice(to, 0, moved);
   return next;
 }
@@ -256,8 +270,8 @@ export function planDrop(
   const { columnId: fromColumn, path: activePath } = splitCardDragId(rawActiveId);
   const overIsColumn = columnIds.includes(rawOverId);
   const over = overIsColumn ? null : splitCardDragId(rawOverId);
-  const toColumn = overIsColumn ? rawOverId : over!.columnId;
-  const realOver = overIsColumn ? rawOverId : over!.path;
+  const toColumn = overIsColumn ? rawOverId : (over?.columnId ?? "");
+  const realOver = overIsColumn ? rawOverId : (over?.path ?? rawOverId);
   if (toColumn === fromColumn && isComputedOrder(board, toColumn)) {
     return { kind: "noop" };
   }
@@ -290,7 +304,7 @@ export function resolveDrop(
   }
   const columnId = columnOf(board, overId);
   if (!columnId) return null;
-  const list = board.columns[columnId].filter((p) => p !== activeId);
+  const list = (board.columns[columnId] ?? []).filter((p) => p !== activeId);
   const idx = list.indexOf(overId);
   return { columnId, index: idx === -1 ? list.length : idx };
 }
@@ -310,7 +324,10 @@ export function moveCard(
   const fromStatus = String(card.frontmatter.status ?? "");
   const colCards = (board.columns[toColumnId] ?? [])
     .filter((p) => p !== cardPath)
-    .map((p) => board.cards[p]);
+    .flatMap((p) => {
+      const c = board.cards[p];
+      return c !== undefined ? [c] : [];
+    });
   const order = computeDropOrder(colCards, dropIndex);
   const history =
     fromStatus === toColumnId

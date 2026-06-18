@@ -1,12 +1,5 @@
-import {
-  FuzzySuggestModal,
-  Notice,
-  Plugin,
-  PluginSettingTab,
-  Setting,
-  TFile,
-  type App,
-} from "obsidian";
+import type { TFile } from "obsidian";
+import { FuzzySuggestModal, Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
 import {
   DEFAULT_SETTINGS,
@@ -16,9 +9,9 @@ import {
 } from "./settings";
 
 export default class FoliaKanbanPlugin extends Plugin {
-  settings: KanbanSettings = DEFAULT_SETTINGS;
+  override settings: KanbanSettings = DEFAULT_SETTINGS;
 
-  async onload(): Promise<void> {
+  override async onload(): Promise<void> {
     await this.loadSettings();
 
     this.registerView(
@@ -58,7 +51,8 @@ export default class FoliaKanbanPlugin extends Plugin {
       return;
     }
     if (boards.length === 1) {
-      await this.openBoard(boards[0].path);
+      const board = boards[0];
+      if (board) await this.openBoard(board.path);
       return;
     }
     // Several boards — let the user pick which to open.
@@ -83,7 +77,8 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded: unknown = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
   }
 
   async saveSettings(): Promise<void> {
@@ -140,7 +135,7 @@ class KanbanSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
-  display(): void {
+  override display(): void {
     const { containerEl } = this;
     const s = this.plugin.settings;
     containerEl.empty();
