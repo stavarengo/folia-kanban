@@ -1054,7 +1054,7 @@ describe("context grouping marker (#14)", () => {
     expect(a).toHaveClass("folia-card--has-context");
     expect(a).toHaveAttribute("data-context", "Acme");
     expect(a.style.getPropertyValue("--folia-ctx-color")).toBe("rgb(91, 141, 239)");
-    expect(a.querySelector(".folia-card-context")).not.toBeNull();
+    expect(a.querySelector(".folia-card-context-strip")).not.toBeNull();
     // The label chip shows the short label and names the context in its tooltip.
     const chip = within(a).getByText("client");
     expect(chip).toHaveClass("folia-chip-context");
@@ -1066,7 +1066,7 @@ describe("context grouping marker (#14)", () => {
     const loose = (await screen.findByText("Loose")).closest(".folia-card") as HTMLElement;
     expect(loose).not.toHaveClass("folia-card--has-context");
     expect(loose).not.toHaveAttribute("data-context");
-    expect(loose.querySelector(".folia-card-context")).toBeNull();
+    expect(loose.querySelector(".folia-card-context-strip")).toBeNull();
     expect(within(loose).queryByText("client")).toBeNull();
   });
 
@@ -1080,7 +1080,7 @@ describe("context grouping marker (#14)", () => {
     expect(b).toHaveClass("folia-card--has-context");
     expect(b).toHaveAttribute("data-context", "Beta");
     // ...but with no color/label configured, neither the colored strip nor a chip renders.
-    expect(b.querySelector(".folia-card-context")).toBeNull();
+    expect(b.querySelector(".folia-card-context-strip")).toBeNull();
     expect(b.style.getPropertyValue("--folia-ctx-color")).toBe("");
   });
 });

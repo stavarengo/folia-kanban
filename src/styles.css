@@ -1622,8 +1622,7 @@
    beside — never on top of — the priority bar (left:0, 3px), keeping the two left-edge cues
    distinct. The chip tints toward the context color when set, else falls back to a muted badge.
    Cross-track note: the #3 urgency cue (card track) owns the top edge + bg tint per contract §6/§8. */
-.folia-card-context {
-  content: "";
+.folia-card-context-strip {
   position: absolute;
   left: 5px;
   top: 6px;

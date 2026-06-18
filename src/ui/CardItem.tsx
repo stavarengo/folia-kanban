@@ -140,7 +140,7 @@ function CardItemInner({ card, columnId, today, selected, nested = false }: Prop
     >
       {/* #14 context grouping: a left accent strip, shown only when the context defines a color
           (inset past the priority bar so the two left-edge cues don't overlap). */}
-      {ctxColor && <span className="folia-card-context" aria-hidden="true" />}
+      {ctxColor && <span className="folia-card-context-strip" aria-hidden="true" />}
       <div
         className="folia-card-main"
         // Nested cards aren't draggable: skip the drag listeners/attributes (which also supply
