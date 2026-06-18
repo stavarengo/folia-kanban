@@ -7,16 +7,16 @@
 
 1. Keep this file thin: only what a fresh LLM session **can't** rediscover from the other files. A few words per entry.
 2. Update [`examples/`](./examples/) whenever a change affects the user experience.
-3. Do not invent architecture. Follow the project's guards. 
+3. Do not invent architecture. Follow the project's guards.
 
 ## Way of Working
 
-4. Before changing code: `pnpm doctor`, 
-5. While changing code (TypeScript only): put files in the documented folders; validate vault input with the Zod schemas; 
-6. Respect the the linters and guards. Don't just disable or ignore the violations. Fix them for real. Only ignore a violation if it's really technically impossible to fix or if the fix would not be worth.
-7. No task is complete until `pnpm verify` passes (`pnpm verify:ui` for UI changes).
-8. Track exceptions with an waiver under `tracking/waivers/` and suface it in the clouseout report.
-9. Closeout: run `pnpm verify`, report each check's result (see the PR template), and explain any "not run".
+1. Before changing code: `pnpm doctor`,
+2. While changing code (TypeScript only): put files in the documented folders; validate vault input with the Zod schemas;
+3. Respect the the linters and guards. Don't just disable or ignore the violations. Fix them for real. Only ignore a violation if it's really technically impossible to fix or if the fix would not be worth.
+4. No task is complete until `pnpm verify` passes (`pnpm verify:ui` for UI changes).
+5. Track exceptions with an waiver under `tracking/waivers/` and suface it in the clouseout report.
+6. Closeout: run `pnpm verify`, report each check's result (see the PR template), and explain any "not run".
 
 ### Driving the Obsidian UI via the Chrome DevTools MCP server
 

@@ -25,6 +25,10 @@
     ".idea",
     ".vscode",
     "test/fixtures",
+    // Sample vault: plugin-generated card/board content, not authored docs. The
+    // serializer (src/model/card.ts) writes `## Heading` directly above its list
+    // items and reverts reformats on GUI edit, so MD022/MD032/MD025 don't apply.
+    "examples",
     "CHANGELOG.md",
   ],
 }
