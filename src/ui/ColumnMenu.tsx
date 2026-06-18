@@ -148,7 +148,7 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdi
           <Icon name="trash" size={14} /> Delete column
         </button>
       ) : (
-        <div className="folia-menu-confirm">
+        <div className="folia-menu-confirm" role="alertdialog" aria-label="Confirm delete column">
           <span>Delete “{column.title}”? Its cards move to a neighbouring column.</span>
           <div className="folia-row-actions">
             <button className="folia-btn folia-btn-danger" onClick={() => { a.deleteColumn(column.id); onClose(); }}>Delete</button>

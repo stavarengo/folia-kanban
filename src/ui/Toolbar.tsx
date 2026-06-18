@@ -162,6 +162,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
+          aria-activedescendant={showList && suggestions.length > 0 ? `${listId}-opt-${highlight}` : undefined}
           aria-autocomplete="list"
           autoComplete="off"
           spellCheck={false}
@@ -186,6 +187,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
                 <button
                   type="button"
                   role="option"
+                  id={`${listId}-opt-${i}`}
                   aria-selected={i === highlight}
                   className={"folia-filter-suggest-item" + (i === highlight ? " is-active" : "")}
                   // Commit before the input's onBlur fires (pointerdown/mousedown precede blur).
