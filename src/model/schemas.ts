@@ -22,18 +22,32 @@ export class DataCorruptionError extends Error {
  */
 export const FrontmatterSchema = z.record(z.string(), z.unknown());
 
+/**
+ * An OPTIONAL config field that must end up a string or be absent. YAML hands us odd values for
+ * hand-edited config — e.g. an unquoted hex colour parses as `null` because a leading `#` starts a
+ * comment, and unquoted dates/numbers auto-type. Those are not "corruption" for an optional,
+ * defaultable display/config field: coerce any non-string to `undefined` (= absent) so a valid
+ * board still loads, exactly as the adapter did before schemas existed. Structural corruption
+ * (a non-object frontmatter block, malformed YAML) is still rejected upstream by FrontmatterSchema
+ * and parseFrontmatter.
+ */
+const optionalConfigString = z.preprocess(
+  (v) => (typeof v === "string" ? v : undefined),
+  z.string().optional(),
+);
+
 /** The board definition note's config frontmatter. `card-folder` + `columns` drive the board. */
 export const BoardFrontmatterSchema = z.looseObject({
-  "card-folder": z.string().optional(),
-  card_folder: z.string().optional(),
+  "card-folder": optionalConfigString,
+  card_folder: optionalConfigString,
   columns: z.unknown().optional(),
 });
 
 /** A context's `_context.md` frontmatter (#14). All display-only and optional. */
 export const ContextFrontmatterSchema = z.looseObject({
-  "context-name": z.string().optional(),
-  color: z.string().optional(),
-  label: z.string().optional(),
+  "context-name": optionalConfigString,
+  color: optionalConfigString,
+  label: optionalConfigString,
 });
 
 /**
