@@ -26,7 +26,7 @@
     "architecture:check": "depcruise --config .dependency-cruiser.cjs src",
     "dead-code:check": "knip",
     "contracts:check": "echo 'contracts:check — N/A: local Obsidian plugin, no REST/GraphQL/tRPC/network API to contract-check.'",
-    "schema:check": "echo 'schema:check — N/A in Stage A: vault Markdown persistence. Becomes a real decode test once Zod is wired (see DATA_RULES.md).'",
+    "schema:check": "vitest run test/schema.test.ts",
     "docs:lint": "markdownlint-cli2",
     "docs:check": "pnpm docs:lint",
     "tokens:check": "node scripts/check-tokens.mjs",
@@ -46,7 +46,8 @@
     "@dnd-kit/utilities": "^3.2.2",
     "js-yaml": "^4.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

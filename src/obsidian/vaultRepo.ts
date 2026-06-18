@@ -45,6 +45,12 @@ import {
   subtaskRemovedLine,
 } from "../model/history";
 import type { CardRepository } from "../model/repo";
+import {
+  BoardFrontmatterSchema,
+  ContextFrontmatterSchema,
+  DataCorruptionError,
+  decode,
+} from "../model/schemas";
 
 function sanitizeFilename(title: string): string {
   return (
@@ -98,8 +104,12 @@ export class VaultRepository implements CardRepository {
     // Parse the board config from the (write-fresh) file text rather than metadataCache:
     // the cache lags a processFrontMatter write by a tick, so reading it right after an
     // in-app column edit would return stale columns and the edit wouldn't reflect.
-    const fm = parseFrontmatter(await this.app.vault.cachedRead(boardFile));
-    const cardFolder = String(fm["card-folder"] ?? fm["card_folder"] ?? "Tasks");
+    const fm = decode(
+      BoardFrontmatterSchema,
+      parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
+      `board config (${this.boardPath})`,
+    );
+    const cardFolder = fm["card-folder"] ?? fm["card_folder"] ?? "Tasks";
     return { path: this.boardPath, columns: normalizeColumns(fm["columns"]), cardFolder };
   }
 
@@ -118,7 +128,14 @@ export class VaultRepository implements CardRepository {
     for (const f of files) {
       let fm = this.frontmatterOf(f);
       const text = await this.app.vault.cachedRead(f);
-      if (Object.keys(fm).length === 0) fm = parseFrontmatter(text);
+      if (Object.keys(fm).length === 0) {
+        try {
+          fm = parseFrontmatter(text);
+        } catch (e) {
+          // §17: surface which card is corrupt instead of silently dropping its fields.
+          throw new DataCorruptionError(`Card "${f.path}" has invalid frontmatter`, { cause: e });
+        }
+      }
       const childLinks = parseSubtasks(text)
         .filter((s) => s.kind === "card" && s.link)
         .map((s) => s.link ?? "")
@@ -150,15 +167,15 @@ export class VaultRepository implements CardRepository {
       let config: ContextConfig = { name: folder, body: "", folder };
       if (note instanceof TFile) {
         const text = await this.app.vault.cachedRead(note);
-        const fm = parseFrontmatter(text);
-        const name =
-          typeof fm["context-name"] === "string" && fm["context-name"].trim()
-            ? String(fm["context-name"])
-            : folder;
-        const color =
-          typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
-        const label =
-          typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
+        const fm = decode(
+          ContextFrontmatterSchema,
+          parseFrontmatter(text),
+          `context config (${note.path})`,
+        );
+        const cn = fm["context-name"];
+        const name = cn !== undefined && cn.trim() ? cn : folder;
+        const color = fm["color"] !== undefined && fm["color"].trim() ? fm["color"] : undefined;
+        const label = fm["label"] !== undefined && fm["label"].trim() ? fm["label"] : undefined;
         config = {
           name,
           ...(color !== undefined ? { color } : {}),

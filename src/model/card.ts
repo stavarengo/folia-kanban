@@ -11,6 +11,7 @@
 
 import yaml from "js-yaml";
 import type { CardBody, CardStats, SubItem } from "./types";
+import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
 const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
@@ -38,12 +39,18 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
   const { fmText } = splitFrontmatter(text);
   if (!fmText) return {};
   const inner = fmText.replace(/^---\r?\n/, "").replace(/\r?\n---\r?\n?$/, "");
+  let data: unknown;
   try {
-    const data = yaml.load(inner);
-    return data && typeof data === "object" ? (data as Record<string, unknown>) : {};
-  } catch {
-    return {};
+    data = yaml.load(inner);
+  } catch (e) {
+    // §17: malformed YAML is corruption, not "no frontmatter" — surface it, don't hide it
+    // behind an empty object (which would silently drop the card's status/order/etc.).
+    throw new DataCorruptionError("Card frontmatter is not valid YAML", { cause: e });
   }
+  // An empty frontmatter block (`--- \n ---`) is legitimately "no fields".
+  if (data == null) return {};
+  // Anything present must be a mapping; a list or scalar in the `---` block is corruption.
+  return decode(FrontmatterSchema, data, "card frontmatter");
 }
 
 // ---------------------------------------------------------------------------
