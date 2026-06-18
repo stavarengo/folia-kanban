@@ -16,8 +16,6 @@ Once the plugin is accepted into the Obsidian community store, you can also add 
 
 ![Dragging a card across columns on the Folia Kanban board](images/board-demo.gif)
 
-<!-- TODO(asset): record a short GIF (~10–15s) showing a card dragged between columns, then the detail panel opening. Save as images/board-demo.gif and keep it under ~5 MB so it loads fast on GitHub. -->
-
 Columns, drag-and-drop, nested subcards, comments and an automatic history — backed entirely by plain `.md` files. Everything about a card (description, subtasks, subcards, comments, history) lives inside that one file as ordinary Obsidian-flavoured Markdown. No database, no proprietary blob, no weird syntax buried in your notes: your board *is* your notes.
 
 ## Contents
@@ -78,9 +76,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 - **Live reload** when files change outside the board, with a self-write echo guard.
 - **Accessible & themed** — keyboard-navigable, ARIA roles and focus management throughout; styled with Obsidian's own CSS variables (light + dark) for a clean, shadcn-grade look.
 
-![The card detail panel docked beside the board](images/card-detail.png)
-
-<!-- TODO(asset): screenshot of the card detail panel (side or modal) showing description, properties, subtasks and comments. Save as images/card-detail.png. -->
+![The card detail panel shown as a centred modal over the board](images/card-detail.png)
 
 ## Set up a board
 
