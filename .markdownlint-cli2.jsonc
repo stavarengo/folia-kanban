@@ -10,13 +10,14 @@
     "MD041": false,
     // Allow duplicate headings under different parents (e.g. repeated "## Command").
     "MD024": { "siblings_only": true },
+    // Table pipe-spacing is cosmetic; Prettier (the usual table formatter) is off for Markdown here.
+    "MD060": false,
   },
   "globs": ["**/*.md"],
   "ignores": [
     "node_modules",
     "dist",
     "coverage",
-    "examples",
     "tmp",
     ".pnpm-store",
     ".devcontainer",
