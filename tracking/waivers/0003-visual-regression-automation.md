@@ -2,25 +2,30 @@
 
 | Field | Value |
 | --- | --- |
-| **Rule violated** | **DS-PROCESS-CONFORMANCE-1**, conformance category **#5 "Visual regression"** — *visual output is protected against unintended change.* (No dedicated `DS-VISUAL-*` rule exists; this is the category that mandates the check.) Justified under **DS-PROCESS-CONFORMANCE-4 — Proportionate enforcement**, which requires the category be enforced but lets the *mechanism* be chosen for proportionality. |
-| **Status** | `active` |
+| **Rule violated** | **DS-PROCESS-CONFORMANCE-1**, conformance category **#5 "Visual regression"** — *visual output is protected against unintended change.* (No dedicated `DS-VISUAL-*` rule exists; this is the category that mandates the check.) Satisfied under **DS-PROCESS-CONFORMANCE-4 — Proportionate enforcement**, which requires the category be enforced but lets the *mechanism* be chosen for proportionality. |
+| **Status** | `retired` |
 | **Owner** | @stavarengo |
 | **Created date** | 2026-06-18 |
-| **Expiry date** | 2027-06-18 (review) |
+| **Expiry date** | 2027-06-18 (no longer enforced — retained for history) |
 | **Scope** | The absence of an automated screenshot / pixel-diff visual-regression harness for the plugin UI. Limited to the visual-regression conformance category; all other categories (token validation, raw-value detection, spec coverage, a11y) are unaffected. |
 
 ## Reason
 
-A real platform constraint, not convenience. There is no Storybook or standalone component-preview harness, and an Obsidian plugin renders only inside the host app — UI is previewed through the `examples/` vault, not an isolated story runner. Standing up a pixel-diff harness (headless host, snapshot baselines, flake management) is disproportionate for a solo repo. Per `DS-PROCESS-CONFORMANCE-4` the category is still *enforced*, just by a proportionate mechanism rather than the heaviest tool: the no-regression proof for the DS work is **structural** — `src/styles.css` is provably untouched and the only source change is a value-preserving 8-color palette dedup (conformance report §B).
+Retired: the visual-regression conformance category is now enforced by a proportionate mechanism wired into `ds:check`, so this waiver is resolved. There is still no Storybook or standalone component-preview harness, and an Obsidian plugin renders only inside the host app — but a full pixel-diff harness (headless host, snapshot baselines, flake management) remains disproportionate for a solo repo. Per `DS-PROCESS-CONFORMANCE-4` the category is enforced by a lighter-weight mechanism instead of the heaviest tool: a **structural-snapshot regression net** (`test:visual`, `test/visual-regression.test.tsx`) that snapshots the focused outerHTML of the stable token-consuming units (a rendered `.folia-card`, a `.folia-column-header`), paired with the **token drift-check** (`tokens:check`, `scripts/check-tokens.mjs`) that guards the token↔consumer mapping.
 
 ## Risk
 
-**Low.** Styling is centralized in one `src/styles.css`, the token drift-check (`tokens:check`) guards the token↔consumer mapping, the raw-value ratchet blocks new literals, and the vitest UI suite (`test/ui.test.tsx`, 76 tests) regression-guards role/state/variant surface. The residual risk is that a *rendered-pixel* change (not a structural/token change) could slip through without a screenshot baseline — mitigated by manual review through the examples vault until a preview harness exists.
+**Low, and now actively guarded.** Styling is centralized in one `src/styles.css`; the token drift-check guards the token↔consumer mapping, the raw-value ratchet blocks new literals, and the structural-snapshot net catches unintended changes to the class/attribute scaffolding the tokens hang off of. The residual gap is a *rendered-pixel* change that alters no structure and no token — caught by manual review through the `examples/` vault until (and unless) a pixel-diff harness is adopted. This residual is accepted as proportionate for an in-Obsidian-rendered solo plugin.
 
-## Exit plan
+## Resolution
 
-Re-evaluate at expiry, or sooner if a component-preview harness (Storybook or equivalent) is adopted for the plugin — at which point adding a screenshot/pixel-diff stage under `ds:check` / CI becomes proportionate. If still no harness at review, renew with fresh justification or formally accept structural+manual proof as the standing mechanism for this category under `DS-PROCESS-CONFORMANCE-4`.
+The visual-regression category is satisfied by two checks that together form the safety net, both wired into `ds:check`:
+
+1. **Structural-snapshot regression net** — `test/visual-regression.test.tsx` (`pnpm test:visual`) renders a representative board and snapshots small, targeted units (`.folia-card`, `.folia-column-header`) so unintended structural change to token-consuming markup fails the gate.
+2. **Token drift-check** — `scripts/check-tokens.mjs` (`pnpm tokens:check`) guards the token↔consumer mapping.
+
+A full pixel-diff / browser harness (Storybook + Playwright or equivalent) is **intentionally deferred** as disproportionate for a plugin that renders only inside Obsidian in a solo repo; if such a harness is ever adopted, a screenshot/pixel-diff stage can be added under `ds:check` at that point. No renewal is required: this waiver is closed, not renewed.
 
 ## Replacement
 
-The proportionate mechanism that stands in until (and unless) a harness lands: the **token drift-check** (`tokens:check`) + the **`examples/` vault** for manual visual review + the **vitest UI test suite**. These collectively satisfy `DS-PROCESS-CONFORMANCE-1` #5 at a cost proportionate to a solo repo.
+The standing mechanism for `DS-PROCESS-CONFORMANCE-1` #5, at a cost proportionate to a solo repo: the **structural-snapshot regression net** (`test:visual`) + the **token drift-check** (`tokens:check`), both enforced in `ds:check`, complemented by the **`examples/` vault** for manual visual review of pure-pixel changes.

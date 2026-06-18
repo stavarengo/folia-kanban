@@ -17,9 +17,10 @@
     "tokens:check": "node scripts/check-tokens.mjs",
     "audit:raw-values": "node scripts/audit-raw-values.mjs",
     "waivers:check": "node scripts/check-waivers.mjs",
-    "ds:check": "pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm lint:a11y && pnpm test:a11y",
+    "ds:check": "pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm lint:a11y && pnpm test:a11y && pnpm test:visual",
     "lint:a11y": "eslint src",
     "test:a11y": "vitest run test/a11y.axe.test.tsx",
+    "test:visual": "vitest run test/visual-regression.test.tsx",
     "prepare": "lefthook install"
   },
   "dependencies": {
