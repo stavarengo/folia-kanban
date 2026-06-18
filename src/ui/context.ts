@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { CardRepository } from "../obsidian/repo";
+import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
 import type { KanbanSettings } from "../settings";
 

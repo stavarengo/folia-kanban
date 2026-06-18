@@ -2,6 +2,10 @@
   "name": "folia-kanban",
   "version": "0.0.1",
   "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=11"
+  },
   "description": "A real Kanban board for Obsidian, with Markdown files as the source of truth.",
   "type": "module",
   "scripts": {
@@ -11,9 +15,20 @@
     "release:bump-plugin-version": "node scripts/bump-plugin-version.mjs",
     "ci:release": "release-it --ci",
     "dev:helpers:release": "release-it",
+    "doctor": "node scripts/doctor.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "filesystem:check": "ls-lint",
+    "architecture:check": "depcruise --config .dependency-cruiser.cjs src",
+    "dead-code:check": "knip",
+    "contracts:check": "echo 'contracts:check — N/A: local Obsidian plugin, no REST/GraphQL/tRPC/network API to contract-check.'",
+    "schema:check": "echo 'schema:check — N/A in Stage A: vault Markdown persistence. Becomes a real decode test once Zod is wired (see DATA_RULES.md).'",
+    "docs:lint": "markdownlint-cli2",
+    "docs:check": "pnpm docs:lint",
     "tokens:check": "node scripts/check-tokens.mjs",
     "audit:raw-values": "node scripts/audit-raw-values.mjs",
     "waivers:check": "node scripts/check-waivers.mjs",
@@ -21,6 +36,8 @@
     "lint:a11y": "eslint src",
     "test:a11y": "vitest run test/a11y.axe.test.tsx",
     "test:visual": "vitest run test/visual-regression.test.tsx",
+    "verify": "pnpm doctor && pnpm format:check && pnpm filesystem:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check && pnpm architecture:check && pnpm schema:check && pnpm dead-code:check && pnpm docs:check && pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check",
+    "verify:ui": "pnpm verify",
     "prepare": "lefthook install"
   },
   "dependencies": {
@@ -33,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@ls-lint/ls-lint": "^2.3.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
@@ -41,19 +59,36 @@
     "@types/node": "^22.5.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "axe-core": "^4.12.1",
+    "@vitest/eslint-plugin": "^1.6.20",
     "builtin-modules": "^4.0.0",
+    "dependency-cruiser": "^17.4.3",
     "esbuild": "^0.23.1",
     "eslint": "^10.5.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "globals": "^17.6.0",
     "jsdom": "^25.0.1",
+    "knip": "^6.17.1",
     "lefthook": "^2.1.9",
+    "lint-staged": "^17.0.7",
+    "markdownlint-cli2": "^0.22.1",
     "obsidian": "^1.7.2",
+    "prettier": "^3.8.4",
     "release-it": "19.2.2",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.61.1",
     "vitest": "^2.1.1",
     "vitest-axe": "^0.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint",
+      "prettier --write"
+    ],
+    "*.{json,mjs,cjs,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.md": [
+      "markdownlint-cli2"
+    ]
   }
 }

@@ -2,8 +2,8 @@
 // tests use an in-memory fake. Keeping the UI behind this interface is what lets us
 // verify board behaviour headlessly.
 
-import type { Board, CardBody, CardFrontmatter, ColumnDef, ContextConfig } from "../model/types";
-import type { CardMutation } from "../model/board";
+import type { Board, CardBody, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
+import type { CardMutation } from "./board";
 
 export interface CardRepository {
   /** Read the board config note + all cards, return the assembled board. */

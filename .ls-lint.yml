@@ -1,0 +1,16 @@
+# Filesystem policy (blueprint §4 + §7), adapted to this Obsidian plugin's
+# layout. App source is TypeScript only — no .js/.jsx. Build tooling under
+# scripts/ is intentionally .mjs and is not app source, so it is out of scope.
+ls:
+  src:
+    .dir: kebab-case
+    .ts: camelCase | PascalCase | kebab-case
+    .tsx: camelCase | PascalCase | kebab-case
+    .js: regex:^NO_JS_FILES_ALLOWED$
+    .jsx: regex:^NO_JSX_FILES_ALLOWED$
+
+ignore:
+  - node_modules
+  - dist
+  - coverage
+  - examples

@@ -1,7 +1,12 @@
+# Git hooks are convenience only (blueprint §30). CI and `pnpm verify` are
+# authoritative — hooks can be bypassed locally with --no-verify, CI cannot.
 pre-commit:
+  parallel: true
   commands:
-    typecheck:
-      glob: "*.{ts,tsx}"
-      run: pnpm typecheck
-    ds-check:
-      run: pnpm ds:check
+    lint-staged:
+      run: pnpm lint-staged
+
+pre-push:
+  commands:
+    verify:
+      run: pnpm verify

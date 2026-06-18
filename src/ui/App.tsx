@@ -3,9 +3,15 @@ import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
 import { columnOf, moveCard, moveColumn, resolveDrop } from "../model/board";
 import { dateOnly } from "../model/dates";
-import type { CardRepository } from "../obsidian/repo";
+import type { CardRepository } from "../model/repo";
 import type { KanbanSettings } from "../settings";
-import { BoardActionsContext, ContextsContext, RepoContext, SettingsContext, type BoardActions } from "./context";
+import {
+  BoardActionsContext,
+  ContextsContext,
+  RepoContext,
+  SettingsContext,
+  type BoardActions,
+} from "./context";
 import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
@@ -83,7 +89,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     (e: unknown) => showToast(e instanceof Error ? e.message : String(e), "error"),
     [showToast],
   );
-  useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    },
+    [],
+  );
   // Latest board for stable callbacks — lets the actions object stay referentially stable
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
@@ -277,7 +288,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const b = boardRef.current;
         if (!b) return { canMoveUp: false, canMoveDown: false };
         const col = columnOf(b, path);
-        const list = col ? b.columns[col] ?? [] : [];
+        const list = col ? (b.columns[col] ?? []) : [];
         const i = list.indexOf(path);
         return { canMoveUp: i > 0, canMoveDown: i >= 0 && i < list.length - 1 };
       },
@@ -308,18 +319,24 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const b = boardRef.current;
         const t = title.trim();
         if (!b || !t) return;
-        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)));
+        void setColumnsAndReload(
+          b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)),
+        );
       },
       setColumnColor: (id, color) => {
         const b = boardRef.current;
         if (!b) return;
-        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, color: color ?? undefined } : c)));
+        void setColumnsAndReload(
+          b.config.columns.map((c) => (c.id === id ? { ...c, color: color ?? undefined } : c)),
+        );
       },
       setColumnLimit: (id, limit) => {
         const b = boardRef.current;
         if (!b) return;
         const lim = limit == null || limit <= 0 ? undefined : Math.floor(limit);
-        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)));
+        void setColumnsAndReload(
+          b.config.columns.map((c) => (c.id === id ? { ...c, limit: lim } : c)),
+        );
       },
       updateColumn: (id, patch) => {
         const b = boardRef.current;
@@ -327,7 +344,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         // Merge the patch onto the current def; serializeColumns then drops anything equal to its
         // default (group:"none", sort:"manual", opacity:1, parked:false) or blank, so the write
         // stays byte-stable. We pass the merged def straight through and let §2 do the pruning.
-        void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+        void setColumnsAndReload(
+          b.config.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        );
       },
       moveColumn: (id, dir) => {
         const b = boardRef.current;
@@ -376,19 +395,34 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const t = title.trim();
         if (!b || !t) return;
         const existing = new Set(b.config.columns.map((c) => c.id));
-        const base = t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "column";
+        const base =
+          t
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "column";
         let id = base;
         let n = 1;
         while (existing.has(id)) id = `${base}-${n++}`;
         void setColumnsAndReload([...b.config.columns, { id, title: t }]);
       },
     }),
-    [openCard, moveTo, doneColumnId, repo, load, setColumnsAndReload, showToast, reportError, settings.addCardOpenMode],
+    [
+      openCard,
+      moveTo,
+      doneColumnId,
+      repo,
+      load,
+      setColumnsAndReload,
+      showToast,
+      reportError,
+      settings.addCardOpenMode,
+    ],
   );
 
   const wipLimits = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
-    if (board) for (const c of board.config.columns) if (typeof c.limit === "number") map[c.id] = c.limit;
+    if (board)
+      for (const c of board.config.columns) if (typeof c.limit === "number") map[c.id] = c.limit;
     return map;
   }, [board]);
 
@@ -448,7 +482,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
 
   // The add-card flows can override the presentation for one open; otherwise use the global setting.
   const globalDetailMode: DetailMode =
-    settings.detailPresentation === "modal" ? "modal" : settings.sidePanelMode === "float" ? "float" : "split";
+    settings.detailPresentation === "modal"
+      ? "modal"
+      : settings.sidePanelMode === "float"
+        ? "float"
+        : "split";
   const detailMode: DetailMode = openOverride ?? globalDetailMode;
   const detailOpen = selected != null && board.cards[selected] != null;
   const createMode = createColumn != null && !detailOpen;
@@ -494,11 +532,17 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
 
   return (
     <SettingsContext.Provider value={settingsValue}>
-        <RepoContext.Provider value={repo}>
-          <BoardActionsContext.Provider value={actions}>
-            <ContextsContext.Provider value={stableContexts}>
+      <RepoContext.Provider value={repo}>
+        <BoardActionsContext.Provider value={actions}>
+          <ContextsContext.Provider value={stableContexts}>
             <div className="folia-root" ref={rootRef}>
-              <Toolbar ref={searchRef} query={query} onChange={setQuery} matchCount={counts.match} totalCount={counts.total} />
+              <Toolbar
+                ref={searchRef}
+                query={query}
+                onChange={setQuery}
+                matchCount={counts.match}
+                totalCount={counts.total}
+              />
               <div className="folia-main" role="region" aria-label="Board">
                 <Board
                   board={board}
@@ -514,26 +558,34 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
                     float overlays it. Modal renders via a portal into the root, over a backdrop. */}
                 {detailMode !== "modal" && detail}
               </div>
-              {detailMode === "modal" && panelShown && rootRef.current &&
+              {detailMode === "modal" &&
+                panelShown &&
+                rootRef.current &&
                 createPortal(
                   <div
                     className="folia-detail-modal-backdrop"
-                    onPointerDown={(e) => { if (e.target === e.currentTarget) closeDetail(); }}
+                    onPointerDown={(e) => {
+                      if (e.target === e.currentTarget) closeDetail();
+                    }}
                   >
                     {detail}
                   </div>,
                   rootRef.current,
                 )}
               {toast && (
-                <div className={"folia-toast folia-toast-" + toast.tone} role="status" aria-live="polite">
+                <div
+                  className={"folia-toast folia-toast-" + toast.tone}
+                  role="status"
+                  aria-live="polite"
+                >
                   <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
                   {toast.text}
                 </div>
               )}
             </div>
-            </ContextsContext.Provider>
-          </BoardActionsContext.Provider>
-        </RepoContext.Provider>
+          </ContextsContext.Provider>
+        </BoardActionsContext.Provider>
+      </RepoContext.Provider>
     </SettingsContext.Provider>
   );
 }

@@ -2,8 +2,17 @@
 // the real adapter treats them) and runs the REAL model functions on the body, so UI tests
 // exercise genuine parse/mutate logic without Obsidian.
 
-import type { CardRepository } from "../src/obsidian/repo";
-import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef, ContextConfig, HistoryScope } from "../src/model/types";
+import type { CardRepository } from "../src/model/repo";
+import type {
+  Board,
+  BoardConfig,
+  Card,
+  CardBody,
+  CardFrontmatter,
+  ColumnDef,
+  ContextConfig,
+  HistoryScope,
+} from "../src/model/types";
 import { buildBoard, deriveContext } from "../src/model/board";
 import {
   SECTION,
@@ -92,9 +101,14 @@ export class FakeRepo implements CardRepository {
       if (e.basename + ".md" === CONTEXT_NOTE) {
         // The fake stores frontmatter (`fm`) apart from `body`, so `body` is already frontmatter-free.
         const fm = e.fm as Record<string, unknown>;
-        const name = typeof fm["context-name"] === "string" && fm["context-name"].trim() ? String(fm["context-name"]) : folder;
-        const color = typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
-        const label = typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
+        const name =
+          typeof fm["context-name"] === "string" && fm["context-name"].trim()
+            ? String(fm["context-name"])
+            : folder;
+        const color =
+          typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
+        const label =
+          typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
         out[folder] = { name, color, label, body: e.body, folder };
       }
     }
@@ -124,8 +138,13 @@ export class FakeRepo implements CardRepository {
     delete this.entry(path).fm[key];
   }
 
-  async applyMove(mutation: { path: string; setFrontmatter?: Partial<CardFrontmatter>; history?: string }) {
-    if (mutation.setFrontmatter) Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
+  async applyMove(mutation: {
+    path: string;
+    setFrontmatter?: Partial<CardFrontmatter>;
+    history?: string;
+  }) {
+    if (mutation.setFrontmatter)
+      Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
     if (mutation.history) {
       const e = this.entry(mutation.path);
       e.body = appendHistory(e.body, mutation.history, this.ts);
@@ -140,7 +159,12 @@ export class FakeRepo implements CardRepository {
     this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, index: number, text: string) {
-    this.entry(path).body = updateTimestampedLine(this.entry(path).body, SECTION.comments, index, text);
+    this.entry(path).body = updateTimestampedLine(
+      this.entry(path).body,
+      SECTION.comments,
+      index,
+      text,
+    );
     this.maybeHistory(path, "comment", commentEditedLine());
   }
   async removeComment(path: string, index: number) {
@@ -154,7 +178,11 @@ export class FakeRepo implements CardRepository {
   async toggleSubtask(path: string, index: number, done: boolean) {
     const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
     this.entry(path).body = setSubtaskDone(this.entry(path).body, index, done);
-    this.maybeHistory(path, "subtask", done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText));
+    this.maybeHistory(
+      path,
+      "subtask",
+      done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText),
+    );
   }
   async removeSubtask(path: string, index: number) {
     const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
@@ -216,7 +244,9 @@ export class FakeRepo implements CardRepository {
 
   renderMarkdown(el: HTMLElement, markdown: string): () => void {
     el.textContent = markdown;
-    return () => { el.textContent = ""; };
+    return () => {
+      el.textContent = "";
+    };
   }
 
   onChange(cb: () => void): () => void {
@@ -236,7 +266,12 @@ function basename(path: string): string {
 
 // Mirrors VaultRepository.sanitizeFilename so the fake derives the same basename for a rename.
 function sanitizeFilename(title: string): string {
-  return title.replace(/[\\/:*?"<>|#^[\]]/g, "").replace(/\s+/g, " ").trim() || "Untitled card";
+  return (
+    title
+      .replace(/[\\/:*?"<>|#^[\]]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || "Untitled card"
+  );
 }
 
 /** Rewrite `[[old]]` / `[[old|alias]]` / `[[old#heading]]` wikilink targets to `new`, by basename. */

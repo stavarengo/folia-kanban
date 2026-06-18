@@ -11,7 +11,7 @@ export interface CardFrontmatter {
   [key: string]: unknown;
 }
 
-export type SubItemKind = "todo" | "card";
+type SubItemKind = "todo" | "card";
 
 /** One line of a card's `## Subtasks` checklist: either a plain todo or a link to a
  *  child card (a subcard). The link target is the single source of truth for parentage. */

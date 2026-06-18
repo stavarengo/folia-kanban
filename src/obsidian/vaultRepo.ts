@@ -1,5 +1,14 @@
 import { App, Component, MarkdownRenderer, TFile, TFolder, normalizePath } from "obsidian";
-import type { Board, BoardConfig, Card, CardBody, CardFrontmatter, ColumnDef, ContextConfig, HistoryScope } from "../model/types";
+import type {
+  Board,
+  BoardConfig,
+  Card,
+  CardBody,
+  CardFrontmatter,
+  ColumnDef,
+  ContextConfig,
+  HistoryScope,
+} from "../model/types";
 import type { CardMutation } from "../model/board";
 import { buildBoard } from "../model/board";
 import { normalizeColumns, serializeColumns } from "../model/columns";
@@ -34,10 +43,15 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../model/history";
-import type { CardRepository } from "./repo";
+import type { CardRepository } from "../model/repo";
 
 function sanitizeFilename(title: string): string {
-  return title.replace(/[\\/:*?"<>|#^[\]]/g, "").replace(/\s+/g, " ").trim() || "Untitled card";
+  return (
+    title
+      .replace(/[\\/:*?"<>|#^[\]]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || "Untitled card"
+  );
 }
 
 /** The per-context config note (#14). Lives inside a context subfolder; read-only for the plugin. */
@@ -54,7 +68,11 @@ export class VaultRepository implements CardRepository {
   ) {}
 
   /** Append a history line for `kind` only when the current scope allows it. */
-  private async maybeHistory(path: string, kind: Parameters<typeof historyAllows>[1], line: string): Promise<void> {
+  private async maybeHistory(
+    path: string,
+    kind: Parameters<typeof historyAllows>[1],
+    line: string,
+  ): Promise<void> {
     if (!historyAllows(this.getHistoryScope(), kind)) return;
     await this.editBody(path, (t) => appendHistory(t, line, stamp()));
   }
@@ -91,7 +109,9 @@ export class VaultRepository implements CardRepository {
       .getMarkdownFiles()
       // Skip the board note and the per-context config notes (#14) — `_context.md` is a folder
       // config, not a card, so it must never surface as a phantom card on the board.
-      .filter((f) => f.path.startsWith(prefix) && f.path !== this.boardPath && f.name !== CONTEXT_NOTE);
+      .filter(
+        (f) => f.path.startsWith(prefix) && f.path !== this.boardPath && f.name !== CONTEXT_NOTE,
+      );
 
     const cards: Card[] = [];
     for (const f of files) {
@@ -101,7 +121,13 @@ export class VaultRepository implements CardRepository {
       const childLinks = parseSubtasks(text)
         .filter((s) => s.kind === "card" && s.link)
         .map((s) => s.link!);
-      cards.push({ path: f.path, basename: f.basename, frontmatter: fm, childLinks, stats: cardStats(text) });
+      cards.push({
+        path: f.path,
+        basename: f.basename,
+        frontmatter: fm,
+        childLinks,
+        stats: cardStats(text),
+      });
     }
     // buildBoard derives each card's `context` from its path; carry the configs alongside.
     return buildBoard(config, cards, await this.loadContexts(config.cardFolder));
@@ -123,9 +149,14 @@ export class VaultRepository implements CardRepository {
       if (note instanceof TFile) {
         const text = await this.app.vault.cachedRead(note);
         const fm = parseFrontmatter(text);
-        const name = typeof fm["context-name"] === "string" && fm["context-name"].trim() ? String(fm["context-name"]) : folder;
-        const color = typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
-        const label = typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
+        const name =
+          typeof fm["context-name"] === "string" && fm["context-name"].trim()
+            ? String(fm["context-name"])
+            : folder;
+        const color =
+          typeof fm["color"] === "string" && fm["color"].trim() ? String(fm["color"]) : undefined;
+        const label =
+          typeof fm["label"] === "string" && fm["label"].trim() ? String(fm["label"]) : undefined;
         config = { name, color, label, body: splitFrontmatter(text).body, folder };
       }
       out[folder] = config;
@@ -170,8 +201,10 @@ export class VaultRepository implements CardRepository {
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
-    if (mutation.setFrontmatter) await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
-    if (mutation.history) await this.editBody(mutation.path, (t) => appendHistory(t, mutation.history!, stamp()));
+    if (mutation.setFrontmatter)
+      await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
+    if (mutation.history)
+      await this.editBody(mutation.path, (t) => appendHistory(t, mutation.history!, stamp()));
   }
 
   setDescription(path: string, description: string): Promise<void> {
@@ -196,12 +229,18 @@ export class VaultRepository implements CardRepository {
   }
   async toggleSubtask(path: string, index: number, done: boolean): Promise<void> {
     // Capture the item text BEFORE the splice so the history line can name it.
-    const itemText = parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
+    const itemText =
+      parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
     await this.editBody(path, (t) => setSubtaskDone(t, index, done));
-    await this.maybeHistory(path, "subtask", done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText));
+    await this.maybeHistory(
+      path,
+      "subtask",
+      done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText),
+    );
   }
   async removeSubtask(path: string, index: number): Promise<void> {
-    const itemText = parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
+    const itemText =
+      parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
     await this.editBody(path, (t) => removeSubtaskText(t, index));
     await this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
   }

@@ -81,6 +81,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 ## Set up a board
 
 1. Make a **board note** — any note with this frontmatter (see `examples/basic/` for a minimal board, or `examples/feature-showcase/` for one that exercises every feature):
+
    ```yaml
    folia-board: true
    card-folder: Cards      # folder holding the card notes
@@ -89,6 +90,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
      - doing
      - done
    ```
+
 2. Put card notes (each with a `status` matching a column) in that folder.
 3. Run the command **“Open Folia Kanban board”** or click the layout-grid ribbon icon.
 
@@ -133,7 +135,7 @@ Edits are surgical: body changes splice only the section they touch, and frontma
 
 ### From Community Plugins
 
-> _Coming soon — Folia Kanban is awaiting review for the Obsidian community store. Until it's listed, use the manual install below._
+> *Coming soon — Folia Kanban is awaiting review for the Obsidian community store. Until it's listed, use the manual install below.*
 
 1. Open **Settings → Community plugins** and turn off restricted mode.
 2. Click **Browse**, search for **Folia Kanban**, and install it.

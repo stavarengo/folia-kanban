@@ -1,0 +1,18 @@
+# Build output and deps
+dist/
+node_modules/
+.pnpm-store/
+coverage/
+
+# Example Obsidian vault — user content, not source
+examples/
+
+# Markdown is owned by markdownlint-cli2 (docs:check), not Prettier
+**/*.md
+
+# Hand-maintained design-system stylesheet is owned by ds:check
+# (tokens:check + audit:raw-values), not Prettier
+src/styles.css
+
+# Lockfile
+pnpm-lock.yaml

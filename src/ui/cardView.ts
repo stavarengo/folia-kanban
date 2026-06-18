@@ -54,7 +54,9 @@ const PRIORITY_LETTER_SCALE = ["A", "B", "C", "D"];
 
 /** Priority options that always include the card's current value (keeps arbitrary scales working). */
 export function priorityOptions(current: string): string[] {
-  const base = PRIORITY_LETTER_SCALE.includes(current) ? PRIORITY_LETTER_SCALE : PRIORITY_WORD_SCALE;
+  const base = PRIORITY_LETTER_SCALE.includes(current)
+    ? PRIORITY_LETTER_SCALE
+    : PRIORITY_WORD_SCALE;
   return current && !base.includes(current) ? [current, ...base] : base;
 }
 
@@ -66,7 +68,7 @@ function dayDelta(target: string, today: string): number | null {
   return Math.round((t - n) / 86_400_000);
 }
 
-export type DueUrgency = "overdue" | "today" | "soon" | "future" | "done";
+type DueUrgency = "overdue" | "today" | "soon" | "future" | "done";
 
 export interface DueInfo {
   label: string;
@@ -96,14 +98,18 @@ export function dueInfo(due: string, today: string, done: boolean): DueInfo {
  * `overdue`/`today`/`soon` to a `data-urgency` attribute (styled in src/styles.css); `future`/`done`/
  * no-date all return null so the card stays neutral (invariant 4: default = current behavior).
  */
-export function cardUrgency(card: Card, today: string, doneColumnId: string | null): "overdue" | "today" | "soon" | null {
+export function cardUrgency(
+  card: Card,
+  today: string,
+  doneColumnId: string | null,
+): "overdue" | "today" | "soon" | null {
   const due = card.frontmatter.due;
   if (typeof due !== "string" || due === "") return null;
   const u = dueInfo(due, today, card.frontmatter.status === doneColumnId).urgency;
   return u === "overdue" || u === "today" || u === "soon" ? u : null;
 }
 
-export function tagValues(card: Card): string[] {
+function tagValues(card: Card): string[] {
   const fm = card.frontmatter;
   const out: string[] = [];
   if (typeof fm.area === "string" && fm.area) out.push(fm.area);
@@ -115,17 +121,11 @@ export function tagValues(card: Card): string[] {
   return out;
 }
 
-export type DueFilter = "" | "overdue" | "soon";
+type DueFilter = "" | "overdue" | "soon";
 
 export interface BoardFilters {
   text: string;
   due: DueFilter;
-}
-
-export const EMPTY_FILTERS: BoardFilters = { text: "", due: "" };
-
-export function hasActiveFilter(f: BoardFilters): boolean {
-  return f.text.trim() !== "" || f.due !== "";
 }
 
 // ---------------------------------------------------------------------------
@@ -146,9 +146,7 @@ export type FilterKey = "area" | "status" | "priority" | "tag" | "due" | "contex
 const FILTER_KEYS: readonly FilterKey[] = ["area", "status", "priority", "tag", "due", "context"];
 
 /** Recognized `due:` values. A bare YYYY-MM-DD date is also accepted (exact match). */
-export type DueToken = "overdue" | "soon" | "today" | "none";
-
-export interface FilterToken {
+interface FilterToken {
   key: FilterKey;
   /** Lower-cased value as written after the colon. */
   value: string;
@@ -187,7 +185,8 @@ function tokenizeQuery(query: string): string[] {
   const re = /(\S*?)"([^"]*)"|(\S+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(query)) !== null) {
-    if (m[2] !== undefined) out.push(m[1] + m[2]); // prefix (maybe "key:") + unquoted value
+    if (m[2] !== undefined)
+      out.push(m[1] + m[2]); // prefix (maybe "key:") + unquoted value
     else out.push(m[3]);
   }
   return out;
@@ -201,7 +200,10 @@ export function parseFilter(query: string): Filter {
     const colon = term.indexOf(":");
     if (colon > 0) {
       const rawKey = term.slice(0, colon).toLowerCase();
-      const value = term.slice(colon + 1).trim().toLowerCase();
+      const value = term
+        .slice(colon + 1)
+        .trim()
+        .toLowerCase();
       if (isFilterKey(rawKey) && value !== "") {
         tokens.push({ key: rawKey, value });
         continue;
@@ -220,13 +222,16 @@ export function isEmptyFilter(f: Filter): boolean {
 
 /** Lower-cased free-text haystack: basename + priority + tags (area + tags). */
 function freeTextHaystack(card: Card): string {
-  return [card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)].join(" ").toLowerCase();
+  return [card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)]
+    .join(" ")
+    .toLowerCase();
 }
 
 /** All lower-cased entries of a frontmatter value that may be a string or string[]. */
 function listValues(value: unknown): string[] {
   if (typeof value === "string") return value ? [value.toLowerCase()] : [];
-  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase());
+  if (Array.isArray(value))
+    return value.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase());
   return [];
 }
 
@@ -317,7 +322,10 @@ export function toggleToken(query: string, key: FilterKey, value: string): strin
   // removing it doesn't leave a double space. \S-anchored so we never clip inside another term.
   const re = new RegExp(`(^|\\s)${escapeRegExp(key)}:${escapeRegExp(want)}(?=\\s|$)`, "i");
   if (hasToken(query, key, value)) {
-    return query.replace(re, "").replace(/\s{2,}/g, " ").trim();
+    return query
+      .replace(re, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   }
   const base = query.trim();
   return base ? `${base} ${key}:${want}` : `${key}:${want}`;
@@ -329,7 +337,12 @@ export function toggleToken(query: string, key: FilterKey, value: string): strin
  * term (it is NOT re-parsed through `parseFilter`, so a colon in the search box keeps matching
  * literally instead of becoming a token). The `due` field maps to a `due:` token.
  */
-export function cardMatches(card: Card, today: string, f: BoardFilters, doneColumnId: string | null): boolean {
+export function cardMatches(
+  card: Card,
+  today: string,
+  f: BoardFilters,
+  doneColumnId: string | null,
+): boolean {
   const q = f.text.trim().toLowerCase();
   const filter: Filter = {
     text: q ? [q] : [],
@@ -356,7 +369,13 @@ export interface CardGroup {
 }
 
 // Higher number = higher urgency, so a descending sort floats the most pressing card up.
-const DUE_BUCKET_RANK: Record<DueUrgency, number> = { overdue: 4, today: 3, soon: 2, future: 1, done: 0 };
+const DUE_BUCKET_RANK: Record<DueUrgency, number> = {
+  overdue: 4,
+  today: 3,
+  soon: 2,
+  future: 1,
+  done: 0,
+};
 // Lower number = higher priority (prio-1 is the strongest tone). "muted"/unknown sinks last.
 const PRIORITY_RANK: Record<ChipTone, number> = {
   "prio-1": 0,
@@ -376,7 +395,14 @@ function dueBucket(card: Card, today: string, doneColumnId: string | null): DueU
   return dueInfo(due, today, card.frontmatter.status === doneColumnId).urgency;
 }
 
-const DUE_GROUP_ORDER: (DueUrgency | "none")[] = ["overdue", "today", "soon", "future", "none", "done"];
+const DUE_GROUP_ORDER: (DueUrgency | "none")[] = [
+  "overdue",
+  "today",
+  "soon",
+  "future",
+  "none",
+  "done",
+];
 const DUE_GROUP_LABEL: Record<DueUrgency | "none", string> = {
   overdue: "Overdue",
   today: "Today",
@@ -401,7 +427,12 @@ function dueRank(card: Card, today: string, doneColumnId: string | null): number
   return DUE_BUCKET_RANK[b === "none" ? "future" : b];
 }
 
-function sortCards(cards: Card[], sort: ColumnSort, today: string, doneColumnId: string | null): Card[] {
+function sortCards(
+  cards: Card[],
+  sort: ColumnSort,
+  today: string,
+  doneColumnId: string | null,
+): Card[] {
   if (sort === "manual") return cards;
   const ranked = cards.map((card, i) => ({ card, i }));
   ranked.sort((a, b) => {
@@ -441,7 +472,11 @@ export function groupAndSortCards(
   for (const b of DUE_GROUP_ORDER) {
     const inBucket = buckets.get(b);
     if (inBucket && inBucket.length) {
-      out.push({ key: b, label: DUE_GROUP_LABEL[b], cards: sortCards(inBucket, sort, today, doneColumnId) });
+      out.push({
+        key: b,
+        label: DUE_GROUP_LABEL[b],
+        cards: sortCards(inBucket, sort, today, doneColumnId),
+      });
     }
   }
   return out;
@@ -452,7 +487,12 @@ export function cardChips(card: Card, today: string, doneColumnId: string | null
   const chips: CardChip[] = [];
 
   if (typeof fm.priority === "string" && fm.priority) {
-    chips.push({ key: "prio", label: fm.priority, tone: priorityTone(fm.priority), title: "Priority" });
+    chips.push({
+      key: "prio",
+      label: fm.priority,
+      tone: priorityTone(fm.priority),
+      title: "Priority",
+    });
   }
   for (const [i, tag] of tagValues(card).entries()) {
     chips.push({ key: "tag-" + i, label: tag, tone: "muted", title: "Tag" });
@@ -461,7 +501,11 @@ export function cardChips(card: Card, today: string, doneColumnId: string | null
     const done = fm.status === doneColumnId;
     const info = dueInfo(fm.due, today, done);
     const tone: ChipTone =
-      info.urgency === "overdue" ? "danger" : info.urgency === "today" || info.urgency === "soon" ? "warn" : "muted";
+      info.urgency === "overdue"
+        ? "danger"
+        : info.urgency === "today" || info.urgency === "soon"
+          ? "warn"
+          : "muted";
     chips.push({
       key: "due",
       label: info.label,

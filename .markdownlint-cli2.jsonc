@@ -1,0 +1,29 @@
+{
+  // Docs linting (blueprint §29). Markdown is owned here, not by Prettier.
+  "config": {
+    "default": true,
+    // We do not hard-wrap prose at a fixed column, so line length is not a rule.
+    "MD013": false,
+    // Docs use inline HTML (details/callouts) where Markdown is insufficient.
+    "MD033": false,
+    // Some files open with a callout or table rather than a top-level H1.
+    "MD041": false,
+    // Allow duplicate headings under different parents (e.g. repeated "## Command").
+    "MD024": { "siblings_only": true },
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "examples",
+    "tmp",
+    ".pnpm-store",
+    ".devcontainer",
+    ".claude",
+    ".idea",
+    ".vscode",
+    "test/fixtures",
+    "CHANGELOG.md",
+  ],
+}
