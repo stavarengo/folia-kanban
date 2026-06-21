@@ -481,7 +481,7 @@ export function CardDetail({
       style={panelStyle}
     >
       {isSide && (
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- resize handle is pointer-only (drag); exposed as a labelled role="separator", so there is no keyboard equivalent to add
         <div
           className="folia-detail-resize"
           role="separator"
@@ -683,7 +683,7 @@ export function CardDetail({
               </div>
             </>
           ) : body && body.description.trim() ? (
-            // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- click-to-edit is a convenience; the keyboard path is the dedicated "Edit description" pencil button rendered below
             <div
               ref={descViewRef}
               className="folia-desc-view"
