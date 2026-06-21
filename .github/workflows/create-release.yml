@@ -9,6 +9,7 @@ permissions:
 jobs:
   create-release:
     name: Create Release
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -17,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -39,4 +40,8 @@ jobs:
       - name: Create release
         env:
           FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN: ${{ secrets.FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN }}
-        run: pnpm ci:release
+        run: |
+          # Inject the push token only here, never during dependency install, so
+          # the release PAT is absent from .git/config while package code runs.
+          git remote set-url origin "https://x-access-token:${FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          pnpm ci:release

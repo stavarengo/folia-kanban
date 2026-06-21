@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
@@ -20,20 +19,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Resolve release tag
+      - name: Resolve and verify release tag
         id: version
         shell: bash
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
 
-          if [[ "$TAG" == *"+"* ]]; then
-            echo "Error: Tag '$TAG' contains '+', which is not valid in Docker image tags."
+          # Plain semver only (no "v" prefix) — matches manifest.version and the
+          # release-it tag contract, and rejects odd tags the "*.*.*" glob admits.
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Error: tag '$TAG' is not a plain semver release tag (e.g. 1.2.3)." >&2
             exit 1
           fi
 
-          if [[ ! "$TAG" =~ ^[A-Za-z0-9_.-]{1,128}$ ]]; then
-            echo "Error: Tag '$TAG' contains characters not allowed in Docker image tags."
+          # Only release tags whose commit is on main, so a stray tag on an
+          # unmerged or forked commit cannot trigger a publish.
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$TAG^{commit}" FETCH_HEAD; then
+            echo "Error: tag '$TAG' is not reachable from origin/main; refusing to release." >&2
             exit 1
           fi
 
