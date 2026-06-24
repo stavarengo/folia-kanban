@@ -1,6 +1,6 @@
 {
   "name": "folia-kanban",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "packageManager": "pnpm@11.3.0",
   "engines": {
     "node": ">=24",
