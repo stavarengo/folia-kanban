@@ -242,7 +242,7 @@ class KanbanSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("History — what to record")
       .setDesc(
-        "moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",
+        "Moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",
       )
       .addDropdown((d) =>
         d

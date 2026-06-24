@@ -172,6 +172,17 @@ export default [
     rules: { "no-undef": "off" },
   },
   {
+    // "Folia Kanban" is the product/brand name, not a phrase to sentence-case. Register it with
+    // the rule's `brands` option so the official casing is preserved wherever the name appears in
+    // UI strings (ribbon tooltip, placeholders, the view's display text). Listing the words
+    // independently lets the rule match each as a brand token with word boundaries. Placed after
+    // the preset spread so it wins the rule's options for src.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "obsidianmd/ui/sentence-case": ["error", { brands: ["Folia", "Kanban"] }],
+    },
+  },
+  {
     // The obsidianmd recommended preset turns on type-aware @typescript-eslint rules but only
     // sets the parser, not parserServices. Provide the project service for every linted ts/tsx
     // file (tsconfig includes both src and test) so those rules can resolve type info instead of
