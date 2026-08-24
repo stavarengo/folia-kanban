@@ -48,9 +48,11 @@ function makeRepo() {
 const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
   render(<App repo={repo} settings={settings} onUpdateSettings={() => {}} today="2026-06-13" />);
 
-// Strip the only run-varying token (dnd-kit's generated aria-describedby) so the structural
-// snapshot is stable across isolated vs full-suite runs.
-const stable = (el: HTMLElement) => el.outerHTML.replace(/ aria-describedby="[^"]*"/g, "");
+// Strip the run-varying tokens so the structural snapshot is stable across isolated vs full-suite
+// runs and across machines: dnd-kit's generated aria-describedby, and the inline transition style
+// it applies for a frame after mount (present or absent depending on when the render settles).
+const stable = (el: HTMLElement) =>
+  el.outerHTML.replace(/ aria-describedby="[^"]*"/g, "").replace(/ style="transition: [^"]*"/g, "");
 
 describe("structural visual-regression snapshots", () => {
   it("a rendered card keeps its structural shape (.folia-card)", async () => {
