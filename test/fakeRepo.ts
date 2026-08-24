@@ -30,8 +30,7 @@ import {
   updateTimestampedLine,
 } from "../src/model/card";
 
-/** Same per-context config note name the vault adapter uses (#14). */
-const CONTEXT_NOTE = "_context.md";
+import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
 import {
   commentAddedLine,
   commentEditedLine,
@@ -45,6 +44,9 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../src/model/history";
+
+/** Same per-context config note name the vault adapter uses (#14). */
+const CONTEXT_NOTE = "_context.md";
 
 interface Entry {
   basename: string;
@@ -80,7 +82,20 @@ export class FakeRepo implements CardRepository {
     const childLinks = parseSubtasks(e.body)
       .filter((s) => s.kind === "card" && s.link)
       .map((s) => s.link!);
-    return { path, basename: e.basename, frontmatter: e.fm, childLinks, stats: cardStats(e.body) };
+    const { title, source } = this.resolveTitle(e);
+    return {
+      path,
+      basename: e.basename,
+      title,
+      titleSource: source,
+      frontmatter: e.fm,
+      childLinks,
+      stats: cardStats(e.body),
+    };
+  }
+
+  private resolveTitle(e: Entry) {
+    return resolveTitle(e.basename, e.fm, e.body, this.config.titleMode);
   }
 
   async loadBoard(): Promise<Board> {
@@ -224,7 +239,20 @@ export class FakeRepo implements CardRepository {
 
   async renameCard(path: string, newTitle: string): Promise<string> {
     const e = this.entry(path);
-    const base = sanitizeFilename(newTitle);
+    const title = newTitle.trim();
+    if (!title) return path; // blank title — no-op, per the CardRepository contract
+    // Mirrors the vault adapter: the title is written back to the source it came from.
+    const { title: current, source } = this.resolveTitle(e);
+    if (title === current) return path; // unchanged — no write
+    if (source === "frontmatter") {
+      e.fm[TITLE_KEY] = title;
+      return path;
+    }
+    if (source === "heading") {
+      e.body = setHeadingTitle(e.body, e.basename, this.config.titleMode, title);
+      return path;
+    }
+    const base = sanitizeFilename(title);
     if (base === e.basename) return path; // unchanged after sanitize
     const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
     const prefix = folder ? `${folder}/` : "";

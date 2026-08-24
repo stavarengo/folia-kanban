@@ -55,6 +55,8 @@ Description text…
 
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
 
+The card's displayed title usually is the file name, but that `# Card title` heading can take over when the file name is a slug — see [Where card titles come from](#where-card-titles-come-from).
+
 ## Features
 
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
@@ -63,7 +65,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 - **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority accepts any scale (`A`/`B`/`C`/`D` or `urgent`/`high`/`medium`/`low`).
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
-- **Search & quick filters** — press `/` to search by title, tag or priority; one-click **Overdue** / **Due soon** filters.
+- **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.
 - **Soft WIP limits** — set a per-column limit; the board nudges (never blocks) when you go over.
 - **In-app column management** — add, rename, recolour, set limits, reorder and delete columns; changes are written back to the board note's `columns` frontmatter.
 - **Relative due dates** — *Today*, *Tomorrow*, *in 3d*, *Yesterday*, with overdue cards flagged.
@@ -80,6 +82,7 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
    ```yaml
    folia-board: true
    card-folder: Cards      # folder holding the card notes
+   card-title: auto        # where card titles come from: auto (default) | filename | heading
    columns:
      - todo
      - doing
@@ -93,6 +96,22 @@ Columns can be edited by hand in the board note's `columns` property, or managed
 column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add column** button — the
 plugin reads and writes that frontmatter list either way. A column entry may be a plain string
 (`- todo`) or an object (`{ id, title, color, limit }`).
+
+### Where card titles come from
+
+Plenty of people name card files as numbered slugs — `01-fix-the-export-path.md` — because the number carries the order and the slug keeps the folder readable. That slug is not what the card is *called*; the note's own first heading usually is. So the board decides per card, and the board note's `card-title` property sets the policy:
+
+- **`auto`** (the default) — if the file name looks like a slug (it opens with a number used as a prefix — `01-fix-the-export-path`, `2026-08-24 notes` — or its words are glued together with dashes/underscores and no spaces), the card takes its title from the first heading in the note that looks like a real title. Any level counts, `#` through `######`, since there's no telling which line it lands on. "Looks like a real title" means three or more words, or two words spanning at least twelve characters, so section labels like `Notes` or `To Do` are skipped and the search continues. If nothing qualifies, the file name is used. This is shape-based on purpose — there is no list of forbidden words, because the plugin should cope with your naming convention rather than impose one.
+- **`filename`** — always the file name, no guessing.
+- **`heading`** — always the first heading in the note, whatever its shape, with the file name as fallback when the note has none.
+
+Any card can override all of that with a non-blank `title:` key in its own frontmatter, which wins in every mode.
+
+A heading only ever becomes a title if it is *your* heading: `## Subtasks`, `## Comments` and `## History` are the sections the plugin itself parses, so they are skipped in every mode and no rename can overwrite them. Headings inside fenced code blocks are skipped too.
+
+Renaming a card from the board writes back to whichever source produced the title: the `title:` frontmatter key, the heading line, or the file name via Obsidian's link-aware rename. So renaming a slug-named card whose title comes from its heading rewrites that heading and leaves the `.md` file where it is. A heading rename replaces only that one line's text, keeping its `#` level and any closing hashes; the rest of the file is untouched, byte for byte.
+
+The file name is still the card's identity: `[[wikilinks]]` between cards, and therefore subcard parentage, always match the file name, never the displayed title. Two cards can safely show the same title.
 
 ## Settings
 
@@ -110,7 +129,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 
 | Action | How |
 | --- | --- |
-| Search by title, tag or priority | Press `/` |
+| Search by title, file name, tag or priority | Press `/` |
 | Filter overdue / due-soon cards | One-click **Overdue** / **Due soon** buttons |
 | Move or reorder a card | Drag with the pointer, or pick it up with the keyboard |
 | Scroll horizontally across columns | Hold **Shift** and drag the board background |

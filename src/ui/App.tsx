@@ -233,7 +233,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       },
       complete: (path) => {
         if (!doneColumnId) return;
-        const title = boardRef.current?.cards[path]?.basename ?? "Card";
+        const title = boardRef.current?.cards[path]?.title ?? "Card";
         void moveTo(path, doneColumnId)
           .then(() => showToast(`${title} — done!`))
           .catch(reportError);
@@ -271,8 +271,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         void (async () => {
           try {
             const newPath = await repo.renameCard(path, t);
-            // The board's card title IS the basename, so a rename can change the path. If the
-            // renamed card was selected, follow it to its new path so the detail/selection holds.
+            // When the title comes from the file name, a rename changes the path. If the renamed
+            // card was selected, follow it to its new path so the detail/selection holds.
             if (newPath !== path) setSelected((cur) => (cur === path ? newPath : cur));
           } catch (e) {
             reportError(e);

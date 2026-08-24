@@ -474,7 +474,7 @@ export function CardDetail({
       data-testid="card-detail"
       role="dialog"
       aria-modal={mode === "modal"}
-      aria-label={card.basename}
+      aria-label={card.title}
       ref={panelRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
@@ -491,7 +491,7 @@ export function CardDetail({
         />
       )}
       <div className="folia-detail-header">
-        <h2 className="folia-detail-title">{card.basename}</h2>
+        <h2 className="folia-detail-title">{card.title}</h2>
         <div className="folia-row-actions">
           {actions.doneColumnId && fm.status !== actions.doneColumnId && (
             <button
@@ -740,8 +740,10 @@ export function CardDetail({
                   (() => {
                     const child = resolveBasename(board, s.link);
                     return child ? (
+                      // The link text is the child's basename (that is what wikilinks bind to);
+                      // show the child's displayed title, same as its tile on the board.
                       <button className="folia-link" onClick={() => onNavigate?.(child)}>
-                        {s.link}
+                        {board.cards[child]?.title ?? s.link}
                       </button>
                     ) : (
                       <span

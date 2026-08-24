@@ -44,6 +44,7 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../model/history";
+import { TITLE_KEY, asTitleMode, resolveTitle, setHeadingTitle } from "../model/cardTitle";
 import type { CardRepository } from "../model/repo";
 import {
   BoardFrontmatterSchema,
@@ -110,7 +111,13 @@ export class VaultRepository implements CardRepository {
       `board config (${this.boardPath})`,
     );
     const cardFolder = fm["card-folder"] ?? fm["card_folder"] ?? "Tasks";
-    return { path: this.boardPath, columns: normalizeColumns(fm["columns"]), cardFolder };
+    const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
+    return {
+      path: this.boardPath,
+      columns: normalizeColumns(fm["columns"]),
+      cardFolder,
+      titleMode,
+    };
   }
 
   async loadBoard(): Promise<Board> {
@@ -140,9 +147,12 @@ export class VaultRepository implements CardRepository {
         .filter((s) => s.kind === "card" && s.link)
         .map((s) => s.link ?? "")
         .filter((l) => l !== "");
+      const { title, source } = resolveTitle(f.basename, fm, text, config.titleMode);
       cards.push({
         path: f.path,
         basename: f.basename,
+        title,
+        titleSource: source,
         frontmatter: fm,
         childLinks,
         stats: cardStats(text),
@@ -336,7 +346,28 @@ export class VaultRepository implements CardRepository {
 
   async renameCard(path: string, newTitle: string): Promise<string> {
     const file = this.file(path);
-    const base = sanitizeFilename(newTitle);
+    // Write the new title to whichever source currently produces it, so the tile changes the way
+    // the person expects: the `title` key, the heading line, or (only then) the file name.
+    const title = newTitle.trim();
+    if (!title) return path; // blank title — no-op, per the CardRepository contract
+    const { titleMode } = await this.readConfig();
+    const text = await this.app.vault.cachedRead(file);
+    const { title: current, source } = resolveTitle(
+      file.basename,
+      parseFrontmatter(text),
+      text,
+      titleMode,
+    );
+    if (title === current) return path; // unchanged — no write
+    if (source === "frontmatter") {
+      await this.writeFrontmatter(path, { [TITLE_KEY]: title });
+      return path;
+    }
+    if (source === "heading") {
+      await this.editBody(path, (t) => setHeadingTitle(t, file.basename, titleMode, title));
+      return path;
+    }
+    const base = sanitizeFilename(title);
     if (base === file.basename) return path; // unchanged (after sanitize) — no write
     const folder = file.parent?.path ?? "";
     const dest = await this.uniquePath(folder === "/" ? "" : folder, base);

@@ -32,6 +32,13 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 
 **Cards** — across the board you'll find every priority (`A`/`B`/`C`/`D`, plus an unknown `someday` that renders muted), every due-date state (overdue, today, soon, later, none), tags (list and string form), an `area:`, custom properties (`energy`, `effort`, `blocked`), subtask checklists with progress, **subcards** (`- [ ] [[Child]]` rendered nested), comments, and auto-history. The cards live in context subfolders (`Cards/Engineering/`, `Cards/Design/`); each folder's `_context.md` gives its cards a coloured accent strip + badge.
 
+**Where card titles come from** — two cards demonstrate that the tile's title isn't always the file name (the board runs in the default `auto` mode, so it decides per card):
+
+| Card file | Shows as | Why |
+| --- | --- | --- |
+| `04-tune-the-search-index.md` | Tune the search index | the filename is a numbered slug, so the first heading that looks like a real title wins |
+| `Ship the release notes.md` | Cut the 1.0 release notes | a `title:` key in the card's own frontmatter beats every other source |
+
 ## Things to try (features you can't see in a static file)
 
 - **Open a card** (click it) to see the **detail panel** — edit status, priority, due date, custom properties, subtasks, comments. Try both presentations: Settings → *Card details — presentation* → `side` vs `modal`.
@@ -41,12 +48,13 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 - **Right-click** a card for the context menu (mark done, change priority, move, add subcard, delete). Right-click a surfaced next-todo to toggle or remove it.
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
 - **Live reload:** edit a card `.md` in another pane and watch the board update.
+- **Rename a title-sourced card:** rename `04-tune-the-search-index` from the board and its `# ` heading is rewritten — the file keeps its slug name. Rename `Ship the release notes` and its `title:` frontmatter value changes instead.
 
 ## Authoring gotchas (worth knowing)
 
 - `card-folder` is **vault-root-relative**, never relative to the board note. With this `examples/` folder opened as the vault, `basic/Cards` resolves to `examples/basic/Cards`.
 - A card joins a column by `status` matching a column **`id`** exactly (case-sensitive); an unknown/missing status lands in the first column.
-- The tile shows the **filename**; the `# H1` inside is the card's parsed title.
+- The tile usually shows the **filename**, but a card whose filename is a slug (or that carries its own `title:` key) shows a different title — see the two title-source cards above. The board note's `card-title` property (`auto` / `filename` / `heading`) sets the policy; `[[wikilinks]]` always match the **filename**, never the displayed title.
 - A subcard (`- [ ] [[Child]]`) is pulled out of its own column and shown nested under its parent.
 - A column `filter:` **replaces** its status bucket (it's a lane). The `context:` search token matches the **folder name**.
 

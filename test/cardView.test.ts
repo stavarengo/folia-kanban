@@ -17,7 +17,14 @@ import { dateOnly, stamp } from "../src/model/dates";
 import type { Card } from "../src/model/types";
 
 function card(fm: Card["frontmatter"], basename = "Card"): Card {
-  return { path: `Tasks/${basename}.md`, basename, frontmatter: fm, childLinks: [] };
+  return {
+    path: `Tasks/${basename}.md`,
+    basename,
+    title: basename,
+    titleSource: "filename",
+    frontmatter: fm,
+    childLinks: [],
+  };
 }
 
 describe("priorityTone", () => {
@@ -144,6 +151,16 @@ describe("matchCard", () => {
     expect(matchCard(c, parseFilter("remote"), ctx)).toBe(true);
     expect(matchCard(c, parseFilter("apply remote"), ctx)).toBe(true); // both present → AND ok
     expect(matchCard(c, parseFilter("apply nope"), ctx)).toBe(false); // one missing → AND fails
+  });
+
+  it("free text matches the displayed title as well as the file name", () => {
+    const c = {
+      ...card({}, "01-fix-export"),
+      title: "Fix the export path",
+      titleSource: "heading" as const,
+    };
+    expect(matchCard(c, parseFilter("export path"), ctx)).toBe(true);
+    expect(matchCard(c, parseFilter("01-fix"), ctx)).toBe(true);
   });
 
   it("area/status/priority tokens are exact, case-insensitive equals", () => {

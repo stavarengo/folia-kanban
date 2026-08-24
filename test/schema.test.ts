@@ -58,6 +58,18 @@ describe("BoardFrontmatterSchema (board config note)", () => {
     expect(() => decode(BoardFrontmatterSchema, {}, "board")).not.toThrow();
   });
 
+  it("accepts card-title (and its underscore alias) as an optional string", () => {
+    expect(decode(BoardFrontmatterSchema, { "card-title": "heading" }, "board")["card-title"]).toBe(
+      "heading",
+    );
+    expect(decode(BoardFrontmatterSchema, { card_title: "filename" }, "board")["card_title"]).toBe(
+      "filename",
+    );
+    expect(
+      decode(BoardFrontmatterSchema, { "card-title": 1 }, "board")["card-title"],
+    ).toBeUndefined();
+  });
+
   it("coerces a non-string card-folder to absent (graceful, not corruption)", () => {
     // A defaultable config field must not crash a real board; the adapter falls back to "Tasks".
     const fm = decode(BoardFrontmatterSchema, { "card-folder": 123 }, "board");

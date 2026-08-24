@@ -22,6 +22,7 @@ import { DEFAULT_SETTINGS } from "../src/settings";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
+  titleMode: "auto",
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },

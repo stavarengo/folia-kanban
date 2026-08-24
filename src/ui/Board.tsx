@@ -262,7 +262,7 @@ export function Board({
   // namespaced (`col::path`); resolve the bare path before looking the card up.
   const labelFor = (id: string) => {
     if (columnIds.includes(id)) return board.config.columns.find((c) => c.id === id)?.title ?? id;
-    return board.cards[splitCardDragId(id).path]?.basename ?? id;
+    return board.cards[splitCardDragId(id).path]?.title ?? id;
   };
   const announcements = {
     onDragStart: ({ active }: { active: { id: string | number } }) =>
@@ -427,7 +427,7 @@ export function Board({
                 }
               >
                 <div className="folia-card-main">
-                  <div className="folia-card-title">{activeCard.basename}</div>
+                  <div className="folia-card-title">{activeCard.title}</div>
                   {(() => {
                     const chips = cardChips(activeCard, today, doneColumnId);
                     return chips.length > 0 ? (

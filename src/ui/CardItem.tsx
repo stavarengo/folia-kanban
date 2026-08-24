@@ -94,13 +94,13 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
   };
 
   // #12 inline title edit. Entered via the right-click menu's "Rename" (a single title click can't
-  // trigger it — that opens the detail), which calls setEditing(basename) to swap in the <input>.
+  // trigger it — that opens the detail), which calls setEditing(title) to swap in the <input>.
   const commitEdit = () => {
     if (editing == null) return;
     const next = editing.trim();
-    // Rename only on a real change; empty/whitespace is rejected (revert). renameCard renames the
-    // .md file via the link-aware path so the board title (= basename) updates and wikilinks follow.
-    if (next && next !== card.basename) actions.renameCard(card.path, next);
+    // Rename only on a real change; empty/whitespace is rejected (revert). renameCard writes the
+    // title back to its source (file name, heading or `title` key), link-aware for file renames.
+    if (next && next !== card.title) actions.renameCard(card.path, next);
     setEditing(null);
   };
   const onEditKeyDown = (e: KeyboardEvent) => {
@@ -152,7 +152,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
         {...(nested ? {} : listeners)}
         onClick={open}
         onKeyDown={onKeyDown}
-        aria-label={card.basename}
+        aria-label={card.title}
         aria-current={selected ? "true" : undefined}
       >
         {editing != null ? (
@@ -169,7 +169,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
             onBlur={commitEdit}
           />
         ) : (
-          <div className="folia-card-title">{card.basename}</div>
+          <div className="folia-card-title">{card.title}</div>
         )}
         {(ctxLabel || chips.length > 0) && (
           <div className="folia-chips">
@@ -244,7 +244,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           {canComplete && (
             <button
               className="folia-icon-btn folia-action-done"
-              aria-label={`Mark "${card.basename}" done`}
+              aria-label={`Mark "${card.title}" done`}
               title="Mark done"
               onClick={(e) => {
                 e.stopPropagation();
@@ -256,7 +256,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           )}
           <button
             className="folia-icon-btn"
-            aria-label={`Open note for "${card.basename}"`}
+            aria-label={`Open note for "${card.title}"`}
             title="Open note"
             onClick={(e) => {
               e.stopPropagation();
@@ -267,7 +267,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           </button>
           <button
             className="folia-icon-btn folia-action-delete"
-            aria-label={`Delete "${card.basename}"`}
+            aria-label={`Delete "${card.title}"`}
             title="Delete card"
             onClick={(e) => {
               e.stopPropagation();
@@ -280,11 +280,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
       )}
 
       {confirming && (
-        <div
-          className="folia-card-confirm"
-          role="alertdialog"
-          aria-label={`Delete ${card.basename}?`}
-        >
+        <div className="folia-card-confirm" role="alertdialog" aria-label={`Delete ${card.title}?`}>
           <span>Delete card?</span>
           <div className="folia-row-actions">
             <button
@@ -321,7 +317,7 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
               canMoveDown={edges.canMoveDown}
-              onRename={() => setEditing(card.basename)}
+              onRename={() => setEditing(card.title)}
               onClose={() => setMenu(null)}
             />
           );
@@ -353,7 +349,7 @@ export const CardItem = memo(
     a.dragId === b.dragId &&
     a.today === b.today &&
     a.card.path === b.card.path &&
-    a.card.basename === b.card.basename &&
+    a.card.title === b.card.title &&
     a.card.frontmatter === b.card.frontmatter &&
     sameStats(a.card.stats, b.card.stats),
 );

@@ -135,7 +135,7 @@ export interface BoardFilters {
 //
 // A query is a space-separated list of terms. A term is either a `key:value` token
 // (area:, status:, priority:, tag:, due:, context:) or free text. Free text is matched
-// case-insensitively against a card's basename + priority + tags (a Card has no body
+// case-insensitively against a card's title + basename + priority + tags (a Card has no body
 // text at board level, so "free text" means title/priority/tags). Use "double quotes"
 // to allow spaces in a value or a free-text phrase. All terms AND together; an empty
 // query matches every card. The grammar never throws — unknown keys fall back to free text.
@@ -221,9 +221,9 @@ export function isEmptyFilter(f: Filter): boolean {
   return f.text.length === 0 && f.tokens.length === 0;
 }
 
-/** Lower-cased free-text haystack: basename + priority + tags (area + tags). */
+/** Lower-cased free-text haystack: title + basename + priority + tags (area + tags). */
 function freeTextHaystack(card: Card): string {
-  return [card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)]
+  return [card.title, card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)]
     .join(" ")
     .toLowerCase();
 }

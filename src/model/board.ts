@@ -45,6 +45,11 @@ function resolveLink(
   return paths !== undefined && paths.length === 1 ? (paths[0] ?? null) : null;
 }
 
+/** Alphabetical by displayed title; the basename breaks ties so the order stays deterministic. */
+function byTitle(a: Card, b: Card): number {
+  return a.title.localeCompare(b.title) || a.basename.localeCompare(b.basename);
+}
+
 function orderOf(c: Card): number | null {
   const o = c.frontmatter.order;
   return typeof o === "number" && Number.isFinite(o) ? o : null;
@@ -65,12 +70,12 @@ export function columnEffectiveOrders(cards: Card[]): { card: Card; eff: number 
       if (eff === null) throw new Error("invariant: filtered null order");
       return { card: c, eff };
     })
-    .sort((a, b) => a.eff - b.eff || a.card.basename.localeCompare(b.card.basename));
+    .sort((a, b) => a.eff - b.eff || byTitle(a.card, b.card));
   const lastOrdered = ordered[ordered.length - 1];
   const maxEff = lastOrdered !== undefined ? lastOrdered.eff : -1;
   const unordered = cards
     .filter((c) => orderOf(c) === null)
-    .sort((a, b) => a.basename.localeCompare(b.basename))
+    .sort(byTitle)
     .map((c, i) => ({ card: c, eff: maxEff + 1 + i }));
   return [...ordered, ...unordered];
 }

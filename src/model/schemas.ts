@@ -36,10 +36,15 @@ const optionalConfigString = z.preprocess(
   z.string().optional(),
 );
 
-/** The board definition note's config frontmatter. `card-folder` + `columns` drive the board. */
+/**
+ * The board definition note's config frontmatter. `card-folder` + `columns` drive the board;
+ * `card-title` picks where card titles come from (validated by `asTitleMode`, unknown = `auto`).
+ */
 export const BoardFrontmatterSchema = z.looseObject({
   "card-folder": optionalConfigString,
   card_folder: optionalConfigString,
+  "card-title": optionalConfigString,
+  card_title: optionalConfigString,
   columns: z.unknown().optional(),
 });
 

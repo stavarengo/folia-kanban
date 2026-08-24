@@ -1,6 +1,12 @@
 // Domain types for the Folia Kanban model. Everything here is plain data so the
 // model layer stays pure and unit-testable with no Obsidian dependency.
 
+/** The board-level `card-title` property. `auto` = guess per card from the file name's shape. */
+export type TitleMode = "auto" | "filename" | "heading";
+
+/** Which source produced a card's title (and which one a rename must write to). */
+export type TitleSource = "filename" | "heading" | "frontmatter";
+
 export interface CardFrontmatter {
   status?: string;
   /** Position within its column / parent. Fractional ranks allow single-card moves. */
@@ -67,8 +73,12 @@ export type HistoryScope = "moves" | "structural" | "all";
 export interface Card {
   /** Vault-relative path, e.g. "Cards/My task.md". */
   path: string;
-  /** Filename without extension — used as the `[[link]]` target and display title. */
+  /** Filename without extension — the card's identity and the `[[link]]` target. */
   basename: string;
+  /** What people see, search and sort by. Equals `basename` unless a heading or `title` key won. */
+  title: string;
+  /** Which source produced `title`; a rename writes back to that same source. */
+  titleSource: TitleSource;
   frontmatter: CardFrontmatter;
   /** Link targets of the card-subtasks (the `[[...]]` checklist items), in order. */
   childLinks: string[];
@@ -140,6 +150,8 @@ export interface BoardConfig {
   columns: ColumnDef[];
   /** Vault folder that holds the card files. */
   cardFolder: string;
+  /** Where card titles come from (`card-title` in the board note). Default `auto`. */
+  titleMode: TitleMode;
 }
 
 export interface Board {

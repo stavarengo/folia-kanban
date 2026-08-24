@@ -10,6 +10,7 @@ import { SettingsContext, useSettings } from "../src/ui/context";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
+  titleMode: "auto",
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },
@@ -498,6 +499,67 @@ describe("inline card title edit (#12)", () => {
     expect(await within(todoCol).findByText("Renamed Alpha")).toBeInTheDocument();
     expect(repo.files.has("Tasks/Renamed Alpha.md")).toBe(true);
     expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
+  });
+
+  it("shows a slug-named card by its heading and writes a rename back to that heading", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/01-fix-export.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Fix the export path\n\nDesc\n",
+      },
+    });
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Fix the export path")).toBeInTheDocument();
+    expect(within(todoCol).queryByText("01-fix-export")).not.toBeInTheDocument();
+    const input = await startRename(user, todoCol, "Fix the export path");
+    await user.clear(input);
+    await user.type(input, "Fix the export path on Windows{Enter}");
+    expect(await within(todoCol).findByText("Fix the export path on Windows")).toBeInTheDocument();
+    // The heading changed; the file did not move.
+    expect(repo.files.has("Tasks/01-fix-export.md")).toBe(true);
+    expect(repo.files.get("Tasks/01-fix-export.md")!.body).toBe(
+      "\n# Fix the export path on Windows\n\nDesc\n",
+    );
+  });
+
+  it("the detail panel names a subcard by its displayed title, not its file name", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Parent.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Parent\n\n## Subtasks\n- [ ] [[01-fix-export]]\n",
+      },
+      "Tasks/01-fix-export.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Fix the export path\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Parent"));
+    const detail = await screen.findByTestId("card-detail");
+    const link = within(detail).getByRole("button", { name: "Fix the export path" });
+    expect(link).toHaveClass("folia-link");
+    expect(within(detail).queryByText("01-fix-export")).not.toBeInTheDocument();
+  });
+
+  it("a card's `title` frontmatter wins and a rename updates that key", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo", title: "Alpha from YAML" },
+        body: "\n# Alpha heading\n",
+      },
+    });
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const input = await startRename(user, todoCol, "Alpha from YAML");
+    await user.clear(input);
+    await user.type(input, "Alpha renamed{Enter}");
+    expect(await within(todoCol).findByText("Alpha renamed")).toBeInTheDocument();
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha renamed");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe("\n# Alpha heading\n");
   });
 
   it("keeps subcard parentage after a rename by rewriting inbound wikilinks", async () => {

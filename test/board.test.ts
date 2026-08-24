@@ -19,6 +19,7 @@ import type { BoardConfig, Card, ColumnDef } from "../src/model/types";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
+  titleMode: "auto",
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },
@@ -31,7 +32,14 @@ function card(
   fm: Partial<Card["frontmatter"]> = {},
   childLinks: string[] = [],
 ): Card {
-  return { path: `Tasks/${basename}.md`, basename, frontmatter: fm, childLinks };
+  return {
+    path: `Tasks/${basename}.md`,
+    basename,
+    title: basename,
+    titleSource: "filename",
+    frontmatter: fm,
+    childLinks,
+  };
 }
 
 describe("buildBoard", () => {
@@ -204,8 +212,22 @@ describe("buildBoard context derivation (#14)", () => {
     const b = buildBoard(
       config,
       [
-        { path: "Tasks/Acme/A.md", basename: "A", frontmatter: { status: "todo" }, childLinks: [] },
-        { path: "Tasks/B.md", basename: "B", frontmatter: { status: "todo" }, childLinks: [] },
+        {
+          path: "Tasks/Acme/A.md",
+          basename: "A",
+          title: "A",
+          titleSource: "filename",
+          frontmatter: { status: "todo" },
+          childLinks: [],
+        },
+        {
+          path: "Tasks/B.md",
+          basename: "B",
+          title: "B",
+          titleSource: "filename",
+          frontmatter: { status: "todo" },
+          childLinks: [],
+        },
       ],
       {
         Acme: {
@@ -225,7 +247,14 @@ describe("buildBoard context derivation (#14)", () => {
   });
   it("defaults to an empty contexts map (boards with no subfolders behave as today)", () => {
     const b = buildBoard(config, [
-      { path: "Tasks/B.md", basename: "B", frontmatter: { status: "todo" }, childLinks: [] },
+      {
+        path: "Tasks/B.md",
+        basename: "B",
+        title: "B",
+        titleSource: "filename",
+        frontmatter: { status: "todo" },
+        childLinks: [],
+      },
     ]);
     expect(b.contexts).toEqual({});
     expect(b.cards["Tasks/B.md"]?.context).toBeUndefined();
