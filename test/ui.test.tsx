@@ -106,6 +106,23 @@ describe("board rendering", () => {
   });
 });
 
+describe("missing card folder (#20260821.07)", () => {
+  it("shows a notice naming the folder instead of looking like a genuinely empty board", async () => {
+    const repo = new FakeRepo(config, {});
+    repo.cardFolderMissing = true;
+    render_(repo);
+    expect(await screen.findByText(/Card folder "Tasks" was not found/)).toBeInTheDocument();
+    // The board still renders — columns are usable, cards just start out empty.
+    expect(screen.getByText("Todo")).toBeInTheDocument();
+  });
+
+  it("shows no notice when the card folder is present", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    expect(screen.queryByText(/Card folder/)).not.toBeInTheDocument();
+  });
+});
+
 describe("card detail", () => {
   it("opens on click and shows description, subtasks and comments", async () => {
     const user = userEvent.setup();

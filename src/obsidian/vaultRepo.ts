@@ -124,14 +124,18 @@ export class VaultRepository implements CardRepository {
     const config = await this.readConfig();
     const folderPath = cardFolderPath(config.cardFolder);
     // A card folder that isn't there matches zero files, which looks exactly like an empty
-    // board — say so instead of rendering a healthy-looking board with nothing on it.
+    // board. Say so via `cardFolderWarning` rather than rendering a healthy-looking board with
+    // nothing on it — but keep loading: a board whose folder was never created yet (the `Tasks`
+    // default, or a fresh `card-folder`) must still be usable, since adding the first card creates
+    // that folder (see `ensureFolder`). The prefix below simply matches nothing when the folder
+    // isn't there, so `cards` comes out empty either way.
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
-    if (!(folder instanceof TFolder)) {
-      const reason = folder === null ? "was not found" : "is not a folder";
-      throw new Error(
-        `Card folder "${config.cardFolder}" ${reason}. Check the board's card-folder property.`,
-      );
-    }
+    const cardFolderWarning =
+      folder instanceof TFolder
+        ? undefined
+        : folder === null
+          ? `Card folder "${config.cardFolder}" was not found. It will be created when you add your first card.`
+          : `Card folder "${config.cardFolder}" is not a folder. Fix the board's card-folder property.`;
     const prefix = folderPath + "/";
     const files = this.app.vault
       .getMarkdownFiles()
@@ -169,7 +173,8 @@ export class VaultRepository implements CardRepository {
       });
     }
     // buildBoard derives each card's `context` from its path; carry the configs alongside.
-    return buildBoard(config, cards, await this.loadContexts(config.cardFolder));
+    const board = buildBoard(config, cards, await this.loadContexts(config.cardFolder));
+    return cardFolderWarning ? { ...board, cardFolderWarning } : board;
   }
 
   async loadContexts(cardFolder?: string): Promise<Record<string, ContextConfig>> {

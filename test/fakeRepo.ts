@@ -61,6 +61,8 @@ export class FakeRepo implements CardRepository {
   listeners = new Set<() => void>();
   opened: string[] = [];
   ts = "2026-06-13 12:00";
+  /** Test hook mirroring VaultRepository's `cardFolderWarning` (missing card-folder, #20260821.07). */
+  cardFolderMissing = false;
 
   constructor(
     public config: BoardConfig,
@@ -102,7 +104,13 @@ export class FakeRepo implements CardRepository {
     const cards = [...this.files.entries()]
       .filter(([, e]) => e.basename + ".md" !== CONTEXT_NOTE) // `_context.md` is config, not a card
       .map(([p, e]) => this.toCard(p, e));
-    return buildBoard(this.config, cards, await this.loadContexts());
+    const board = buildBoard(this.config, cards, await this.loadContexts());
+    return this.cardFolderMissing
+      ? {
+          ...board,
+          cardFolderWarning: `Card folder "${this.config.cardFolder}" was not found. It will be created when you add your first card.`,
+        }
+      : board;
   }
 
   async loadContexts(): Promise<Record<string, ContextConfig>> {

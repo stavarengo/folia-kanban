@@ -578,6 +578,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
                 matchCount={counts.match}
                 totalCount={counts.total}
               />
+              {board.cardFolderWarning && (
+                <div className="folia-card-folder-notice" role="status">
+                  {board.cardFolderWarning}
+                </div>
+              )}
               <div className="folia-main" role="region" aria-label="Board">
                 <Board
                   board={board}
