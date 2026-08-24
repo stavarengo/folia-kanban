@@ -167,11 +167,13 @@ export interface Board {
   /** Context configs keyed by subfolder name (#14). Empty when the board has no subfolders. */
   contexts: Record<string, ContextConfig>;
   /**
-   * Set when `config.cardFolder` doesn't currently resolve to a real vault folder — a typo, a
-   * folder that moved, or a board that never got its first card yet (the `Tasks` default, or an
-   * explicit `card-folder` nobody created). The board still loads (with no cards, since none can
-   * live in a folder that isn't there) so the UI can say so instead of looking like a genuinely
-   * empty board, while adding the first card still works — it creates the folder, same as before.
+   * Set when `config.cardFolder` doesn't currently exist — a typo, a folder that moved, or a
+   * board that never got its first card yet (the `Tasks` default, or an explicit `card-folder`
+   * nobody created). The board still loads (with no cards, since none can live in a folder that
+   * isn't there) so the UI can say so instead of looking like a genuinely empty board, while
+   * adding the first card still works — it creates the folder, same as before. A `card-folder`
+   * that resolves to something other than a folder (e.g. a file already sits there) has no such
+   * self-heal path, so that case fails the load outright instead of setting this field.
    */
   cardFolderWarning?: string;
 }
