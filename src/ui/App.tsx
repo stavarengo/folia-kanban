@@ -164,17 +164,21 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
 
   const onAddCard = useCallback(
     async (columnId: string, title: string) => {
-      const path = await repo.createCard(title, columnId);
-      await load();
-      // 'inline' (default): add-only — stay in the column, don't open the detail.
-      // 'inline-edit': open the new card's detail and focus its description for editing.
-      if (settings.addCardFlow === "inline-edit") {
-        setOpenOverride(mapOpenMode(settings.addCardOpenMode));
-        setFocusNew(true);
-        setSelected(path);
+      try {
+        const path = await repo.createCard(title, columnId);
+        await load();
+        // 'inline' (default): add-only — stay in the column, don't open the detail.
+        // 'inline-edit': open the new card's detail and focus its description for editing.
+        if (settings.addCardFlow === "inline-edit") {
+          setOpenOverride(mapOpenMode(settings.addCardOpenMode));
+          setFocusNew(true);
+          setSelected(path);
+        }
+      } catch (e) {
+        reportError(e);
       }
     },
-    [repo, load, settings.addCardFlow, settings.addCardOpenMode],
+    [repo, load, settings.addCardFlow, settings.addCardOpenMode, reportError],
   );
 
   const doneColumnId = useMemo(() => (board ? findDoneColumn(board) : null), [board]);

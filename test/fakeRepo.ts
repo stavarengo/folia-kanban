@@ -63,6 +63,9 @@ export class FakeRepo implements CardRepository {
   ts = "2026-06-13 12:00";
   /** Test hook mirroring VaultRepository's `cardFolderWarning` (missing card-folder, #20260821.07). */
   cardFolderMissing = false;
+  /** Test hook: when set, `loadBoard` throws with this message (mirrors a card-folder that
+   *  resolves to a file rather than a folder — an unrecoverable misconfiguration, #20260821.07). */
+  failLoadWith: string | null = null;
 
   constructor(
     public config: BoardConfig,
@@ -101,6 +104,7 @@ export class FakeRepo implements CardRepository {
   }
 
   async loadBoard(): Promise<Board> {
+    if (this.failLoadWith) throw new Error(this.failLoadWith);
     const cards = [...this.files.entries()]
       .filter(([, e]) => e.basename + ".md" !== CONTEXT_NOTE) // `_context.md` is config, not a card
       .map(([p, e]) => this.toCard(p, e));

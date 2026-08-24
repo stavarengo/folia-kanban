@@ -110,7 +110,14 @@ export class VaultRepository implements CardRepository {
       parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
       `board config (${this.boardPath})`,
     );
-    const cardFolder = fm["card-folder"] ?? fm["card_folder"] ?? "Tasks";
+    // Normalized once, here, so every consumer of `config.cardFolder` — card selection, context
+    // derivation (`deriveContext`, called deep inside `buildBoard`), `loadContexts`, and
+    // `ensureFolder`/`createCard` — agrees on the exact same string Obsidian itself uses for vault
+    // paths. A leading slash, doubled slashes or a stray space in `card-folder` must not make one
+    // of those consumers see the folder (or a card's context) and another not.
+    const cardFolder = normalizePath(
+      cardFolderPath(fm["card-folder"] ?? fm["card_folder"] ?? "Tasks"),
+    );
     const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
     return {
       path: this.boardPath,
@@ -122,24 +129,29 @@ export class VaultRepository implements CardRepository {
 
   async loadBoard(): Promise<Board> {
     const config = await this.readConfig();
-    // normalizePath (not just cardFolderPath's trailing-slash trim) so the existence check below
-    // and the `startsWith` card-selection filter agree on the exact same string Obsidian itself
-    // uses for vault paths — a leading slash, doubled slashes or a stray space in `card-folder`
-    // must not make one see the folder and the other not.
-    const folderPath = normalizePath(cardFolderPath(config.cardFolder));
+    const folderPath = config.cardFolder;
     // A card folder that isn't there matches zero files, which looks exactly like an empty
     // board. Say so via `cardFolderWarning` rather than rendering a healthy-looking board with
     // nothing on it — but keep loading: a board whose folder was never created yet (the `Tasks`
     // default, or a fresh `card-folder`) must still be usable, since adding the first card creates
     // that folder (see `ensureFolder`). The prefix below simply matches nothing when the folder
     // isn't there, so `cards` comes out empty either way.
+    //
+    // A path that resolves to something OTHER than a folder (a file already sits there) has no
+    // such self-heal story — `ensureFolder`/`createCard` can't create a folder where a file already
+    // is, and would fail with no useful feedback surfaced anywhere in the UI. That case stays a
+    // hard failure instead of a soft notice, so the board (and its "Add card" controls) are simply
+    // not reachable rather than reachable-but-broken.
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
+    if (folder !== null && !(folder instanceof TFolder)) {
+      throw new Error(
+        `Card folder "${config.cardFolder}" is not a folder. Fix the board's card-folder property.`,
+      );
+    }
     const cardFolderWarning =
-      folder instanceof TFolder
-        ? undefined
-        : folder === null
-          ? `Card folder "${config.cardFolder}" was not found. It will be created when you add your first card.`
-          : `Card folder "${config.cardFolder}" is not a folder. Fix the board's card-folder property.`;
+      folder === null
+        ? `Card folder "${config.cardFolder}" was not found. It will be created when you add your first card.`
+        : undefined;
     const prefix = folderPath + "/";
     const files = this.app.vault
       .getMarkdownFiles()

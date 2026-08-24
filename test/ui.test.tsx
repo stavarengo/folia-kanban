@@ -121,6 +121,17 @@ describe("missing card folder (#20260821.07)", () => {
     await screen.findByText("Alpha");
     expect(screen.queryByText(/Card folder/)).not.toBeInTheDocument();
   });
+
+  it("refuses to load — no board, no reachable add-card — when the folder can't ever self-heal", async () => {
+    // A card-folder that resolves to a FILE (not a missing folder) has no "add a card creates it"
+    // recovery path, so it stays a hard load failure instead of a soft notice.
+    const repo = new FakeRepo(config, {});
+    repo.failLoadWith =
+      'Card folder "Tasks" is not a folder. Fix the board\'s card-folder property.';
+    render_(repo);
+    expect(await screen.findByText(/Couldn.t load the board/)).toBeInTheDocument();
+    expect(screen.queryByText("Todo")).not.toBeInTheDocument();
+  });
 });
 
 describe("card detail", () => {
