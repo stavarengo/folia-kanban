@@ -1442,6 +1442,9 @@
 .folia-comment-text.markdown-rendered {
   font-size: var(--folia-font-size-md);
   line-height: 1.5;
+  /* Same reason as .folia-desc-rendered.markdown-rendered above: zero out any reading-view gutter
+     a theme adds to .markdown-rendered — a comment row has no room to spare. */
+  padding: 0;
 }
 /* edit/delete affordances stay quiet until the comment is hovered/focused */
 .folia-comment-row .folia-mini {
