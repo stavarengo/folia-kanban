@@ -17,4 +17,4 @@ Sort the latest issues into bugs vs. feature requests, then label and respond.
 - [ ] Close duplicates
 
 ## History
-- [2026-06-18 01:38] Due → 0002-01-07
+- _2026-06-18 01:38:_ Due → 0002-01-07

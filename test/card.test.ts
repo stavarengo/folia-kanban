@@ -82,7 +82,7 @@ describe("append operations only add at the end (input body is a prefix)", () =>
   it("appendComment creates a Comments section without touching prior bytes", () => {
     const out = appendComment(SAMPLE_CARD, "first note", "2026-06-13 10:00");
     expect(out.startsWith(SAMPLE_CARD)).toBe(true);
-    expect(out).toContain("## Comments\n- [2026-06-13 10:00] first note");
+    expect(out).toContain("## Comments\n- _2026-06-13 10:00:_ first note");
     expect(parseBody(out).comments).toEqual([
       { timestamp: "2026-06-13 10:00", text: "first note" },
     ]);
@@ -237,8 +237,8 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
     expect(comments[1].timestamp).toBe("2026-06-13 11:00"); // timestamp kept
     // every byte except comment 2's text is identical: rebuild expected from the original.
     const expected = withThreeComments.replace(
-      "- [2026-06-13 11:00] two",
-      "- [2026-06-13 11:00] edited two",
+      "- _2026-06-13 11:00:_ two",
+      "- _2026-06-13 11:00:_ edited two",
     );
     expect(out).toBe(expected);
     expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(withThreeComments).fmText);
@@ -247,13 +247,13 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
   it("removeTimestampedLine deletes only its line", () => {
     const out = removeTimestampedLine(withThreeComments, SECTION.comments, 1);
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);
-    const expected = withThreeComments.replace("- [2026-06-13 11:00] two\n", "");
+    const expected = withThreeComments.replace("- _2026-06-13 11:00:_ two\n", "");
     expect(out).toBe(expected);
   });
 
   it("updateTimestampedLine edits a bare-bullet (no timestamp) comment, not just timestamped ones", () => {
     const body =
-      "# C\n\n## Comments\n- [2026-06-13 10:00] one\n- bare note\n- [2026-06-13 12:00] three\n";
+      "# C\n\n## Comments\n- _2026-06-13 10:00:_ one\n- bare note\n- _2026-06-13 12:00:_ three\n";
     const out = updateTimestampedLine(body, SECTION.comments, 1, "edited bare");
     expect(out).toBe(body.replace("- bare note", "- edited bare"));
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "edited bare", "three"]);
@@ -262,9 +262,73 @@ describe("updateTimestampedLine / removeTimestampedLine — byte-stable on Comme
   it("updateTimestampedLine collapses an embedded newline so the index walk can't desync", () => {
     const out = updateTimestampedLine(withThreeComments, SECTION.comments, 1, "line1\nline2");
     expect(out).toBe(
-      withThreeComments.replace("- [2026-06-13 11:00] two", "- [2026-06-13 11:00] line1 line2"),
+      withThreeComments.replace("- _2026-06-13 11:00:_ two", "- _2026-06-13 11:00:_ line1 line2"),
     );
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "line1 line2", "three"]);
+  });
+});
+
+describe("legacy bracketed timestamp lines — read forever, edited in place without migrating", () => {
+  const legacyThreeComments = [
+    "# C",
+    "",
+    "## Comments",
+    "- [2026-06-13 10:00] one",
+    "- [2026-06-13 11:00] two",
+    "- [2026-06-13 12:00] three",
+    "",
+  ].join("\n");
+
+  it("parseBody reads the legacy [timestamp] form", () => {
+    expect(parseBody(legacyThreeComments).comments).toEqual([
+      { timestamp: "2026-06-13 10:00", text: "one" },
+      { timestamp: "2026-06-13 11:00", text: "two" },
+      { timestamp: "2026-06-13 12:00", text: "three" },
+    ]);
+  });
+
+  it("updateTimestampedLine edits a legacy line's text, keeping its [timestamp] prefix as-is", () => {
+    const out = updateTimestampedLine(legacyThreeComments, SECTION.comments, 1, "edited two");
+    expect(out).toBe(
+      legacyThreeComments.replace("[2026-06-13 11:00] two", "[2026-06-13 11:00] edited two"),
+    );
+    const comments = parseBody(out).comments;
+    expect(comments.map((c) => c.text)).toEqual(["one", "edited two", "three"]);
+    expect(comments[1]?.timestamp).toBe("2026-06-13 11:00");
+  });
+
+  it("removeTimestampedLine deletes a legacy line same as a current one", () => {
+    const out = removeTimestampedLine(legacyThreeComments, SECTION.comments, 1);
+    expect(out).toBe(legacyThreeComments.replace("- [2026-06-13 11:00] two\n", ""));
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);
+  });
+
+  it("appendComment on a card whose Comments section is all-legacy still appends in the current format, mixing formats in one section", () => {
+    const out = appendComment(legacyThreeComments, "four", "2026-06-13 13:00");
+    expect(out).toContain("- _2026-06-13 13:00:_ four");
+    expect(out).toContain("- [2026-06-13 10:00] one"); // legacy lines untouched
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "two", "three", "four"]);
+  });
+});
+
+describe("TS_LINE_RE's timestamp capture is restricted to digits/dash/colon/space", () => {
+  it("a well-formed date-time timestamp round-trips through updateTimestampedLine byte-stably", () => {
+    const body = "# C\n\n## Comments\n- _2026-06-13 10:00:_ note\n";
+    const out = updateTimestampedLine(body, SECTION.comments, 0, "edited note");
+    expect(out).toBe(
+      body.replace("- _2026-06-13 10:00:_ note", "- _2026-06-13 10:00:_ edited note"),
+    );
+  });
+
+  it("a timestamp value outside that character set degrades to a plain, timestamp-less bullet on read-back — never a wrong boundary", () => {
+    const out = appendComment(SAMPLE_CARD, "note", "build_42");
+    expect(out).toContain("- _build_42:_ note");
+    expect(parseBody(out).comments).toEqual([{ timestamp: "", text: "_build_42:_ note" }]);
+  });
+
+  it("does not swallow an ordinary italic-labelled bullet as a timestamp", () => {
+    const body = "# C\n\n## Comments\n- _Decision:_ use SQLite\n";
+    expect(parseBody(body).comments).toEqual([{ timestamp: "", text: "_Decision:_ use SQLite" }]);
   });
 });
 
@@ -279,9 +343,9 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
     "# C\r",
     "\r",
     "## Comments\r",
-    "- [2026-06-13 10:00] one\r",
-    "- [2026-06-13 11:00] two\r",
-    "- [2026-06-13 12:00] three\r",
+    "- _2026-06-13 10:00:_ one\r",
+    "- _2026-06-13 11:00:_ two\r",
+    "- _2026-06-13 12:00:_ three\r",
     "",
   ].join("\n");
 
@@ -294,8 +358,8 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
   it("updateComment edits comment 2 of 3 with the CR preserved on that line", () => {
     const out = updateTimestampedLine(crlf, SECTION.comments, 1, "edited two");
     const expected = crlf.replace(
-      "- [2026-06-13 11:00] two\r",
-      "- [2026-06-13 11:00] edited two\r",
+      "- _2026-06-13 11:00:_ two\r",
+      "- _2026-06-13 11:00:_ edited two\r",
     );
     expect(out).toBe(expected); // whole file byte-identical except the intended change
     everyLineKeepsCRLF(out);
@@ -304,7 +368,7 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
 
   it("removeComment removes only comment 2 of 3, leaving the rest CRLF-intact", () => {
     const out = removeTimestampedLine(crlf, SECTION.comments, 1);
-    const expected = crlf.replace("- [2026-06-13 11:00] two\r\n", "");
+    const expected = crlf.replace("- _2026-06-13 11:00:_ two\r\n", "");
     expect(out).toBe(expected);
     everyLineKeepsCRLF(out);
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);

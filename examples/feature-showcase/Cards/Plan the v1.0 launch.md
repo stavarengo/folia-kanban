@@ -23,9 +23,9 @@ Pull together everything blocking the **1.0** release. The big picture lives on 
 - [ ] [[Record the launch demo]]
 
 ## Comments
-- [2026-06-13 14:32] Targeting next Friday if review clears.
-- [2026-06-15 09:10] Changelog draft started.
+- _2026-06-13 14:32:_ Targeting next Friday if review clears.
+- _2026-06-15 09:10:_ Changelog draft started.
 
 ## History
-- [2026-06-10 09:05] Created
-- [2026-06-13 14:30] Priority raised to A
+- _2026-06-10 09:05:_ Created
+- _2026-06-13 14:30:_ Priority raised to A

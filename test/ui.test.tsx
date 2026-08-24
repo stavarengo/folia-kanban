@@ -22,7 +22,7 @@ function makeRepo() {
   return new FakeRepo(config, {
     "Tasks/Alpha.md": {
       fm: { type: "task", status: "todo", priority: "A", area: "home" },
-      body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
+      body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- _2026-06-13 09:00:_ hi there\n",
     },
     "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "\n# Beta\n" },
     "Tasks/Gamma.md": {
@@ -298,7 +298,7 @@ describe("card detail", () => {
     expect(await within(detail).findByText("edited text")).toBeInTheDocument();
     const body = repo.files.get("Tasks/Alpha.md")!.body;
     expect(body).toContain("edited text");
-    expect(body).toContain("[2026-06-13 09:00]"); // timestamp preserved
+    expect(body).toContain("_2026-06-13 09:00:_"); // timestamp preserved
     expect(body).not.toContain("hi there");
   });
 

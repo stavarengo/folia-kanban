@@ -16,7 +16,19 @@ import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
 const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
 const WIKILINK_ONLY_RE = /^\[\[([^\]]+)\]\]$/;
-const TS_LINE_RE = /^\s*[-*]\s+\[([^\]]+)\]\s+([\s\S]*)$/;
+// Current write format: `- _2026-08-21 11:49:_ text` — an italic timestamp prefix, no brackets.
+// No timezone suffix is written today (`stamp()` in ./dates.ts is local time, unlabeled); if one
+// is ever added, extend this character class to match (letters, currently excluded) — otherwise
+// every newly written line would silently fail to parse as timestamped.
+// The timestamp capture is restricted to the characters `stamp()` ever produces (digits, `-`,
+// `:`, space) rather than "anything but `_`": that both makes the closing `:_ ` delimiter
+// unambiguous (a timestamp can never itself contain that sequence) and keeps the format from
+// swallowing an unrelated prose line that happens to start with an italic label, e.g.
+// `- _Decision:_ use SQLite`.
+const TS_LINE_RE = /^\s*[-*]\s+_([0-9: -]+):_\s+([\s\S]*)$/;
+// Legacy format written before this change: `- [2026-08-21 11:49] text`. Old notes never get
+// rewritten, so this stays supported for reading forever alongside TS_LINE_RE.
+const TS_LINE_LEGACY_RE = /^\s*[-*]\s+\[([^\]]+)\]\s+([\s\S]*)$/;
 
 export const SECTION = {
   subtasks: "Subtasks",
@@ -135,7 +147,7 @@ function parseTimestamped(body: string, name: string): { timestamp: string; text
   const out: { timestamp: string; text: string }[] = [];
   for (const line of sectionLines(body, name)) {
     if (!/^\s*[-*]\s+/.test(line)) continue;
-    const m = TS_LINE_RE.exec(line);
+    const m = TS_LINE_RE.exec(line) ?? TS_LINE_LEGACY_RE.exec(line);
     if (m) out.push({ timestamp: (m[1] ?? "").trim(), text: (m[2] ?? "").trim() });
     else out.push({ timestamp: "", text: line.replace(/^\s*[-*]\s+/, "").trim() });
   }
@@ -197,11 +209,13 @@ function withBody(text: string, fn: (body: string) => string): string {
 }
 
 export function appendComment(text: string, comment: string, timestamp: string): string {
-  return withBody(text, (b) => appendToSection(b, SECTION.comments, `- [${timestamp}] ${comment}`));
+  return withBody(text, (b) =>
+    appendToSection(b, SECTION.comments, `- _${timestamp}:_ ${comment}`),
+  );
 }
 
 export function appendHistory(text: string, entry: string, timestamp: string): string {
-  return withBody(text, (b) => appendToSection(b, SECTION.history, `- [${timestamp}] ${entry}`));
+  return withBody(text, (b) => appendToSection(b, SECTION.history, `- _${timestamp}:_ ${entry}`));
 }
 
 export function addTodo(text: string, todo: string): string {
@@ -253,13 +267,17 @@ export function removeSubtask(text: string, index: number): string {
   });
 }
 
-const TS_PREFIX_RE = /^(\s*[-*]\s+\[[^\]]+\]\s+)([\s\S]*)$/;
+// Matches either the current `- _timestamp:_ ` prefix or the legacy `- [timestamp] ` one, so
+// editing an old note's line keeps its original prefix byte-for-byte instead of migrating it.
+// The `_..._` branch mirrors TS_LINE_RE's character-class boundary rule.
+const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+:_|\[[^\]]+\])\s+)([\s\S]*)$/;
 const BULLET_RE = /^\s*[-*]\s+/;
 
 /**
- * Replace ONLY the text after `[timestamp] ` of the index-th bullet line in a timestamped
- * section (Comments / History). The bullet prefix + timestamp stay byte-identical. Index is
- * 0-based among the section's bullet lines (matching `parseTimestamped`'s walk).
+ * Replace ONLY the text after the timestamp prefix (`_timestamp:_ ` or the legacy `[timestamp] `)
+ * of the index-th bullet line in a timestamped section (Comments / History). The bullet prefix +
+ * timestamp stay byte-identical. Index is 0-based among the section's bullet lines (matching
+ * `parseTimestamped`'s walk).
  */
 export function updateTimestampedLine(
   text: string,

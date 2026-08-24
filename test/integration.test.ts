@@ -62,6 +62,8 @@ describe("subcards", () => {
 });
 
 describe("comment edit/delete are byte-stable", () => {
+  // Legacy [timestamp] lines, standing in for a note written before the current italic-prefix
+  // format — edit/delete must keep working on them without migrating the prefix.
   const bodyWith3 =
     "\n# A\n\n## Comments\n- [2026-06-13 10:00] one\n- [2026-06-13 11:00] two\n- [2026-06-13 12:00] three\n";
 
@@ -111,7 +113,7 @@ describe("history seam — gated by scope (default 'moves' = no extra history)",
     const body = repo.files.get("Tasks/A.md")!.body;
     expect(body.match(/## History/g)).toHaveLength(1);
     expect(body.match(/Comment added/g)).toHaveLength(1);
-    expect(body).toContain("- [2026-06-13 12:00] hi"); // the comment itself, byte-stable
+    expect(body).toContain("- _2026-06-13 12:00:_ hi"); // the comment itself, byte-stable
   });
 
   it("scope 'moves' (default): addComment appends NO history", async () => {

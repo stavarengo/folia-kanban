@@ -19,4 +19,4 @@ Focus is lost after dropping with the keyboard. Repro: pick up with **Space**, m
 - [ ] Add a regression test
 
 ## History
-- [2026-06-18 01:38] Due → 2026-06-19
+- _2026-06-18 01:38:_ Due → 2026-06-19

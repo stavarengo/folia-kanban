@@ -17,8 +17,8 @@ Automate building and publishing on tag.
 - [ ] [[Write the release notes]]
 
 ## Comments
-- [2026-01-11 09:30] Started looking into GitHub Actions.
+- _2026-01-11 09:30:_ Started looking into GitHub Actions.
 
 ## History
-- [2026-01-11 09:00] Created
-- [2026-01-11 10:15] Moved from Todo to Doing
+- _2026-01-11 09:00:_ Created
+- _2026-01-11 10:15:_ Moved from Todo to Doing

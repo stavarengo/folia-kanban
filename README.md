@@ -47,10 +47,10 @@ Description text…
 - [ ] [[A Subcard]]      ← a nested child card (its own file)
 
 ## Comments
-- [2026-06-13 14:32] looks good
+- _2026-06-13 14:32:_ looks good
 
 ## History
-- [2026-06-13 14:30] Moved from Todo to Doing
+- _2026-06-13 14:30:_ Moved from Todo to Doing
 ```
 
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
