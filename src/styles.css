@@ -1325,41 +1325,49 @@
 
 /* Rendered markdown block: the container also carries Obsidian's own "markdown-rendered" class
    (see Markdown.tsx), so prose spacing/color/list-markers/callouts come from the active theme.
-   font-size and line-height stay pinned to the panel's own scale (matching the raw-editor textarea
-   below and the rest of the detail panel's UI text) instead of the theme's reading-view values —
-   themes vary both, which would make the block visibly resize/reflow on the view↔edit toggle and
-   throw off the preserved preview height. What's left here besides that is panel-specific: long
-   tokens wrapping in a narrow column, and trimming the lead/trail margin the theme's prose rules
-   leave around the block. */
-.folia-desc-rendered {
+   Every rule below is scoped as the ".folia-desc-rendered.markdown-rendered" compound (not just
+   ".folia-desc-rendered") — both classes are always present together, and the compound's higher
+   specificity is what actually wins against a theme rule targeting ".markdown-rendered" alone;
+   with a single-class selector the two tie and source order (theme loads after the plugin) would
+   let the theme win, silently defeating the panel-specific rules below. font-size/line-height stay
+   pinned to the panel's own scale (matching the raw-editor textarea and the rest of the detail
+   panel's UI text) instead of the theme's reading-view values — themes vary both, which would make
+   the block visibly resize/reflow on the view↔edit toggle and throw off the preserved preview
+   height. padding is zeroed since some themes add reading-view gutters that don't belong in a
+   narrow docked panel. The rest is panel-specific: long tokens wrapping in a narrow column, and
+   trimming the lead/trail margin the theme's prose rules leave around the block. */
+.folia-desc-rendered.markdown-rendered {
   font-size: var(--folia-font-size-md);
   line-height: 1.5;
+  padding: 0;
   overflow-wrap: anywhere;
 }
-.folia-desc-rendered > :first-child,
-.folia-comment-text > :first-child {
+.folia-desc-rendered.markdown-rendered > :first-child,
+.folia-comment-text.markdown-rendered > :first-child {
   margin-top: 0;
 }
-.folia-desc-rendered > :last-child,
-.folia-comment-text > :last-child {
+.folia-desc-rendered.markdown-rendered > :last-child,
+.folia-comment-text.markdown-rendered > :last-child {
   margin-bottom: 0;
 }
-.folia-desc-rendered pre,
-.folia-desc-rendered code,
-.folia-comment-text pre,
-.folia-comment-text code {
+.folia-desc-rendered.markdown-rendered pre,
+.folia-desc-rendered.markdown-rendered code,
+.folia-comment-text.markdown-rendered pre,
+.folia-comment-text.markdown-rendered code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-width: 100%;
 }
-.folia-desc-rendered img,
-.folia-comment-text img {
+.folia-desc-rendered.markdown-rendered img,
+.folia-comment-text.markdown-rendered img {
   max-width: 100%;
   height: auto;
 }
 /* Comments render inline-ish: keep paragraph margins flat so the edit/delete
-   buttons stay aligned with the first text line under .folia-comment-row. */
-.folia-comment-text p {
+   buttons stay aligned with the first text line under .folia-comment-row. Compound-scoped for the
+   same reason as above: a theme rule on ".markdown-rendered p" is equal specificity to a bare
+   ".folia-comment-text p" and loads after it, so it would win the tie and restore the margin. */
+.folia-comment-text.markdown-rendered p {
   margin: 0;
 }
 
@@ -1420,13 +1428,17 @@
   gap: 4px;
 }
 .folia-comment-text {
-  /* Pinned explicitly: "markdown-rendered" (see Markdown.tsx) carries its own font-size/line-height
-     from the theme, which would otherwise win over the inherited value from .folia-comments below. */
-  font-size: var(--folia-font-size-md);
-  line-height: 1.5;
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* Pinned as the ".markdown-rendered" compound (see the comment above .folia-desc-rendered.markdown-
+   rendered): a theme rule targeting ".markdown-rendered" alone ties a bare ".folia-comment-text"
+   rule on specificity and loads after it, so it would win and override this font-size/line-height —
+   including the inherited value from .folia-comments below, which a theme rule bypasses entirely. */
+.folia-comment-text.markdown-rendered {
+  font-size: var(--folia-font-size-md);
+  line-height: 1.5;
 }
 /* edit/delete affordances stay quiet until the comment is hovered/focused */
 .folia-comment-row .folia-mini {
