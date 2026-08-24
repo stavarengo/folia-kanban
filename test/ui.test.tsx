@@ -154,6 +154,8 @@ describe("card detail", () => {
     // View mode: fakeRepo renders the markdown as textContent (no raw editor yet).
     const rendered = await within(detail).findByText("Desc A");
     expect(rendered).toHaveClass("folia-desc-rendered");
+    // Obsidian's own reading-view class, so theme CSS (community themes/snippets scope to it) applies.
+    expect(rendered).toHaveClass("markdown-rendered");
     expect(within(detail).queryByLabelText("Edit description")).not.toBeNull();
     expect(within(detail).queryByRole("textbox", { name: "Edit description" })).toBeNull();
     // Clicking the rendered area flips to the raw textarea.
