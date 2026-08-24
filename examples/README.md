@@ -4,12 +4,12 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 
 ## How to open it
 
-1. **Open this `examples/` folder as a vault** in Obsidian (`Open folder as vault` → pick this `examples/` folder). It needs to be the vault root: the boards point `card-folder` at paths like `basic/Cards` and `feature-showcase/Cards`, which are resolved **relative to the vault root**.
+1. **Open this `examples/` folder as a vault** in Obsidian (`Open folder as vault` → pick this `examples/` folder). The Feature Showcase board points `card-folder` at `feature-showcase/Cards`, read **from the vault root**, so this folder needs to be the vault root for it to resolve.
 2. Enable **Folia Kanban** under Settings → Community plugins (install it manually first if needed — see the repo's main README). Trust the author if Obsidian prompts you.
 3. Open either board note (below) and run the command **"Open Folia Kanban board"**, or click the layout-grid ribbon icon.
 
 > [!note]
-> Want these in your own vault instead? Copy a board's folder (e.g. `feature-showcase/`) anywhere, then edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`).
+> Want these in your own vault instead? Copy a board's folder anywhere. `basic/` just works — its `card-folder: ./Cards` travels with the note. For `feature-showcase/` you also edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`), or to `./Cards` to make it portable too.
 
 ## The boards
 
@@ -52,7 +52,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 
 ## Authoring gotchas (worth knowing)
 
-- `card-folder` is **vault-root-relative**, never relative to the board note. With this `examples/` folder opened as the vault, `basic/Cards` resolves to `examples/basic/Cards`.
+- `card-folder` is read **from the vault root** and, when no folder is there but one sits beside the board note, **relative to the board note**. Write it as `./Cards` (or `../shared/Cards`) to mean the board-note reading and only that — which is what makes `basic/` portable, while `feature-showcase/Cards` names its path from the vault root. It can never resolve outside the vault, and the vault root itself is not a valid card folder.
 - A card joins a column by `status` matching a column **`id`** exactly (case-sensitive); an unknown/missing status lands in the first column.
 - The tile usually shows the **filename**, but a card whose filename is a slug (or that carries its own `title:` key) shows a different title — see the two title-source cards above. The board note's `card-title` property (`auto` / `filename` / `heading`) sets the policy; `[[wikilinks]]` always match the **filename**, never the displayed title.
 - A subcard (`- [ ] [[Child]]`) is pulled out of its own column and shown nested under its parent.

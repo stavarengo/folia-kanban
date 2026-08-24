@@ -11,7 +11,7 @@ import type {
   HistoryScope,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
-import { buildBoard, cardFolderPath } from "../model/board";
+import { buildBoard, resolveCardFolder } from "../model/board";
 import { normalizeColumns, serializeColumns } from "../model/columns";
 import { dateOnly, stamp } from "../model/dates";
 import {
@@ -65,6 +65,18 @@ function sanitizeFilename(title: string): string {
 /** The per-context config note (#14). Lives inside a context subfolder; read-only for the plugin. */
 const CONTEXT_NOTE = "_context.md";
 
+/**
+ * `BoardConfig` plus what resolving `card-folder` learned on the way, so `loadBoard` can report a
+ * missing or ambiguous folder without repeating the vault lookups. Repo-internal: `BoardConfig`
+ * stays the adapter-agnostic shape every consumer shares.
+ */
+interface ResolvedBoardConfig extends BoardConfig {
+  /** The property text as written, for messages that must name what the person actually typed. */
+  cardFolderRaw: string;
+  /** Every candidate path that exists as a folder right now, in the order they were preferred. */
+  cardFolderExisting: string[];
+}
+
 export class VaultRepository implements CardRepository {
   private recentWrites = new Map<string, number>();
 
@@ -100,7 +112,37 @@ export class VaultRepository implements CardRepository {
     this.recentWrites.set(path, Date.now());
   }
 
-  private async readConfig(): Promise<BoardConfig> {
+  /**
+   * How to name the card folder in a message: what was written, plus what it resolved to whenever
+   * the two differ — a `./Cards` that came out as `basic/Cards` is only actionable with both.
+   */
+  private describeCardFolder(config: ResolvedBoardConfig): string {
+    return config.cardFolderRaw === config.cardFolder
+      ? `"${config.cardFolderRaw}"`
+      : `"${config.cardFolderRaw}" (resolved to "${config.cardFolder}")`;
+  }
+
+  /** Pick the vault path a `card-folder` property names, against the vault as it is right now. */
+  private cardFolderFor(raw: string): { path: string; existing: string[] } {
+    // `normalizePath` only tidies separators (it leaves `.` and `..` alone and turns an empty
+    // value into "/"), so the `.`/`..` resolution and the two readings live in the pure helper.
+    const resolved = resolveCardFolder(this.boardPath, normalizePath(raw), (p) => this.isFolder(p));
+    if (resolved === null) {
+      // Nothing left after dropping the readings that climb out of the vault or land on its root.
+      // Unlike a folder that simply isn't there yet, adding a card cannot fix this, so it fails
+      // hard rather than rendering a board whose "Add card" would write somewhere nonsensical.
+      throw new Error(
+        `Card folder "${raw}" does not name a folder inside the vault. Fix the board's card-folder property.`,
+      );
+    }
+    return resolved;
+  }
+
+  private isFolder(path: string): boolean {
+    return this.app.vault.getAbstractFileByPath(path) instanceof TFolder;
+  }
+
+  private async readConfig(): Promise<ResolvedBoardConfig> {
     const boardFile = this.file(this.boardPath);
     // Parse the board config from the (write-fresh) file text rather than metadataCache:
     // the cache lags a processFrontMatter write by a tick, so reading it right after an
@@ -110,20 +152,21 @@ export class VaultRepository implements CardRepository {
       parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
       `board config (${this.boardPath})`,
     );
-    // Normalized once, here, so every consumer of `config.cardFolder` — card selection, context
+    // Resolved once, here, so every consumer of `config.cardFolder` — card selection, context
     // derivation (`deriveContext`, called deep inside `buildBoard`), `loadContexts`, and
-    // `ensureFolder`/`createCard` — agrees on the exact same string Obsidian itself uses for vault
-    // paths. A leading slash, doubled slashes or a stray space in `card-folder` must not make one
-    // of those consumers see the folder (or a card's context) and another not.
-    const cardFolder = normalizePath(
-      cardFolderPath(fm["card-folder"] ?? fm["card_folder"] ?? "Tasks"),
-    );
+    // `ensureFolder`/`createCard` — agrees on the exact same vault path. A leading slash, doubled
+    // slashes, a `..` segment or a board-note-relative reading must not make one of those
+    // consumers see the folder (or a card's context) and another not.
+    const cardFolderRaw = String(fm["card-folder"] ?? fm["card_folder"] ?? "Tasks");
+    const { path: cardFolder, existing: cardFolderExisting } = this.cardFolderFor(cardFolderRaw);
     const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
     return {
       path: this.boardPath,
       columns: normalizeColumns(fm["columns"]),
       cardFolder,
+      cardFolderRaw,
       titleMode,
+      cardFolderExisting,
     };
   }
 
@@ -145,13 +188,19 @@ export class VaultRepository implements CardRepository {
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
     if (folder !== null && !(folder instanceof TFolder)) {
       throw new Error(
-        `Card folder "${config.cardFolder}" is not a folder. Fix the board's card-folder property.`,
+        `Card folder ${this.describeCardFolder(config)} is not a folder. Fix the board's card-folder property.`,
       );
     }
+    // Both readings existing is the one way the fallback can flip silently: a board using the
+    // board-note-relative reading keeps working until someone creates a same-named folder at the
+    // vault root, and then loads empty with the folder it wanted still sitting right there. Name
+    // the winner rather than let that look like an ordinary empty board.
     const cardFolderWarning =
       folder === null
-        ? `Card folder "${config.cardFolder}" was not found. It will be created when you add your first card.`
-        : undefined;
+        ? `Card folder ${this.describeCardFolder(config)} was not found. It will be created when you add your first card.`
+        : config.cardFolderExisting.length > 1
+          ? `Card folder "${config.cardFolderRaw}" matches both "${config.cardFolderExisting[0]}" and "${config.cardFolderExisting[1]}". Using "${config.cardFolder}" — write the path as "./…" to always mean the one beside this board note.`
+          : undefined;
     const prefix = folderPath + "/";
     const files = this.app.vault
       .getMarkdownFiles()
@@ -194,9 +243,9 @@ export class VaultRepository implements CardRepository {
   }
 
   async loadContexts(cardFolder?: string): Promise<Record<string, ContextConfig>> {
-    const folderPath = normalizePath(
-      cardFolderPath(cardFolder ?? (await this.readConfig()).cardFolder),
-    );
+    // Already the resolved path when it comes from a caller — `readConfig` is the only place that
+    // turns the raw property into one, so re-normalizing here could only make the two disagree.
+    const folderPath = cardFolder ?? (await this.readConfig()).cardFolder;
     const root = this.app.vault.getAbstractFileByPath(folderPath);
     const out: Record<string, ContextConfig> = {};
     if (!(root instanceof TFolder)) return out;

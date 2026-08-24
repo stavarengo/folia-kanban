@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyReloc,
   buildBoard,
-  cardFolderPath,
+  resolveCardFolder,
   columnEffectiveOrders,
   computeDropOrder,
   deriveContext,
@@ -200,29 +200,86 @@ describe("deriveContext (#14)", () => {
   it("returns only the FIRST subfolder for a deeply nested card", () => {
     expect(deriveContext("Tasks", "Tasks/Acme/Sub/Foo.md")).toBe("Acme");
   });
-  it("tolerates a trailing slash on the card folder", () => {
-    expect(deriveContext("Tasks/", "Tasks/Acme/Foo.md")).toBe("Acme");
+  it("takes the card folder as already resolved, so a trailing slash matches nothing", () => {
+    // `readConfig` is the single place that turns the raw property into a path; tolerating a
+    // second shape here would let a card's context depend on which spelling reached this far.
+    expect(deriveContext("Tasks/", "Tasks/Acme/Foo.md")).toBeUndefined();
   });
   it("returns undefined for a path outside the card folder", () => {
     expect(deriveContext("Tasks", "Other/Acme/Foo.md")).toBeUndefined();
   });
 });
 
-describe("cardFolderPath (#20260821.07)", () => {
-  it("passes a plain folder path through unchanged", () => {
-    expect(cardFolderPath("Tasks")).toBe("Tasks");
+describe("resolveCardFolder (#20260821.08)", () => {
+  const board = "basic/Example Board.md";
+  /** Resolve `value` against a vault where exactly `folders` exist. */
+  const pick = (boardPath: string, value: string, folders: string[] = []) =>
+    resolveCardFolder(boardPath, value, (p) => folders.includes(p));
+
+  describe("which readings a value allows", () => {
+    it("prefers the vault-root reading of a plain path, with the board note's as fallback", () => {
+      expect(pick(board, "Cards", ["Cards", "basic/Cards"])?.existing).toEqual([
+        "Cards",
+        "basic/Cards",
+      ]);
+    });
+    it("allows only the board-note reading for an explicitly relative path", () => {
+      expect(pick(board, "./Cards", ["Cards", "basic/Cards"])?.existing).toEqual(["basic/Cards"]);
+    });
+    it("climbs out of the board's folder for a `..` path", () => {
+      expect(pick("a/b/Board.md", "../shared/Cards")?.path).toBe("a/shared/Cards");
+    });
+    it("resolves `.` and `..` segments in the middle of a path", () => {
+      expect(pick(board, "Area/./Cards")?.path).toBe("Area/Cards");
+      expect(pick(board, "Area/Sub/../Cards")?.path).toBe("Area/Cards");
+    });
+    it("joins without a stray leading slash for a board note at the vault root", () => {
+      expect(pick("Board.md", "./Cards")?.path).toBe("Cards");
+    });
+    it("ignores a trailing slash", () => {
+      expect(pick("Board.md", "Cards/")?.path).toBe("Cards");
+    });
+    it("treats `..` as a whole segment, so a folder named `..foo` or `...` survives", () => {
+      expect(pick("Board.md", "..foo/Cards")?.path).toBe("..foo/Cards");
+      expect(pick("Board.md", ".../Cards")?.path).toBe(".../Cards");
+    });
+    it("reads a bare `.` as the board note's own folder", () => {
+      expect(pick(board, ".")?.path).toBe("basic");
+    });
+    it("keeps the board-note reading when only the vault-root one escapes", () => {
+      // `x/../../y` climbs one level past the root from the root, but only back to `a/` from `a/b/`.
+      expect(pick("a/b/Board.md", "x/../../y")?.path).toBe("a/y");
+    });
+    it("refuses a value that climbs above the vault root under every reading", () => {
+      expect(pick(board, "../../Cards")).toBeNull();
+    });
+    it("refuses a value naming the vault root itself, however it is spelled", () => {
+      expect(pick(board, "/")).toBeNull();
+      expect(pick(board, "")).toBeNull();
+      expect(pick(board, "//")).toBeNull();
+      expect(pick("Board.md", ".")).toBeNull();
+      expect(pick("Board.md", "..")).toBeNull();
+    });
   });
-  it("strips a single trailing slash", () => {
-    expect(cardFolderPath("Tasks/")).toBe("Tasks");
-  });
-  it("strips repeated trailing slashes", () => {
-    expect(cardFolderPath("Tasks///")).toBe("Tasks");
-  });
-  it("preserves a nested path, stripping only the trailing slash", () => {
-    expect(cardFolderPath("Area/Tasks/")).toBe("Area/Tasks");
-  });
-  it("leaves an empty string as-is", () => {
-    expect(cardFolderPath("")).toBe("");
+
+  describe("which reading wins", () => {
+    it("takes the vault-root folder when it exists", () => {
+      expect(pick(board, "Cards", ["Cards", "basic/Cards"])?.path).toBe("Cards");
+    });
+    it("falls back to the folder beside the board note when the root one isn't there", () => {
+      expect(pick(board, "Cards", ["basic/Cards"])?.path).toBe("basic/Cards");
+    });
+    it("keeps the vault-root reading when neither exists, so the folder is still created there", () => {
+      // The create-on-first-card story predates this: a board with no card folder yet must keep
+      // creating it exactly where it always did, not silently move it beside the board note.
+      expect(pick(board, "Cards")).toEqual({ path: "Cards", existing: [] });
+    });
+    it("stays with the board-note reading of a `./` path even when a root folder exists", () => {
+      expect(pick(board, "./Cards", ["Cards"])).toEqual({ path: "basic/Cards", existing: [] });
+    });
+    it("reports both readings when both exist, so the caller can flag the ambiguity", () => {
+      expect(pick(board, "Cards", ["Cards", "basic/Cards"])?.existing).toHaveLength(2);
+    });
   });
 });
 

@@ -6,23 +6,90 @@
 
 import type { Board, BoardConfig, Card, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
 
+/** The folder a vault path lives in — `""` for a note sitting at the vault root. */
+function parentFolder(path: string): string {
+  const slash = path.lastIndexOf("/");
+  return slash === -1 ? "" : path.slice(0, slash);
+}
+
 /**
- * Normalize a configured `card-folder` value to the vault path it names: trailing slashes
- * stripped. The single place every adapter derives that path from, so a folder-existence check,
- * a card-selection prefix, and a context scan can never drift apart on how they read the setting.
+ * The candidate vault paths a configured `card-folder` value can name, best reading first, for
+ * the adapter to pick from by checking which one actually exists.
+ *
+ * Two readings exist. A value written with an explicit relative marker (`./x`, `../x`, `.`, `..`)
+ * means genuinely relative to the board note, so it gets that reading only — a self-contained
+ * project folder can point at `./Cards` and stay portable when it moves. Any other value keeps
+ * the vault-root reading it always had, with the board-note-relative one as a fallback, so a
+ * board whose card folder sits beside it works without repeating its own location.
+ *
+ * `.` and `..` are resolved here: Obsidian's `normalizePath` leaves them untouched, it only tidies
+ * separators. They are matched as whole segments, so folders legitimately named `...` or `..foo`
+ * survive. Two readings are dropped rather than returned, which is why the list can come back
+ * empty: one that would climb above the vault root (the plugin must never resolve outside the
+ * vault) and one that lands on the vault root itself (every note in the vault is not a card
+ * folder, and no folder can be created to fix it).
  */
-export function cardFolderPath(cardFolder: string): string {
-  return cardFolder.replace(/\/+$/, "");
+function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
+  // A value made of nothing but separators names the vault root under either reading, so there is
+  // no reading left to try. `.` and `..` do carry meaning and fall through to the resolution below.
+  if (cardFolder.split("/").every((s) => s === "")) return [];
+  const relativeOnly = /^\.\.?(\/|$)/.test(cardFolder);
+  const bases = relativeOnly ? [parentFolder(boardPath)] : ["", parentFolder(boardPath)];
+  const out: string[] = [];
+  for (const base of bases) {
+    const resolved = resolveSegments(base, cardFolder);
+    if (resolved !== null && resolved !== "" && !out.includes(resolved)) out.push(resolved);
+  }
+  return out;
+}
+
+/**
+ * Pick the vault path a configured `card-folder` value names, out of the readings
+ * {@link cardFolderCandidates} allows, and report which of them exist right now.
+ *
+ * `isFolder` is the caller's live view of the vault — the only impure part, injected so the choice
+ * itself stays testable. An existing folder always beats one that isn't there, which is what makes
+ * the board-note reading a fallback rather than a second guess. When none of the readings exists,
+ * the first one wins and keeps its create-on-first-card story: for a value without an explicit
+ * `./`, that is the vault-root reading, exactly where the folder has always been created.
+ *
+ * `null` when no reading survives at all — see {@link cardFolderCandidates}.
+ */
+export function resolveCardFolder(
+  boardPath: string,
+  cardFolder: string,
+  isFolder: (path: string) => boolean,
+): { path: string; existing: string[] } | null {
+  const candidates = cardFolderCandidates(boardPath, cardFolder);
+  const [preferred] = candidates;
+  if (preferred === undefined) return null;
+  const existing = candidates.filter(isFolder);
+  return { path: existing[0] ?? preferred, existing };
+}
+
+/** Join `base` with `path`, resolving `.`/`..` segments. `null` when it climbs above the root. */
+function resolveSegments(base: string, path: string): string | null {
+  const segments = base === "" ? [] : base.split("/");
+  for (const segment of path.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") {
+      if (segments.pop() === undefined) return null;
+      continue;
+    }
+    segments.push(segment);
+  }
+  return segments.join("/");
 }
 
 /**
  * The context (#14) a card belongs to, derived purely from its path: the immediate subfolder of
  * `cardFolder` it lives under. A card directly in `cardFolder` (no further `/` after the folder)
  * has no context → undefined. The single source of truth shared by every repo + the board build,
- * so derived context can never diverge between adapters.
+ * so derived context can never diverge between adapters. `cardFolder` must already be the
+ * resolved path the adapter settled on (see {@link cardFolderCandidates}), never the raw property.
  */
 export function deriveContext(cardFolder: string, path: string): string | undefined {
-  const prefix = cardFolderPath(cardFolder) + "/";
+  const prefix = cardFolder + "/";
   if (!path.startsWith(prefix)) return undefined;
   const rest = path.slice(prefix.length);
   const slash = rest.indexOf("/");

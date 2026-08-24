@@ -81,7 +81,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 
    ```yaml
    folia-board: true
-   card-folder: Cards      # folder holding the card notes
+   card-folder: Cards      # folder holding the card notes (or ./Cards, beside this note)
    card-title: auto        # where card titles come from: auto (default) | filename | heading
    columns:
      - todo
@@ -92,7 +92,9 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 2. Put card notes (each with a `status` matching a column) in that folder.
 3. Run the command **“Open Folia Kanban board”** or click the layout-grid ribbon icon.
 
-If `card-folder` (or its `Tasks` default, when the property is omitted) points at a folder that doesn't exist yet, the board still opens, but shows a notice naming the folder instead of looking like a genuinely empty board — a typo is now visible instead of silent. Adding a card still creates that folder, same as before, so a brand-new board works exactly as it did. If `card-folder` instead resolves to something that isn't a folder at all (a note already has that exact name), there's no folder to create, so the board refuses to open until the property or the conflicting note is fixed.
+`card-folder` is read from the vault root, exactly as it always was, and falls back to the same path read relative to the board note when **a folder actually exists there and none does at the root** — so a board sitting in `Projects/Acme/` finds an existing `Projects/Acme/Cards` from a bare `card-folder: Cards`. When neither exists, the vault-root reading still wins, so a brand-new board creates its folder exactly where it always did. Writing the path with a leading `./` or `../` (`./Cards`, `../shared/Cards`) skips the vault-root reading entirely and always means "relative to this note", whether that folder exists yet or not — which keeps a project folder portable: move the whole folder and the board still finds its cards. A `..` segment may climb inside the vault but never out of it, and the vault root itself isn't a valid card folder; either one is refused with a message rather than silently reinterpreted. If both readings exist, the board loads from the vault-root one and says so, so the ambiguity is visible instead of silently switching the day someone creates a same-named folder at the root.
+
+If `card-folder` (or its `Tasks` default, when the property is omitted) points at a folder that doesn't exist yet, the board still opens, but shows a notice naming the folder instead of looking like a genuinely empty board — a typo is now visible instead of silent. Adding a card still creates that folder, same as before, so a brand-new board works exactly as it did. If the reading the board settles on resolves to something that isn't a folder at all (a note already has that exact name), there's no folder to create, so the board refuses to open until the property or the conflicting note is fixed. A note occupying only the *other* reading's path is simply not the folder being looked for, and is passed over.
 
 Columns can be edited by hand in the board note's `columns` property, or managed in-app from each
 column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add column** button — the
