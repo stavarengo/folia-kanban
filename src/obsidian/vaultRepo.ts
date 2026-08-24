@@ -132,7 +132,7 @@ export class VaultRepository implements CardRepository {
       // Unlike a folder that simply isn't there yet, adding a card cannot fix this, so it fails
       // hard rather than rendering a board whose "Add card" would write somewhere nonsensical.
       throw new Error(
-        `Card folder "${raw}" does not name a folder inside the vault. Fix the board's card-folder property.`,
+        `Card folder "${raw}" names the vault root or a path outside it, neither of which can hold cards. Fix the board's card-folder property.`,
       );
     }
     return resolved;
@@ -157,7 +157,7 @@ export class VaultRepository implements CardRepository {
     // `ensureFolder`/`createCard` — agrees on the exact same vault path. A leading slash, doubled
     // slashes, a `..` segment or a board-note-relative reading must not make one of those
     // consumers see the folder (or a card's context) and another not.
-    const cardFolderRaw = String(fm["card-folder"] ?? fm["card_folder"] ?? "Tasks");
+    const cardFolderRaw = fm["card-folder"] ?? fm["card_folder"] ?? "Tasks";
     const { path: cardFolder, existing: cardFolderExisting } = this.cardFolderFor(cardFolderRaw);
     const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
     return {

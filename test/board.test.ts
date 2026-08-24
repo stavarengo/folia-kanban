@@ -240,8 +240,10 @@ describe("resolveCardFolder (#20260821.08)", () => {
       expect(pick("Board.md", "Cards/")?.path).toBe("Cards");
     });
     it("treats `..` as a whole segment, so a folder named `..foo` or `...` survives", () => {
-      expect(pick("Board.md", "..foo/Cards")?.path).toBe("..foo/Cards");
-      expect(pick("Board.md", ".../Cards")?.path).toBe(".../Cards");
+      // A nested board note, so a mishandled `..` would visibly climb instead of collapsing into
+      // the same string the vault-root reading produces.
+      expect(pick(board, "..foo/Cards", ["basic/..foo/Cards"])?.path).toBe("basic/..foo/Cards");
+      expect(pick(board, ".../Cards")?.path).toBe(".../Cards");
     });
     it("reads a bare `.` as the board note's own folder", () => {
       expect(pick(board, ".")?.path).toBe("basic");
@@ -253,10 +255,14 @@ describe("resolveCardFolder (#20260821.08)", () => {
     it("refuses a value that climbs above the vault root under every reading", () => {
       expect(pick(board, "../../Cards")).toBeNull();
     });
-    it("refuses a value naming the vault root itself, however it is spelled", () => {
+    it("refuses a root-anchored value rather than reading it as the board note's folder", () => {
+      // `/` names the vault root under both readings only because it is refused outright: resolved
+      // against the board note's folder it would otherwise come out as that folder, silently
+      // turning "the whole vault" into "the folder this note happens to sit in".
       expect(pick(board, "/")).toBeNull();
       expect(pick(board, "")).toBeNull();
-      expect(pick(board, "//")).toBeNull();
+    });
+    it("refuses a relative value that lands on the vault root", () => {
       expect(pick("Board.md", ".")).toBeNull();
       expect(pick("Board.md", "..")).toBeNull();
     });

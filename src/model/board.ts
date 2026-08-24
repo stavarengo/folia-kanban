@@ -30,8 +30,10 @@ function parentFolder(path: string): string {
  * folder, and no folder can be created to fix it).
  */
 function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
-  // A value made of nothing but separators names the vault root under either reading, so there is
-  // no reading left to try. `.` and `..` do carry meaning and fall through to the resolution below.
+  // A root-anchored value (`/`, or the empty value `normalizePath` turns into `/`) names the vault
+  // root and nothing else. Without this guard the board-note reading below would quietly turn it
+  // into the board's own folder, which is not what someone writing `/` asked for. `.` and `..` are
+  // a different thing — they do mean "relative to this note" — and fall through to the resolution.
   if (cardFolder.split("/").every((s) => s === "")) return [];
   const relativeOnly = /^\.\.?(\/|$)/.test(cardFolder);
   const bases = relativeOnly ? [parentFolder(boardPath)] : ["", parentFolder(boardPath)];

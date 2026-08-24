@@ -7,9 +7,10 @@ import type { CardMutation } from "./board";
 
 export interface CardRepository {
   /**
-   * Read the board config note + all cards, return the assembled board. If the card folder
-   * doesn't currently exist, the returned board still loads (with no cards) and carries
-   * `cardFolderWarning` instead of failing — see {@link Board.cardFolderWarning}.
+   * Read the board config note + all cards, return the assembled board. When the card folder is
+   * merely worth a remark — it doesn't exist yet, or the setting reads as two existing folders —
+   * the board still loads and carries `cardFolderWarning` instead of failing; see
+   * {@link Board.cardFolderWarning}.
    */
   loadBoard(): Promise<Board>;
   /**
