@@ -148,7 +148,12 @@ export interface BoardConfig {
   /** Path of the board definition note. */
   path: string;
   columns: ColumnDef[];
-  /** Vault folder that holds the card files. */
+  /**
+   * Vault path of the folder holding the card files: the single already-resolved value every
+   * consumer shares. The adapter derives it once from the board note's `card-folder` property,
+   * which may name it from the vault root or relative to the board note, so this is never the raw
+   * property text — and never the vault root, which is refused rather than resolved.
+   */
   cardFolder: string;
   /** Where card titles come from (`card-title` in the board note). Default `auto`. */
   titleMode: TitleMode;
