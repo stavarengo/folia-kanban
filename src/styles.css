@@ -1267,6 +1267,9 @@
   min-height: 72px;
   resize: vertical;
   font: inherit;
+  /* Matches .folia-desc-rendered.markdown-rendered's pinned line-height, so entering edit mode
+     doesn't change the line-box height under the preserved preview height. */
+  line-height: 1.5;
   background: var(--background-primary);
   color: var(--text-normal);
   border: 1px solid var(--folia-border);
@@ -1455,6 +1458,9 @@
   resize: vertical;
   font: inherit;
   font-size: var(--folia-font-size-md);
+  /* Matches .folia-comment-text.markdown-rendered's pinned line-height, for the same reason as
+     .folia-desc above. */
+  line-height: 1.5;
   background: var(--background-primary);
   color: var(--text-normal);
   border: 1px solid var(--folia-border);
