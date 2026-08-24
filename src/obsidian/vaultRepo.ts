@@ -11,7 +11,7 @@ import type {
   HistoryScope,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
-import { buildBoard } from "../model/board";
+import { buildBoard, cardFolderPath } from "../model/board";
 import { normalizeColumns, serializeColumns } from "../model/columns";
 import { dateOnly, stamp } from "../model/dates";
 import {
@@ -122,7 +122,15 @@ export class VaultRepository implements CardRepository {
 
   async loadBoard(): Promise<Board> {
     const config = await this.readConfig();
-    const prefix = config.cardFolder.replace(/\/$/, "") + "/";
+    const folderPath = cardFolderPath(config.cardFolder);
+    // A card folder that isn't there matches zero files, which looks exactly like an empty
+    // board — say so instead of rendering a healthy-looking board with nothing on it.
+    if (!(this.app.vault.getAbstractFileByPath(folderPath) instanceof TFolder)) {
+      throw new Error(
+        `Card folder "${config.cardFolder}" was not found. Check the board's card-folder property.`,
+      );
+    }
+    const prefix = folderPath + "/";
     const files = this.app.vault
       .getMarkdownFiles()
       // Skip the board note and the per-context config notes (#14) — `_context.md` is a folder
@@ -163,7 +171,7 @@ export class VaultRepository implements CardRepository {
   }
 
   async loadContexts(cardFolder?: string): Promise<Record<string, ContextConfig>> {
-    const folderPath = (cardFolder ?? (await this.readConfig()).cardFolder).replace(/\/+$/, "");
+    const folderPath = cardFolderPath(cardFolder ?? (await this.readConfig()).cardFolder);
     const root = this.app.vault.getAbstractFileByPath(folderPath);
     const out: Record<string, ContextConfig> = {};
     if (!(root instanceof TFolder)) return out;

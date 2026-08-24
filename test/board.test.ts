@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyReloc,
   buildBoard,
+  cardFolderPath,
   columnEffectiveOrders,
   computeDropOrder,
   deriveContext,
@@ -204,6 +205,24 @@ describe("deriveContext (#14)", () => {
   });
   it("returns undefined for a path outside the card folder", () => {
     expect(deriveContext("Tasks", "Other/Acme/Foo.md")).toBeUndefined();
+  });
+});
+
+describe("cardFolderPath (#20260821.07)", () => {
+  it("passes a plain folder path through unchanged", () => {
+    expect(cardFolderPath("Tasks")).toBe("Tasks");
+  });
+  it("strips a single trailing slash", () => {
+    expect(cardFolderPath("Tasks/")).toBe("Tasks");
+  });
+  it("strips repeated trailing slashes", () => {
+    expect(cardFolderPath("Tasks///")).toBe("Tasks");
+  });
+  it("preserves a nested path, stripping only the trailing slash", () => {
+    expect(cardFolderPath("Area/Tasks/")).toBe("Area/Tasks");
+  });
+  it("leaves an empty string as-is", () => {
+    expect(cardFolderPath("")).toBe("");
   });
 });
 

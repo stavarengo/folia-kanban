@@ -7,13 +7,22 @@
 import type { Board, BoardConfig, Card, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
 
 /**
+ * Normalize a configured `card-folder` value to the vault path it names: trailing slashes
+ * stripped. The single place every adapter derives that path from, so a folder-existence check,
+ * a card-selection prefix, and a context scan can never drift apart on how they read the setting.
+ */
+export function cardFolderPath(cardFolder: string): string {
+  return cardFolder.replace(/\/+$/, "");
+}
+
+/**
  * The context (#14) a card belongs to, derived purely from its path: the immediate subfolder of
  * `cardFolder` it lives under. A card directly in `cardFolder` (no further `/` after the folder)
  * has no context → undefined. The single source of truth shared by every repo + the board build,
  * so derived context can never diverge between adapters.
  */
 export function deriveContext(cardFolder: string, path: string): string | undefined {
-  const prefix = cardFolder.replace(/\/+$/, "") + "/";
+  const prefix = cardFolderPath(cardFolder) + "/";
   if (!path.startsWith(prefix)) return undefined;
   const rest = path.slice(prefix.length);
   const slash = rest.indexOf("/");
