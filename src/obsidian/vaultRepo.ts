@@ -125,9 +125,11 @@ export class VaultRepository implements CardRepository {
     const folderPath = cardFolderPath(config.cardFolder);
     // A card folder that isn't there matches zero files, which looks exactly like an empty
     // board — say so instead of rendering a healthy-looking board with nothing on it.
-    if (!(this.app.vault.getAbstractFileByPath(folderPath) instanceof TFolder)) {
+    const folder = this.app.vault.getAbstractFileByPath(folderPath);
+    if (!(folder instanceof TFolder)) {
+      const reason = folder === null ? "was not found" : "is not a folder";
       throw new Error(
-        `Card folder "${config.cardFolder}" was not found. Check the board's card-folder property.`,
+        `Card folder "${config.cardFolder}" ${reason}. Check the board's card-folder property.`,
       );
     }
     const prefix = folderPath + "/";
