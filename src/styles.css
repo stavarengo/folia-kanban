@@ -1324,10 +1324,16 @@
 }
 
 /* Rendered markdown block: the container also carries Obsidian's own "markdown-rendered" class
-   (see Markdown.tsx), so prose sizing/spacing/color comes from the active theme. What's left here
-   is panel-specific: long tokens wrapping in a narrow column, and trimming the lead/trail margin
-   the theme's prose rules leave around the block. */
+   (see Markdown.tsx), so prose spacing/color/list-markers/callouts come from the active theme.
+   font-size and line-height stay pinned to the panel's own scale (matching the raw-editor textarea
+   below and the rest of the detail panel's UI text) instead of the theme's reading-view values —
+   themes vary both, which would make the block visibly resize/reflow on the view↔edit toggle and
+   throw off the preserved preview height. What's left here besides that is panel-specific: long
+   tokens wrapping in a narrow column, and trimming the lead/trail margin the theme's prose rules
+   leave around the block. */
 .folia-desc-rendered {
+  font-size: var(--folia-font-size-md);
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .folia-desc-rendered > :first-child,
@@ -1414,6 +1420,10 @@
   gap: 4px;
 }
 .folia-comment-text {
+  /* Pinned explicitly: "markdown-rendered" (see Markdown.tsx) carries its own font-size/line-height
+     from the theme, which would otherwise win over the inherited value from .folia-comments below. */
+  font-size: var(--folia-font-size-md);
+  line-height: 1.5;
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
