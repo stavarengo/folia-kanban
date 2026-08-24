@@ -122,7 +122,11 @@ export class VaultRepository implements CardRepository {
 
   async loadBoard(): Promise<Board> {
     const config = await this.readConfig();
-    const folderPath = cardFolderPath(config.cardFolder);
+    // normalizePath (not just cardFolderPath's trailing-slash trim) so the existence check below
+    // and the `startsWith` card-selection filter agree on the exact same string Obsidian itself
+    // uses for vault paths — a leading slash, doubled slashes or a stray space in `card-folder`
+    // must not make one see the folder and the other not.
+    const folderPath = normalizePath(cardFolderPath(config.cardFolder));
     // A card folder that isn't there matches zero files, which looks exactly like an empty
     // board. Say so via `cardFolderWarning` rather than rendering a healthy-looking board with
     // nothing on it — but keep loading: a board whose folder was never created yet (the `Tasks`
@@ -178,7 +182,9 @@ export class VaultRepository implements CardRepository {
   }
 
   async loadContexts(cardFolder?: string): Promise<Record<string, ContextConfig>> {
-    const folderPath = cardFolderPath(cardFolder ?? (await this.readConfig()).cardFolder);
+    const folderPath = normalizePath(
+      cardFolderPath(cardFolder ?? (await this.readConfig()).cardFolder),
+    );
     const root = this.app.vault.getAbstractFileByPath(folderPath);
     const out: Record<string, ContextConfig> = {};
     if (!(root instanceof TFolder)) return out;

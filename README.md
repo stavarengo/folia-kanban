@@ -92,10 +92,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 2. Put card notes (each with a `status` matching a column) in that folder.
 3. Run the command **“Open Folia Kanban board”** or click the layout-grid ribbon icon.
 
-If `card-folder` (or its `Tasks` default, when the property is omitted) points at a folder that
-doesn't exist yet, the board still opens, but shows a notice naming the missing folder instead of
-looking like a genuinely empty board — a typo is now visible instead of silent. Adding a card still
-creates that folder, same as before, so a brand-new board works exactly as it did.
+If `card-folder` (or its `Tasks` default, when the property is omitted) points at a folder that doesn't exist yet, the board still opens, but shows a notice naming the folder instead of looking like a genuinely empty board — a typo is now visible instead of silent. Adding a card still creates that folder, same as before, so a brand-new board works exactly as it did.
 
 Columns can be edited by hand in the board note's `columns` property, or managed in-app from each
 column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add column** button — the

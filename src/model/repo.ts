@@ -6,7 +6,11 @@ import type { Board, CardBody, CardFrontmatter, ColumnDef, ContextConfig } from 
 import type { CardMutation } from "./board";
 
 export interface CardRepository {
-  /** Read the board config note + all cards, return the assembled board. */
+  /**
+   * Read the board config note + all cards, return the assembled board. If the card folder
+   * doesn't currently exist, the returned board still loads (with no cards) and carries
+   * `cardFolderWarning` instead of failing — see {@link Board.cardFolderWarning}.
+   */
   loadBoard(): Promise<Board>;
   /**
    * Scan the card folder's immediate subfolders for contexts (#14), keyed by subfolder name.
