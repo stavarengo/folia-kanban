@@ -32,9 +32,9 @@
    ```
 
 3. Use Obsidian only in the `examples/` vault — never touch others unless asked. Confirm it's open with `app.vault.getName()`.
-   3.1. If not our `examples/` vault and this is the devcontainer, then use the `$HOST_REPO_ROOT_REAL_PATH` environment variable and open it via `evaluate_script` — `require('electron').shell.openExternal('obsidian://open?path=' + encodeURIComponent('$HOST_REPO_ROOT_REAL_PATH/examples'))` — then `list_pages` → `select_page`.
-   3.2. If the host path is unknown or this is not the devcontainer, ask your human to open it.
-   3.3. If this is the host system, you can easily open the vault using instructions from 3.1. using the current repo root path instead of `$HOST_REPO_ROOT_REAL_PATH`.
+   - 3.1. If not our `examples/` vault and this is the devcontainer, then use the `$HOST_REPO_ROOT_REAL_PATH` environment variable and open it via `evaluate_script` — `require('electron').shell.openExternal('obsidian://open?path=' + encodeURIComponent('$HOST_REPO_ROOT_REAL_PATH/examples'))` — then `list_pages` → `select_page`.
+   - 3.2. If the host path is unknown or this is not the devcontainer, ask your human to open it.
+   - 3.3. If this is the host system, you can easily open the vault using instructions from 3.1. using the current repo root path instead of `$HOST_REPO_ROOT_REAL_PATH`.
 4. Watch and rebuild the plugin into the `examples/` vault on every change: `pnpm run dev:examplesVault` (watch mode — keeps running).
 5. `take_snapshot` hides the file tree — pass `verbose: true` for folder/file nodes.
 6. Breadcrumb and explorer both show the folder name, but the breadcrumb only selects — click the explorer node to open.
