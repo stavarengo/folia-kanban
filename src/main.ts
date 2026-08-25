@@ -33,17 +33,30 @@ interface NavigableViewState extends ViewState {
  *  behind this one field, so unloading the plugin can cut the link: a wrapper we were unable to
  *  remove is then inert *and* holds nothing, instead of pinning the whole plugin in memory. */
 interface PatchState {
-  redirectToBoard: ((leaf: WorkspaceLeaf, filePath: string) => boolean) | null;
+  redirectToBoard: ((leaf: WorkspaceLeaf, filePath: string, eState: unknown) => boolean) | null;
+}
+
+/** A link to a heading or a block, and a search result, all ask for a *place in the text*. The
+ *  board has nowhere to put a line number, so those opens are left in the editor where the thing
+ *  the user clicked actually is. A bare scroll position is not such a request. */
+function targetsAPlaceInTheText(eState: unknown): boolean {
+  if (typeof eState !== "object" || eState === null) return false;
+  const target = eState as Record<string, unknown>;
+  return (
+    target["line"] !== undefined || target["subpath"] !== undefined || target["match"] !== undefined
+  );
 }
 
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
 
-  /** Set only for the instant the toggle spends swapping a tab to the Markdown editor, so the
-   *  patch below lets that one call through instead of bouncing it straight back to the board.
-   *  Deliberately not durable state: which view a tab is in is a question the workspace already
-   *  answers, and a second copy of that answer is a second copy to get wrong. */
-  private pendingMarkdown: string | null = null;
+  /** Tabs the user sent to the Markdown editor with the button, and the note they did it for.
+   *  Nothing else ever writes to this: it records a decision a person made, never a guess about
+   *  one. Keyed on the leaf so it dies with the tab, and scoped to the file so the decision does
+   *  not follow the tab to some other note. Without it, going Back to a tab you had put in the
+   *  editor would land on the board instead — Obsidian replays the tab's *state*, which reaches
+   *  the same redirect as a fresh open. */
+  private readonly markdownTabs = new WeakMap<WorkspaceLeaf, string>();
 
   private readonly patchState: PatchState = { redirectToBoard: null };
 
@@ -98,8 +111,9 @@ export default class FoliaKanbanPlugin extends Plugin {
   private patchLeafSetViewState(): void {
     const patchState = this.patchState;
     // An arrow, so the wrapper below can stay a `function` and keep `this` as the leaf.
-    patchState.redirectToBoard = (leaf, filePath) =>
-      this.pendingMarkdown !== filePath &&
+    patchState.redirectToBoard = (leaf, filePath, eState) =>
+      this.markdownTabs.get(leaf) !== filePath &&
+      !targetsAPlaceInTheText(eState) &&
       this.isEditingSurface(leaf) &&
       this.shouldOpenAsBoard(filePath);
 
@@ -114,7 +128,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       if (
         state.type === "markdown" &&
         typeof filePath === "string" &&
-        patchState.redirectToBoard?.(this, filePath) === true
+        patchState.redirectToBoard?.(this, filePath, eState) === true
       ) {
         return original.call(this, { ...state, type: VIEW_TYPE_KANBAN }, eState);
       }
@@ -140,7 +154,7 @@ export default class FoliaKanbanPlugin extends Plugin {
         const action = view.addAction("layout-grid", "Open as Folia Kanban board", () => {
           // Read the file at click time: one MarkdownView outlives the file it started on.
           const current = view.file;
-          if (current) void this.showBoardIn(leaf, current.path, true);
+          if (current) void this.openBoardFrom(leaf, current.path);
         });
         action.addClass(BOARD_ACTION_CLASS);
       } else if (!wanted && existing) {
@@ -155,10 +169,18 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
   }
 
+  /** The Markdown editor's button. In a normal tab it swaps in place; from a sidebar it sends
+   *  the board to a real tab instead, because a dock has no room for one. */
+  private async openBoardFrom(leaf: WorkspaceLeaf, filePath: string): Promise<void> {
+    if (this.isEditingSurface(leaf)) await this.showBoardIn(leaf, filePath, true);
+    else await this.openBoard(filePath);
+  }
+
   /** Swap a tab to the board, same leaf, same file. */
   async showBoardIn(leaf: WorkspaceLeaf, filePath: string, focus: boolean): Promise<void> {
     // Flush whatever the user typed before the editor goes away.
     if (leaf.view instanceof MarkdownView) await leaf.view.save();
+    this.markdownTabs.delete(leaf);
     const state: NavigableViewState = {
       type: VIEW_TYPE_KANBAN,
       state: { file: filePath },
@@ -174,12 +196,8 @@ export default class FoliaKanbanPlugin extends Plugin {
       state: { file: filePath },
       popstate: true,
     };
-    this.pendingMarkdown = filePath;
-    try {
-      await leaf.setViewState(state, { focus: true });
-    } finally {
-      this.pendingMarkdown = null;
-    }
+    this.markdownTabs.set(leaf, filePath);
+    await leaf.setViewState(state, { focus: true });
     this.syncMarkdownActions();
   }
 
@@ -248,10 +266,12 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   private leafShowing(viewType: string, filePath: string): WorkspaceLeaf | null {
     return (
-      this.app.workspace
-        .getLeavesOfType(viewType)
-        .find((l) => this.isEditingSurface(l) && l.getViewState().state?.["file"] === filePath) ??
-      null
+      this.app.workspace.getLeavesOfType(viewType).find((l) => {
+        if (!this.isEditingSurface(l)) return false;
+        const saved = l.getViewState().state;
+        // `boardPath` is what a board tab saved before this view owned its file looks like.
+        return saved?.["file"] === filePath || saved?.["boardPath"] === filePath;
+      }) ?? null
     );
   }
 
