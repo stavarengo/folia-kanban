@@ -13,7 +13,7 @@ import type {
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import { buildBoard, resolveCardFolder } from "../model/board";
-import { normalizeColumns, serializeColumns } from "../model/columns";
+import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
 import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
 import { dateOnly, stamp } from "../model/dates";
 import {
@@ -483,13 +483,11 @@ export class VaultRepository implements CardRepository {
   async addSubcard(parentPath: string, title: string): Promise<string> {
     // Read the parent status from write-fresh text (metadataCache can lag a just-written status).
     const parentFm = parseFrontmatter(await this.app.vault.cachedRead(this.file(parentPath)));
-    // A `status:` that is not a plain string is corruption, not a column — fall back rather than
+    // Unquoted YAML turns `status: 2` into a number, and a column id may legitimately be one, so
+    // scalars are kept as text — but a mapping or a list is corruption, and coercing it would
     // create the subcard in a column named "[object Object]".
-    const parentStatus = parentFm["status"];
-    const childPath = await this.createCard(
-      title,
-      typeof parentStatus === "string" ? parentStatus : "todo",
-    );
+    const parentStatus = scalarText(parentFm["status"]);
+    const childPath = await this.createCard(title, parentStatus || "todo");
     const childBase = (childPath.split("/").pop() ?? "").replace(/\.md$/i, "");
     await this.editBody(parentPath, (t) => addSubcardText(t, childBase));
     return childPath;

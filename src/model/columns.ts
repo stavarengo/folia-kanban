@@ -59,8 +59,9 @@ function asSort(value: unknown): ColumnSort | undefined {
  * default seven columns. Never throws.
  */
 /** A YAML scalar as text. Mappings, lists, `null` and `undefined` come back as "" rather than
- *  as "[object Object]" or "null", so a malformed frontmatter value is rejected, not adopted. */
-function scalarText(value: unknown): string {
+ *  as "[object Object]" or "null", so a malformed frontmatter value is rejected, not adopted.
+ *  Unquoted YAML yields numbers and booleans for things people typed as text, so those are kept. */
+export function scalarText(value: unknown): string {
   const t = typeof value;
   return t === "string" || t === "number" || t === "boolean" ? String(value) : "";
 }

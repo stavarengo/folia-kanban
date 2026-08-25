@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import process from "node:process";
 import { ESLint } from "eslint";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import baseConfig, { a11yExceptions } from "../eslint.config.mjs";
 
 const root = process.cwd();
@@ -25,10 +26,50 @@ const root = process.cwd();
 // little room for a JSX `{/* … */}` wrapper).
 const COMMENT_LOOKBACK = 3;
 
+// Rules that are not call-site exceptions and so are not expected in `a11yExceptions`:
+// jsx-a11y's own recommended preset already ships them off (deprecated rules), plus one
+// plugin-wide decision. Keep the explicit half short and justified.
+const GLOBAL_POLICY = new Set([
+  // Autofocus is deliberate focus management for modals and inline edit — good a11y here.
+  "jsx-a11y/no-autofocus",
+  ...Object.entries(jsxA11y.flatConfigs.recommended.rules ?? {})
+    .filter(([, setting]) => setting === "off" || setting === 0)
+    .map(([rule]) => rule),
+]);
+
 // Every (file, rule) pair eslint.config.mjs deliberately switches off for a call-site exception.
 const exempt = a11yExceptions.flatMap((block) =>
   Object.keys(block.rules).flatMap((rule) => block.files.map((file) => ({ file, rule }))),
 );
+
+// A jsx-a11y rule switched off ANYWHERE else in the config would never be re-run below, so the
+// fence would not cover it. Refuse to run rather than pass on an exception it cannot see. Blocks
+// that came from `a11yExceptions` are recognised by identity, not by shape.
+const declared = new Set(a11yExceptions);
+const undeclared = baseConfig.flatMap((block) =>
+  declared.has(block)
+    ? []
+    : Object.entries(block.rules ?? {})
+        .filter(
+          ([rule, setting]) =>
+            rule.startsWith("jsx-a11y/") &&
+            (setting === "off" || setting === 0) &&
+            !GLOBAL_POLICY.has(rule),
+        )
+        .map(([rule]) => `${rule} for ${JSON.stringify(block.files ?? "(all files)")}`),
+);
+
+if (undeclared.length > 0) {
+  console.error("check-a11y-exceptions: FAILED");
+  for (const u of undeclared) {
+    console.error(`  eslint.config.mjs switches off ${u} outside the a11yExceptions array`);
+  }
+  console.error(
+    "\nMove it into `a11yExceptions` so this fence re-runs it, or — if it is plugin-wide policy" +
+      " rather than a call-site exception — add it to GLOBAL_POLICY here with the reason.",
+  );
+  process.exit(1);
+}
 
 if (exempt.length === 0) {
   console.log("check-a11y-exceptions: OK (eslint.config.mjs declares no jsx-a11y exception)");
@@ -70,17 +111,24 @@ const justified = [];
 for (const result of results) {
   const lines = sources.get(result.filePath) ?? [];
   const file = relative(root, result.filePath);
-  const used = new Set();
+  // comment line -> the single source line it justifies. One comment covers one element, however
+  // many rules that element trips; a second element must carry its own comment.
+  const used = new Map();
   for (const m of result.messages) {
     if (!m.ruleId || !rules.includes(m.ruleId)) continue;
     const at = justification(lines, m.line, m.ruleId);
+    const claimed = used.get(at);
     if (at === 0) {
       problems.push(
         `${file}:${m.line}:${m.column} ${m.ruleId} — no "a11y exception (${m.ruleId.replace("jsx-a11y/", "")}): …" comment above it`,
       );
+    } else if (claimed !== undefined && claimed !== m.line) {
+      problems.push(
+        `${file}:${m.line}:${m.column} ${m.ruleId} — the "a11y exception" comment on line ${at} already justifies line ${claimed}; give this element its own comment`,
+      );
     } else {
       justified.push(`${file}:${m.line} ${m.ruleId}`);
-      used.add(at);
+      used.set(at, m.line);
     }
   }
   // A justification whose element no longer violates anything is stale documentation.
