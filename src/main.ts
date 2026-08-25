@@ -356,8 +356,29 @@ class KanbanSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  /**
+   * The name typed but not committed yet. Committing per keystroke would save + re-render every
+   * open board nine times for "alexandra", and each intermediate value is a DIFFERENT reader as far
+   * as comment read-state is concerned — so a half-typed name reaching an open card's read marker
+   * would leave it recorded under someone who does not exist. It lands on blur, or when the tab
+   * closes, whichever comes first.
+   */
+  private pendingUserName: string | null = null;
+
   override display(): void {
     this.render();
+  }
+
+  override hide(): void {
+    this.commitUserName();
+    super.hide();
+  }
+
+  private commitUserName(): void {
+    const name = this.pendingUserName;
+    this.pendingUserName = null;
+    if (name !== null && name !== this.plugin.settings.userName)
+      void this.plugin.updateSettings({ userName: name });
   }
 
   private render(): void {
@@ -499,12 +520,14 @@ class KanbanSettingTab extends PluginSettingTab {
       .setDesc(
         "Signs the comments you write from the board (e.g. \u201calex\u201d \u2192 \u201c- _2026-08-21 11:49 @alex:_ \u2026\u201d), so your own comments never show as unread and a comment landing after one of yours reads as a reply. Leave empty to write comments unsigned.",
       )
-      .addText((t) =>
-        t
-          .setPlaceholder("Alex")
+      .addText((t) => {
+        t.setPlaceholder("Alex")
           .setValue(this.plugin.settings.userName)
-          .onChange((v) => void this.plugin.updateSettings({ userName: v.trim() })),
-      );
+          .onChange((v) => {
+            this.pendingUserName = v.trim();
+          });
+        t.inputEl.addEventListener("blur", () => this.commitUserName());
+      });
 
     new Setting(containerEl)
       .setName("History — what to record")

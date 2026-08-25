@@ -2458,6 +2458,42 @@ describe("unread comments", () => {
     expect(box.current.commentsSeen["Tasks/Older.md"]).toBe("2026-06-13 10:00#1");
   });
 
+  it("never hands a comment you just wrote back to you as unread — even with no name set", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    // No name set — the default. The comment is written unsigned, so nothing in the note says it
+    // is the reader's; only the panel knows, because the panel is what typed it.
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "on it{Enter}");
+    await within(detail).findByText("on it");
+    // The agent's line keeps the marker it opened with; the reader's own line gets none.
+    const flags = within(detail).getAllByText("new");
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.closest("li")).toHaveTextContent("take a look");
+  });
+
+  it("still calls it a reply when the answer lands inside the same minute as yours", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @rafa:_ thoughts?\n- _2026-06-13 09:00 @agent:_ yes\n",
+      },
+    });
+    render_(repo, asRafa);
+    const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    // Timestamps carry no seconds, so an agent answering straight away shares your minute.
+    expect(
+      within(alpha).getByTitle("2 comments, 1 unread comment, one a reply to yours"),
+    ).toBeInTheDocument();
+  });
+
   it("forgets a stale marker when the card's timestamped comments are gone", async () => {
     const user = userEvent.setup();
     const box = { current: asRafa };

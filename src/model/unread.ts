@@ -55,6 +55,13 @@ export function normalizeAuthor(raw: string): string {
   );
 }
 
+/**
+ * Stands in for the reader when they have set no name. It contains characters the line grammar
+ * cannot carry, so nothing parsed out of a note can ever collide with it — which is the point: it
+ * lets a caller say "this comment is the reader's own" about a line that carries no signature.
+ */
+export const SELF = "\u0000self";
+
 /** Case-insensitive "did I write this?", false whenever either side is unknown/unset. */
 export function isMine(author: string | null, userName: string): boolean {
   const me = normalizeAuthor(userName);
@@ -141,12 +148,14 @@ export function unreadComments(
   const indices = unreadIndices(comments, parseMarker(seen), userName);
   if (indices.length === 0) return NOTHING_UNREAD;
   // "After one of yours" is measured in time, like everything else here — not in line order, which
-  // an externally merged note can put out of sequence with the timestamps it carries.
+  // an externally merged note can put out of sequence with the timestamps it carries. The
+  // comparison includes your own minute: timestamps have no seconds, and an agent answering you
+  // straight away lands inside it, which is the case this cue exists for.
   const mineLatest = latestOfMine(comments, userName);
   const replyIndex =
     mineLatest === null
       ? null
-      : (indices.find((i) => sortKey(comments[i]?.timestamp ?? "") > mineLatest) ?? null);
+      : (indices.find((i) => sortKey(comments[i]?.timestamp ?? "") >= mineLatest) ?? null);
   return { kind: replyIndex === null ? "unread" : "reply", indices, replyIndex };
 }
 
