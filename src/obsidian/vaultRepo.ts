@@ -424,20 +424,32 @@ export class VaultRepository implements CardRepository {
   }
 
   async rememberPriorities(values: string[]): Promise<void> {
-    this.markWrite(this.boardPath);
-    await this.app.fileManager.processFrontMatter(
-      this.file(this.boardPath),
-      (fm: Record<string, unknown>) => {
-        // Merge against the note as it is INSIDE the write, not against a snapshot the caller
-        // read earlier: that is what makes a second edit landing mid-reload additive rather than
-        // a clobber. A board that learns nothing keeps its pre-feature shape — no `priorities:`
-        // key appears (the same byte-stability contract `serializeColumns` documents).
-        const merged = mergePriorities(normalizePriorities(fm["priorities"]), values);
-        if (merged === null) return;
-        const value = serializePriorities(merged);
-        if (value !== null) fm["priorities"] = value;
-      },
+    const boardFile = this.file(this.boardPath);
+    // Decide whether to write BEFORE opening the write. `processFrontMatter` re-serializes the
+    // whole frontmatter block whether or not the callback changes anything, so a callback that
+    // bails out still rewrites the note — it reflows other properties (it drops the quotes from
+    // `filter: "priority:a"`, for one). Setting a priority the board already knows is the common
+    // case, so that would churn the board note on nearly every priority edit.
+    const current = normalizePriorities(
+      decode(
+        BoardFrontmatterSchema,
+        parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
+        `board config (${this.boardPath})`,
+      )["priorities"],
     );
+    if (mergePriorities(current, values) === null) return;
+
+    this.markWrite(this.boardPath);
+    await this.app.fileManager.processFrontMatter(boardFile, (fm: Record<string, unknown>) => {
+      // Merge again, now against the note as it is INSIDE the write rather than the snapshot read
+      // above: that is what makes a second edit landing mid-reload additive rather than a clobber.
+      const merged = mergePriorities(normalizePriorities(fm["priorities"]), values);
+      if (merged === null) return;
+      const value = serializePriorities(merged);
+      // A board that learns nothing never gains a `priorities:` key (the same byte-stability
+      // contract `serializeColumns` documents).
+      if (value !== null) fm["priorities"] = value;
+    });
   }
 
   async deleteCard(path: string): Promise<void> {
