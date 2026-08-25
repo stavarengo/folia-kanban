@@ -63,8 +63,12 @@ export interface BoardActions {
   remove(path: string): void;
   /** Open the underlying note in an Obsidian tab. */
   openNote(path: string): void;
-  /** Set a card's priority frontmatter (empty string clears it). */
-  setPriority(path: string, value: string): void;
+  /**
+   * Set a card's priority frontmatter (empty string clears it) and let the board note learn the
+   * value. Resolves once the board has reloaded, so a caller with its own view to refresh (the
+   * detail panel's body) can await it instead of racing the write.
+   */
+  setPriority(path: string, value: string): Promise<void>;
   /**
    * Rename a card in place (#12): writes the title back to its source — the `.md` file name
    * (link-aware so inbound wikilinks follow), the heading line, or the `title` frontmatter key.
@@ -81,6 +85,12 @@ export interface BoardActions {
   removeTodo(path: string, index: number): void;
   /** Id of the column treated as "done", or null if the board has none. */
   doneColumnId: string | null;
+  /**
+   * The priority values this board offers, most pressing first: what its note remembers plus what
+   * its cards use, or the todo.txt `A`/`B`/`C` starting set when it knows none yet. The pickers
+   * suggest these and `sort: priority` uses the order to break ties between equal severities.
+   */
+  priorities: string[];
 
   /** Column management (persists to the board note frontmatter). */
   renameColumn(id: string, title: string): void;

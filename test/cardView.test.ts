@@ -12,6 +12,8 @@ import {
   groupAndSortCards,
   hasToken,
   toggleToken,
+  boardPriorities,
+  priorityOptions,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
 import type { Card } from "../src/model/types";
@@ -247,6 +249,54 @@ describe("matchCard", () => {
   });
 });
 
+describe("boardPriorities (the board's own vocabulary)", () => {
+  it("falls back to the todo.txt A/B/C set only when the board knows nothing", () => {
+    expect(boardPriorities([], [])).toEqual(["A", "B", "C"]);
+    expect(boardPriorities([], [card({ priority: "a" })])).toEqual(["a"]);
+  });
+
+  it("learns the values the cards use, strongest severity first then alphabetically", () => {
+    const cards = [
+      card({ priority: "low" }, "1"),
+      card({ priority: "urgent" }, "2"),
+      card({ priority: "medium" }, "3"),
+      card({ priority: "high" }, "4"),
+    ];
+    expect(boardPriorities([], cards)).toEqual(["high", "urgent", "medium", "low"]);
+  });
+
+  it("keeps the remembered order first and appends only what is genuinely new", () => {
+    const cards = [card({ priority: "c" }, "1"), card({ priority: "zzz" }, "2")];
+    expect(boardPriorities(["c", "b", "a"], cards)).toEqual(["c", "b", "a", "zzz"]);
+  });
+
+  it("treats a value as one value regardless of case, keeping the first spelling", () => {
+    expect(boardPriorities(["A"], [card({ priority: "a" }), card({ priority: "B" })])).toEqual([
+      "A",
+      "B",
+    ]);
+  });
+
+  it("ignores blank and whitespace-only priorities", () => {
+    expect(boardPriorities([], [card({ priority: "" }), card({ priority: "   " })])).toEqual([
+      "A",
+      "B",
+      "C",
+    ]);
+  });
+});
+
+describe("priorityOptions", () => {
+  it("offers the vocabulary as-is when it already holds the current value", () => {
+    expect(priorityOptions(["a", "b"], "b")).toEqual(["a", "b"]);
+    expect(priorityOptions(["a", "b"], "")).toEqual(["a", "b"]);
+  });
+
+  it("prepends a current value the vocabulary does not hold, so the control never lies", () => {
+    expect(priorityOptions(["a", "b"], "zzz")).toEqual(["zzz", "a", "b"]);
+  });
+});
+
 describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
   const today = "2026-06-16";
   const done = "done";
@@ -282,6 +332,40 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     });
     if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["Urg", "Med", "Low1", "Low2", "None"]);
+  });
+
+  it("sort: priority breaks a severity tie by the board's own vocabulary order", () => {
+    // All three are unknown words, so they share the `muted` tone and used to collapse into one
+    // tie that fell back to board order. The board's vocabulary now decides.
+    const cards = [
+      card({ priority: "whenever" }, "W"),
+      card({ priority: "blocker" }, "B"),
+      card({ priority: "someday" }, "N"),
+    ];
+    const out = groupAndSortCards(cards, {
+      group: "none",
+      sort: "priority",
+      today,
+      doneColumnId: done,
+      priorities: ["blocker", "someday", "whenever"],
+    });
+    if (!out[0]) throw new Error("expected group at index 0");
+    expect(names(out[0])).toEqual(["B", "N", "W"]);
+  });
+
+  it("sort: priority keeps severity above the vocabulary order", () => {
+    // `urgent` sits last in the vocabulary but is a stronger tone than `C`, so it still leads —
+    // a board that sorted correctly before this vocabulary existed still does.
+    const cards = [card({ priority: "C" }, "C"), card({ priority: "urgent" }, "U")];
+    const out = groupAndSortCards(cards, {
+      group: "none",
+      sort: "priority",
+      today,
+      doneColumnId: done,
+      priorities: ["A", "B", "C", "urgent"],
+    });
+    if (!out[0]) throw new Error("expected group at index 0");
+    expect(names(out[0])).toEqual(["U", "C"]);
   });
 
   it("sort: due orders most-pressing-first; no-due cards rank as future", () => {

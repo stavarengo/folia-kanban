@@ -31,6 +31,7 @@ import {
 } from "../src/model/card";
 
 import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
+import { serializePriorities } from "../src/model/priorities";
 import {
   commentAddedLine,
   commentEditedLine,
@@ -243,6 +244,10 @@ export class FakeRepo implements CardRepository {
 
   async setColumns(columns: ColumnDef[]): Promise<void> {
     this.config = { ...this.config, columns };
+  }
+
+  async setPriorities(priorities: string[]): Promise<void> {
+    this.config = { ...this.config, priorities: serializePriorities(priorities) ?? [] };
   }
 
   async deleteCard(path: string): Promise<void> {

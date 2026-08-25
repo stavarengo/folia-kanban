@@ -233,6 +233,7 @@ export function Column({
       sort: column.sort ?? "manual",
       today,
       doneColumnId,
+      priorities: actions.priorities,
     },
   );
 

@@ -38,7 +38,8 @@ const optionalConfigString = z.preprocess(
 
 /**
  * The board definition note's config frontmatter. `card-folder` + `columns` drive the board;
- * `card-title` picks where card titles come from (validated by `asTitleMode`, unknown = `auto`).
+ * `card-title` picks where card titles come from (validated by `asTitleMode`, unknown = `auto`);
+ * `priorities` remembers the board's own priority vocabulary (validated by `normalizePriorities`).
  */
 export const BoardFrontmatterSchema = z.looseObject({
   "card-folder": optionalConfigString,
@@ -46,6 +47,7 @@ export const BoardFrontmatterSchema = z.looseObject({
   "card-title": optionalConfigString,
   card_title: optionalConfigString,
   columns: z.unknown().optional(),
+  priorities: z.unknown().optional(),
 });
 
 /** A context's `_context.md` frontmatter (#14). All display-only and optional. */

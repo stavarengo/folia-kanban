@@ -153,7 +153,7 @@ export function CardContextMenu({
           <div className="folia-menu-divider" />
           <span className="folia-menu-label">Priority</span>
           <div className="folia-menu-priorities" role="group" aria-label="Change priority">
-            {priorityOptions(priority).map((p) => (
+            {priorityOptions(a.priorities, priority).map((p) => (
               <button
                 key={p}
                 className={
@@ -165,7 +165,7 @@ export function CardContextMenu({
                 aria-checked={p === priority}
                 onClick={() => {
                   actioned.current = true;
-                  a.setPriority(path, p);
+                  void a.setPriority(path, p);
                   onClose();
                 }}
               >
@@ -182,7 +182,7 @@ export function CardContextMenu({
               title="No priority"
               onClick={() => {
                 actioned.current = true;
-                a.setPriority(path, "");
+                void a.setPriority(path, "");
                 onClose();
               }}
             >

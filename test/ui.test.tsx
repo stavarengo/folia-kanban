@@ -11,6 +11,7 @@ const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
   titleMode: "auto",
+  priorities: [],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },
@@ -131,6 +132,40 @@ describe("missing card folder (#20260821.07)", () => {
     render_(repo);
     expect(await screen.findByText(/Couldn.t load the board/)).toBeInTheDocument();
     expect(screen.queryByText("Todo")).not.toBeInTheDocument();
+  });
+});
+
+describe("card detail — priority", () => {
+  const openPriority = async (repo = makeRepo()) => {
+    const user = userEvent.setup();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    return { repo, user, field: within(detail).getByLabelText("Priority") as HTMLInputElement };
+  };
+
+  it("suggests the board's own values rather than a predefined word scale", async () => {
+    const { field } = await openPriority();
+    expect(field).toHaveValue("A");
+    const list = field.ownerDocument.getElementById(field.getAttribute("list")!);
+    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.value)).toEqual(["A"]);
+  });
+
+  it("accepts a value the board has never seen and remembers it on the board note", async () => {
+    const { repo, user, field } = await openPriority();
+    await user.clear(field);
+    await user.type(field, "blocker{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.priority).toBe("blocker"));
+    // `A` is remembered too: it was the board's only known value until this edit replaced it.
+    await waitFor(() => expect(repo.config.priorities).toEqual(["A", "blocker"]));
+  });
+
+  it("clearing the field removes the priority key and remembers nothing new", async () => {
+    const { repo, user, field } = await openPriority();
+    await user.clear(field);
+    await user.tab();
+    await waitFor(() => expect("priority" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+    expect(repo.config.priorities).toEqual([]);
   });
 });
 
@@ -830,7 +865,10 @@ describe("card context menu", () => {
         fm: { type: "task", status: "todo", order: 1, priority: "low" },
         body: "\n# First\n\n## Subtasks\n- [x] done one\n- [ ] real one\n- [ ] real two\n",
       },
-      "Tasks/Second.md": { fm: { type: "task", status: "todo", order: 2 }, body: "\n# Second\n" },
+      "Tasks/Second.md": {
+        fm: { type: "task", status: "todo", order: 2, priority: "urgent" },
+        body: "\n# Second\n",
+      },
     });
 
   const openCardMenu = async (cardName: string, repo = ctxRepo()) => {
@@ -877,8 +915,28 @@ describe("card context menu", () => {
   it("Change priority sets the chosen priority via the repo", async () => {
     const { repo, menu } = await openCardMenu("First");
     const user = userEvent.setup();
-    await user.click(within(menu).getByRole("menuitemradio", { name: "high" }));
-    await waitFor(() => expect(repo.files.get("Tasks/First.md")!.fm.priority).toBe("high"));
+    await user.click(within(menu).getByRole("menuitemradio", { name: "urgent" }));
+    await waitFor(() => expect(repo.files.get("Tasks/First.md")!.fm.priority).toBe("urgent"));
+  });
+
+  it("offers the board's own priority values, not a predefined scale", async () => {
+    const { menu } = await openCardMenu("First");
+    const group = within(menu).getByRole("group", { name: "Change priority" });
+    // The two values the board's cards actually use, strongest first — and nothing the plugin
+    // invented: `high`/`medium` are not on this board, so they are not suggested.
+    expect(
+      within(group)
+        .getAllByRole("menuitemradio")
+        .map((b) => b.textContent),
+    ).toEqual(["urgent", "low", ""]);
+  });
+
+  it("remembers a chosen priority in the board note so it outlives its last card", async () => {
+    const { repo, menu } = await openCardMenu("First");
+    const user = userEvent.setup();
+    await user.click(within(menu).getByRole("menuitemradio", { name: "urgent" }));
+    // Every value the board knows is written, including `low`, which only a card carried until now.
+    await waitFor(() => expect(repo.config.priorities).toEqual(["urgent", "low"]));
   });
 
   it("Add subcard opens the card detail with its subcard input focused and adds the subcard", async () => {

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -80,6 +81,58 @@ function PropRow({
         <Icon name="close" size={13} />
       </button>
     </div>
+  );
+}
+
+/**
+ * The PRIORITY field: a free-text combobox over whatever priority values the board itself uses.
+ *
+ * `list` + `<datalist>` is what keeps the vocabulary a set of SUGGESTIONS rather than a closed
+ * menu — a value the board has never seen can simply be typed, which is the only way a board's
+ * vocabulary ever grows. Commits on blur/Enter (and never per keystroke) so a half-typed value
+ * never reaches the note, matching how the custom-property rows behave. Emptying the field clears
+ * the priority.
+ */
+function PriorityField({
+  value,
+  options,
+  onCommit,
+}: {
+  value: string;
+  options: string[];
+  onCommit: (v: string) => void;
+}) {
+  const listId = useId();
+  const [draft, setDraft] = useState(value);
+  // Resync when the persisted value changes (e.g. after reload) and no edit is mid-flight.
+  useEffect(() => setDraft(value), [value]);
+  const commit = () => {
+    const next = draft.trim();
+    if (next !== draft) setDraft(next);
+    if (next !== value) onCommit(next);
+  };
+  return (
+    <label>
+      Priority
+      <input
+        list={listId}
+        value={draft}
+        placeholder="—"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      <datalist id={listId}>
+        {options.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+    </label>
   );
 }
 
@@ -561,26 +614,16 @@ export function CardDetail({
               ))}
             </select>
           </label>
-          <label>
-            Priority
-            <select
-              value={curPriority}
-              onChange={(e) =>
-                void mutate(() =>
-                  e.target.value === ""
-                    ? repo.unsetFrontmatterKey(path, "priority")
-                    : repo.setFrontmatter(path, { priority: e.target.value }),
-                )
-              }
-            >
-              <option value="">—</option>
-              {priorityOptions(curPriority).map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
+          <PriorityField
+            value={curPriority}
+            options={priorityOptions(actions.priorities, curPriority)}
+            onCommit={(value) =>
+              void (async () => {
+                await actions.setPriority(path, value);
+                await reload();
+              })()
+            }
+          />
           <label>
             Due
             <input

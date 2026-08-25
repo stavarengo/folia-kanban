@@ -13,6 +13,7 @@ import type {
 import type { CardMutation } from "../model/board";
 import { buildBoard, resolveCardFolder } from "../model/board";
 import { normalizeColumns, serializeColumns } from "../model/columns";
+import { normalizePriorities, serializePriorities } from "../model/priorities";
 import { dateOnly, stamp } from "../model/dates";
 import {
   SECTION,
@@ -163,6 +164,7 @@ export class VaultRepository implements CardRepository {
     return {
       path: this.boardPath,
       columns: normalizeColumns(fm["columns"]),
+      priorities: normalizePriorities(fm["priorities"]),
       cardFolder,
       cardFolderRaw,
       titleMode,
@@ -417,6 +419,20 @@ export class VaultRepository implements CardRepository {
       this.file(this.boardPath),
       (fm: Record<string, unknown>) => {
         fm["columns"] = serializeColumns(columns);
+      },
+    );
+  }
+
+  async setPriorities(priorities: string[]): Promise<void> {
+    this.markWrite(this.boardPath);
+    await this.app.fileManager.processFrontMatter(
+      this.file(this.boardPath),
+      (fm: Record<string, unknown>) => {
+        const value = serializePriorities(priorities);
+        // Deleting rather than writing `priorities: []` keeps a board that has learned nothing
+        // byte-identical to its pre-feature shape (same contract `serializeColumns` documents).
+        if (value === null) delete fm["priorities"];
+        else fm["priorities"] = value;
       },
     );
   }

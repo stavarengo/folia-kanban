@@ -21,6 +21,7 @@ const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
   titleMode: "auto",
+  priorities: [],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },

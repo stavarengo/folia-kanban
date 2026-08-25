@@ -1,6 +1,7 @@
 // Pure helpers that turn a card's data into the little chips shown on its board card.
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D) or a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones.
+import { DEFAULT_PRIORITIES, dedupePriorities, priorityIndex } from "../model/priorities";
 import type { Card, ColumnGroup, ColumnSort } from "../model/types";
 import type { IconName } from "./icons";
 
@@ -49,15 +50,46 @@ export function priorityTone(value: string): ChipTone {
   return PRIORITY_TONE[value.trim().toLowerCase()] ?? "muted";
 }
 
-const PRIORITY_WORD_SCALE = ["urgent", "high", "medium", "low"];
-const PRIORITY_LETTER_SCALE = ["A", "B", "C", "D"];
+/**
+ * The priority vocabulary a board actually offers: what its note remembers, followed by whatever
+ * its cards use right now and it has not remembered yet.
+ *
+ * The remembered values come first and keep the board note's order, because that order is the
+ * user's to edit and it is what breaks ties when a column sorts by priority. Newly discovered
+ * values are appended in a deterministic order — strongest severity first (so a word scale reads
+ * urgent → high → medium → low rather than alphabetically), then alphabetically among equals — so
+ * a board that has never been through the UI still suggests its own scheme in a sensible order.
+ *
+ * A board with neither remembered nor in-use values falls back to the todo.txt convention
+ * (`A`/`B`/`C`); it never falls back to a word scale, which would nudge the user toward a
+ * vocabulary the plugin invented for them.
+ */
+export function boardPriorities(remembered: readonly string[], cards: Card[]): string[] {
+  const inUse: string[] = [];
+  for (const card of cards) {
+    const p = card.frontmatter.priority;
+    if (typeof p === "string" && p.trim()) inUse.push(p.trim());
+  }
+  inUse.sort(
+    (a, b) =>
+      PRIORITY_RANK[priorityTone(a)] - PRIORITY_RANK[priorityTone(b)] ||
+      a.localeCompare(b, undefined, { sensitivity: "base" }) ||
+      a.localeCompare(b),
+  );
+  const out = dedupePriorities([...remembered, ...inUse]);
+  return out.length ? out : [...DEFAULT_PRIORITIES];
+}
 
-/** Priority options that always include the card's current value (keeps arbitrary scales working). */
-export function priorityOptions(current: string): string[] {
-  const base = PRIORITY_LETTER_SCALE.includes(current)
-    ? PRIORITY_LETTER_SCALE
-    : PRIORITY_WORD_SCALE;
-  return current && !base.includes(current) ? [current, ...base] : base;
+/**
+ * The options a priority picker shows: the board's vocabulary, plus the card's current value when
+ * that value somehow is not in it (a card being edited while the board reloads), so the control
+ * never silently reads as a different priority than the note holds.
+ */
+export function priorityOptions(vocabulary: readonly string[], current: string): string[] {
+  const value = current.trim();
+  return value && priorityIndex(vocabulary, value) === -1
+    ? [value, ...vocabulary]
+    : [...vocabulary];
 }
 
 /** Whole-day difference (target − today), both as YYYY-MM-DD. */
@@ -413,9 +445,27 @@ const DUE_GROUP_LABEL: Record<DueUrgency | "none", string> = {
   done: "Done",
 };
 
-function priorityRank(card: Card): number {
+/**
+ * Sort key for `sort: priority`, most pressing first. Two levels:
+ *
+ * 1. The severity tone, exactly as before — so every board that sorts correctly today still does,
+ *    and a hand-added `urgent` still outranks a `C` even on a board whose vocabulary lists `C`.
+ * 2. The value's position in the board's own vocabulary, which only breaks ties. This is what
+ *    makes a fully custom scheme sort sensibly: `blocker`/`normal`/`whenever` all share the
+ *    `muted` tone and used to collapse into one tie, and now order the way the board note lists
+ *    them — an order the user can rearrange by editing that list.
+ *
+ * A value the vocabulary does not hold sorts after the ones it does, within its own tone.
+ */
+function priorityKey(card: Card, vocabulary: readonly string[]): { tone: number; index: number } {
   const p = card.frontmatter.priority;
-  return typeof p === "string" && p ? PRIORITY_RANK[priorityTone(p)] : PRIORITY_RANK.muted;
+  const value = typeof p === "string" ? p.trim() : "";
+  if (!value) return { tone: PRIORITY_RANK.muted, index: vocabulary.length };
+  const index = priorityIndex(vocabulary, value);
+  return {
+    tone: PRIORITY_RANK[priorityTone(value)],
+    index: index === -1 ? vocabulary.length : index,
+  };
 }
 
 /**
@@ -428,20 +478,27 @@ function dueRank(card: Card, today: string, doneColumnId: string | null): number
   return DUE_BUCKET_RANK[b === "none" ? "future" : b];
 }
 
-function sortCards(
-  cards: Card[],
-  sort: ColumnSort,
-  today: string,
-  doneColumnId: string | null,
-): Card[] {
+interface SortContext {
+  sort: ColumnSort;
+  today: string;
+  doneColumnId: string | null;
+  priorities: readonly string[];
+}
+
+function sortCards(cards: Card[], ctx: SortContext): Card[] {
+  const { sort, today, doneColumnId, priorities } = ctx;
   if (sort === "manual") return cards;
   const ranked = cards.map((card, i) => ({ card, i }));
   ranked.sort((a, b) => {
     // priority: low rank first (prio-1 strongest). due: high rank first (overdue most pressing).
-    const d =
-      sort === "priority"
-        ? priorityRank(a.card) - priorityRank(b.card)
-        : dueRank(b.card, today, doneColumnId) - dueRank(a.card, today, doneColumnId);
+    let d: number;
+    if (sort === "priority") {
+      const ka = priorityKey(a.card, priorities);
+      const kb = priorityKey(b.card, priorities);
+      d = ka.tone - kb.tone || ka.index - kb.index;
+    } else {
+      d = dueRank(b.card, today, doneColumnId) - dueRank(a.card, today, doneColumnId);
+    }
     return d !== 0 ? d : a.i - b.i; // stable: equal keys keep their incoming (board) order
   });
   return ranked.map((r) => r.card);
@@ -456,11 +513,19 @@ function sortCards(
  */
 export function groupAndSortCards(
   cards: Card[],
-  opts: { group: ColumnGroup; sort: ColumnSort; today: string; doneColumnId: string | null },
+  opts: {
+    group: ColumnGroup;
+    sort: ColumnSort;
+    today: string;
+    doneColumnId: string | null;
+    /** The board's priority vocabulary; only breaks ties under `sort: "priority"`. */
+    priorities?: readonly string[];
+  },
 ): CardGroup[] {
-  const { group, sort, today, doneColumnId } = opts;
+  const { group, sort, today, doneColumnId, priorities = [] } = opts;
+  const ctx: SortContext = { sort, today, doneColumnId, priorities };
   if (group !== "due") {
-    return [{ key: "", label: "", cards: sortCards(cards, sort, today, doneColumnId) }];
+    return [{ key: "", label: "", cards: sortCards(cards, ctx) }];
   }
   const buckets = new Map<DueUrgency | "none", Card[]>();
   for (const c of cards) {
@@ -479,7 +544,7 @@ export function groupAndSortCards(
       out.push({
         key: b,
         label: DUE_GROUP_LABEL[b],
-        cards: sortCards(inBucket, sort, today, doneColumnId),
+        cards: sortCards(inBucket, ctx),
       });
     }
   }

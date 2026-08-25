@@ -56,6 +56,12 @@ export interface CardRepository {
   /** Persist column definitions to the board note frontmatter. */
   setColumns(columns: ColumnDef[]): Promise<void>;
 
+  /**
+   * Persist the board's priority vocabulary to the board note frontmatter, so a value survives the
+   * last card that used it. An empty list removes the key rather than writing an empty one.
+   */
+  setPriorities(priorities: string[]): Promise<void>;
+
   /** Open a card note in the workspace. */
   openCard(path: string): Promise<void>;
 

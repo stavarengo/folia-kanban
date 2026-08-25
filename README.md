@@ -62,7 +62,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
 - **Quick actions on every card** — mark done, open the note, or delete (with confirm) straight from the board, or right-click for the full context menu (change priority, move up/down, add subcard, and more).
 - **Next actions on the card** — optionally surface the next *N* unchecked todos inline, so the board shows the next step without opening anything.
-- **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority accepts any scale (`A`/`B`/`C`/`D` or `urgent`/`high`/`medium`/`low`).
+- **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority is a free-text combobox that suggests [your board's own scale](#priorities-are-your-scale-not-ours), never one the plugin picked for you.
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
 - **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.
@@ -83,6 +83,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
    folia-board: true
    card-folder: Cards      # folder holding the card notes (or ./Cards, beside this note)
    card-title: auto        # where card titles come from: auto (default) | filename | heading
+   priorities: [A, B, C]   # optional — the board's own priority vocabulary; it learns as you go
    columns:
      - todo
      - doing
@@ -101,7 +102,26 @@ column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add
 plugin reads and writes that frontmatter list either way. A column entry may be a plain string
 (`- todo`) or an object (`{ id, title, color, limit }`).
 
-### Where card titles come from
+### Priorities are your scale, not ours
+
+A card's `priority` is any word you like. The board never imposes a vocabulary: the priority field and the right-click priority chips suggest **the values your own board uses** — what its cards carry right now, plus everything the board note remembers. Type something new and it becomes part of that vocabulary; there is no fixed list to fight.
+
+A board that has never seen a priority starts from the [todo.txt](https://github.com/todotxt/todo.txt) convention — `A`, `B`, `C` — purely as a first suggestion. Nothing stops you from typing `urgent`, `p1` or `blocker` instead, and once you do, that is what the board suggests from then on.
+
+Whenever you set a priority from the board, the board note learns it:
+
+```yaml
+priorities:
+  - A
+  - B
+  - blocker
+```
+
+That list is why a value **outlives the last card that used it**: delete every `blocker` card and `blocker` is still offered tomorrow. It is a plain property — reorder it, prune it, or write it yourself.
+
+Its order matters in one place. A column with `sort: priority` orders cards by severity first (the built-in colour ramp, where `A`/`urgent`/`p1` are strongest and `D`/`trivial` weakest) and falls back to this list to break ties — so a scale the ramp knows nothing about (`blocker`, `someday`, `whenever`) sorts the way you listed it instead of collapsing into one undifferentiated heap.
+
+## Where card titles come from
 
 Plenty of people name card files as numbered slugs — `01-fix-the-export-path.md` — because the number carries the order and the slug keeps the folder readable. That slug is not what the card is *called*; the note's own first heading usually is. So the board decides per card, and the board note's `card-title` property sets the policy:
 

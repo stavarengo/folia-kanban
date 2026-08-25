@@ -1,6 +1,12 @@
 ---
 folia-board: true
 card-folder: feature-showcase/Cards
+priorities:
+  - A
+  - B
+  - C
+  - D
+  - someday
 columns:
   - todo
   - id: next

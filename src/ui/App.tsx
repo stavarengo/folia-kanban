@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
 import { columnOf, moveCard, moveColumn, resolveDrop } from "../model/board";
 import { dateOnly } from "../model/dates";
+import { DEFAULT_PRIORITIES, dedupePriorities } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
 import type { KanbanSettings } from "../settings";
 import {
@@ -17,7 +18,7 @@ import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
-import { matchCard, parseFilter } from "./cardView";
+import { boardPriorities, matchCard, parseFilter } from "./cardView";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
 
@@ -210,6 +211,54 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     [repo, load],
   );
 
+  // What the board actually knows: its remembered vocabulary plus the values its cards carry.
+  // Empty for a board that has never seen a priority — the pickers substitute the todo.txt
+  // starting set below, but nothing empty is ever written back to the note.
+  const vocabulary = useMemo(
+    () => (board ? boardPriorities(board.config.priorities, Object.values(board.cards)) : []),
+    [board],
+  );
+  const priorities = useMemo(
+    () => (vocabulary.length ? vocabulary : [...DEFAULT_PRIORITIES]),
+    [vocabulary],
+  );
+
+  /**
+   * Set a card's priority and let the board note learn from it.
+   *
+   * The note is only ever written when the user sets a priority — never while loading — and the
+   * list written is everything the board knows at that moment, so a value hand-written into a card
+   * gets remembered too and outlives that card. Clearing a priority learns nothing: it is a
+   * removal, and the point of remembering is that the vocabulary survives its last card.
+   */
+  const setPriorityAndReload = useCallback(
+    async (path: string, value: string) => {
+      // Read the vocabulary BEFORE the write. Afterwards the card no longer carries the value it
+      // is replacing, so learning from the post-write board would drop the outgoing value — the
+      // very thing remembering is supposed to prevent.
+      const b = boardRef.current;
+      const remembered = b?.config.priorities ?? [];
+      const merged =
+        b && value !== ""
+          ? dedupePriorities([...boardPriorities(remembered, Object.values(b.cards)), value])
+          : remembered;
+      try {
+        // Empty value clears the key cleanly (removes the `priority:` line) per the contract,
+        // instead of writing a stray empty `priority:` and a misleading `Priority → ` history line.
+        if (value === "") await repo.unsetFrontmatterKey(path, "priority");
+        else await repo.setFrontmatter(path, { priority: value });
+        const unchanged =
+          merged.length === remembered.length && merged.every((p, i) => p === remembered[i]);
+        if (!unchanged) await repo.setPriorities(merged);
+      } catch (e) {
+        reportError(e);
+      } finally {
+        await load();
+      }
+    },
+    [repo, load, reportError],
+  );
+
   // Opening a real card resets every add-card flow field so a stale create form can't resurface
   // when the panel later flips to create mode (e.g. the opened card is deleted out from under it).
   // Invariant: createColumn is null whenever a real card is selected.
@@ -255,20 +304,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       openNote: (path) => void repo.openCard(path),
-      setPriority: (path, value) => {
-        void (async () => {
-          try {
-            // Empty value clears the key cleanly (removes the `priority:` line) per the contract,
-            // instead of writing a stray empty `priority:` and a misleading `Priority → ` history line.
-            if (value === "") await repo.unsetFrontmatterKey(path, "priority");
-            else await repo.setFrontmatter(path, { priority: value });
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
-      },
+      setPriority: (path, value) => setPriorityAndReload(path, value),
       renameCard: (path, title) => {
         const t = title.trim();
         if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
@@ -340,6 +376,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       doneColumnId,
+      priorities,
       renameColumn: (id, title) => {
         const b = boardRef.current;
         const t = title.trim();
@@ -449,9 +486,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       openCard,
       moveTo,
       doneColumnId,
+      priorities,
       repo,
       load,
       setColumnsAndReload,
+      setPriorityAndReload,
       showToast,
       reportError,
       settings.addCardOpenMode,
