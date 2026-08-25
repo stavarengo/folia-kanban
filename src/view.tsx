@@ -61,10 +61,25 @@ export class KanbanView extends FileView {
 
   override async onLoadFile(file: TFile): Promise<void> {
     await super.onLoadFile(file);
-    if (this.repoPath !== file.path) {
-      this.repo = null; // rebuild the repo for the new board
-      this.repoPath = file.path;
-    }
+    this.rebindTo(file.path);
+    this.renderApp();
+  }
+
+  /** Drop the repository when the board it was built for is no longer the board we are showing. */
+  private rebindTo(path: string): void {
+    if (this.repoPath === path) return;
+    this.repo = null;
+    this.repoPath = path;
+  }
+
+  /**
+   * A rename moves the file without reloading it, so `onLoadFile` never runs. The repository is
+   * built around a path string, so without this it would keep reading and writing the board note
+   * at its old location — and resolving `card-folder` against the folder the note just left.
+   */
+  override async onRename(file: TFile): Promise<void> {
+    await super.onRename(file);
+    this.rebindTo(file.path);
     this.renderApp();
   }
 
