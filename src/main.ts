@@ -15,8 +15,10 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
+  hydrateSettings,
   type KanbanSettings,
 } from "./settings";
+import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
 /** Marks the header button this plugin adds to a board note's Markdown editor. */
@@ -295,7 +297,11 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const loaded: unknown = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+    const { settings, stampedBaseline } = hydrateSettings(loaded, stamp());
+    this.settings = settings;
+    // Persisted right away: the baseline is "when tracking started", and it must not drift to a
+    // later launch if nothing else happens to save the settings before then.
+    if (stampedBaseline) await this.saveSettings();
   }
 
   async saveSettings(): Promise<void> {

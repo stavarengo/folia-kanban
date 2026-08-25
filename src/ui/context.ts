@@ -4,7 +4,7 @@ import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
-import type { KanbanSettings } from "../settings";
+import { seenMarkerFor, type KanbanSettings } from "../settings";
 
 /**
  * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
@@ -100,15 +100,15 @@ export function useSubitemsCollapse(): SubitemsCollapse {
 
 /**
  * Unread-comment state for one card, read live from settings. A card that was never opened has no
- * `commentsSeen` entry, so every comment on it counts as unread — the honest default: nothing was
- * silently marked read on your behalf, and one visit to a card clears it.
+ * `commentsSeen` entry and is judged against the install-time baseline instead, so only what
+ * arrived after tracking started counts as unread — and one visit to the card clears it.
  */
 export function useUnreadComments(
   path: string,
   marks: readonly CommentMark[] | undefined,
 ): UnreadState {
   const settings = useSettings();
-  const seen = settings.commentsSeen[path];
+  const seen = seenMarkerFor(settings, path);
   const userName = settings.userName;
   return useMemo(() => unreadComments(marks ?? [], seen, userName), [marks, seen, userName]);
 }

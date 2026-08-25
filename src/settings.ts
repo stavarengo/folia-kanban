@@ -36,10 +36,19 @@ export interface KanbanSettings {
    * Read-state for comments, keyed by card path: the marker `seenMarker` builds for the newest
    * comment already seen on that card. Written when its detail panel is open. Never in the note —
    * "Rafa has read this" is personal to one install, not a fact the vault should carry to everyone
-   * who has the file. A card missing from this map has never been opened, so all of its comments
-   * count as unread.
+   * who has the file. A card missing from this map has never been opened on this install, so it
+   * falls back to `commentsBaseline`.
    */
   commentsSeen: Record<string, string>;
+  /**
+   * The moment unread tracking started on this install, as a `stamp()` timestamp, set once by
+   * `hydrateSettings` when the stored data has none (first run after installing or upgrading) and
+   * never changed after that. It stands in for the marker of every card without a `commentsSeen`
+   * entry: comments written up to that minute count as already read, later ones as unread. Without
+   * it, the first board opened after an upgrade would light up every card that has ever been
+   * commented on. Empty only in `DEFAULT_SETTINGS`, where it means "no baseline, everything counts".
+   */
+  commentsBaseline: string;
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
@@ -56,7 +65,30 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   collapsedCards: {},
   userName: "",
   commentsSeen: {},
+  commentsBaseline: "",
 };
+
+/**
+ * Settings as loaded from plugin data: defaults filled in, and the comments baseline stamped with
+ * `now` when the stored data carries none. `stampedBaseline` tells the caller to persist that.
+ */
+export function hydrateSettings(
+  loaded: unknown,
+  now: string,
+): { settings: KanbanSettings; stampedBaseline: boolean } {
+  const settings: KanbanSettings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+  if (settings.commentsBaseline) return { settings, stampedBaseline: false };
+  return { settings: { ...settings, commentsBaseline: now }, stampedBaseline: true };
+}
+
+/**
+ * The seen-marker to judge a card's comments against: its own entry when it has been opened here,
+ * otherwise the install-time baseline. `undefined` only when neither exists, which makes every
+ * comment unread.
+ */
+export function seenMarkerFor(settings: KanbanSettings, path: string): string | undefined {
+  return settings.commentsSeen[path] ?? (settings.commentsBaseline || undefined);
+}
 
 export const DETAIL_WIDTH_MIN = 280;
 export const DETAIL_WIDTH_MAX = 720;

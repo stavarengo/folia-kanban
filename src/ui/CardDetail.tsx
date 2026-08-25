@@ -13,7 +13,7 @@ import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/type
 import { syncSubtaskClaim } from "../model/board";
 import { RELATION_KEYS } from "../model/relationships";
 import { SELF, seenMarker, unreadComments } from "../model/unread";
-import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
+import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
 import { priorityOptions } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
 import { Icon } from "./icons";
@@ -457,10 +457,10 @@ export function CardDetail({
   if (postedHere.current.path !== path) postedHere.current = { path, texts: new Set() };
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
-    seen: settings.commentsSeen[path],
+    seen: seenMarkerFor(settings, path),
   });
   if (seenOnOpen.current.path !== path)
-    seenOnOpen.current = { path, seen: settings.commentsSeen[path] };
+    seenOnOpen.current = { path, seen: seenMarkerFor(settings, path) };
   const seenAtOpen = seenOnOpen.current.seen;
   /**
    * Who "me" is for this panel. With a name set it is that name; with none, a value no author can

@@ -2512,6 +2512,39 @@ describe("unread comments", () => {
     await waitFor(() => expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBeUndefined());
   });
 
+  it("judges a card never opened against the install baseline, not as fully unread", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      // Both comments predate the baseline: the upgrade case, where nothing should light up.
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @rafa:_ mine\n- _2026-06-13 10:00 @agent:_ from the agent\n",
+      },
+      // One before, one in the baseline's own minute, one after: only the last is news.
+      "Tasks/Beta.md": {
+        fm: { type: "task", status: "doing" },
+        body: "\n# Beta\n\n## Comments\n- _2026-06-13 10:00 @agent:_ old\n- _2026-06-14 09:00 @agent:_ same minute\n- _2026-06-14 09:01 @agent:_ after the baseline\n",
+      },
+    });
+    const box = { current: asRafa };
+    renderStateful(repo, { ...asRafa, commentsBaseline: "2026-06-14 09:00" }, box);
+    const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    const beta = screen.getByText("Beta").closest(".folia-card") as HTMLElement;
+    expect(within(beta).getByTitle("3 comments, 1 unread comment")).toBeInTheDocument();
+
+    // The panel draws the New rule at the same place the tile counted from...
+    await user.click(screen.getByText("Beta"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("New")).toBeInTheDocument();
+    expect(within(detail).getAllByText("new")).toHaveLength(1);
+    // ...and the visit gives the card a marker of its own, leaving the baseline untouched.
+    await waitFor(() =>
+      expect(box.current.commentsSeen["Tasks/Beta.md"]).toBe("2026-06-14 09:01#1"),
+    );
+    expect(box.current.commentsBaseline).toBe("2026-06-14 09:00");
+  });
+
   it("shows no markers once the card has been seen", async () => {
     const user = userEvent.setup();
     render_(conversation(), {
