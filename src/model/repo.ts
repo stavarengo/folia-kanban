@@ -57,10 +57,12 @@ export interface CardRepository {
   setColumns(columns: ColumnDef[]): Promise<void>;
 
   /**
-   * Persist the board's priority vocabulary to the board note frontmatter, so a value survives the
-   * last card that used it. An empty list removes the key rather than writing an empty one.
+   * Fold priority values into the board note's remembered vocabulary, so each one survives the
+   * last card that used it. Additive on purpose: the note's current list wins on order and is
+   * never shrunk, so two edits in flight at once cannot drop each other's value. Writes nothing
+   * when every value is already remembered. Pruning the list stays a hand edit of the note.
    */
-  setPriorities(priorities: string[]): Promise<void>;
+  rememberPriorities(values: string[]): Promise<void>;
 
   /** Open a card note in the workspace. */
   openCard(path: string): Promise<void>;

@@ -13,7 +13,7 @@ import type {
 import type { CardMutation } from "../model/board";
 import { buildBoard, resolveCardFolder } from "../model/board";
 import { normalizeColumns, serializeColumns } from "../model/columns";
-import { normalizePriorities, serializePriorities } from "../model/priorities";
+import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
 import { dateOnly, stamp } from "../model/dates";
 import {
   SECTION,
@@ -423,16 +423,19 @@ export class VaultRepository implements CardRepository {
     );
   }
 
-  async setPriorities(priorities: string[]): Promise<void> {
+  async rememberPriorities(values: string[]): Promise<void> {
     this.markWrite(this.boardPath);
     await this.app.fileManager.processFrontMatter(
       this.file(this.boardPath),
       (fm: Record<string, unknown>) => {
-        const value = serializePriorities(priorities);
-        // Deleting rather than writing `priorities: []` keeps a board that has learned nothing
-        // byte-identical to its pre-feature shape (same contract `serializeColumns` documents).
-        if (value === null) delete fm["priorities"];
-        else fm["priorities"] = value;
+        // Merge against the note as it is INSIDE the write, not against a snapshot the caller
+        // read earlier: that is what makes a second edit landing mid-reload additive rather than
+        // a clobber. A board that learns nothing keeps its pre-feature shape — no `priorities:`
+        // key appears (the same byte-stability contract `serializeColumns` documents).
+        const merged = mergePriorities(normalizePriorities(fm["priorities"]), values);
+        if (merged === null) return;
+        const value = serializePriorities(merged);
+        if (value !== null) fm["priorities"] = value;
       },
     );
   }

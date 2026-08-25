@@ -250,8 +250,8 @@ describe("matchCard", () => {
 });
 
 describe("boardPriorities (the board's own vocabulary)", () => {
-  it("falls back to the todo.txt A/B/C set only when the board knows nothing", () => {
-    expect(boardPriorities([], [])).toEqual(["A", "B", "C"]);
+  it("comes back empty for a board that has never seen a priority (no invented values)", () => {
+    expect(boardPriorities([], [])).toEqual([]);
     expect(boardPriorities([], [card({ priority: "a" })])).toEqual(["a"]);
   });
 
@@ -278,11 +278,7 @@ describe("boardPriorities (the board's own vocabulary)", () => {
   });
 
   it("ignores blank and whitespace-only priorities", () => {
-    expect(boardPriorities([], [card({ priority: "" }), card({ priority: "   " })])).toEqual([
-      "A",
-      "B",
-      "C",
-    ]);
+    expect(boardPriorities([], [card({ priority: "" }), card({ priority: "   " })])).toEqual([]);
   });
 });
 

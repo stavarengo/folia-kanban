@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
 import { columnOf, moveCard, moveColumn, resolveDrop } from "../model/board";
 import { dateOnly } from "../model/dates";
-import { DEFAULT_PRIORITIES, dedupePriorities } from "../model/priorities";
+import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
 import type { KanbanSettings } from "../settings";
 import {
@@ -233,23 +233,21 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
    */
   const setPriorityAndReload = useCallback(
     async (path: string, value: string) => {
-      // Read the vocabulary BEFORE the write. Afterwards the card no longer carries the value it
-      // is replacing, so learning from the post-write board would drop the outgoing value — the
-      // very thing remembering is supposed to prevent.
+      // Read what the board knows BEFORE the write. Afterwards the card no longer carries the
+      // value it is replacing, so learning from the post-write board would drop the outgoing
+      // value — the very thing remembering is supposed to prevent. Only real values are learned:
+      // the `A`/`B`/`C` starting set is a suggestion, never something the board is told it uses.
       const b = boardRef.current;
-      const remembered = b?.config.priorities ?? [];
-      const merged =
+      const learn =
         b && value !== ""
-          ? dedupePriorities([...boardPriorities(remembered, Object.values(b.cards)), value])
-          : remembered;
+          ? [...boardPriorities(b.config.priorities, Object.values(b.cards)), value]
+          : [];
       try {
         // Empty value clears the key cleanly (removes the `priority:` line) per the contract,
         // instead of writing a stray empty `priority:` and a misleading `Priority → ` history line.
         if (value === "") await repo.unsetFrontmatterKey(path, "priority");
         else await repo.setFrontmatter(path, { priority: value });
-        const unchanged =
-          merged.length === remembered.length && merged.every((p, i) => p === remembered[i]);
-        if (!unchanged) await repo.setPriorities(merged);
+        if (learn.length) await repo.rememberPriorities(learn);
       } catch (e) {
         reportError(e);
       } finally {

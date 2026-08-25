@@ -24,10 +24,30 @@ export function dedupePriorities(values: readonly string[]): string[] {
   return out;
 }
 
+/** Whether two priority values name the same priority (the case-insensitive comparison used everywhere). */
+export function samePriority(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 /** Position of `value` in `vocabulary`, case-insensitively; `-1` when it is not there. */
 export function priorityIndex(vocabulary: readonly string[], value: string): number {
-  const key = value.trim().toLowerCase();
-  return vocabulary.findIndex((v) => v.trim().toLowerCase() === key);
+  return vocabulary.findIndex((v) => samePriority(v, value));
+}
+
+/**
+ * Fold `values` into the vocabulary `current` already holds, keeping its order and appending only
+ * what is genuinely new. `null` when there is nothing to add, so a caller can skip the write.
+ *
+ * Merging rather than replacing is what makes remembering safe against two edits in flight at
+ * once: each write only ever ADDS to whatever the note holds at that moment, so neither can drop
+ * a value the other just learned.
+ */
+export function mergePriorities(
+  current: readonly string[],
+  values: readonly string[],
+): string[] | null {
+  const merged = dedupePriorities([...current, ...values]);
+  return merged.length === current.length ? null : merged;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { samePriority } from "../model/priorities";
 import { priorityOptions, priorityTone } from "./cardView";
 import { useBoardActions } from "./context";
 import { Icon, type IconName } from "./icons";
@@ -159,10 +160,10 @@ export function CardContextMenu({
                 className={
                   "folia-menu-prio folia-chip-" +
                   priorityTone(p) +
-                  (p === priority ? " is-active" : "")
+                  (samePriority(p, priority) ? " is-active" : "")
                 }
                 role="menuitemradio"
-                aria-checked={p === priority}
+                aria-checked={samePriority(p, priority)}
                 onClick={() => {
                   actioned.current = true;
                   void a.setPriority(path, p);

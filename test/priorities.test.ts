@@ -4,6 +4,8 @@ import {
   serializePriorities,
   priorityIndex,
   dedupePriorities,
+  mergePriorities,
+  samePriority,
   DEFAULT_PRIORITIES,
 } from "../src/model/priorities";
 
@@ -44,5 +46,27 @@ describe("dedupePriorities / priorityIndex", () => {
 describe("DEFAULT_PRIORITIES", () => {
   it("is the todo.txt convention, not a word scale of the plugin's own invention", () => {
     expect(DEFAULT_PRIORITIES).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("mergePriorities — remembering without clobbering", () => {
+  it("appends only what is new, keeping the note's own order", () => {
+    expect(mergePriorities(["c", "a"], ["a", "b"])).toEqual(["c", "a", "b"]);
+  });
+
+  it("returns null when there is nothing to add, so no write happens", () => {
+    expect(mergePriorities(["A", "B"], ["b", "a"])).toBeNull();
+    expect(mergePriorities([], [])).toBeNull();
+  });
+
+  it("never shrinks the vocabulary — a value the caller did not mention survives", () => {
+    expect(mergePriorities(["A", "B", "C"], ["D"])).toEqual(["A", "B", "C", "D"]);
+  });
+});
+
+describe("samePriority", () => {
+  it("compares case-insensitively and ignores surrounding space", () => {
+    expect(samePriority("A", " a ")).toBe(true);
+    expect(samePriority("a", "b")).toBe(false);
   });
 });

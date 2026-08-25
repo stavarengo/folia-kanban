@@ -160,6 +160,27 @@ describe("card detail — priority", () => {
     await waitFor(() => expect(repo.config.priorities).toEqual(["A", "blocker"]));
   });
 
+  it("never remembers the suggested A/B/C — only values the board really uses", async () => {
+    // A board with no priorities anywhere: the field suggests the todo.txt starting set, but
+    // typing `blocker` must remember `blocker` alone, not the three values nobody chose.
+    const repo = new FakeRepo(config, {
+      "Tasks/Solo.md": { fm: { type: "task", status: "todo" }, body: "\n# Solo\n" },
+    });
+    const user = userEvent.setup();
+    render_(repo);
+    await user.click(await screen.findByText("Solo"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Priority") as HTMLInputElement;
+    const list = field.ownerDocument.getElementById(field.getAttribute("list")!);
+    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.value)).toEqual([
+      "A",
+      "B",
+      "C",
+    ]);
+    await user.type(field, "blocker{Enter}");
+    await waitFor(() => expect(repo.config.priorities).toEqual(["blocker"]));
+  });
+
   it("clearing the field removes the priority key and remembers nothing new", async () => {
     const { repo, user, field } = await openPriority();
     await user.clear(field);
@@ -929,6 +950,24 @@ describe("card context menu", () => {
         .getAllByRole("menuitemradio")
         .map((b) => b.textContent),
     ).toEqual(["urgent", "low", ""]);
+  });
+
+  it("marks the current priority selected even when the note spells it differently", async () => {
+    const repo = new FakeRepo(
+      { ...config, priorities: ["LOW"] },
+      {
+        "Tasks/First.md": {
+          fm: { type: "task", status: "todo", order: 1, priority: "low" },
+          body: "\n# First\n",
+        },
+      },
+    );
+    const { menu } = await openCardMenu("First", repo);
+    // The board remembers `LOW`; the card carries `low`. One priority, so one checked option.
+    expect(within(menu).getByRole("menuitemradio", { name: "LOW" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 
   it("remembers a chosen priority in the board note so it outlives its last card", async () => {

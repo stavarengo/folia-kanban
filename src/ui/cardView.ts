@@ -1,7 +1,7 @@
 // Pure helpers that turn a card's data into the little chips shown on its board card.
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D) or a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones.
-import { DEFAULT_PRIORITIES, dedupePriorities, priorityIndex } from "../model/priorities";
+import { dedupePriorities, priorityIndex } from "../model/priorities";
 import type { Card, ColumnGroup, ColumnSort } from "../model/types";
 import type { IconName } from "./icons";
 
@@ -60,9 +60,9 @@ export function priorityTone(value: string): ChipTone {
  * urgent → high → medium → low rather than alphabetically), then alphabetically among equals — so
  * a board that has never been through the UI still suggests its own scheme in a sensible order.
  *
- * A board with neither remembered nor in-use values falls back to the todo.txt convention
- * (`A`/`B`/`C`); it never falls back to a word scale, which would nudge the user toward a
- * vocabulary the plugin invented for them.
+ * Comes back EMPTY for a board that has never seen a priority. The empty case is the caller's to
+ * interpret: a picker substitutes the todo.txt `A`/`B`/`C` starting set, but nothing remembers it,
+ * because suggesting a value and claiming the board uses it are not the same thing.
  */
 export function boardPriorities(remembered: readonly string[], cards: Card[]): string[] {
   const inUse: string[] = [];
@@ -76,8 +76,7 @@ export function boardPriorities(remembered: readonly string[], cards: Card[]): s
       a.localeCompare(b, undefined, { sensitivity: "base" }) ||
       a.localeCompare(b),
   );
-  const out = dedupePriorities([...remembered, ...inUse]);
-  return out.length ? out : [...DEFAULT_PRIORITIES];
+  return dedupePriorities([...remembered, ...inUse]);
 }
 
 /**
