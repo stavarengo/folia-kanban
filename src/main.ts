@@ -76,6 +76,9 @@ export default class FoliaKanbanPlugin extends Plugin {
     // The button follows the flag: a note that gains or loses `folia-board` while it is open
     // gains or loses the button, but the tab is never swapped out from under the user.
     this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
+    // Without this, disabling the plugin leaves its buttons in the headers of open notes, still
+    // clickable, still calling into a view type Obsidian no longer knows about.
+    this.register(() => this.removeMarkdownActions());
     this.app.workspace.onLayoutReady(() => {
       this.adoptRestoredLeaves();
       this.syncMarkdownActions();
@@ -155,6 +158,12 @@ export default class FoliaKanbanPlugin extends Plugin {
       } else if (!wanted && existing) {
         existing.remove();
       }
+    }
+  }
+
+  private removeMarkdownActions(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      leaf.view.containerEl.querySelector(`.view-actions .${BOARD_ACTION_CLASS}`)?.remove();
     }
   }
 
@@ -240,7 +249,9 @@ export default class FoliaKanbanPlugin extends Plugin {
     let leaf =
       this.leafShowing(VIEW_TYPE_KANBAN, boardPath) ?? this.leafShowing("markdown", boardPath);
     // Otherwise reuse an existing board tab, and only then open a new one (a board wants width).
-    leaf ??= workspace.getLeavesOfType(VIEW_TYPE_KANBAN)[0] ?? workspace.getLeaf(true);
+    leaf ??=
+      workspace.getLeavesOfType(VIEW_TYPE_KANBAN).find((l) => this.isEditingSurface(l)) ??
+      workspace.getLeaf(true);
     await this.showBoardIn(leaf, boardPath, true);
     await workspace.revealLeaf(leaf);
   }
@@ -249,8 +260,17 @@ export default class FoliaKanbanPlugin extends Plugin {
     return (
       this.app.workspace
         .getLeavesOfType(viewType)
-        .find((l) => l.getViewState().state?.["file"] === filePath) ?? null
+        .find((l) => this.isEditingSurface(l) && l.getViewState().state?.["file"] === filePath) ??
+      null
     );
+  }
+
+  /** A board needs width, so "open the board" never retargets a sidebar tab. A popout window is
+   *  a real editing surface and does qualify. */
+  private isEditingSurface(leaf: WorkspaceLeaf): boolean {
+    const root = leaf.getRoot();
+    const { leftSplit, rightSplit } = this.app.workspace;
+    return root !== leftSplit && root !== rightSplit;
   }
 
   async loadSettings(): Promise<void> {
