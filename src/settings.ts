@@ -33,8 +33,8 @@ export interface KanbanSettings {
    */
   userName: string;
   /**
-   * Read-state for comments, keyed by card path: the timestamp of the newest comment already seen
-   * on that card. Written when its detail panel is open. Plugin data, never written to the note —
+   * Read-state for comments, keyed by card path: the marker `seenMarker` builds for the newest
+   * comment already seen on that card. Written when its detail panel is open. Never in the note —
    * "Rafa has read this" is personal to one install, not a fact the vault should carry to everyone
    * who has the file. A card missing from this map has never been opened, so all of its comments
    * count as unread.

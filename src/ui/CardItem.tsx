@@ -285,7 +285,16 @@ function CardItemInner({
                 aria-label={commentsTitle(stats.comments, unread)}
               >
                 <Icon name="message" size={13} /> {stats.comments}
-                {unread.kind !== "none" && <span className="folia-unread-dot" aria-hidden="true" />}
+                {/* Shape, not just colour: a plain dot for unread, an arrow for a reply — so the
+                    two states stay apart for anyone who cannot tell blue from purple. */}
+                {unread.kind === "unread" && (
+                  <span className="folia-unread-dot" aria-hidden="true" />
+                )}
+                {unread.kind === "reply" && (
+                  <span className="folia-unread-reply-mark" aria-hidden="true">
+                    ↩
+                  </span>
+                )}
               </span>
             )}
           </div>

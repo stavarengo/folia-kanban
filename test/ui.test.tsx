@@ -2416,7 +2416,7 @@ describe("unread comments", () => {
 
     // The visit records the newest comment as seen...
     await waitFor(() =>
-      expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 10:00"),
+      expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 10:00#1"),
     );
     // ...but the panel keeps showing what was new when it opened — otherwise it would erase the
     // markers in the same breath as showing them.
@@ -2426,11 +2426,36 @@ describe("unread comments", () => {
     await waitFor(() => expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument());
   });
 
+  it("never records one card's comments as seen on another when the panel switches cards", async () => {
+    const user = userEvent.setup();
+    const box = { current: asRafa };
+    const repo = new FakeRepo(config, {
+      "Tasks/Newer.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Newer\n\n## Comments\n- _2026-06-20 10:00 @agent:_ recent\n",
+      },
+      "Tasks/Older.md": {
+        fm: { type: "task", status: "doing" },
+        body: "\n# Older\n\n## Comments\n- _2026-06-13 10:00 @agent:_ ancient\n",
+      },
+    });
+    renderStateful(repo, asRafa, box);
+    await user.click(await screen.findByText("Newer"));
+    await screen.findByTestId("card-detail");
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Newer.md"]).toBeDefined());
+
+    // Switching cards re-renders the panel while it still holds the previous card's body. If that
+    // body reached the marker, Older's older comment would be filed as already read, unseen.
+    await user.click(screen.getByText("Older"));
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Older.md"]).toBeDefined());
+    expect(box.current.commentsSeen["Tasks/Older.md"]).toBe("2026-06-13 10:00#1");
+  });
+
   it("shows no markers once the card has been seen", async () => {
     const user = userEvent.setup();
     render_(conversation(), {
       ...asRafa,
-      commentsSeen: { "Tasks/Alpha.md": "2026-06-13 10:00" },
+      commentsSeen: { "Tasks/Alpha.md": "2026-06-13 10:00#1" },
     });
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();

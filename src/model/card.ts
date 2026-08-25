@@ -33,9 +33,10 @@ const INLINE_STATUS_RE = /\[status::\s*([^\]]*?)\s*\]/;
 // `- _Decision:_ use SQLite`.
 // An optional `@author` may follow the timestamp inside the same italic prefix
 // (`- _2026-08-21 11:49 @rafa:_ text`) — how a person or an agent signs a comment. The author
-// capture excludes whitespace, `:` and `_` so it can never eat the closing `:_ ` delimiter; a line
-// without one parses exactly as before, with an unknown author.
-const TS_LINE_RE = /^\s*[-*]\s+_([0-9: -]+?)(?:\s+@([^\s:_]+))?:_\s+([\s\S]*)$/;
+// capture excludes whitespace and `:` (the two characters that delimit the prefix) but ALLOWS `_`,
+// so a real name like `@alex_smith` reads: the `:` is what ends the capture, and the `_` right
+// after it closes the italics. A line without an author parses exactly as before, author unknown.
+const TS_LINE_RE = /^\s*[-*]\s+_([0-9: -]+?)(?:\s+@([^\s:]+))?:_\s+([\s\S]*)$/;
 // Legacy format written before this change: `- [2026-08-21 11:49] text`. Old notes never get
 // rewritten, so this stays supported for reading forever alongside TS_LINE_RE.
 const TS_LINE_LEGACY_RE = /^\s*[-*]\s+\[([^\]]+)\]\s+([\s\S]*)$/;
@@ -411,7 +412,7 @@ export function removeSubtask(text: string, index: number): string {
 // `- [timestamp] ` one, so editing an old note's line keeps its original prefix byte-for-byte
 // instead of migrating it — and editing an authored comment keeps its signature.
 // The `_..._` branch mirrors TS_LINE_RE's character-class boundary rule.
-const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+?(?:\s+@[^\s:_]+)?:_|\[[^\]]+\])\s+)([\s\S]*)$/;
+const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+?(?:\s+@[^\s:]+)?:_|\[[^\]]+\])\s+)([\s\S]*)$/;
 const BULLET_RE = /^\s*[-*]\s+/;
 
 /**

@@ -12,7 +12,7 @@ import {
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
 import { RELATION_KEYS } from "../model/relationships";
-import { latestCommentTimestamp, unreadComments } from "../model/unread";
+import { seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
@@ -416,6 +416,8 @@ export function CardDetail({
   // Enter-then-click) during the async createCard window before onCreated unmounts this branch.
   const creatingRef = useRef(false);
   const [body, setBody] = useState<CardBody | null>(null);
+  /** Which card `body` was read from — the unread block below must not trust a stale one. */
+  const [bodyPath, setBodyPath] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState("");
   // Description defaults to a rendered view; clicking it (or the pencil) flips to the raw editor.
   const [editingDesc, setEditingDesc] = useState(false);
@@ -452,9 +454,15 @@ export function CardDetail({
   if (seenOnOpen.current.path !== path)
     seenOnOpen.current = { path, seen: settings.commentsSeen[path] };
   const seenAtOpen = seenOnOpen.current.seen;
+  // `body` outlives the card it was read from: navigating to another card re-renders with the
+  // PREVIOUS card's body still in state, and only then does the loader below replace it. Pairing it
+  // with the path it came from keeps the marker written below from being the old card's.
   const commentMarks = useMemo(
-    () => (body?.comments ?? []).map((c) => ({ timestamp: c.timestamp, author: c.author })),
-    [body],
+    () =>
+      bodyPath === path
+        ? (body?.comments ?? []).map((c) => ({ timestamp: c.timestamp, author: c.author }))
+        : [],
+    [body, bodyPath, path],
   );
   const unread = useMemo(
     () => unreadComments(commentMarks, seenAtOpen, settings.userName),
@@ -463,12 +471,12 @@ export function CardDetail({
   // Opening a card marks everything on it as seen. Keyed on the newest timestamp (a string), not on
   // the comments array, which is a fresh reference after every board reload; the equality guard
   // stops the settings write it triggers from coming straight back round.
-  const latestComment = latestCommentTimestamp(commentMarks);
+  const marker = seenMarker(commentMarks);
   const seenNow = settings.commentsSeen[path];
   useEffect(() => {
-    if (!latestComment || seenNow === latestComment) return;
-    updateSettings({ commentsSeen: { ...settings.commentsSeen, [path]: latestComment } });
-  }, [path, latestComment, seenNow, settings.commentsSeen, updateSettings]);
+    if (!marker || seenNow === marker) return;
+    updateSettings({ commentsSeen: { ...settings.commentsSeen, [path]: marker } });
+  }, [path, marker, seenNow, settings.commentsSeen, updateSettings]);
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
@@ -476,6 +484,7 @@ export function CardDetail({
     try {
       const b = await repo.readBody(path);
       setBody(b);
+      setBodyPath(path);
       setDescDraft(b.description);
     } catch {
       onClose(); // card was deleted out from under us
@@ -485,6 +494,7 @@ export function CardDetail({
   useEffect(() => {
     if (isCreate) return; // no card to read while the create form is up
     setBody(null);
+    setBodyPath(null);
     setConfirmDelete(false);
     setEditingDesc(false); // navigating cards starts the new card in view mode
     void reload();
@@ -1192,11 +1202,11 @@ export function CardDetail({
               // The divider is an extra <li> spliced in at the boundary, NOT a second list: `i`
               // stays the comment's own position, which is the edit/delete handle the model walks.
               const isFirstUnread = unread.indices[0] === i;
-              // The card-level "reply" verdict is shown on the first unread comment — the flat list
-              // has no threading, so that is the one that came after something of yours.
+              // "reply" marks the comment that actually landed after one of yours, which need not be
+              // the first unread one — an older unread comment can sit before it.
               const mark: false | "unread" | "reply" = !unread.indices.includes(i)
                 ? false
-                : isFirstUnread && unread.kind === "reply"
+                : unread.replyIndex === i
                   ? "reply"
                   : "unread";
               const item = (

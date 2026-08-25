@@ -686,6 +686,16 @@ describe("comment authorship — an optional @name inside the italic prefix", ()
     ]);
   });
 
+  it("reads a name with an underscore in it, and edits it without eating the prefix", () => {
+    const body = "# C\n\n## Comments\n- _2026-06-13 14:32 @alex_smith:_ hello\n";
+    expect(parseBody(body).comments).toEqual([
+      { timestamp: "2026-06-13 14:32", author: "alex_smith", text: "hello" },
+    ]);
+    expect(updateTimestampedLine(body, SECTION.comments, 0, "goodbye")).toBe(
+      body.replace("hello", "goodbye"),
+    );
+  });
+
   it("never writes an author onto a History line", () => {
     const out = appendHistory(SAMPLE_CARD, "Created", "2026-06-13 10:00");
     expect(out).toContain("- _2026-06-13 10:00:_ Created");

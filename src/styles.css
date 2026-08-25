@@ -47,7 +47,8 @@
   --folia-on-accent: var(--text-on-accent, #fff);
   --folia-danger: var(--color-red, #e5534b);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
-     answered you". Two hues, never a lone colour difference — both cues also carry a word. */
+     answered you". Two hues, never a lone colour difference — the tile pairs each with its own
+     shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
   --folia-unread: var(--color-blue, #5b8def);
   --folia-unread-reply: var(--color-purple, #a882e0);
   --folia-success: var(--color-green, #4caf7d);
@@ -990,6 +991,12 @@
   height: 6px;
   border-radius: var(--folia-r-pill);
   background: currentColor;
+  margin-left: 1px;
+}
+/* The reply state's own shape, so the two unread cues differ by more than hue. */
+.folia-unread-reply-mark {
+  font-size: var(--folia-font-size-xs);
+  line-height: 1;
   margin-left: 1px;
 }
 
