@@ -90,8 +90,8 @@ importers:
         specifier: ^6.10.2
         version: 6.10.2(eslint@10.5.0(jiti@2.7.0))
       eslint-plugin-obsidianmd:
-        specifier: ^0.4.1
-        version: 0.4.2(@eslint/js@10.0.1(eslint@10.5.0(jiti@2.7.0)))(@eslint/json@0.14.0)(@typescript-eslint/parser@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.5.0(jiti@2.7.0))(obsidian@1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6))(typescript-eslint@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))
+        specifier: 0.4.1
+        version: 0.4.1(@eslint/js@10.0.1(eslint@10.5.0(jiti@2.7.0)))(@eslint/json@0.14.0)(@typescript-eslint/parser@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.5.0(jiti@2.7.0))(obsidian@1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6))(typescript-eslint@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))
       globals:
         specifier: ^17.6.0
         version: 17.6.0
@@ -2068,8 +2068,8 @@ packages:
     peerDependencies:
       eslint: ^9 || ^10
 
-  eslint-plugin-obsidianmd@0.4.2:
-    resolution: {integrity: sha512-NFp6wsRSvN0TU6EPi03uF2UQ3GuYyVtzjKDl25KyP8Bnz8gM0unX7R/e+VQ2JtMW2/3DC/VwIXjHnzAhB9JQwg==}
+  eslint-plugin-obsidianmd@0.4.1:
+    resolution: {integrity: sha512-Nv3593kVsFOS8kir/HWaJ5CR3xcyiPWEPyXst5Pib8mxRYYuLYPpJS2ALMoZXHulHyiGwoYW8AaxvLRc4rhrRg==}
     engines: {node: '>= 18'}
     hasBin: true
     peerDependencies:
@@ -6004,7 +6004,7 @@ snapshots:
     dependencies:
       eslint: 10.5.0(jiti@2.7.0)
 
-  eslint-plugin-obsidianmd@0.4.2(@eslint/js@10.0.1(eslint@10.5.0(jiti@2.7.0)))(@eslint/json@0.14.0)(@typescript-eslint/parser@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.5.0(jiti@2.7.0))(obsidian@1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6))(typescript-eslint@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3)):
+  eslint-plugin-obsidianmd@0.4.1(@eslint/js@10.0.1(eslint@10.5.0(jiti@2.7.0)))(@eslint/json@0.14.0)(@typescript-eslint/parser@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.5.0(jiti@2.7.0))(obsidian@1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6))(typescript-eslint@8.61.1(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3)):
     dependencies:
       '@eslint-community/eslint-plugin-eslint-comments': 4.7.2(eslint@10.5.0(jiti@2.7.0))
       '@eslint/config-helpers': 0.4.2

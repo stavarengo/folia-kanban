@@ -838,7 +838,8 @@ export function CardDetail({
       style={panelStyle}
     >
       {isSide && (
-        // a11y exception (no-static-element-interactions): resize handle is pointer-only (drag); exposed as a labelled role="separator", so there is no keyboard equivalent to add
+        // Pointer-only by design (drag to resize); exposed as a labelled role="separator", so
+        // there is no keyboard equivalent to add.
         <div
           className="folia-detail-resize"
           role="separator"

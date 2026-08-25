@@ -27,7 +27,7 @@
 // ignoreDependencies for that reason.
 
 import { glob, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { relative as relativePath, resolve } from "node:path";
 import process from "node:process";
 import { ESLint } from "eslint";
 import { globalIgnores } from "eslint/config";
@@ -353,13 +353,14 @@ const BASELINE = [
     text: "This PluginSettingTab does not implement getSettingDefinitions(); its settings will not appear in Obsidian's settings search for users on 1.13.0 or later. Consider adopting the declarative settings API.",
     count: 1,
     // Obsidian's declarative settings API is @since 1.13.0, and obsidian.d.ts states display() is
-    // not called once getSettingDefinitions() returns a non-empty array. With minAppVersion 1.7.4
+    // not called once getSettingDefinitions() returns a non-empty array. With minAppVersion 1.7.2
     // adopting it means either two parallel settings UIs or broken settings below 1.13.
     // docs/ai/backlog/20260826.01.settings-tab-is-invisible-to-obsidian-settings-search.md
   },
 ];
 
-const relative = (file) => String(file).replace(`${root}/`, "");
+// Also normalises separators, so the BASELINE keys match on Windows too.
+const relative = (file) => relativePath(root, resolve(root, String(file))).replaceAll("\\", "/");
 
 // Walks the findings once, handing each the first baseline entry that still has room for it.
 // Returns the findings nothing excused, plus the entries that matched fewer times than declared.

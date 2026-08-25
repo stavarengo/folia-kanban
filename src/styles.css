@@ -1559,9 +1559,11 @@
 }
 .folia-link-missing {
   color: var(--text-muted);
-  /* Drawn as a border, not a dashed text-decoration: Obsidian's community-directory CSS scan
-     flags every text-decoration-* longhand and every multi-keyword shorthand as only partially
-     supported, so the dashed underline has to come from somewhere else. */
+  /* Drawn as a border, not as `text-decoration: underline dashed`: Obsidian's community-directory
+     CSS scan flags every text-decoration-* longhand and every multi-keyword text-decoration
+     shorthand as only partially supported, so the dashed underline has to come from somewhere
+     else. The dashes now sit at the bottom of the inline box instead of 2px below the baseline —
+     a slightly lower line, same signal. */
   border-bottom: 1px dashed;
   cursor: help;
 }

@@ -483,7 +483,13 @@ export class VaultRepository implements CardRepository {
   async addSubcard(parentPath: string, title: string): Promise<string> {
     // Read the parent status from write-fresh text (metadataCache can lag a just-written status).
     const parentFm = parseFrontmatter(await this.app.vault.cachedRead(this.file(parentPath)));
-    const childPath = await this.createCard(title, String(parentFm["status"] ?? "todo"));
+    // A `status:` that is not a plain string is corruption, not a column — fall back rather than
+    // create the subcard in a column named "[object Object]".
+    const parentStatus = parentFm["status"];
+    const childPath = await this.createCard(
+      title,
+      typeof parentStatus === "string" ? parentStatus : "todo",
+    );
     const childBase = (childPath.split("/").pop() ?? "").replace(/\.md$/i, "");
     await this.editBody(parentPath, (t) => addSubcardText(t, childBase));
     return childPath;

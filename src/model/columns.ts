@@ -58,6 +58,13 @@ function asSort(value: unknown): ColumnSort | undefined {
  * Bad / absent fields are gracefully dropped (or clamped); a malformed list falls back to the
  * default seven columns. Never throws.
  */
+/** A YAML scalar as text. Mappings, lists, `null` and `undefined` come back as "" rather than
+ *  as "[object Object]" or "null", so a malformed frontmatter value is rejected, not adopted. */
+function scalarText(value: unknown): string {
+  const t = typeof value;
+  return t === "string" || t === "number" || t === "boolean" ? String(value) : "";
+}
+
 export function normalizeColumns(raw: unknown): ColumnDef[] {
   if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_COLUMNS;
   const cols: ColumnDef[] = [];
@@ -68,13 +75,13 @@ export function normalizeColumns(raw: unknown): ColumnDef[] {
     }
     if (c === null || typeof c !== "object") continue; // skip null / number / other malformed entries
     const obj = c as Record<string, unknown>;
-    if (obj["id"] == null || String(obj["id"]).trim() === "") continue; // a column needs a usable id
+    // A hand-written `id:` may come back as a number or a boolean; anything with a shape (a
+    // mapping, a list) is corruption, and stringifying it would produce "[object Object]".
+    const id = scalarText(obj["id"]);
+    if (id.trim() === "") continue; // a column needs a usable id
     const col: ColumnDef = {
-      id: String(obj["id"]),
-      title:
-        typeof obj["title"] === "string" && obj["title"]
-          ? obj["title"]
-          : titleCase(String(obj["id"])),
+      id,
+      title: typeof obj["title"] === "string" && obj["title"] ? obj["title"] : titleCase(id),
     };
     if (typeof obj["color"] === "string") col.color = obj["color"];
     if (typeof obj["limit"] === "number" && Number.isFinite(obj["limit"])) col.limit = obj["limit"];

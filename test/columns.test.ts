@@ -16,6 +16,18 @@ describe("normalizeColumns — reading the board frontmatter", () => {
     expect(normalizeColumns([null, 3, {}])).toBe(DEFAULT_COLUMNS); // every entry unusable → default
   });
 
+  it("rejects an id that is not a scalar instead of adopting its stringification", () => {
+    // A hand-written `id:` that came out as a mapping or a list used to become the literal column
+    // id "[object Object]" (or "a,b"); an entry with no usable id is dropped.
+    expect(normalizeColumns([{ id: { a: 1 } }])).toBe(DEFAULT_COLUMNS);
+    expect(normalizeColumns([{ id: ["a", "b"] }])).toBe(DEFAULT_COLUMNS);
+    expect(normalizeColumns([{ id: { a: 1 } }, "todo"])).toEqual([{ id: "todo", title: "Todo" }]);
+  });
+
+  it("accepts a numeric or boolean id, which is what unquoted YAML yields", () => {
+    expect(normalizeColumns([{ id: 2 }])).toEqual([{ id: "2", title: "2" }]);
+  });
+
   it("accepts bare string columns and title-cases the id", () => {
     expect(normalizeColumns(["todo", "in-progress"])).toEqual([
       { id: "todo", title: "Todo" },
