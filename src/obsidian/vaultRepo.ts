@@ -91,6 +91,8 @@ export class VaultRepository implements CardRepository {
     private boardPath: string,
     /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
     public getHistoryScope: () => HistoryScope = () => "moves",
+    /** Live source of the name new comments are signed with. Empty = write them unsigned. */
+    public getUserName: () => string = () => "",
   ) {}
 
   /** Append a history line for `kind` only when the current scope allows it. */
@@ -359,7 +361,8 @@ export class VaultRepository implements CardRepository {
     return this.editBody(path, (t) => setDescriptionText(t, description));
   }
   async addComment(path: string, text: string): Promise<void> {
-    await this.editBody(path, (t) => appendComment(t, text, stamp()));
+    const author = this.getUserName();
+    await this.editBody(path, (t) => appendComment(t, text, stamp(), author));
     await this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, index: number, text: string): Promise<void> {

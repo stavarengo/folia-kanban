@@ -17,6 +17,7 @@ Columns, drag-and-drop, nested subcards, comments and an automatic history — b
 
 - [Your board is just Markdown](#your-board-is-just-markdown)
 - [Features](#features)
+- [Unread comments](#unread-comments)
 - [Set up a board](#set-up-a-board)
 - [Settings](#settings)
 - [Keyboard & mouse](#keyboard--mouse)
@@ -51,6 +52,7 @@ Description text…
 
 ## Comments
 - _2026-06-13 14:32:_ looks good
+- _2026-06-13 15:01 @alex:_ signed, so the board knows whose it is
 
 ## History
 - _2026-06-13 14:30:_ Moved from Todo to Doing
@@ -99,6 +101,27 @@ The toggle is per card, and it nests: collapsing a card also hides its subcards'
 
 Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems — default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again.
 
+## Unread comments
+
+Set Settings → **Your name** and the board can tell your comments from everyone else's. A comment you add from the panel is then written with your name inside its timestamp prefix:
+
+```markdown
+## Comments
+- _2026-06-13 14:32 @alex:_ Targeting next Friday if review clears.
+- _2026-06-16 08:05 @agent:_ Review is clear on my side. Friday works.
+```
+
+That signature is ordinary Markdown, so anyone — a colleague, a script, an agent writing straight into the file — signs a comment by typing `@name` the same way. A line without one is read as "author unknown", which is what every comment written before this existed is, and what yours stay if you leave the name empty.
+
+From there the board tracks what you have already read:
+
+- The comment badge on a card tile turns **blue with a dot** while the card holds comments you have not read, and its label says so (*"3 comments, 2 unread"*).
+- It turns **purple and says *a reply to yours*** when one of those unread comments landed after a comment of your own. There is no threading in a flat list of comments, so that ordering is the closest thing to "someone answered me" — and it is usually right.
+- Inside the detail panel, the unread ones are tinted and tagged **new** (or **reply**), under a **New** rule marking where what you had already read ends.
+- Opening a card marks its comments as read. The markers stay put for that visit, so you can actually read what was new before it goes quiet.
+
+Read-state is **per install**, stored in the plugin's own data — never in your notes. "Alex has read this" is not a fact the vault should carry to everyone who has the file, so it does not travel with the note, sync between your machines, or say anything about what a collaborator has read. The flip side: a card the plugin has never seen you open counts as fully unread, so the first time you turn this on, every card with comments lights up. One visit each clears them.
+
 ## Features
 
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
@@ -114,7 +137,7 @@ Whether a card starts expanded or collapsed, before anyone has touched its toggl
 - **Soft WIP limits** — set a per-column limit; the board nudges (never refuses) when you go over.
 - **In-app column management** — add, rename, recolour, set limits, reorder and delete columns; changes are written back to the board note's `columns` frontmatter.
 - **Relative due dates** — *Today*, *Tomorrow*, *in 3d*, *Yesterday*, with overdue cards flagged.
-- **Comments** and auto-generated **history**, appended to the card file with timestamps.
+- **Comments** and auto-generated **history**, appended to the card file with timestamps. Comments can carry an author, and the board marks the ones you have not read yet — with a louder cue when someone answered you (see [Unread comments](#unread-comments)).
 - **Live reload** when files change outside the board, with a self-write echo guard.
 - **Accessible & themed** — keyboard-navigable, ARIA roles and focus management throughout; styled with Obsidian's own CSS variables (light + dark) for a clean, shadcn-grade look.
 
@@ -208,6 +231,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **Add-card button — flow** — `inline` (add in the column), `inline-edit` (add, then open the new card's details), or `detail` (open a details form to create).
 - **Add-card — open new card's details as** — which presentation to use for the two detail-opening add flows.
 - **Card — next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
+- **Your name** — signs the comments you write from the board, and tells the board which comments are yours for [unread marking](#unread-comments). Empty (the default) writes them unsigned.
 - **Subitems — default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).
 - **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
 

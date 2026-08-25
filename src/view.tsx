@@ -118,10 +118,15 @@ export class KanbanView extends FileView {
       );
       return;
     }
-    // The repo reads the history scope live via the getter, so settings changes don't
-    // require rebuilding it — only a file change does (handled in onLoadFile).
+    // The repo reads the history scope and the comment signature live via getters, so settings
+    // changes don't require rebuilding it — only a file change does (handled in onLoadFile).
     if (!this.repo)
-      this.repo = new VaultRepository(this.app, boardPath, () => this.getSettings().historyScope);
+      this.repo = new VaultRepository(
+        this.app,
+        boardPath,
+        () => this.getSettings().historyScope,
+        () => this.getSettings().userName,
+      );
     this.root.render(
       <StrictMode>
         <BoardApp

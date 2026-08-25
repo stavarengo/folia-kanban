@@ -12,6 +12,7 @@
 import { parse as parseYaml } from "yaml";
 import type { CardBody, CardStats, SubItem } from "./types";
 import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
+import { normalizeAuthor } from "./unread";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
 const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
@@ -30,7 +31,11 @@ const INLINE_STATUS_RE = /\[status::\s*([^\]]*?)\s*\]/;
 // unambiguous (a timestamp can never itself contain that sequence) and keeps the format from
 // swallowing an unrelated prose line that happens to start with an italic label, e.g.
 // `- _Decision:_ use SQLite`.
-const TS_LINE_RE = /^\s*[-*]\s+_([0-9: -]+):_\s+([\s\S]*)$/;
+// An optional `@author` may follow the timestamp inside the same italic prefix
+// (`- _2026-08-21 11:49 @rafa:_ text`) — how a person or an agent signs a comment. The author
+// capture excludes whitespace, `:` and `_` so it can never eat the closing `:_ ` delimiter; a line
+// without one parses exactly as before, with an unknown author.
+const TS_LINE_RE = /^\s*[-*]\s+_([0-9: -]+?)(?:\s+@([^\s:_]+))?:_\s+([\s\S]*)$/;
 // Legacy format written before this change: `- [2026-08-21 11:49] text`. Old notes never get
 // rewritten, so this stays supported for reading forever alongside TS_LINE_RE.
 const TS_LINE_LEGACY_RE = /^\s*[-*]\s+\[([^\]]+)\]\s+([\s\S]*)$/;
@@ -205,13 +210,39 @@ export function parseSubtasks(text: string): SubItem[] {
   return items;
 }
 
-function parseTimestamped(body: string, name: string): { timestamp: string; text: string }[] {
-  const out: { timestamp: string; text: string }[] = [];
+/**
+ * Walk a timestamped section's bullet lines. Only the current format carries an author; the legacy
+ * bracketed form and bare bullets report `null`, i.e. "written before anyone signed comments".
+ */
+function parseTimestamped(
+  body: string,
+  name: string,
+): { timestamp: string; text: string; author: string | null }[] {
+  const out: { timestamp: string; text: string; author: string | null }[] = [];
   for (const line of sectionLines(body, name)) {
     if (!/^\s*[-*]\s+/.test(line)) continue;
-    const m = TS_LINE_RE.exec(line) ?? TS_LINE_LEGACY_RE.exec(line);
-    if (m) out.push({ timestamp: (m[1] ?? "").trim(), text: (m[2] ?? "").trim() });
-    else out.push({ timestamp: "", text: line.replace(/^\s*[-*]\s+/, "").trim() });
+    const m = TS_LINE_RE.exec(line);
+    if (m) {
+      out.push({
+        timestamp: (m[1] ?? "").trim(),
+        author: m[2] ?? null,
+        text: (m[3] ?? "").trim(),
+      });
+      continue;
+    }
+    const legacy = TS_LINE_LEGACY_RE.exec(line);
+    if (legacy)
+      out.push({
+        timestamp: (legacy[1] ?? "").trim(),
+        author: null,
+        text: (legacy[2] ?? "").trim(),
+      });
+    else
+      out.push({
+        timestamp: "",
+        author: null,
+        text: line.replace(/^\s*[-*]\s+/, "").trim(),
+      });
   }
   return out;
 }
@@ -244,6 +275,7 @@ export function cardStats(text: string): CardStats {
     checklistDone: b.subtasks.filter((s) => s.done).length,
     subcards: b.subtasks.filter((s) => s.kind === "card").length,
     comments: b.comments.length,
+    commentMarks: b.comments.map((c) => ({ timestamp: c.timestamp, author: c.author })),
     // Every outstanding todo, uncapped: the board still has to drop the ones placed in a column of
     // their own, and capping before that could hide todos that are genuinely waiting. The card tile
     // shows the first `cardNextTodos` of what survives.
@@ -262,10 +294,20 @@ function withBody(text: string, fn: (body: string) => string): string {
   return fmText + fn(body);
 }
 
-export function appendComment(text: string, comment: string, timestamp: string): string {
-  return withBody(text, (b) =>
-    appendToSection(b, SECTION.comments, `- _${timestamp}:_ ${comment}`),
-  );
+/**
+ * Append a comment. `author` signs it inside the italic prefix (`- _<ts> @name:_ text`); left out
+ * or empty, the line is written exactly as it was before authorship existed. The name is
+ * normalized so it can never contain a character that would break the prefix.
+ */
+export function appendComment(
+  text: string,
+  comment: string,
+  timestamp: string,
+  author?: string,
+): string {
+  const signature = author ? normalizeAuthor(author) : "";
+  const prefix = signature ? `${timestamp} @${signature}` : timestamp;
+  return withBody(text, (b) => appendToSection(b, SECTION.comments, `- _${prefix}:_ ${comment}`));
 }
 
 export function appendHistory(text: string, entry: string, timestamp: string): string {
@@ -365,10 +407,11 @@ export function removeSubtask(text: string, index: number): string {
   });
 }
 
-// Matches either the current `- _timestamp:_ ` prefix or the legacy `- [timestamp] ` one, so
-// editing an old note's line keeps its original prefix byte-for-byte instead of migrating it.
+// Matches either the current `- _timestamp:_ ` / `- _timestamp @author:_ ` prefix or the legacy
+// `- [timestamp] ` one, so editing an old note's line keeps its original prefix byte-for-byte
+// instead of migrating it — and editing an authored comment keeps its signature.
 // The `_..._` branch mirrors TS_LINE_RE's character-class boundary rule.
-const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+:_|\[[^\]]+\])\s+)([\s\S]*)$/;
+const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+?(?:\s+@[^\s:_]+)?:_|\[[^\]]+\])\s+)([\s\S]*)$/;
 const BULLET_RE = /^\s*[-*]\s+/;
 
 /**

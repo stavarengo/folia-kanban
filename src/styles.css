@@ -46,6 +46,10 @@
   --folia-accent: var(--interactive-accent);
   --folia-on-accent: var(--text-on-accent, #fff);
   --folia-danger: var(--color-red, #e5534b);
+  /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
+     answered you". Two hues, never a lone colour difference — both cues also carry a word. */
+  --folia-unread: var(--color-blue, #5b8def);
+  --folia-unread-reply: var(--color-purple, #a882e0);
   --folia-success: var(--color-green, #4caf7d);
 
   /* typography — font sizes */
@@ -972,6 +976,22 @@
   align-items: center;
   gap: 3px;
 }
+/* The comment badge picks up a colour + a dot when the card holds comments you haven't read. */
+.folia-card-meta .folia-comments-unread {
+  color: var(--folia-unread);
+  font-weight: var(--folia-font-weight-semibold);
+}
+.folia-card-meta .folia-comments-reply {
+  color: var(--folia-unread-reply);
+  font-weight: var(--folia-font-weight-semibold);
+}
+.folia-unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--folia-r-pill);
+  background: currentColor;
+  margin-left: 1px;
+}
 
 /* ------------------------------------------------------------------ next todos (inline preview) */
 .folia-card-next-todos {
@@ -1598,6 +1618,64 @@
   outline: none;
   border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
+}
+/* One row for a comment's metadata; the <li> itself stacks (metadata, then the comment body). */
+.folia-comment-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.folia-comment-author {
+  font-size: var(--folia-font-size-xxs-plus);
+  color: var(--text-muted);
+  font-weight: var(--folia-font-weight-medium);
+}
+.folia-comment-flag {
+  font-size: var(--folia-font-size-xxs);
+  font-weight: var(--folia-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--folia-r-pill);
+  padding: 0 6px;
+  color: var(--folia-on-accent);
+  background: var(--folia-unread);
+}
+.folia-comment-reply .folia-comment-flag {
+  background: var(--folia-unread-reply);
+}
+.folia-comments li.folia-comment-unread,
+.folia-comments li.folia-comment-reply {
+  padding: 2px 6px 3px 10px;
+  border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
+}
+.folia-comments li.folia-comment-unread {
+  border-left-color: var(--folia-unread);
+  background: color-mix(in srgb, var(--folia-unread) 8%, transparent);
+}
+.folia-comments li.folia-comment-reply {
+  border-left-color: var(--folia-unread-reply);
+  background: color-mix(in srgb, var(--folia-unread-reply) 10%, transparent);
+}
+/* The "New" rule: where the comments you have already read end. Specificity has to beat the
+   `.folia-comments li` block above, which stacks children and draws the quote-style left border. */
+.folia-comments li.folia-comments-divider {
+  display: flex;
+  flex-direction: row;
+  border-left-color: transparent;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--folia-font-size-xxs);
+  font-weight: var(--folia-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--folia-unread);
+  padding: 2px 0 0;
+}
+.folia-comments li.folia-comments-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--folia-unread) 45%, transparent);
 }
 .folia-ts {
   font-size: var(--folia-font-size-xxs-plus);

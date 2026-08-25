@@ -85,7 +85,7 @@ describe("append operations only add at the end (input body is a prefix)", () =>
     expect(out.startsWith(SAMPLE_CARD)).toBe(true);
     expect(out).toContain("## Comments\n- _2026-06-13 10:00:_ first note");
     expect(parseBody(out).comments).toEqual([
-      { timestamp: "2026-06-13 10:00", text: "first note" },
+      { timestamp: "2026-06-13 10:00", author: null, text: "first note" },
     ]);
   });
 
@@ -145,7 +145,7 @@ describe("setDescription", () => {
     const b = parseBody(t);
     expect(b.title).toBe("Write the getting-started guide");
     expect(b.description).toBe("A brand new description.");
-    expect(b.comments).toEqual([{ timestamp: "2026-06-13 10:00", text: "keep me" }]);
+    expect(b.comments).toEqual([{ timestamp: "2026-06-13 10:00", author: null, text: "keep me" }]);
     expect(splitFrontmatter(t).fmText).toBe(splitFrontmatter(SAMPLE_CARD).fmText);
   });
 });
@@ -288,9 +288,9 @@ describe("legacy bracketed timestamp lines — read forever, edited in place wit
 
   it("parseBody reads the legacy [timestamp] form", () => {
     expect(parseBody(legacyThreeComments).comments).toEqual([
-      { timestamp: "2026-06-13 10:00", text: "one" },
-      { timestamp: "2026-06-13 11:00", text: "two" },
-      { timestamp: "2026-06-13 12:00", text: "three" },
+      { timestamp: "2026-06-13 10:00", author: null, text: "one" },
+      { timestamp: "2026-06-13 11:00", author: null, text: "two" },
+      { timestamp: "2026-06-13 12:00", author: null, text: "three" },
     ]);
   });
 
@@ -330,12 +330,16 @@ describe("TS_LINE_RE's timestamp capture is restricted to digits/dash/colon/spac
   it("a timestamp value outside that character set degrades to a plain, timestamp-less bullet on read-back — never a wrong boundary", () => {
     const out = appendComment(SAMPLE_CARD, "note", "build_42");
     expect(out).toContain("- _build_42:_ note");
-    expect(parseBody(out).comments).toEqual([{ timestamp: "", text: "_build_42:_ note" }]);
+    expect(parseBody(out).comments).toEqual([
+      { timestamp: "", author: null, text: "_build_42:_ note" },
+    ]);
   });
 
   it("does not swallow an ordinary italic-labelled bullet as a timestamp", () => {
     const body = "# C\n\n## Comments\n- _Decision:_ use SQLite\n";
-    expect(parseBody(body).comments).toEqual([{ timestamp: "", text: "_Decision:_ use SQLite" }]);
+    expect(parseBody(body).comments).toEqual([
+      { timestamp: "", author: null, text: "_Decision:_ use SQLite" },
+    ]);
   });
 });
 
@@ -488,8 +492,10 @@ All three landed.
 `;
     const b = parseBody(mixed);
     expect(b.description).toBe(parseBody(ownHeadings).description);
-    expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", text: "Applied and checked." }]);
-    expect(b.history).toEqual([{ timestamp: "2026-08-21 11:00", text: "Created" }]);
+    expect(b.comments).toEqual([
+      { timestamp: "2026-08-21 11:49", author: null, text: "Applied and checked." },
+    ]);
+    expect(b.history).toEqual([{ timestamp: "2026-08-21 11:00", author: null, text: "Created" }]);
   });
 
   it("agrees with the section readers on a lowercase owned heading", () => {
@@ -497,7 +503,7 @@ All three landed.
     // `## comments` would show inside the description AND in the comments list.
     const b = parseBody("# T\n\ndesc\n\n## comments\n- _2026-08-21 11:49:_ hi\n");
     expect(b.description).toBe("desc");
-    expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", text: "hi" }]);
+    expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", author: null, text: "hi" }]);
   });
 
   it("reads the whole body when the note has no H1", () => {
@@ -542,7 +548,9 @@ All three landed.
     // Verified identical against the previous boundary rule; pinned so it stays a decision.
     const out = setDescription("# My card\n\nIntro\n", "Intro\n\n## History\n\n- 2024: started");
     expect(parseBody(out).description).toBe("Intro");
-    expect(parseBody(out).history).toEqual([{ timestamp: "", text: "2024: started" }]);
+    expect(parseBody(out).history).toEqual([
+      { timestamp: "", author: null, text: "2024: started" },
+    ]);
   });
 
   it("survives an edit that adds a heading of the note's own", () => {
@@ -644,5 +652,67 @@ describe("inline subtask status (a checklist line's own column)", () => {
   it("is a no-op when the card has no Subtasks section", () => {
     const src = "# T\n\nJust prose.\n";
     expect(setSubtaskStatus(src, 0, "doing")).toBe(src);
+  });
+});
+
+describe("comment authorship — an optional @name inside the italic prefix", () => {
+  it("signs a new comment when an author is given, and leaves it unsigned when it isn't", () => {
+    expect(appendComment(SAMPLE_CARD, "hi", "2026-06-13 10:00", "rafa")).toContain(
+      "- _2026-06-13 10:00 @rafa:_ hi",
+    );
+    expect(appendComment(SAMPLE_CARD, "hi", "2026-06-13 10:00")).toContain(
+      "- _2026-06-13 10:00:_ hi",
+    );
+    expect(appendComment(SAMPLE_CARD, "hi", "2026-06-13 10:00", "")).toContain(
+      "- _2026-06-13 10:00:_ hi",
+    );
+  });
+
+  it("normalizes a name that would otherwise break the line grammar", () => {
+    expect(appendComment(SAMPLE_CARD, "hi", "2026-06-13 10:00", "@Ana Maria")).toContain(
+      "- _2026-06-13 10:00 @Ana-Maria:_ hi",
+    );
+  });
+
+  it("reads the author back, and reports null for every unsigned form", () => {
+    const authored = appendComment(SAMPLE_CARD, "from the agent", "2026-06-13 10:00", "agent");
+    expect(parseBody(authored).comments).toEqual([
+      { timestamp: "2026-06-13 10:00", author: "agent", text: "from the agent" },
+    ]);
+    const legacy = "# C\n\n## Comments\n- [2026-06-13 10:00] old one\n- plain bullet\n";
+    expect(parseBody(legacy).comments).toEqual([
+      { timestamp: "2026-06-13 10:00", author: null, text: "old one" },
+      { timestamp: "", author: null, text: "plain bullet" },
+    ]);
+  });
+
+  it("never writes an author onto a History line", () => {
+    const out = appendHistory(SAMPLE_CARD, "Created", "2026-06-13 10:00");
+    expect(out).toContain("- _2026-06-13 10:00:_ Created");
+    expect(parseBody(out).history).toEqual([
+      { timestamp: "2026-06-13 10:00", author: null, text: "Created" },
+    ]);
+  });
+
+  it("edits an authored comment's text and keeps its `@name` prefix byte-identical", () => {
+    const authored = appendComment(SAMPLE_CARD, "first draft", "2026-06-13 10:00", "rafa");
+    const out = updateTimestampedLine(authored, SECTION.comments, 0, "second draft");
+    expect(out).toBe(
+      authored.replace(
+        "- _2026-06-13 10:00 @rafa:_ first draft",
+        "- _2026-06-13 10:00 @rafa:_ second draft",
+      ),
+    );
+  });
+
+  it("carries the author onto cardStats, alongside the plain count", () => {
+    let t = appendComment(SAMPLE_CARD, "one", "2026-06-13 10:00", "agent");
+    t = appendComment(t, "two", "2026-06-13 11:00");
+    const s = cardStats(t);
+    expect(s.comments).toBe(2);
+    expect(s.commentMarks).toEqual([
+      { timestamp: "2026-06-13 10:00", author: "agent" },
+      { timestamp: "2026-06-13 11:00", author: null },
+    ]);
   });
 });

@@ -25,6 +25,21 @@ export interface KanbanSettings {
    *  subitems toggle is used (directly, or via a column's collapse/expand-all). Absent from this
    *  map means "follow `subitemsDefault`". Plugin data, never written to the note. */
   collapsedCards: Record<string, boolean>;
+  /**
+   * The name comments added from the board are signed with (`- _<ts> @name:_ …`). Empty (the
+   * default) writes them unsigned, exactly as before authorship existed. It is also who "me" is:
+   * comments carrying this name are never unread, and an unread comment landing after one of them
+   * is what the board calls a reply.
+   */
+  userName: string;
+  /**
+   * Read-state for comments, keyed by card path: the timestamp of the newest comment already seen
+   * on that card. Written when its detail panel is open. Plugin data, never written to the note —
+   * "Rafa has read this" is personal to one install, not a fact the vault should carry to everyone
+   * who has the file. A card missing from this map has never been opened, so all of its comments
+   * count as unread.
+   */
+  commentsSeen: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
@@ -39,6 +54,8 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   boardNoteDefaultView: "board",
   subitemsDefault: "expanded",
   collapsedCards: {},
+  userName: "",
+  commentsSeen: {},
 };
 
 export const DETAIL_WIDTH_MIN = 280;

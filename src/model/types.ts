@@ -1,6 +1,8 @@
 // Domain types for the Folia Kanban model. Everything here is plain data so the
 // model layer stays pure and unit-testable with no Obsidian dependency.
 
+import type { CommentMark } from "./unread";
+
 /** The board-level `card-title` property. `auto` = guess per card from the file name's shape. */
 export type TitleMode = "auto" | "filename" | "heading";
 
@@ -49,6 +51,12 @@ export interface SubItem {
 interface Comment {
   timestamp: string;
   text: string;
+  /**
+   * Who wrote it, from the optional `@name` inside the line's italic prefix
+   * (`- _2026-08-21 11:49 @rafa:_ text`). `null` when the line carries none — every comment written
+   * before authorship existed, and every one written by someone who set no name.
+   */
+  author: string | null;
 }
 
 interface HistoryEntry {
@@ -74,6 +82,11 @@ export interface CardStats {
   /** Subcard-link checklist lines only (git-branch info). */
   subcards: number;
   comments: number;
+  /**
+   * Each comment reduced to its timestamp + author, in document order — everything the unread
+   * markers need without carrying comment text onto the board. Same length as `comments`.
+   */
+  commentMarks: CommentMark[];
   /**
    * The outstanding plain todos in document order. `index` is the `SubItem.index` (0-based among
    * ALL checklist lines) so a rendered row can be toggled later.

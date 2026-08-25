@@ -495,6 +495,18 @@ class KanbanSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Your name")
+      .setDesc(
+        "Signs the comments you write from the board (e.g. \u201calex\u201d \u2192 \u201c- _2026-08-21 11:49 @alex:_ \u2026\u201d), so your own comments never show as unread and a comment landing after one of yours reads as a reply. Leave empty to write comments unsigned.",
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder("Alex")
+          .setValue(this.plugin.settings.userName)
+          .onChange((v) => void this.plugin.updateSettings({ userName: v.trim() })),
+      );
+
+    new Setting(containerEl)
       .setName("History — what to record")
       .setDesc(
         "Moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",

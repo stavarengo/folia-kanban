@@ -7,7 +7,8 @@
       "orange": { "$value": "var(--color-orange, #d9882f)", "$type": "color" },
       "yellow": { "$value": "var(--color-yellow, #c2a312)", "$type": "color" },
       "blue": { "$value": "var(--color-blue, #5b8def)", "$type": "color" },
-      "green": { "$value": "var(--color-green, #4caf7d)", "$type": "color" }
+      "green": { "$value": "var(--color-green, #4caf7d)", "$type": "color" },
+      "purple": { "$value": "var(--color-purple, #a882e0)", "$type": "color" }
     },
     "border": {
       "$value": "var(--background-modifier-border)",
@@ -58,6 +59,30 @@
           "cssVar": "--folia-success",
           "live": true,
           "resolvedValue": "var(--color-green, #4caf7d)"
+        }
+      }
+    },
+    "unread": {
+      "$description": "Comments you have not read yet: the tile badge, the panel marker and the \"New\" rule.",
+      "$value": "{color.primitive.blue}",
+      "$type": "color",
+      "$extensions": {
+        "folia": {
+          "cssVar": "--folia-unread",
+          "live": true,
+          "resolvedValue": "var(--color-blue, #5b8def)"
+        }
+      }
+    },
+    "unread-reply": {
+      "$description": "The louder of the two unread cues: an unread comment that landed after one of your own.",
+      "$value": "{color.primitive.purple}",
+      "$type": "color",
+      "$extensions": {
+        "folia": {
+          "cssVar": "--folia-unread-reply",
+          "live": true,
+          "resolvedValue": "var(--color-purple, #a882e0)"
         }
       }
     },

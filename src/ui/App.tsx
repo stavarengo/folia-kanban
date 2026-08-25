@@ -318,14 +318,22 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             reportError(e);
           } finally {
             setSelected((cur) => (cur === path ? null : cur));
-            // Prune its collapse-state override (§ collapse), same reason renameCard migrates
-            // one: left behind, it would silently hand its collapsed/expanded state to an
-            // unrelated card someone later creates at this same path.
+            // Prune the per-path plugin data this card owned — its collapse-state override
+            // (§ collapse) and its comments-seen marker (§ unread). Left behind, either would
+            // silently hand its state to an unrelated card someone later creates at this same
+            // path. One patch, because two calls would each build on the same stale snapshot.
+            const prune: Partial<KanbanSettings> = {};
             if (settingsRef.current.collapsedCards[path] !== undefined) {
               const nextCollapsed = { ...settingsRef.current.collapsedCards };
               delete nextCollapsed[path];
-              onUpdateSettings({ collapsedCards: nextCollapsed });
+              prune.collapsedCards = nextCollapsed;
             }
+            if (settingsRef.current.commentsSeen[path] !== undefined) {
+              const nextSeen = { ...settingsRef.current.commentsSeen };
+              delete nextSeen[path];
+              prune.commentsSeen = nextSeen;
+            }
+            if (Object.keys(prune).length) onUpdateSettings(prune);
             await load();
           }
         })();
@@ -342,17 +350,29 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             // card was selected, follow it to its new path so the detail/selection holds.
             if (newPath !== path) {
               setSelected((cur) => (cur === path ? newPath : cur));
-              // Subitems-collapse state (§ collapse) is keyed by path in settings, same as
-              // selection — follow it too, or a toggled card silently resets to the board default,
-              // and its vacated path could later hand that state to an unrelated card reusing it.
+              // Per-path plugin data is keyed by path in settings, same as selection — follow it
+              // to the new path, or a toggled card silently resets to the board default and its
+              // already-read comments all light up again; the vacated path could also later hand
+              // that state to an unrelated card reusing it. Both maps move in ONE patch, because
+              // two calls would each build on the same stale settings snapshot.
+              const migrated: Partial<KanbanSettings> = {};
               const collapsedCards = settingsRef.current.collapsedCards;
               const collapsed = collapsedCards[path];
               if (collapsed !== undefined) {
                 const nextCollapsed = { ...collapsedCards };
                 delete nextCollapsed[path];
                 nextCollapsed[newPath] = collapsed;
-                onUpdateSettings({ collapsedCards: nextCollapsed });
+                migrated.collapsedCards = nextCollapsed;
               }
+              const commentsSeen = settingsRef.current.commentsSeen;
+              const seen = commentsSeen[path];
+              if (seen !== undefined) {
+                const nextSeen = { ...commentsSeen };
+                delete nextSeen[path];
+                nextSeen[newPath] = seen;
+                migrated.commentsSeen = nextSeen;
+              }
+              if (Object.keys(migrated).length) onUpdateSettings(migrated);
             }
           } catch (e) {
             reportError(e);

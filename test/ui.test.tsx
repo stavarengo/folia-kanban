@@ -161,7 +161,9 @@ describe("board rendering", () => {
     expect(within(alpha).getByText("A")).toBeInTheDocument(); // priority chip
     expect(within(alpha).getByText("1/3")).toBeInTheDocument(); // 1 of 3 checklist lines done (2 todos + 1 subcard)
     expect(within(alpha).getByTitle("Subcards")).toHaveTextContent("1"); // 1 subcard
-    expect(within(alpha).getByTitle("Comments")).toHaveTextContent("1"); // 1 comment
+    // The badge names what it counts AND what is new: no card has been opened, so its one comment
+    // (unsigned, so not "mine") is unread.
+    expect(within(alpha).getByTitle("1 comment, 1 unread")).toHaveTextContent("1");
 
     const gamma = screen.getByText("Gamma").closest(".folia-card") as HTMLElement;
     expect(within(gamma).getByTitle("Due 2026-06-01")).toHaveTextContent("12d ago"); // overdue, relative
@@ -2374,5 +2376,66 @@ describe("blocking relationships", () => {
     expect(within(detail).queryByLabelText("Value of blocks")).toBeNull();
     await user.type(within(detail).getByLabelText("New property name"), "blocks");
     expect(within(detail).getByRole("button", { name: "Add property" })).toBeDisabled();
+  });
+});
+
+describe("unread comments", () => {
+  const conversation = () =>
+    new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @rafa:_ mine\n- _2026-06-13 10:00 @agent:_ from the agent\n",
+      },
+    });
+  const asRafa: KanbanSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
+
+  it("flags the tile as a reply when an unread comment follows one of yours", async () => {
+    render_(conversation(), asRafa);
+    const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    // Two comments, one of them yours — so only the agent's counts, and it came after yours.
+    expect(within(alpha).getByTitle("2 comments, 1 unread — a reply to yours")).toHaveClass(
+      "folia-comments-reply",
+    );
+  });
+
+  it("with no name set nothing is yours, so both comments read as plain unread", async () => {
+    render_(conversation());
+    const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    expect(within(alpha).getByTitle("2 comments, 2 unread")).toHaveClass("folia-comments-unread");
+  });
+
+  it("opening a card shows the New divider, keeps it for the visit, and quiets the tile", async () => {
+    const user = userEvent.setup();
+    const box = { current: asRafa };
+    renderStateful(conversation(), asRafa, box);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("New")).toBeInTheDocument();
+    expect(within(detail).getByText("reply")).toBeInTheDocument();
+    expect(within(detail).getByText("@agent")).toBeInTheDocument();
+
+    // The visit records the newest comment as seen...
+    await waitFor(() =>
+      expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 10:00"),
+    );
+    // ...but the panel keeps showing what was new when it opened — otherwise it would erase the
+    // markers in the same breath as showing them.
+    expect(within(detail).getByText("New")).toBeInTheDocument();
+    // The tile is quiet again.
+    const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
+    await waitFor(() => expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument());
+  });
+
+  it("shows no markers once the card has been seen", async () => {
+    const user = userEvent.setup();
+    render_(conversation(), {
+      ...asRafa,
+      commentsSeen: { "Tasks/Alpha.md": "2026-06-13 10:00" },
+    });
+    const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    await user.click(screen.getByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).queryByText("New")).toBeNull();
   });
 });

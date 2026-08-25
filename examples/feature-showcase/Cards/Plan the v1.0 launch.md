@@ -25,8 +25,9 @@ Every subitem here can claim a column of its own, whichever kind it is. "Cut the
 - [ ] [[Record the launch demo]]
 
 ## Comments
-- _2026-06-13 14:32:_ Targeting next Friday if review clears.
-- _2026-06-15 09:10:_ Changelog draft started.
+- _2026-06-13 14:32 @alex:_ Targeting next Friday if review clears.
+- _2026-06-15 09:10 @alex:_ Changelog draft started.
+- _2026-06-16 08:05 @agent:_ Review is clear on my side — the changelog is the only thing still open. Friday works.
 
 ## History
 - _2026-06-10 09:05:_ Created

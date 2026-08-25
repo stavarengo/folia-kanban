@@ -842,6 +842,7 @@ describe("subitems in a column of their own", () => {
         checklistDone: 0,
         subcards: 0,
         comments: 0,
+        commentMarks: [],
         nextTodos: [
           { text: "Moved", index: 0 },
           { text: "Stays", index: 1 },
@@ -863,6 +864,7 @@ describe("subitems in a column of their own", () => {
         checklistDone: 0,
         subcards: 0,
         comments: 0,
+        commentMarks: [],
         nextTodos: [
           { text: "Hand-written", index: 0 },
           { text: "Open", index: 1 },
@@ -938,6 +940,7 @@ describe("subitems in a column of their own", () => {
         checklistDone: 0,
         subcards: 0,
         comments: 0,
+        commentMarks: [],
         nextTodos: [{ text: "Ship it", index: 0 }],
       },
     };
@@ -966,6 +969,7 @@ describe("subitems in a column of their own", () => {
         checklistDone: 0,
         subcards: 0,
         comments: 0,
+        commentMarks: [],
         nextTodos: [
           { text: "p1", index: 0 },
           { text: "p2", index: 1 },

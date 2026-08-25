@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
+import type { UnreadState } from "../model/unread";
 import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
 import {
@@ -10,6 +11,7 @@ import {
   useRelationCounts,
   useSettings,
   useSubitemsCollapse,
+  useUnreadComments,
 } from "./context";
 import { Icon } from "./icons";
 
@@ -76,6 +78,10 @@ function CardItemInner({
   // Blocking markers come from the board graph (a link on ANOTHER card decides what this one
   // shows), so they arrive through their own context rather than this card's memoized props.
   const relations = useRelationCounts()[card.path];
+  // Unread comments (§ unread): read-state lives in plugin data, not the note, so it is read here
+  // from settings rather than arriving on the memoized card. `reply` = an unread comment that
+  // landed after one of your own.
+  const unread = useUnreadComments(card.path, card.stats?.commentMarks);
   const chips = [...relationChips(relations), ...cardChips(card, today, actions.doneColumnId)];
   const stats = card.stats;
   const fm = card.frontmatter;
@@ -274,10 +280,12 @@ function CardItemInner({
             )}
             {stats.comments > 0 && (
               <span
-                title="Comments"
-                aria-label={`${stats.comments} comment${stats.comments === 1 ? "" : "s"}`}
+                className={unread.kind === "none" ? undefined : `folia-comments-${unread.kind}`}
+                title={commentsTitle(stats.comments, unread)}
+                aria-label={commentsTitle(stats.comments, unread)}
               >
                 <Icon name="message" size={13} /> {stats.comments}
+                {unread.kind !== "none" && <span className="folia-unread-dot" aria-hidden="true" />}
               </span>
             )}
           </div>
@@ -439,6 +447,17 @@ function CardItemInner({
   );
 }
 
+/**
+ * The comment badge's tooltip and accessible name — additive, so the count a sighted user reads is
+ * still spoken, with what is new appended rather than replacing it.
+ */
+function commentsTitle(total: number, unread: UnreadState): string {
+  const base = `${total} comment${total === 1 ? "" : "s"}`;
+  if (unread.kind === "none") return base;
+  const news = `${unread.indices.length} unread`;
+  return unread.kind === "reply" ? `${base}, ${news} \u2014 a reply to yours` : `${base}, ${news}`;
+}
+
 /** The claims a card's checklist lines make, as one comparable string (see the memo below). */
 function claimsOf(card: Card): string {
   return (card.subItems ?? []).map((i) => `${i.index}:${i.status ?? ""}`).join("|");
@@ -452,6 +471,8 @@ function sameStats(a?: CardStats, b?: CardStats): boolean {
     a.checklistDone === b.checklistDone &&
     a.subcards === b.subcards &&
     a.comments === b.comments &&
+    a.commentMarks.map((c) => `${c.timestamp}:${c.author ?? ""}`).join("\n") ===
+      b.commentMarks.map((c) => `${c.timestamp}:${c.author ?? ""}`).join("\n") &&
     a.nextTodos.map((t) => `${t.index}:${t.text}`).join("\n") ===
       b.nextTodos.map((t) => `${t.index}:${t.text}`).join("\n")
   );

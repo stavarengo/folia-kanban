@@ -2,6 +2,8 @@ import { createContext, useContext, useMemo } from "react";
 import type { RelationCounts } from "../model/board";
 import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
+import type { CommentMark, UnreadState } from "../model/unread";
+import { unreadComments } from "../model/unread";
 import type { KanbanSettings } from "../settings";
 
 /**
@@ -94,6 +96,21 @@ export function useSubitemsCollapse(): SubitemsCollapse {
     }),
     [settings.collapsedCards, settings.subitemsDefault, update],
   );
+}
+
+/**
+ * Unread-comment state for one card, read live from settings. A card that was never opened has no
+ * `commentsSeen` entry, so every comment on it counts as unread — the honest default: nothing was
+ * silently marked read on your behalf, and one visit to a card clears it.
+ */
+export function useUnreadComments(
+  path: string,
+  marks: readonly CommentMark[] | undefined,
+): UnreadState {
+  const settings = useSettings();
+  const seen = settings.commentsSeen[path];
+  const userName = settings.userName;
+  return useMemo(() => unreadComments(marks ?? [], seen, userName), [marks, seen, userName]);
 }
 
 /** Card-level actions, provided by App so cards/columns don't prop-drill callbacks. */
