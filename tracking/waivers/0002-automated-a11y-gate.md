@@ -21,7 +21,7 @@ The a11y *contracts* were always real and documented — the per-component / per
 
 The automated a11y gate is installed and enforced. It is **two-layered**:
 
-- **Static** — `eslint` + `eslint-plugin-jsx-a11y`, exposed as the `lint:a11y` script.
+- **Static** — `eslint` + `eslint-plugin-jsx-a11y`, exposed as the `lint:a11y` script (which also runs `a11y-exceptions:check`, the fence around the file-scoped exceptions).
 - **Runtime** — `vitest-axe` over the UI suite, exposed as the `test:a11y` script.
 
 Both layers run under `ds:check` and the `lefthook` pre-commit/pre-push hooks, so the gate blocks regressions locally and in CI.
@@ -35,7 +35,7 @@ Both layers run under `ds:check` and the `lefthook` pre-commit/pre-push hooks, s
 - Column-count badge uses `role=img`.
 - Combobox now exposes `aria-activedescendant` + per-option `id`s.
 - `ColumnMenu` delete-confirm now uses `role=alertdialog`.
-- Dead `jsx-a11y` `eslint-disable` directives removed; the few remaining disables are justified (dnd-spread / dialog-keyboard false positives).
+- Dead `jsx-a11y` `eslint-disable` directives removed; the few remaining exceptions are justified (dnd-spread / dialog-keyboard false positives). They no longer live in `eslint-disable` comments — Obsidian's community-directory scan errors on a directive naming a rule its own ESLint config never loaded — but in file-scoped `off` blocks in `eslint.config.mjs`, fenced by `a11y-exceptions:check`, which re-runs those rules on those files and fails on any violation beyond the nine documented ones.
 
 **Remaining (why this waiver stays `active`):**
 

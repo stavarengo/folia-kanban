@@ -141,7 +141,10 @@ export default [
     //    cannot see, and the detail resize handle is a pointer-only `role="separator"`;
     //  - click-to-edit on the description is a convenience with a real keyboard equivalent (the
     //    "Edit description" button rendered next to it).
-    // Kept scoped to the exact rule/file pairs the call sites need, so nothing else is relaxed.
+    // ESLint can only switch a rule off per file, so these blocks are wider than the nine call
+    // sites they exist for. `pnpm a11y-exceptions:check` (in `pnpm verify`) closes that gap: it
+    // re-runs exactly these rules on exactly these files and fails on any violation beyond the
+    // documented ones, so the files are not actually unguarded.
     files: ["src/ui/CardDetail.tsx", "src/ui/ColumnEditModal.tsx", "src/ui/ColumnMenu.tsx"],
     rules: { "jsx-a11y/no-noninteractive-element-interactions": "off" },
   },

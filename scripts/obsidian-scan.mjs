@@ -13,6 +13,15 @@
 //    would add an identical copy under dist/, so the CSS file list is filtered explicitly below
 //    to keep the check deterministic. IGNORES is still passed through unchanged.
 //
+// Known limit of the reproduction: the bot npm-installs its own tool versions at run time
+// (stylelint 17.6.0, stylelint-no-unsupported-browser-features 8.1.1, eslint 9.37.0,
+// eslint-plugin-obsidianmd 0.4.1, typescript-eslint 8.61.1). Everything here is pinned to the
+// same version EXCEPT eslint itself, which stays on the repo's own major (10.x) because two
+// eslint majors cannot coexist in one install. The obsidianmd plugin's peer range covers both,
+// but a rule whose behaviour differs between the two majors could still diverge. The browser
+// feature data (caniuse-lite) is likewise pinned here and fresh on the bot, so a data update can
+// surface a CSS warning there that this check has not seen yet.
+//
 // `stylelint-no-unsupported-browser-features` is only named as a string in the stylelint config,
 // the way lint.ts does it, so knip cannot see the dependency — it is listed in knip.json's
 // ignoreDependencies for that reason.
@@ -332,32 +341,58 @@ const runEslint = async () => {
   return { linted, findings };
 };
 
-// Findings we have decided not to act on yet, matched exactly on rule + file. Anything not
-// listed here fails the check, so a new finding can never hide behind a count threshold.
+// Findings we have decided not to act on yet. An entry matches on tool + rule + file + the exact
+// message text, and on how many times it may occur; a second occurrence, or a changed message, is
+// an unexpected finding like any other. An entry that stops matching is reported too, so a stale
+// baseline cannot quietly outlive the thing it excused.
 const BASELINE = [
   {
     tool: "eslint",
     rule: "obsidianmd/settings-tab/prefer-setting-definitions",
     file: "src/main.ts",
+    text: "This PluginSettingTab does not implement getSettingDefinitions(); its settings will not appear in Obsidian's settings search for users on 1.13.0 or later. Consider adopting the declarative settings API.",
+    count: 1,
     // Obsidian's declarative settings API is @since 1.13.0, and obsidian.d.ts states display() is
     // not called once getSettingDefinitions() returns a non-empty array. With minAppVersion 1.7.4
     // adopting it means either two parallel settings UIs or broken settings below 1.13.
     // docs/ai/backlog/20260826.01.settings-tab-is-invisible-to-obsidian-settings-search.md
-    note: "declarative settings API needs minAppVersion >= 1.13; see the backlog entry",
   },
 ];
 
-const isBaselined = (tool, f) =>
-  BASELINE.some(
-    (b) =>
-      b.tool === tool && b.rule === f.rule && String(f.file).replace(`${root}/`, "") === b.file,
-  );
+const relative = (file) => String(file).replace(`${root}/`, "");
 
-const report = (label, { linted, findings }) => {
+// Walks the findings once, handing each the first baseline entry that still has room for it.
+// Returns the findings nothing excused, plus the entries that matched fewer times than declared.
+const applyBaseline = (all) => {
+  const left = BASELINE.map((b) => b.count);
+  const excused = new Set();
+  const unexpected = [];
+
+  for (const [tool, f] of all) {
+    const i = BASELINE.findIndex(
+      (b, n) =>
+        left[n] > 0 &&
+        b.tool === tool &&
+        b.rule === f.rule &&
+        b.file === relative(f.file) &&
+        b.text === f.text,
+    );
+    if (i === -1) unexpected.push([tool, f]);
+    else {
+      left[i] -= 1;
+      excused.add(f);
+    }
+  }
+
+  const stale = BASELINE.map((b, n) => ({ ...b, missing: left[n] })).filter((b) => b.missing > 0);
+  return { unexpected, excused, stale };
+};
+
+const report = (label, { linted, findings }, excused) => {
   console.log(`\n=== ${label} ===`);
   if (verbose) {
     console.log(`linted ${linted.length} file(s):`);
-    for (const f of linted) console.log(`  ${f.replace(`${root}/`, "")}`);
+    for (const f of linted) console.log(`  ${relative(f)}`);
   } else {
     console.log(`linted ${linted.length} file(s)`);
   }
@@ -366,8 +401,8 @@ const report = (label, { linted, findings }) => {
     return;
   }
   for (const f of findings) {
-    const where = `${String(f.file).replace(`${root}/`, "")}:${f.line}:${f.column}`;
-    const tag = isBaselined(label, f) ? "baselined" : f.severity;
+    const where = `${relative(f.file)}:${f.line}:${f.column}`;
+    const tag = excused.has(f) ? "baselined" : f.severity;
     console.log(`  ${tag}  ${where}  ${f.rule}  ${f.text}`);
   }
 };
@@ -380,18 +415,26 @@ console.log(
 );
 
 const css = await runStylelint(minElectron);
-report("stylelint", css);
 const js = await runEslint();
-report("eslint", js);
 
 const all = [
   ...css.findings.map((f) => ["stylelint", f]),
   ...js.findings.map((f) => ["eslint", f]),
 ];
-const unexpected = all.filter(([tool, f]) => !isBaselined(tool, f));
-const baselined = all.length - unexpected.length;
-console.log(`\n${all.length} finding(s): ${unexpected.length} unexpected, ${baselined} baselined.`);
+const { unexpected, excused, stale } = applyBaseline(all);
+
+report("stylelint", css, excused);
+report("eslint", js, excused);
+
+console.log(
+  `\n${all.length} finding(s): ${unexpected.length} unexpected, ${all.length - unexpected.length} baselined.`,
+);
+for (const b of stale) {
+  console.error(
+    `obsidian-scan: baseline entry for ${b.rule} in ${b.file} matched ${b.count - b.missing} of ${b.count} declared finding(s) — remove or narrow it.`,
+  );
+}
 if (unexpected.length > 0) {
   console.error("obsidian-scan: the community scan would report the findings above.");
-  process.exit(1);
 }
+if (unexpected.length > 0 || stale.length > 0) process.exit(1);

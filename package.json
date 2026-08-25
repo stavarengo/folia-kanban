@@ -34,10 +34,11 @@
     "waivers:check": "node scripts/check-waivers.mjs",
     "obsidian-scan:check": "node scripts/obsidian-scan.mjs",
     "ds:check": "pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm lint:a11y && pnpm test:a11y && pnpm test:visual",
-    "lint:a11y": "eslint src",
+    "lint:a11y": "eslint src && pnpm a11y-exceptions:check",
+    "a11y-exceptions:check": "node scripts/check-a11y-exceptions.mjs",
     "test:a11y": "vitest run test/a11y.axe.test.tsx",
     "test:visual": "vitest run test/visual-regression.test.tsx",
-    "verify": "pnpm doctor && pnpm format:check && pnpm filesystem:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check && pnpm architecture:check && pnpm schema:check && pnpm dead-code:check && pnpm docs:check && pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm obsidian-scan:check",
+    "verify": "pnpm doctor && pnpm format:check && pnpm filesystem:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check && pnpm architecture:check && pnpm schema:check && pnpm dead-code:check && pnpm docs:check && pnpm tokens:check && pnpm audit:raw-values && pnpm waivers:check && pnpm a11y-exceptions:check && pnpm obsidian-scan:check",
     "verify:ui": "pnpm verify",
     "prepare": "lefthook install"
   },
