@@ -337,6 +337,9 @@ function relationChoices(board: Board, selfPath: string): Map<string, string> {
     if (!c || p === selfPath) continue;
     offer(c.title, c);
     if (c.basename !== c.title) offer(c.basename, c);
+    // A card whose file name another folder repeats is also offered under its path, which is
+    // unique — otherwise two cards sharing a name AND a title would be unreachable from here.
+    if ((nameCount.get(c.basename) ?? 0) > 1) offer(targetFor(c), c);
   }
   const out = new Map<string, string>();
   for (const [label, card] of choices) {
@@ -1001,7 +1004,11 @@ export function CardDetail({
                 {...(l.source === "own"
                   ? {
                       onRemove: () =>
-                        void mutate(() => repo.removeRelation(path, l.type, l.target)),
+                        void mutate(async () => {
+                          // Every spelling the note uses for this one link, so the row it showed
+                          // does not come straight back on the next load.
+                          for (const t of l.targets) await repo.removeRelation(path, l.type, t);
+                        }),
                     }
                   : { note: RELATION_NOTES[l.source] })}
               />

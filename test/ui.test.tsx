@@ -1878,7 +1878,29 @@ describe("blocking relationships", () => {
     expect(within(cardOf("Keyboard bug")).getByText("Blocked")).toBeInTheDocument();
   });
 
-  it("does not offer a file name two cards share, which the board refuses to bind", async () => {
+  it("clears every spelling a note gives one link, so the row does not come back", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Blocker.md": {
+          fm: { type: "task", status: "todo", blocks: ["[[Waiting]]", "[[Tasks/Waiting]]"] },
+          body: "\n# Blocker\n",
+        },
+        "Tasks/Waiting.md": { fm: { type: "task", status: "doing" }, body: "\n# Waiting\n" },
+      },
+      () => "all",
+    );
+    render_(repo);
+    await user.click(await screen.findByText("Blocker"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(within(detail).getByLabelText("Remove relationship to Waiting"));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Blocker.md")!.fm).not.toHaveProperty("blocks"),
+    );
+  });
+
+  it("offers a card by its path when its file name alone could not reach it", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
@@ -1888,9 +1910,9 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Here"));
     const detail = await screen.findByTestId("card-detail");
-    // Both candidates answer to the same file name, which the board refuses to resolve, so the
-    // field offers nothing rather than hand out a link that would land dead.
-    expect(blockSuggestions(detail)).toEqual([]);
+    // Neither the shared file name nor the title (which equals it here) can pick one of the two,
+    // so each is offered under its path instead — the one label that names exactly one note.
+    expect(blockSuggestions(detail)).toEqual(["Tasks/One/B", "Tasks/Two/B"]);
   });
 
   it("refuses a link to the card itself, which the board would only drop again", async () => {

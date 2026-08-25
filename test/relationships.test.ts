@@ -156,10 +156,10 @@ describe("buildBoard relationships", () => {
       card("B", { status: "todo" }),
     ]);
     expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "B", path: "Tasks/B.md", source: "own" },
+      { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "own" },
     ]);
     expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-      { type: "blocks", target: "A", path: "Tasks/A.md", source: "inverse" },
+      { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "inverse" },
     ]);
     // The inverse is derived only — nothing is written back to B.
     expect(b.cards["Tasks/B.md"]?.frontmatter["blocked-by"]).toBeUndefined();
@@ -171,10 +171,10 @@ describe("buildBoard relationships", () => {
       card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
     ]);
     expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "B", path: "Tasks/B.md", source: "inverse" },
+      { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "inverse" },
     ]);
     expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-      { type: "blocks", target: "A", path: "Tasks/A.md", source: "own" },
+      { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "own" },
     ]);
   });
 
@@ -188,10 +188,10 @@ describe("buildBoard relationships", () => {
       ];
       const b = buildBoard(config, order === 0 ? pair : pair.reverse());
       expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-        { type: "blocks", target: "B", path: "Tasks/B.md", source: "both" },
+        { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "both" },
       ]);
       expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-        { type: "blocks", target: "A", path: "Tasks/A.md", source: "both" },
+        { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "both" },
       ]);
     }
   });
@@ -204,10 +204,22 @@ describe("buildBoard relationships", () => {
     expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.source).toBe("own");
   });
 
+  it("remembers every spelling one note gives a single link, so removing it clears them all", () => {
+    // `[[B]]` and `[[Tasks/B]]` name one card, so they are one row — but both are in the note, and
+    // leaving either behind would bring that row straight back on the next load.
+    const b = buildBoard(config, [
+      card("A", { status: "todo", blocks: ["[[B]]", "[[Tasks/B]]"] }),
+      card("B", { status: "todo" }),
+    ]);
+    const link = b.cards["Tasks/A.md"]?.relations?.blocks;
+    expect(link).toHaveLength(1);
+    expect(link?.[0]?.targets).toEqual(["B", "Tasks/B"]);
+  });
+
   it("keeps a target that matches no card, marked unresolved", () => {
     const b = buildBoard(config, [card("A", { status: "todo", blocks: ["[[Ghost]]"] })]);
     expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "Ghost", path: null, source: "own" },
+      { type: "blocks", target: "Ghost", targets: ["Ghost"], path: null, source: "own" },
     ]);
   });
 

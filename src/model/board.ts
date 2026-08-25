@@ -228,7 +228,13 @@ function buildRelations(
       if (existing.declarer !== declarer) {
         if (existing.out) existing.out.source = "both";
         if (existing.in) existing.in.source = "both";
+        return;
       }
+      // Stated twice by the SAME note, spelled differently (`[[B]]` and `[[Tasks/B]]`). One row,
+      // but every spelling has to go when it is removed — remember them all on that row.
+      const link = declaredBy === "blocker" ? existing.out : existing.in;
+      const extra = declaredBy === "blocker" ? blocked.target : blocker.target;
+      if (link && !link.targets.includes(extra)) link.targets.push(extra);
       return;
     }
     const record: { declarer: string | null; out?: RelationLink; in?: RelationLink } = { declarer };
@@ -236,6 +242,7 @@ function buildRelations(
       record.out = {
         type: "blocks",
         target: blocked.target,
+        targets: [blocked.target],
         path: blocked.path,
         source: declaredBy === "blocker" ? "own" : "inverse",
       };
@@ -245,6 +252,7 @@ function buildRelations(
       record.in = {
         type: "blocks",
         target: blocker.target,
+        targets: [blocker.target],
         path: blocker.path,
         source: declaredBy === "blocked" ? "own" : "inverse",
       };

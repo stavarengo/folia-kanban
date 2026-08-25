@@ -91,8 +91,14 @@ type RelationSource = "own" | "inverse" | "both";
 /** One end of a relationship, as one card sees it. */
 export interface RelationLink {
   type: RelationType;
-  /** The link text as the note holds it, e.g. `Other card` out of `[[Other card]]`. */
+  /** The link text as the declaring note first writes it — what a row shows. */
   target: string;
+  /**
+   * Every way that note writes this one link, `target` first. A hand-edited note can spell the
+   * same relationship more than once — `[[B]]` and `[[Tasks/B]]` both name one card — and clearing
+   * it has to clear all of them, or the row it showed comes back on the next load.
+   */
+  targets: string[];
   /** Vault path of the card the target resolves to, or `null` when no card on the board matches. */
   path: string | null;
   source: RelationSource;
