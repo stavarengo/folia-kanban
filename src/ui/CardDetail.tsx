@@ -313,13 +313,23 @@ const BLOCKED_BY_NOTES: Record<"own" | "inverse" | "both", { text: string; title
  * itself.
  */
 function relationChoices(board: Board, selfPath: string): Map<string, string> {
-  const choices = new Map<string, { path: string; basename: string }>();
+  // A file name two cards share cannot be linked BY that name — the board refuses to bind it — so
+  // such a card is offered as its full path instead, which names exactly one note.
+  const nameCount = new Map<string, number>();
+  for (const p in board.cards) {
+    const c = board.cards[p];
+    if (c) nameCount.set(c.basename, (nameCount.get(c.basename) ?? 0) + 1);
+  }
+  const targetFor = (c: Card) =>
+    (nameCount.get(c.basename) ?? 0) > 1 ? c.path.replace(/\.md$/i, "") : c.basename;
+
+  const choices = new Map<string, { path: string; target: string }>();
   const ambiguous = new Set<string>();
   const offer = (label: string, card: Card) => {
     const seen = choices.get(label);
-    if (seen === undefined) choices.set(label, { path: card.path, basename: card.basename });
-    // Compared by card, not by file name: two cards sharing a file name across folders are the
-    // case the board refuses to bind at all, so offering that name would hand out a dead link.
+    if (seen === undefined) choices.set(label, { path: card.path, target: targetFor(card) });
+    // Compared by card, not by what it would link to: a label answering for two different cards
+    // is one the field must not offer, whichever of them it would happen to pick.
     else if (seen.path !== card.path) ambiguous.add(label);
   };
   for (const p in board.cards) {
@@ -330,7 +340,7 @@ function relationChoices(board: Board, selfPath: string): Map<string, string> {
   }
   const out = new Map<string, string>();
   for (const [label, card] of choices) {
-    if (!ambiguous.has(label)) out.set(label, card.basename);
+    if (!ambiguous.has(label)) out.set(label, card.target);
   }
   return out;
 }

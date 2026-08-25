@@ -82,6 +82,15 @@ describe("relationship frontmatter", () => {
     expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", "Z")).toBeNull();
   });
 
+  it("reads two ways of writing one target as the single relationship they are", () => {
+    // Otherwise the note shows two rows and one click clears both, or one row hides the other.
+    expect(readRelations({ blocks: ["[[A]]", "[[A|see this]]", "[[A#Notes]]"] }, "blocks")).toEqual(
+      ["A"],
+    );
+    // Case is kept, matching how the board binds a link, so these stay two distinct targets.
+    expect(readRelations({ blocks: ["[[A]]", "[[a]]"] }, "blocks")).toEqual(["A", "a"]);
+  });
+
   it("treats an aliased or anchored target as the same relationship the board resolves it to", () => {
     // `[[A|see this]]`, `[[A#Notes]]` and `[[A]]` all name card A, so the list must never hold two
     // of them: the board shows one row, and one click on it has to clear the relationship.
@@ -120,6 +129,10 @@ describe("relationship frontmatter", () => {
     expect(self("   ")).toBe(true);
     expect(self("B")).toBe(false);
     expect(self("Other/B")).toBe(false);
+    // A folder-qualified target names one exact note, so a same-named card elsewhere is a real
+    // link, not a self-link.
+    expect(self("Sub/A")).toBe(false);
+    expect(self("[[Tasks/Sub/A]]")).toBe(false);
   });
 });
 

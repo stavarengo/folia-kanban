@@ -1852,6 +1852,32 @@ describe("blocking relationships", () => {
     );
   });
 
+  it("links a card whose file name is shared by its path, not by that ambiguous name", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
+      // Same file name, different folders — distinguishable only by their titles.
+      "Tasks/One/B.md": {
+        fm: { type: "task", status: "todo", title: "Keyboard bug" },
+        body: "\n",
+      },
+      "Tasks/Two/B.md": { fm: { type: "task", status: "todo", title: "Mouse bug" }, body: "\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Here"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(
+      within(detail).getByLabelText("Add a card this one blocks"),
+      "Keyboard bug{Enter}",
+    );
+    // `[[B]]` would be refused by the board as ambiguous and land dead, so the path is written.
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Here.md")!.fm["blocks"]).toEqual(["[[Tasks/One/B]]"]),
+    );
+    // And it really binds: the blocked card carries the marker.
+    expect(within(cardOf("Keyboard bug")).getByText("Blocked")).toBeInTheDocument();
+  });
+
   it("does not offer a file name two cards share, which the board refuses to bind", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {

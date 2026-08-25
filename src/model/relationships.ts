@@ -75,8 +75,10 @@ export function isSelfRelation(path: string, basename: string, target: string): 
   const raw = targetIdentity(target);
   if (!raw) return true;
   const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
-  if (withMd === path) return true;
-  return (raw.split("/").pop() ?? raw).replace(/\.md$/i, "") === basename;
+  // A target carrying a folder names one exact note, so only that note counts — `[[Sub/A]]` from
+  // `A.md` is a link to a DIFFERENT card that happens to share a file name, not a self-link.
+  if (raw.includes("/")) return withMd === path;
+  return raw.replace(/\.md$/i, "") === basename;
 }
 
 /**
@@ -100,9 +102,16 @@ function readTargets(fm: Record<string, unknown>, key: string): string[] {
   const raw: string[] = [];
   collectStrings(fm[key], raw);
   const out: string[] = [];
+  const seen = new Set<string>();
   for (const entry of raw) {
     const target = relationTarget(entry);
-    if (target && !out.includes(target)) out.push(target);
+    // De-duplicated by what the target NAMES, not by how it is written, so a note holding both
+    // `[[A]]` and `[[A|see this]]` is one relationship everywhere: one row, and one click that
+    // clears every stored form of it. The first form written is the one shown.
+    const identity = targetIdentity(entry);
+    if (!target || !identity || seen.has(identity)) continue;
+    seen.add(identity);
+    out.push(target);
   }
   return out;
 }
