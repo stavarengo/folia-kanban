@@ -20,7 +20,8 @@ export type IconName =
   | "more"
   | "inbox"
   | "ban"
-  | "octagon-alert";
+  | "octagon-alert"
+  | "chevron-down";
 
 const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M5 12h14M12 5v14" />,
@@ -107,6 +108,7 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </>
   ),
+  "chevron-down": <path d="m6 9 6 6 6-6" />,
 };
 
 interface IconProps extends SVGProps<SVGSVGElement> {

@@ -531,6 +531,26 @@ export function relationCounts(
   return out;
 }
 
+/**
+ * Every path reachable from `roots` by walking `board.childrenOf` (the same nested-subcard tree
+ * `SubcardGroup` renders), roots included. Used by a column's "collapse all / expand all" so it
+ * sets every descendant's state, not just the top-level cards — an "expand all" that stopped at
+ * the top would leave a grandchild collapsed from an earlier individual toggle. Cycle-safe with
+ * the same per-branch `seen` guard `SubcardGroup` uses.
+ */
+export function subtreePaths(board: Board, roots: readonly string[]): string[] {
+  const out: string[] = [];
+  const walk = (path: string, seen: ReadonlySet<string>) => {
+    out.push(path);
+    for (const child of board.childrenOf[path] ?? []) {
+      if (seen.has(child) || !board.cards[child]) continue;
+      walk(child, new Set(seen).add(child));
+    }
+  };
+  for (const root of roots) walk(root, new Set([root]));
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Drag reducer
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { RelationCounts } from "../model/board";
 import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
@@ -59,6 +59,41 @@ export function useSettingsUpdater(): (patch: Partial<KanbanSettings>) => void {
   const c = useContext(SettingsContext);
   if (!c) throw new Error("SettingsContext missing");
   return c.update;
+}
+
+/**
+ * One control decides both a card's inline-todos preview and its subcard group (§ collapse
+ * subitems): whatever is nested under a card tile lives or dies together. `isCollapsed` reads the
+ * effective state (the per-card override in `collapsedCards`, falling back to the board-wide
+ * `subitemsDefault`); `toggle` flips one card; `setMany` is the column-level collapse-all/expand-all,
+ * writing an explicit override for every path at once.
+ */
+export interface SubitemsCollapse {
+  isCollapsed(path: string): boolean;
+  toggle(path: string): void;
+  setMany(paths: readonly string[], collapsed: boolean): void;
+}
+
+export function useSubitemsCollapse(): SubitemsCollapse {
+  const c = useContext(SettingsContext);
+  if (!c) throw new Error("SettingsContext missing");
+  const { settings, update } = c;
+  return useMemo<SubitemsCollapse>(
+    () => ({
+      isCollapsed: (path) =>
+        settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed",
+      toggle: (path) => {
+        const cur = settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed";
+        update({ collapsedCards: { ...settings.collapsedCards, [path]: !cur } });
+      },
+      setMany: (paths, collapsed) => {
+        const next = { ...settings.collapsedCards };
+        for (const p of paths) next[p] = collapsed;
+        update({ collapsedCards: next });
+      },
+    }),
+    [settings.collapsedCards, settings.subitemsDefault, update],
+  );
 }
 
 /** Card-level actions, provided by App so cards/columns don't prop-drill callbacks. */

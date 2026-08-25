@@ -23,9 +23,23 @@ interface Props {
   /** Open the full "Edit column" modal (#8). The menu closes first so its outside-click teardown
    *  doesn't race the modal — the modal's open-state lives in the parent Column, not here. */
   onEdit: () => void;
+  /** Collapse every card's subitems (inline-todos preview + subcard group), recursively, for every
+   *  card currently rendered in this column. */
+  onCollapseAll: () => void;
+  /** Expand every card's subitems, recursively, for every card currently rendered in this column. */
+  onExpandAll: () => void;
 }
 
-export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdit }: Props) {
+export function ColumnMenu({
+  column,
+  isFirst,
+  isLast,
+  triggerRef,
+  onClose,
+  onEdit,
+  onCollapseAll,
+  onExpandAll,
+}: Props) {
   const a = useBoardActions();
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState(column.title);
@@ -153,6 +167,26 @@ export function ColumnMenu({ column, isFirst, isLast, triggerRef, onClose, onEdi
         }}
       >
         <Icon name="pencil" size={14} /> Edit column…
+      </button>
+
+      <div className="folia-menu-divider" />
+      <button
+        className="folia-menu-item"
+        onClick={() => {
+          onCollapseAll();
+          onClose();
+        }}
+      >
+        <Icon name="chevron-down" size={14} /> Collapse all subitems
+      </button>
+      <button
+        className="folia-menu-item"
+        onClick={() => {
+          onExpandAll();
+          onClose();
+        }}
+      >
+        <Icon name="chevron-down" size={14} className="is-collapsed" /> Expand all subitems
       </button>
 
       <div className="folia-menu-divider" />

@@ -1003,6 +1003,30 @@
   text-overflow: ellipsis;
 }
 
+/* ------------------------------------------------------------------ subitems collapse toggle */
+.folia-card-subitems-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-xs);
+  cursor: pointer;
+}
+.folia-card-subitems-toggle:hover,
+.folia-card-subitems-toggle:focus-visible {
+  color: var(--text-normal);
+}
+.folia-card-subitems-toggle .folia-icon {
+  transition: transform var(--folia-dur-fast) var(--folia-ease);
+}
+.folia-card-subitems-toggle .folia-icon.is-collapsed {
+  transform: rotate(-90deg);
+}
+
 /* ------------------------------------------------------------------ card quick actions + confirm */
 .folia-card-actions {
   position: absolute;

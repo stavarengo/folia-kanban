@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Board, ColumnDef } from "../model/types";
-import { makeCardDragId, splitCardDragId, type DragReloc } from "../model/board";
+import { makeCardDragId, splitCardDragId, subtreePaths, type DragReloc } from "../model/board";
 import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
 import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
-import { useBoardActions, useSettings } from "./context";
+import { useBoardActions, useSettings, useSubitemsCollapse } from "./context";
 import { groupAndSortCards, isEmptyFilter, matchCard, parseFilter, type Filter } from "./cardView";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -28,6 +28,7 @@ function SubcardGroup({
   selectedPath: string | null;
   seen: ReadonlySet<string>;
 }) {
+  const subitems = useSubitemsCollapse();
   const children = (board.childrenOf[parentPath] ?? []).filter(
     (p) => board.cards[p] && !seen.has(p),
   );
@@ -40,14 +41,24 @@ function SubcardGroup({
         const next = new Set(seen).add(p);
         return (
           <div key={p} className="folia-subcard">
-            <CardItem card={card} today={today} selected={p === selectedPath} nested />
-            <SubcardGroup
-              parentPath={p}
-              board={board}
+            <CardItem
+              card={card}
               today={today}
-              selectedPath={selectedPath}
-              seen={next}
+              selected={p === selectedPath}
+              nested
+              hasSubcardChildren={(board.childrenOf[p]?.length ?? 0) > 0}
             />
+            {/* Same rule as the top-level tree below: a collapsed card's own group of children
+                stays unmounted, so its toggle really does hide "everything nested under it". */}
+            {!subitems.isCollapsed(p) && (
+              <SubcardGroup
+                parentPath={p}
+                board={board}
+                today={today}
+                selectedPath={selectedPath}
+                seen={next}
+              />
+            )}
           </div>
         );
       })}
@@ -114,6 +125,7 @@ export function Column({
   } = useSortable({ id: column.id });
   const settings = useSettings();
   const actions = useBoardActions();
+  const subitems = useSubitemsCollapse();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -394,6 +406,13 @@ export function Column({
             triggerRef={menuBtnRef}
             onClose={() => setMenuOpen(false)}
             onEdit={() => setEditModalOpen(true)}
+            // `paths`, not the raw status bucket: what's actually rendered here right now (after
+            // the lane rule and the global search filter), so a filtered column only touches what
+            // the user can see. The whole family, not just the top-level tiles: an "expand all"
+            // that stopped there would leave a grandchild collapsed from an earlier individual
+            // toggle still hidden.
+            onCollapseAll={() => subitems.setMany(subtreePaths(board, paths), true)}
+            onExpandAll={() => subitems.setMany(subtreePaths(board, paths), false)}
           />
         )}
       </header>
@@ -417,14 +436,17 @@ export function Column({
                     // already says whose it is). So this doubles as "show the ↳ reference".
                     parentPath={board.placedOf[c.path]}
                     parentTitle={board.cards[board.placedOf[c.path] ?? ""]?.title}
+                    hasSubcardChildren={(board.childrenOf[c.path]?.length ?? 0) > 0}
                   />
-                  <SubcardGroup
-                    parentPath={c.path}
-                    board={board}
-                    today={today}
-                    selectedPath={selectedPath}
-                    seen={new Set([c.path])}
-                  />
+                  {!subitems.isCollapsed(c.path) && (
+                    <SubcardGroup
+                      parentPath={c.path}
+                      board={board}
+                      today={today}
+                      selectedPath={selectedPath}
+                      seen={new Set([c.path])}
+                    />
+                  )}
                 </div>
               ))}
             </div>

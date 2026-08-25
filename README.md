@@ -91,6 +91,14 @@ Sending a todo to the column its own card is in means the same thing as **With i
 
 One deliberate limit: a plain todo carries no `order`, so dragging it *within* a column does not stick (it sorts after the ordered cards, alphabetically). Moving it *between* columns — the thing this is for — always does.
 
+## Collapse/expand subitems
+
+Every card tile that has nested subitems — a next-todos preview, a group of subcards, or both — gets a small toggle under its title: a chevron plus **Subitems** while expanded, or a count summary like **3 subitems, 1 done** once collapsed. One control for both kinds, because a collapsed card hides everything nested under it at once: the inline todos preview and the `SubcardGroup` of subcard files together. A subitem that has claimed a column of its own is unaffected either way — it is not nested under anything, so there is nothing for the toggle to hide.
+
+The toggle is per card, and it nests: collapsing a card also hides its subcards' own toggles (and their children), and a subcard keeps its own collapsed/expanded state when its parent is expanded again — so a big subtree can be folded down to just its top level. A column's **⋯** menu adds **Collapse all subitems** / **Expand all subitems**, which reaches every card currently shown in that column and its full nested subtree, not just the top level.
+
+Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems — default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again.
+
 ## Features
 
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
@@ -99,6 +107,7 @@ One deliberate limit: a plain todo carries no `order`, so dragging it *within* a
 - **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority is a free-text combobox that suggests [your board's own scale](#priorities-are-your-scale-not-ours), never one the plugin picked for you.
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
 - **Subitems can hold a column of their own** — drag a subtask into any column and it stands there like a card, carrying a `↳ parent` reference. Works the same for a plain todo and for a subcard file (see [Subitems in their own column](#subitems-in-their-own-column)).
+- **Collapse/expand subitems** — one toggle per card tile hides or shows everything nested under it, todos preview and subcard group alike, with a count summary while collapsed. A board-wide default plus a per-column collapse-all/expand-all (see [Collapse/expand subitems](#collapseexpand-subitems)).
 - **Blocking relationships** — say that one card blocks another with a `blocks: ["[[Other card]]"]` list. The detail panel adds and removes them with suggestions from the board's own cards, and shows the derived **Blocked by** side; the tiles get a *Blocked* / *Blocks n* marker while both ends are unfinished. Typed from the start, so other kinds of link can follow. It marks, it never refuses a move.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
 - **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.
@@ -199,6 +208,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **Add-card button — flow** — `inline` (add in the column), `inline-edit` (add, then open the new card's details), or `detail` (open a details form to create).
 - **Add-card — open new card's details as** — which presentation to use for the two detail-opening add flows.
 - **Card — next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
+- **Subitems — default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).
 - **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
 
 ## Keyboard & mouse

@@ -20,6 +20,7 @@ import {
   resolveDragReloc,
   resolveDrop,
   splitCardDragId,
+  subtreePaths,
 } from "../src/model/board";
 import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
 
@@ -170,6 +171,35 @@ describe("childrenOf (nested subcard rendering)", () => {
     // `parentOf` links every cycle member, but none of them is anybody's placed subitem — so no
     // tile claims a `↳ parent` it does not visibly have.
     expect(Object.keys(b.placedOf)).toEqual([]);
+  });
+});
+
+describe("subtreePaths (§ collapse-all/expand-all root set)", () => {
+  it("walks the full nested subtree of every root, roots included", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", {}, ["Leaf"]),
+      card("Leaf", {}),
+      card("Other", { status: "todo" }),
+    ]);
+    expect(subtreePaths(b, ["Tasks/Root.md", "Tasks/Other.md"]).sort()).toEqual(
+      ["Tasks/Leaf.md", "Tasks/Mid.md", "Tasks/Other.md", "Tasks/Root.md"].sort(),
+    );
+  });
+
+  it("does not infinite-loop on a cycle", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo" }, ["B"]),
+      card("B", { status: "todo" }, ["C"]),
+      card("C", { status: "todo" }, ["A"]),
+    ]);
+    // Cycle members have no genuine childrenOf entry (see above), so each root walks alone.
+    expect(subtreePaths(b, ["Tasks/A.md"])).toEqual(["Tasks/A.md"]);
+  });
+
+  it("returns just the roots when none has children", () => {
+    const b = buildBoard(config, [card("Solo", { status: "todo" })]);
+    expect(subtreePaths(b, ["Tasks/Solo.md"])).toEqual(["Tasks/Solo.md"]);
   });
 });
 

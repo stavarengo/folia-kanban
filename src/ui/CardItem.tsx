@@ -4,7 +4,13 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
 import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
-import { useBoardActions, useContexts, useRelationCounts, useSettings } from "./context";
+import {
+  useBoardActions,
+  useContexts,
+  useRelationCounts,
+  useSettings,
+  useSubitemsCollapse,
+} from "./context";
 import { Icon } from "./icons";
 
 interface Props {
@@ -25,6 +31,11 @@ interface Props {
   parentPath?: string | undefined;
   /** That parent's title, for the reference line. */
   parentTitle?: string | undefined;
+  /** Whether this card has its own subcard children (a non-empty `board.childrenOf[card.path]`),
+   *  computed by the caller (Column/SubcardGroup) since only they hold the board graph. Together
+   *  with the card's own inline-todos preview this decides whether the collapse/expand toggle
+   *  shows at all — a card with nothing nested gets no control. */
+  hasSubcardChildren?: boolean;
 }
 
 function CardItemInner({
@@ -35,10 +46,12 @@ function CardItemInner({
   nested = false,
   parentPath,
   parentTitle,
+  hasSubcardChildren = false,
 }: Props) {
   const actions = useBoardActions();
   const contexts = useContexts();
   const { cardNextTodos } = useSettings();
+  const subitems = useSubitemsCollapse();
   const [confirming, setConfirming] = useState(false);
   const [menu, setMenu] = useState<ContextTarget | null>(null);
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
@@ -78,6 +91,12 @@ function CardItemInner({
   const urgency = cardUrgency(card, today, actions.doneColumnId);
 
   const allDone = !!stats && stats.checklist > 0 && stats.checklistDone === stats.checklist;
+  // Subitems (§ collapse): anything that would render nested under this tile — its own inline-todos
+  // preview (gated by the same `cardNextTodos` cap the list below uses) and/or its subcard children
+  // (rendered as a sibling `SubcardGroup` by the caller). No toggle when neither exists.
+  const hasNextTodosPreview = cardNextTodos > 0 && (stats?.nextTodos.length ?? 0) > 0;
+  const hasNestedSubitems = hasSubcardChildren || hasNextTodosPreview;
+  const subitemsCollapsed = hasNestedSubitems && subitems.isCollapsed(card.path);
   // Hide the hover-action cluster while renaming: focus-within would otherwise reveal it over the
   // full-width title <input> (which has no right gutter), letting buttons cover the caret/text.
   const showActions = !confirming && editing == null;
@@ -233,7 +252,7 @@ function CardItemInner({
             </span>
           </div>
         )}
-        {stats && cardNextTodos > 0 && stats.nextTodos.length > 0 && (
+        {!subitemsCollapsed && stats && cardNextTodos > 0 && stats.nextTodos.length > 0 && (
           <ul className="folia-card-next-todos">
             {stats.nextTodos.slice(0, cardNextTodos).map((t) => (
               <li key={t.index} className="folia-card-next-todo" data-todo-index={t.index}>
@@ -264,6 +283,37 @@ function CardItemInner({
           </div>
         )}
       </div>
+
+      {/* Sibling of `.folia-card-main`, same reason as the buttons below: that div carries
+          `role="button"` and a nested interactive element inside it would be unreachable to
+          assistive tech. One control for both nested forms of subitem (§ collapse): toggling it
+          hides/shows this tile's own inline-todos preview above AND the `SubcardGroup` its caller
+          renders as this tile's next sibling — same collapsed value, same `card.path` key. */}
+      {hasNestedSubitems && (
+        <button
+          className="folia-card-subitems-toggle"
+          aria-expanded={!subitemsCollapsed}
+          aria-label={
+            subitemsCollapsed
+              ? `Show ${stats?.checklist ?? 0} subitems, ${stats?.checklistDone ?? 0} done`
+              : "Hide subitems"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            subitems.toggle(card.path);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Icon
+            name="chevron-down"
+            size={13}
+            className={subitemsCollapsed ? "is-collapsed" : undefined}
+          />
+          {subitemsCollapsed
+            ? `${stats?.checklist ?? 0} subitem${(stats?.checklist ?? 0) === 1 ? "" : "s"}, ${stats?.checklistDone ?? 0} done`
+            : "Subitems"}
+        </button>
+      )}
 
       {/* Sibling of `.folia-card-main`, never inside it: that div carries `role="button"` (from the
           drag attributes, or the explicit nested branch), and a button within it is unreachable to
@@ -418,6 +468,7 @@ export const CardItem = memo(
     a.card.title === b.card.title &&
     a.parentPath === b.parentPath &&
     a.parentTitle === b.parentTitle &&
+    a.hasSubcardChildren === b.hasSubcardChildren &&
     a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
     a.card.todoRef?.index === b.card.todoRef?.index &&
     a.card.todoRef?.claim === b.card.todoRef?.claim &&

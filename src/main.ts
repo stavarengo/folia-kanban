@@ -473,6 +473,24 @@ class KanbanSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Subitems — default state")
+      .setDesc(
+        "Whether a card's nested subitems (inline todos preview + subcard files) start expanded or collapsed. Toggling a card, or a column's collapse/expand-all, overrides this per card.",
+      )
+      .addDropdown((d) =>
+        d
+          .addOption("expanded", "Expanded")
+          .addOption("collapsed", "Collapsed")
+          .setValue(s.subitemsDefault)
+          .onChange(
+            (v) =>
+              void this.plugin.updateSettings({
+                subitemsDefault: v as KanbanSettings["subitemsDefault"],
+              }),
+          ),
+      );
+
+    new Setting(containerEl)
       .setName("History — what to record")
       .setDesc(
         "Moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",

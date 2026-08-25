@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
 import { SettingsContext, useSettings } from "../src/ui/context";
 
 const config: BoardConfig = {
@@ -35,6 +36,23 @@ function makeRepo() {
 
 const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
   render(<App repo={repo} settings={settings} onUpdateSettings={() => {}} today="2026-06-13" />);
+
+/** Same as `render_`, but settings updates (e.g. a subitems-collapse toggle) actually apply —
+ *  needed for anything that reads its own patch back through `useSettings()`. */
+function renderStateful(repo: FakeRepo, initial: KanbanSettings) {
+  function Stateful() {
+    const [settings, setSettings] = useState(initial);
+    return (
+      <App
+        repo={repo}
+        settings={settings}
+        onUpdateSettings={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+        today="2026-06-13"
+      />
+    );
+  }
+  return render(<Stateful />);
+}
 
 describe("board rendering", () => {
   it("renders columns with the right cards and counts; subcards are not top-level", async () => {
@@ -881,6 +899,105 @@ describe("next todos on cards", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("a");
     expect(rows[1]).toHaveTextContent("b");
+  });
+});
+
+describe("collapse/expand subitems", () => {
+  const nextTodosRepo = () =>
+    new FakeRepo(config, {
+      "Tasks/WithTodos.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# WithTodos\n\n## Subtasks\n- [x] done one\n- [ ] real one\n- [ ] real two\n",
+      },
+    });
+
+  it("shows no toggle on a card with no subitems", async () => {
+    render_(makeRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const gamma = (await screen.findByText("Gamma")).closest(".folia-card") as HTMLElement;
+    expect(gamma.querySelector(".folia-card-subitems-toggle")).toBeNull();
+  });
+
+  it("one toggle hides both the inline-todos preview and the subcard group, with a count summary", async () => {
+    const user = userEvent.setup();
+    renderStateful(makeRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const alphaTree = (await screen.findByText("Alpha")).closest(".folia-card-tree") as HTMLElement;
+    const alpha = within(alphaTree).getByText("Alpha").closest(".folia-card") as HTMLElement;
+
+    // Expanded by default (board-wide default is "expanded"): both forms of subitem show.
+    expect(within(alpha).getByText("first todo")).toBeInTheDocument();
+    expect(alphaTree.querySelector(".folia-subcard-group")).not.toBeNull();
+    const toggle = within(alpha).getByRole("button", { name: "Hide subitems" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(toggle);
+
+    // Alpha has 3 checklist lines total (2 todos + 1 subcard link), 1 already done.
+    expect(
+      within(alpha).getByRole("button", { name: "Show 3 subitems, 1 done" }),
+    ).toBeInTheDocument();
+    expect(within(alpha).queryByText("first todo")).toBeNull();
+    expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
+
+    await user.click(within(alpha).getByRole("button", { name: "Show 3 subitems, 1 done" }));
+    expect(within(alpha).getByText("first todo")).toBeInTheDocument();
+    expect(alphaTree.querySelector(".folia-subcard-group")).not.toBeNull();
+  });
+
+  it("hides a card's own inline-todos preview when collapsed even with no subcards", async () => {
+    const user = userEvent.setup();
+    renderStateful(nextTodosRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("WithTodos")).closest(".folia-card") as HTMLElement;
+    expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(2);
+
+    await user.click(within(card).getByRole("button", { name: "Hide subitems" }));
+    expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
+  });
+
+  it("starts collapsed board-wide when subitemsDefault is 'collapsed'", async () => {
+    render_(nextTodosRepo(), {
+      ...DEFAULT_SETTINGS,
+      cardNextTodos: 2,
+      subitemsDefault: "collapsed",
+    });
+    const card = (await screen.findByText("WithTodos")).closest(".folia-card") as HTMLElement;
+    expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
+    expect(
+      within(card).getByRole("button", { name: "Show 3 subitems, 1 done" }),
+    ).toBeInTheDocument();
+  });
+
+  it("column menu's collapse-all/expand-all applies to every card in that column, recursively", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n",
+      },
+      "Tasks/Mid.md": {
+        fm: { type: "task" },
+        body: "\n# Mid\n\n## Subtasks\n- [ ] [[Leaf]]\n",
+      },
+      "Tasks/Leaf.md": { fm: { type: "task" }, body: "\n# Leaf\n" },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await screen.findByText("Root");
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    // Everything is nested and visible up front.
+    expect(within(todoCol).getByText("Mid")).toBeInTheDocument();
+    expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
+
+    await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
+    await user.click(screen.getByRole("button", { name: "Collapse all subitems" }));
+
+    expect(within(todoCol).queryByText("Mid")).toBeNull();
+    expect(within(todoCol).queryByText("Leaf")).toBeNull();
+
+    await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
+    await user.click(screen.getByRole("button", { name: "Expand all subitems" }));
+
+    // Expand-all reaches the grandchild too, not just Root's direct child.
+    expect(within(todoCol).getByText("Mid")).toBeInTheDocument();
+    expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
   });
 });
 
