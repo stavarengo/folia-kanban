@@ -16,6 +16,11 @@ import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
 const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
 const WIKILINK_ONLY_RE = /^\[\[([^\]]+)\]\]$/;
+// A checklist line's own column, written as an Obsidian/Dataview inline field: `- [ ] Ship it
+// [status:: doing]`. Hand-editable and invisible in reading view, which is why it is preferred
+// over a `#doing` tag (that would land in the note's tag pane and mean something else).
+// Whitespace-tolerant on both sides of `::` so a hand-typed `[status::doing]` still reads.
+const INLINE_STATUS_RE = /\[status::\s*([^\]]*?)\s*\]/;
 // Current write format: `- _2026-08-21 11:49:_ text` — an italic timestamp prefix, no brackets.
 // No timezone suffix is written today (`stamp()` in ./dates.ts is local time, unlabeled); if one
 // is ever added, extend this character class to match (letters, currently excluded) — otherwise
@@ -147,15 +152,34 @@ function sectionLines(body: string, name: string): string[] {
 // Parsing (read-only, for display)
 // ---------------------------------------------------------------------------
 
+/**
+ * Split a checklist line's text into the part people read and the inline `[status:: …]` field.
+ * The field is taken out of the text so it never shows up as part of a todo's title, and an empty
+ * or whitespace-only value reads as no claim at all (the same as omitting the field).
+ */
+function splitInlineStatus(text: string): { text: string; status?: string } {
+  const m = INLINE_STATUS_RE.exec(text);
+  if (!m) return { text };
+  const rest = (text.slice(0, m.index) + text.slice(m.index + m[0].length))
+    .replace(/\s+/g, " ")
+    .trim();
+  const value = (m[1] ?? "").trim();
+  return value === "" ? { text: rest } : { text: rest, status: value };
+}
+
 function parseSubItem(rawText: string, index: number, done: boolean): SubItem {
-  const trimmed = rawText.trim();
+  // Strip the inline field FIRST: a subcard line carrying one (`- [ ] [[Child]] [status:: doing]`)
+  // must still parse as a link, not fall through to a plain todo whose text happens to contain one.
+  const { text: trimmed, status } = splitInlineStatus(rawText.trim());
   const m = WIKILINK_ONLY_RE.exec(trimmed);
   if (m) {
     const group1 = m[1] ?? "";
     const target = group1.split("|")[0]?.split("#")[0]?.trim() ?? "";
     return { kind: "card", text: trimmed, done, link: target, index };
   }
-  return { kind: "todo", text: trimmed, done, index };
+  return status === undefined
+    ? { kind: "todo", text: trimmed, done, index }
+    : { kind: "todo", text: trimmed, done, status, index };
 }
 
 export function parseSubtasks(text: string): SubItem[] {
@@ -259,6 +283,51 @@ export function setSubtaskDone(text: string, index: number, done: boolean): stri
       if (!m) continue;
       if (n === index) {
         lines[i] = `${m[1] ?? ""}[${done ? "x" : " "}] ${m[3] ?? ""}`;
+        break;
+      }
+      n++;
+    }
+    return lines.join("\n");
+  });
+}
+
+/**
+ * Set (or clear, with `null`) the inline `[status:: …]` field of the index-th checklist line.
+ * Byte-stable: only that one line is touched, its bullet prefix and checkbox pass through, and an
+ * existing field is rewritten where it already sits rather than moved to the end of the line.
+ */
+export function setSubtaskStatus(text: string, index: number, status: string | null): string {
+  return withBody(text, (body) => {
+    const lines = body.split("\n");
+    const start = headingIndex(lines, SECTION.subtasks);
+    if (start === -1) return body;
+    const end = sectionEnd(lines, start);
+    let n = 0;
+    for (let i = start + 1; i < end; i++) {
+      const line = lines[i] ?? "";
+      const m = CHECKBOX_RE.exec(line);
+      if (!m) continue;
+      if (n === index) {
+        // `split("\n")` leaves a trailing CR on CRLF files; keep this line's ending as it was.
+        const cr = line.endsWith("\r") ? "\r" : "";
+        const prefix = m[1] ?? "";
+        const box = m[2] ?? " ";
+        const content = (m[3] ?? "").replace(/\r$/, "");
+        const field = status === null ? "" : `[status:: ${status}]`;
+        const existing = INLINE_STATUS_RE.exec(content);
+        let next: string;
+        if (existing) {
+          next = (
+            content.slice(0, existing.index) +
+            field +
+            content.slice(existing.index + existing[0].length)
+          )
+            .replace(/[ \t]{2,}/g, " ")
+            .trimEnd();
+        } else {
+          next = field === "" ? content : `${content.trimEnd()} ${field}`;
+        }
+        lines[i] = `${prefix}[${box}] ${next}${cr}`;
         break;
       }
       n++;

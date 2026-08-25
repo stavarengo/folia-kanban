@@ -6,6 +6,10 @@ import {
   columnEffectiveOrders,
   computeDropOrder,
   deriveContext,
+  findDoneColumn,
+  makeTodoPath,
+  parseTodoPath,
+  reassignColumn,
   isComputedOrder,
   makeCardDragId,
   moveCard,
@@ -15,7 +19,7 @@ import {
   resolveDrop,
   splitCardDragId,
 } from "../src/model/board";
-import type { BoardConfig, Card, ColumnDef } from "../src/model/types";
+import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
 
 const config: BoardConfig = {
   path: "Board.md",
@@ -99,18 +103,56 @@ describe("childrenOf (nested subcard rendering)", () => {
     ]);
   });
 
-  it("nests a grandchild under its parent and keeps it out of every column", () => {
+  it("nests a grandchild under its parent when neither claims a column of its own", () => {
     const b = buildBoard(config, [
       card("Root", { status: "todo" }, ["Mid"]),
-      card("Mid", { status: "doing" }, ["Leaf"]),
-      card("Leaf", { status: "done" }),
+      card("Mid", {}, ["Leaf"]),
+      card("Leaf", {}),
     ]);
-    // Only Root is top-level; Mid and Leaf are nested at depth 1 and 2.
+    // Only Root is top-level; Mid and Leaf have no status, so they follow Root's column.
     expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
     expect(b.columns["doing"]).toEqual([]);
     expect(b.columns["done"]).toEqual([]);
     // The full chain is reachable via childrenOf so recursive rendering surfaces every card once.
     expect(b.childrenOf["Tasks/Root.md"]).toEqual(["Tasks/Mid.md"]);
+    expect(b.childrenOf["Tasks/Mid.md"]).toEqual(["Tasks/Leaf.md"]);
+  });
+
+  it("keeps a subcard nested when its own status names its parent's column", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", { status: "todo" }),
+    ]);
+    expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(b.childrenOf["Tasks/Root.md"]).toEqual(["Tasks/Mid.md"]);
+  });
+
+  it("places a subcard in the column its own status names, once, with its parent recorded", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", { status: "doing" }, ["Leaf"]),
+      card("Leaf", { status: "done" }),
+    ]);
+    expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(b.columns["doing"]).toEqual(["Tasks/Mid.md"]);
+    expect(b.columns["done"]).toEqual(["Tasks/Leaf.md"]);
+    // Each moved subcard leaves its parent's nested group, so nothing renders twice...
+    expect(b.childrenOf["Tasks/Root.md"]).toBeUndefined();
+    expect(b.childrenOf["Tasks/Mid.md"]).toBeUndefined();
+    // ...but the parentage the `↳ parent` reference reads is still there.
+    expect(b.parentOf["Tasks/Mid.md"]).toBe("Tasks/Root.md");
+    expect(b.parentOf["Tasks/Leaf.md"]).toBe("Tasks/Mid.md");
+  });
+
+  it("carries a placed subcard's own nested subtree with it", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", { status: "doing" }, ["Leaf"]),
+      card("Leaf", {}),
+    ]);
+    expect(b.columns["doing"]).toEqual(["Tasks/Mid.md"]);
+    expect(b.columns["done"]).toEqual([]);
+    // Leaf claims nothing, so it follows Mid — into Mid's new column, still nested under it.
     expect(b.childrenOf["Tasks/Mid.md"]).toEqual(["Tasks/Leaf.md"]);
   });
 
@@ -679,5 +721,138 @@ describe("isComputedOrder (#6 — auto-sorted columns)", () => {
   });
   it("is false for an unknown column", () => {
     expect(isComputedOrder(mk([{ id: "todo", title: "Todo" }]), "ghost")).toBe(false);
+  });
+});
+
+describe("subitems in a column of their own", () => {
+  function todo(text: string, index: number, status?: string, done = false): SubItem {
+    return status === undefined
+      ? { kind: "todo", text, done, index }
+      : { kind: "todo", text, done, status, index };
+  }
+  function withTodos(basename: string, fm: Partial<Card["frontmatter"]>, items: SubItem[]): Card {
+    return { ...card(basename, fm), subItems: items };
+  }
+
+  it("names the done column from the board's own columns", () => {
+    expect(findDoneColumn(config.columns)).toBe("done");
+    expect(findDoneColumn([{ id: "a", title: "Shipped" }])).toBe("a");
+    expect(findDoneColumn([{ id: "a", title: "Open" }])).toBeNull();
+  });
+
+  it("round-trips a synthetic todo path", () => {
+    const p = makeTodoPath("Tasks/Root.md", 3);
+    expect(parseTodoPath(p)).toEqual({ parentPath: "Tasks/Root.md", index: 3 });
+    expect(parseTodoPath("Tasks/Root.md")).toBeNull();
+  });
+
+  it("leaves a todo with no claim inside its parent", () => {
+    const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("Plain", 0)])]);
+    expect(b.columns["doing"]).toEqual([]);
+    expect(Object.keys(b.cards)).toEqual(["Tasks/Root.md"]);
+  });
+
+  it("places a todo that claims another column, as a card of that column", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing"), todo("Plain", 1)]),
+    ]);
+    const p = makeTodoPath("Tasks/Root.md", 0);
+    expect(b.columns["doing"]).toEqual([p]);
+    expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(b.cards[p]).toMatchObject({
+      title: "Write docs",
+      titleSource: "subtask",
+      frontmatter: { status: "doing" },
+      todoRef: { parentPath: "Tasks/Root.md", index: 0 },
+    });
+    expect(b.parentOf[p]).toBe("Tasks/Root.md");
+  });
+
+  it("keeps a todo home when its claim names the column its parent is already in", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Here", 0, "todo")]),
+    ]);
+    expect(b.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(Object.keys(b.cards)).toEqual(["Tasks/Root.md"]);
+  });
+
+  it("ignores a claim that names no column of this board", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("X", 0, "nowhere")]),
+    ]);
+    expect(Object.keys(b.cards)).toEqual(["Tasks/Root.md"]);
+  });
+
+  it("sends a checked placed todo to the done column, whatever its field says", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Was doing", 0, "doing", true)]),
+    ]);
+    expect(b.columns["done"]).toEqual([makeTodoPath("Tasks/Root.md", 0)]);
+    expect(b.columns["doing"]).toEqual([]);
+  });
+
+  it("follows a placed subcard's own column when reading its todos' home", () => {
+    // Child sits in `doing` by its own status; a todo of Child claiming `doing` is therefore home.
+    const child = { ...card("Child", { status: "doing" }), subItems: [todo("Here", 0, "doing")] };
+    const b = buildBoard(config, [card("Root", { status: "todo" }, ["Child"]), child]);
+    expect(b.columns["doing"]).toEqual(["Tasks/Child.md"]);
+  });
+
+  it("drops a placed todo from its parent's next-todos but keeps it in the progress count", () => {
+    const parent: Card = {
+      ...card("Root", { status: "todo" }),
+      subItems: [todo("Moved", 0, "doing"), todo("Stays", 1)],
+      stats: {
+        checklist: 2,
+        checklistDone: 0,
+        subcards: 0,
+        comments: 0,
+        nextTodos: [
+          { text: "Moved", index: 0 },
+          { text: "Stays", index: 1 },
+        ],
+      },
+    };
+    const b = buildBoard(config, [parent]);
+    const stats = b.cards["Tasks/Root.md"]?.stats;
+    expect(stats?.nextTodos).toEqual([{ text: "Stays", index: 1 }]);
+    expect(stats?.checklist).toBe(2);
+  });
+
+  it("moves a placed todo by writing its line, not frontmatter", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
+    ]);
+    const p = makeTodoPath("Tasks/Root.md", 0);
+    expect(moveCard(b, p, "done", 0)).toEqual({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 0, status: "done", done: true },
+      history: 'Moved subtask "Write docs" from Doing to Done',
+    });
+    expect(moveCard(b, p, "todo", 0)).toMatchObject({
+      setSubtaskStatus: { index: 0, status: "todo", done: false },
+    });
+  });
+
+  it("writes nothing for a placed todo dropped inside its own column", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
+    ]);
+    expect(moveCard(b, makeTodoPath("Tasks/Root.md", 0), "doing", 0)).toBeNull();
+  });
+
+  it("rehomes an orphan of either kind without history", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
+      card("Other", { status: "doing" }),
+    ]);
+    expect(reassignColumn(b, "Tasks/Other.md", "todo")).toEqual({
+      path: "Tasks/Other.md",
+      setFrontmatter: { status: "todo" },
+    });
+    expect(reassignColumn(b, makeTodoPath("Tasks/Root.md", 0), "todo")).toEqual({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 0, status: "todo", done: false },
+    });
   });
 });

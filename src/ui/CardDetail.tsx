@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Board, Card, CardBody, RelationLink } from "../model/types";
+import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { RELATION_KEYS } from "../model/relationships";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
@@ -208,6 +208,23 @@ function CommentItem({
 function resolveBasename(board: Board, link: string): string | null {
   for (const p in board.cards) if (board.cards[p]?.basename === link) return p;
   return null;
+}
+
+/**
+ * The value the per-subitem column picker shows: the column this line claims for itself, or `""`
+ * for "with this card". Deliberately the CLAIM and not where the item renders — a checked todo
+ * shows in the done column, but the picker must still say which column it would go back to when
+ * reopened, or reopening would silently move it.
+ */
+function subtaskColumn(board: Board, item: SubItem): string {
+  if (item.kind === "card") {
+    const child = item.link ? resolveBasename(board, item.link) : null;
+    const status = child ? String(board.cards[child]?.frontmatter.status ?? "") : "";
+    return board.config.columns.some((c) => c.id === status) ? status : "";
+  }
+  const status = item.status ?? "";
+  // A claim naming no column of this board is no claim at all, the way the board graph reads it.
+  return board.config.columns.some((c) => c.id === status) ? status : "";
 }
 
 // The frontmatter keys the panel edits through a dedicated control, so the generic property rows
@@ -947,6 +964,36 @@ export function CardDetail({
                 ) : (
                   <span className={s.done ? "folia-done" : ""}>{s.text}</span>
                 )}
+                {/* Where this subitem sits on the board. One control, both kinds: a todo claims a
+                    column on its own checklist line, a subcard through its note's own `status` —
+                    and either way "With this card" means "wherever this card is". */}
+                <select
+                  className="folia-subtask-column"
+                  aria-label={`Column for ${s.text}`}
+                  title="Column"
+                  value={subtaskColumn(board, s)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (s.kind === "card") {
+                      const child = s.link ? resolveBasename(board, s.link) : null;
+                      if (!child) return;
+                      void mutate(() =>
+                        value === ""
+                          ? repo.unsetFrontmatterKey(child, "status")
+                          : repo.setFrontmatter(child, { status: value }),
+                      );
+                      return;
+                    }
+                    actions.moveTodo(path, s.index, value === "" ? null : value);
+                  }}
+                >
+                  <option value="">With this card</option>
+                  {board.config.columns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
                 <button
                   className="folia-icon-btn folia-mini"
                   aria-label="Remove"

@@ -75,23 +75,59 @@ describe("board rendering", () => {
         body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n",
       },
       "Tasks/Mid.md": {
-        fm: { type: "task", status: "doing" },
+        fm: { type: "task" },
         body: "\n# Mid\n\n## Subtasks\n- [ ] [[Leaf]]\n",
       },
-      "Tasks/Leaf.md": { fm: { type: "task", status: "done" }, body: "\n# Leaf\n" },
+      "Tasks/Leaf.md": { fm: { type: "task" }, body: "\n# Leaf\n" },
     });
     render_(repo);
     const tree = (await screen.findByText("Root")).closest(".folia-card-tree") as HTMLElement;
-    // Mid nested under Root, Leaf nested under Mid — both present despite their own statuses.
+    // Neither child claims a column, so both stay nested under Root at their own depth.
     expect(within(tree).getByText("Mid")).toBeInTheDocument();
     expect(within(tree).getByText("Leaf")).toBeInTheDocument();
-    // Neither Mid (doing) nor Leaf (done) leaks into its own status column.
     expect(
       within(screen.getByText("Doing").closest("section") as HTMLElement).queryByText("Mid"),
     ).toBeNull();
-    expect(
-      within(screen.getByText("Done").closest("section") as HTMLElement).queryByText("Leaf"),
-    ).toBeNull();
+  });
+
+  it("moves a subcard whose own status names another column into that column, with its parent shown", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n",
+      },
+      "Tasks/Mid.md": { fm: { type: "task", status: "doing" }, body: "\n# Mid\n" },
+    });
+    render_(repo);
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+    const doing = screen.getByText("Doing").closest("section") as HTMLElement;
+    const mid = within(doing).getByText("Mid").closest(".folia-card") as HTMLElement;
+    expect(mid).toHaveClass("folia-card--subitem");
+    // The nesting is gone, so the tile says whose work it is instead.
+    expect(within(mid).getByRole("button", { name: /Part of Root/ })).toBeInTheDocument();
+    // And it renders exactly once — not also under Root.
+    expect(screen.getAllByText("Mid")).toHaveLength(1);
+  });
+
+  it("places an inline todo that claims a column, and keeps it out of its parent's next-todos", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n- [ ] Stay home\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+    const doing = screen.getByText("Doing").closest("section") as HTMLElement;
+    const tile = within(doing).getByText("Write the docs").closest(".folia-card") as HTMLElement;
+    expect(tile).toHaveAttribute("data-subitem", "todo");
+    expect(within(tile).getByRole("button", { name: /Part of Root/ })).toBeInTheDocument();
+    // It left the parent's inline list; the todo with no claim is still there.
+    const todo = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todo).queryByText("Write the docs")).toBeNull();
+    expect(within(todo).getByText("Stay home")).toBeInTheDocument();
+    // The parent still counts it: progress is 0 of 2, not 0 of 1.
+    expect(within(todo).getByText("0/2")).toBeInTheDocument();
   });
 
   it("shows chips and subtask/subcard/comment stats on a card", async () => {

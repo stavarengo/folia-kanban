@@ -28,6 +28,7 @@ import {
   removeTimestampedLine,
   setDescription,
   setSubtaskDone,
+  setSubtaskStatus,
   updateTimestampedLine,
 } from "../src/model/card";
 
@@ -94,9 +95,8 @@ export class FakeRepo implements CardRepository {
   }
 
   private toCard(path: string, e: Entry): Card {
-    const childLinks = parseSubtasks(e.body)
-      .filter((s) => s.kind === "card" && s.link)
-      .map((s) => s.link!);
+    const subItems = parseSubtasks(e.body);
+    const childLinks = subItems.filter((s) => s.kind === "card" && s.link).map((s) => s.link!);
     const { title, source } = this.resolveTitle(e);
     return {
       path,
@@ -105,6 +105,7 @@ export class FakeRepo implements CardRepository {
       titleSource: source,
       frontmatter: e.fm,
       childLinks,
+      subItems,
       stats: cardStats(e.body),
     };
   }
@@ -184,10 +185,16 @@ export class FakeRepo implements CardRepository {
   async applyMove(mutation: {
     path: string;
     setFrontmatter?: Partial<CardFrontmatter>;
+    setSubtaskStatus?: { index: number; status: string | null; done: boolean };
     history?: string;
   }) {
     if (mutation.setFrontmatter)
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
+    if (mutation.setSubtaskStatus) {
+      const { index, status, done } = mutation.setSubtaskStatus;
+      const e = this.entry(mutation.path);
+      e.body = setSubtaskStatus(setSubtaskDone(e.body, index, done), index, status);
+    }
     if (mutation.history) {
       const e = this.entry(mutation.path);
       e.body = appendHistory(e.body, mutation.history, this.ts);

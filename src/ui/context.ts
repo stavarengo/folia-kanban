@@ -95,8 +95,16 @@ export interface BoardActions {
   toggleTodo(path: string, index: number, done: boolean): void;
   /** Delete the index-th checklist item of a card. */
   removeTodo(path: string, index: number): void;
+  /**
+   * Send the index-th checklist line of `path` to a column of its own, or back to its card's column
+   * with `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until
+   * it claims a column, so without this there would be nothing to drag in the first place.
+   */
+  moveTodo(path: string, index: number, columnId: string | null): void;
   /** Id of the column treated as "done", or null if the board has none. */
   doneColumnId: string | null;
+  /** The board's columns, in board order — what a "move this to…" picker offers. */
+  columns: readonly ColumnDef[];
   /**
    * The priority values this board offers: what its note remembers, in the order the note lists
    * them, followed by what its cards use — or the todo.txt `A`/`B`/`C` starting set when it knows

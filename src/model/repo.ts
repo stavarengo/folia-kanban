@@ -29,7 +29,11 @@ export interface CardRepository {
   /** Parse a card's body for the detail panel. */
   readBody(path: string): Promise<CardBody>;
 
-  /** Apply a drag result: status + order frontmatter and a history line. */
+  /**
+   * Apply a drag result: the card's status + order frontmatter, or — for an inline todo, which has
+   * no frontmatter of its own — the `[status:: …]` field and checkbox of its checklist line in the
+   * note named by `mutation.path`. Plus a history line when one is given.
+   */
   applyMove(mutation: CardMutation): Promise<void>;
 
   setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void>;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeRepo } from "./fakeRepo";
-import { resolveDrop, moveCard } from "../src/model/board";
+import { makeTodoPath, resolveDrop, moveCard } from "../src/model/board";
 import type { BoardConfig } from "../src/model/types";
 
 const config: BoardConfig = {
@@ -210,5 +210,69 @@ describe("contexts (#14)", () => {
     });
     const board = await repo.loadBoard();
     expect(board.contexts).toEqual({});
+  });
+});
+
+describe("subitem drag persistence", () => {
+  it("drags an inline todo to another column by writing its own checklist line", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] Write the docs\n- [ ] Stay home\n",
+      },
+    });
+    let board = await repo.loadBoard();
+    // Nothing is placed yet — the board looks exactly as it did before subitems could move.
+    expect(board.columns["doing"]).toEqual([]);
+
+    // Drag it into Doing: the write lands on the line, and the note keeps its own frontmatter.
+    await repo.applyMove(moveCard(board, "Tasks/Root.md", "todo", 0) ?? { path: "Tasks/Root.md" });
+    board = await repo.loadBoard();
+    const todoPath = makeTodoPath("Tasks/Root.md", 0);
+    // The tile does not exist until the line claims a column, so the move starts from the parent's
+    // detail/board state — simulate the drop the UI would produce once it is placed.
+    const placed =
+      "\n# Root\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n- [ ] Stay home\n";
+    repo.files.get("Tasks/Root.md")!.body = placed;
+    board = await repo.loadBoard();
+    expect(board.columns["doing"]).toEqual([todoPath]);
+
+    // Now drag it on to Done: the checkbox and the field are written together.
+    const drop = resolveDrop(board, todoPath, "done")!;
+    await repo.applyMove(moveCard(board, todoPath, drop.columnId, drop.index)!);
+    board = await repo.loadBoard();
+    expect(board.columns["done"]).toEqual([todoPath]);
+    expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [x] Write the docs [status:: done]");
+    expect(repo.files.get("Tasks/Root.md")!.fm.status).toBe("todo"); // the parent has not moved
+    expect(repo.files.get("Tasks/Root.md")!.body).toContain(
+      'Moved subtask "Write the docs" from Doing to Done',
+    );
+
+    // And back to the parent's own column: the tile disappears and the todo is open again.
+    const back = moveCard(board, todoPath, "todo", 0)!;
+    await repo.applyMove(back);
+    board = await repo.loadBoard();
+    expect(board.columns["todo"]).toEqual(["Tasks/Root.md"]);
+    expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [ ] Write the docs [status:: todo]");
+  });
+
+  it("drags a file subcard out of its parent's group into a column of its own", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Child]]\n",
+      },
+      "Tasks/Child.md": { fm: { type: "task" }, body: "\n# Child\n" },
+    });
+    let board = await repo.loadBoard();
+    expect(board.childrenOf["Tasks/Root.md"]).toEqual(["Tasks/Child.md"]);
+
+    const drop = resolveDrop(board, "Tasks/Child.md", "doing")!;
+    await repo.applyMove(moveCard(board, "Tasks/Child.md", drop.columnId, drop.index)!);
+    board = await repo.loadBoard();
+    expect(board.columns["doing"]).toEqual(["Tasks/Child.md"]);
+    expect(board.childrenOf["Tasks/Root.md"]).toBeUndefined();
+    expect(board.parentOf["Tasks/Child.md"]).toBe("Tasks/Root.md");
+    expect(repo.files.get("Tasks/Child.md")!.fm.status).toBe("doing");
   });
 });

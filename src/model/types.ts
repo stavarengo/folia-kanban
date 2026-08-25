@@ -4,8 +4,14 @@
 /** The board-level `card-title` property. `auto` = guess per card from the file name's shape. */
 export type TitleMode = "auto" | "filename" | "heading";
 
-/** Which source produced a card's title (and which one a rename must write to). */
-export type TitleSource = "filename" | "heading" | "frontmatter";
+/**
+ * Which source produced a card's title (and which one a rename must write to).
+ *
+ * `subtask` belongs to the synthetic cards the board builds for inline todos placed in their own
+ * column: their title is a checklist line, not a file, so there is nothing for a rename to write
+ * to — the write paths refuse it rather than guess.
+ */
+export type TitleSource = "filename" | "heading" | "frontmatter" | "subtask";
 
 export interface CardFrontmatter {
   status?: string;
@@ -28,6 +34,13 @@ export interface SubItem {
   done: boolean;
   /** For kind === "card": the resolved link target (basename or path inside `[[ ]]`). */
   link?: string;
+  /**
+   * The column this line claims for itself, from an inline `[status:: doing]` field on the line.
+   * Absent when the line carries no such field, which means "wherever my parent is" — the way
+   * every checklist line behaved before subitems could be placed. Only read for `kind === "todo"`:
+   * a subcard link is a file, and a file's own `status` frontmatter is its single source of truth.
+   */
+  status?: string;
   /** 0-based position among checklist items in the Subtasks section (stable edit handle). */
   index: number;
 }
@@ -126,6 +139,18 @@ export interface Card {
   frontmatter: CardFrontmatter;
   /** Link targets of the card-subtasks (the `[[...]]` checklist items), in order. */
   childLinks: string[];
+  /**
+   * The card's parsed `## Subtasks` checklist, when the loader read the body. `buildBoard` needs it
+   * to see which inline todos claim a column of their own (`SubItem.status`); nothing else does.
+   */
+  subItems?: SubItem[];
+  /**
+   * Set ONLY on the synthetic cards `buildBoard` mints for an inline todo that sits in its own
+   * column: the file that owns the checklist line, and the line's `SubItem.index` inside it. Its
+   * `path` is synthetic (see `makeTodoPath`) and names no file, so every write path must route
+   * through the parent named here instead of treating `Card.path` as a vault path.
+   */
+  todoRef?: { parentPath: string; index: number };
   /** Optional precomputed display stats (ignored by board logic). */
   stats?: CardStats;
   /**

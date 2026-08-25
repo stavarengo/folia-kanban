@@ -412,6 +412,11 @@ export function Column({
                     dragId={dragIdFor(c.path)}
                     today={today}
                     selected={c.path === selectedPath}
+                    // Only a subitem placed in a column of its own has a parent up here (a subitem
+                    // still living with its parent renders inside SubcardGroup below, where the
+                    // nesting already says whose it is). So this doubles as "show the ↳ reference".
+                    parentPath={board.parentOf[c.path]}
+                    parentTitle={board.cards[board.parentOf[c.path] ?? ""]?.title}
                   />
                   <SubcardGroup
                     parentPath={c.path}

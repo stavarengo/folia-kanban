@@ -15,6 +15,42 @@ import type {
 } from "./types";
 import { readBlockedBy, readRelations } from "./relationships";
 
+const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
+
+/**
+ * The column that means "finished": the one whose id is literally `done`, else the first whose id
+ * or title reads as done, else none. Lives here rather than in the UI because the board graph needs
+ * it too — a checked inline todo is done whatever its `[status:: …]` line says.
+ */
+export function findDoneColumn(columns: readonly ColumnDef[]): string | null {
+  const exact = columns.find((c) => c.id.toLowerCase() === "done");
+  if (exact) return exact.id;
+  const fuzzy = columns.find((c) => DONE_RE.test(c.id) || DONE_RE.test(c.title));
+  return fuzzy?.id ?? null;
+}
+
+// A placed inline todo is a board item without a file. Its id is its owning note's path plus the
+// checklist index — `#` cannot occur in an Obsidian vault path, so this can never collide with a
+// real card, and it holds no `::`, so the drag-id namespacing still splits it correctly.
+const TODO_PATH_SEP = "#todo:";
+
+/** The synthetic board path for the index-th checklist line of the note at `parentPath`. */
+export function makeTodoPath(parentPath: string, index: number): string {
+  return parentPath + TODO_PATH_SEP + index;
+}
+
+/**
+ * Read a synthetic inline-todo path back into the note that owns the line and the line's index,
+ * or `null` for an ordinary card path. Every write path uses this to route to a real file.
+ */
+export function parseTodoPath(path: string): { parentPath: string; index: number } | null {
+  const at = path.lastIndexOf(TODO_PATH_SEP);
+  if (at < 0) return null;
+  const index = Number(path.slice(at + TODO_PATH_SEP.length));
+  if (!Number.isInteger(index) || index < 0) return null;
+  return { parentPath: path.slice(0, at), index };
+}
+
 /** The folder a vault path lives in — `""` for a note sitting at the vault root. */
 function parentFolder(path: string): string {
   const slash = path.lastIndexOf("/");
@@ -324,16 +360,94 @@ export function buildBoard(
 
   const colIds = new Set(config.columns.map((c) => c.id));
   const firstCol = config.columns[0]?.id;
+  const doneCol = findDoneColumn(config.columns);
+
+  // The column a card actually renders in. A top-level card reads its own `status` and falls back
+  // to the first column, as it always has. A nested subcard reads its own `status` too — that is
+  // what lets it sit in a column of its own — and only falls back to its parent's column when it
+  // has none, which is why a board nobody has moved a subitem on looks exactly as it did.
+  // Memoized, and the walk terminates because `isGenuinelyNested` already rejected every cycle.
+  const effective = new Map<string, string | undefined>();
+  const effectiveColumnOf = (path: string): string | undefined => {
+    const hit = effective.get(path);
+    if (hit !== undefined || effective.has(path)) return hit;
+    effective.set(path, firstCol); // cycle guard; overwritten below
+    const card = cardsByPath[path];
+    const st = String(card?.frontmatter.status ?? "");
+    const own = colIds.has(st) ? st : undefined;
+    const parent = parentOf[path];
+    const value =
+      own ?? (parent && isGenuinelyNested(path, parentOf) ? effectiveColumnOf(parent) : firstCol);
+    effective.set(path, value);
+    return value;
+  };
+
   const groups: Record<string, Card[]> = {};
   for (const col of config.columns) groups[col.id] = [];
+  const place = (card: Card, target: string | undefined) => {
+    if (!target) return;
+    const bucket = groups[target];
+    if (bucket) bucket.push(card);
+  };
+
+  // Which nested subcards were pulled OUT of their parent's group into a column of their own, so
+  // the nested view below skips them (they must render once, not twice).
+  const placedChildren = new Set<string>();
   for (const c of cards) {
-    if (isGenuinelyNested(c.path, parentOf)) continue; // real subcards are not on the board top level
-    const st = String(c.frontmatter.status ?? "");
-    const target = colIds.has(st) ? st : firstCol;
-    if (target) {
-      const bucket = groups[target];
-      if (bucket) bucket.push(c);
+    const nested = isGenuinelyNested(c.path, parentOf);
+    if (!nested) {
+      place(c, effectiveColumnOf(c.path));
+      continue;
     }
+    const parent = parentOf[c.path];
+    const own = effectiveColumnOf(c.path);
+    if (parent !== undefined && own !== undefined && own !== effectiveColumnOf(parent)) {
+      placedChildren.add(c.path);
+      place(c, own);
+    }
+  }
+
+  // Inline todos that claim a column of their own become synthetic cards, so every per-column rule
+  // the board already has — order, sort, group, filter, WIP count, drag — applies to them without
+  // a second implementation. A line with no `[status:: …]` field claims nothing and keeps rendering
+  // inside its parent card, exactly as before; a checked line is done wherever its field points.
+  const placedTodos = new Map<string, Set<number>>();
+  for (const c of cards) {
+    const parentColumn = effectiveColumnOf(c.path);
+    for (const item of c.subItems ?? []) {
+      if (item.kind !== "todo") continue;
+      const claimed =
+        item.status !== undefined && colIds.has(item.status) ? item.status : undefined;
+      if (claimed === undefined) continue;
+      const target = item.done && doneCol ? doneCol : claimed;
+      if (target === parentColumn) continue; // back home: renders inside its parent again
+      const path = makeTodoPath(c.path, item.index);
+      const todoCard: Card = {
+        path,
+        basename: c.basename,
+        title: item.text,
+        titleSource: "subtask",
+        frontmatter: { status: target },
+        childLinks: [],
+        todoRef: { parentPath: c.path, index: item.index },
+      };
+      if (c.context !== undefined) todoCard.context = c.context;
+      cardsByPath[path] = todoCard;
+      parentOf[path] = c.path;
+      let indices = placedTodos.get(c.path);
+      if (!indices) placedTodos.set(c.path, (indices = new Set()));
+      indices.add(item.index);
+      place(todoCard, target);
+    }
+  }
+
+  // A todo showing as its own tile must not ALSO show in its parent's "next todos" list. Its
+  // checklist line still counts towards the parent's progress: the work is still the card's.
+  for (const [path, indices] of placedTodos) {
+    const card = cardsByPath[path];
+    const stats = card?.stats;
+    if (!card || !stats) continue;
+    card.stats = { ...stats, nextTodos: stats.nextTodos.filter((t) => !indices.has(t.index)) };
   }
 
   const columns: Record<string, string[]> = {};
@@ -341,13 +455,14 @@ export function buildBoard(
     columns[col.id] = columnEffectiveOrders(groups[col.id] ?? []).map((x) => x.card.path);
   }
 
-  // Inverse of parentOf, but ONLY for genuinely-nested children — so a card in an A<->B cycle
-  // (which parentOf links both ways) is excluded here. That keeps childrenOf a forest: cycle
-  // members surface only as top-level cards, never doubly as a nested child of each other.
+  // Inverse of parentOf, but ONLY for genuinely-nested children that are not placed in a column of
+  // their own — and so a card in an A<->B cycle (which parentOf links both ways) is excluded here.
+  // That keeps childrenOf a forest: cycle members surface only as top-level cards, never doubly as
+  // a nested child of each other.
   const childGroups: Record<string, Card[]> = {};
   for (const c of cards) {
     const parent = parentOf[c.path];
-    if (!parent || !isGenuinelyNested(c.path, parentOf)) continue;
+    if (!parent || placedChildren.has(c.path) || !isGenuinelyNested(c.path, parentOf)) continue;
     (childGroups[parent] ??= []).push(c);
   }
   const childrenOf: Record<string, string[]> = {};
@@ -514,8 +629,15 @@ export function computeDropOrder(colCards: Card[], dropIndex: number): number {
 }
 
 export interface CardMutation {
+  /** The note to write. For an inline todo this is the note that OWNS the checklist line. */
   path: string;
   setFrontmatter?: Partial<CardFrontmatter>;
+  /**
+   * An inline todo's placement, written to its own `## Subtasks` line instead of to frontmatter:
+   * the line's `[status:: …]` field (`null` clears it) and its checkbox. Mutually exclusive with
+   * `setFrontmatter` — a checklist line has no frontmatter of its own.
+   */
+  setSubtaskStatus?: { index: number; status: string | null; done: boolean };
   /** History event text to append (timestamp added by the adapter). */
   history?: string;
 }
@@ -588,6 +710,65 @@ export function planDrop(
   return { kind: "moveCard", path: activePath, overId: realOver };
 }
 
+/**
+ * Move the index-th checklist line of `parentPath` into `toColumnId`, or back home to wherever its
+ * card is with `null`. This is the ONE write behind every way a todo changes column — the drag, the
+ * context menu and the detail panel — so a todo cannot end up in a state one of them can produce
+ * and another cannot read.
+ *
+ * The checkbox moves with it: landing in the done column checks the line, leaving it unchecks it.
+ * That keeps the two ways a todo can say "finished" from disagreeing, since a checked line reads as
+ * done wherever its field points. Coming home leaves the checkbox alone — it says nothing about
+ * which column the line claims, because it no longer claims one.
+ */
+export function moveSubtask(
+  board: Board,
+  parentPath: string,
+  index: number,
+  toColumnId: string | null,
+): CardMutation | null {
+  const parent = board.cards[parentPath];
+  if (!parent) return null;
+  const item = parent.subItems?.find((s) => s.index === index && s.kind === "todo");
+  if (!item) return null;
+  const home = columnOf(board, parentPath);
+  const from = columnOf(board, makeTodoPath(parentPath, index)) ?? home;
+  const target = toColumnId ?? home;
+  if (from === target) return null; // already where it is being sent
+  const setSubtaskStatus =
+    toColumnId === null
+      ? { index, status: null, done: item.done }
+      : { index, status: toColumnId, done: toColumnId === findDoneColumn(board.config.columns) };
+  const label = item.text || "todo";
+  return {
+    path: parentPath,
+    setSubtaskStatus,
+    history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
+  };
+}
+
+/**
+ * The history-free mutation that reassigns `path` to `toColumnId` — what a column being deleted
+ * needs for the cards it leaves behind. Routed through here rather than a direct frontmatter write
+ * so an inline todo stranded in that column is rehomed on its own line instead of being handed a
+ * synthetic path no file answers to.
+ */
+export function reassignColumn(
+  board: Board,
+  path: string,
+  toColumnId: string,
+): CardMutation | null {
+  const card = board.cards[path];
+  if (!card) return null;
+  const todoRef = card.todoRef;
+  if (!todoRef) return { path, setFrontmatter: { status: toColumnId } };
+  const done = toColumnId === findDoneColumn(board.config.columns);
+  return {
+    path: todoRef.parentPath,
+    setSubtaskStatus: { index: todoRef.index, status: toColumnId, done },
+  };
+}
+
 /** Column id that currently contains `path`, or null. */
 export function columnOf(board: Board, path: string): string | null {
   for (const col of board.config.columns) {
@@ -632,6 +813,8 @@ export function moveCard(
   const card = board.cards[cardPath];
   if (!card) return null;
   const fromStatus = String(card.frontmatter.status ?? "");
+  const todoRef = card.todoRef;
+  if (todoRef) return moveSubtask(board, todoRef.parentPath, todoRef.index, toColumnId);
   const colCards = (board.columns[toColumnId] ?? [])
     .filter((p) => p !== cardPath)
     .flatMap((p) => {

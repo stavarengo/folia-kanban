@@ -20,9 +20,22 @@ interface Props {
   /** A nested subcard rendered inside its parent's `.folia-subcard-group`: not drag-reorderable,
    *  rendered without a drag affordance, but keeps click/keyboard open and the context menu. */
   nested?: boolean;
+  /** Set when this tile is a SUBITEM sitting in a column of its own: the note it belongs to. Drives
+   *  the `↳ parent` reference line that replaces the nesting as the visible sign of whose work it is. */
+  parentPath?: string | undefined;
+  /** That parent's title, for the reference line. */
+  parentTitle?: string | undefined;
 }
 
-function CardItemInner({ card, dragId, today, selected, nested = false }: Props) {
+function CardItemInner({
+  card,
+  dragId,
+  today,
+  selected,
+  nested = false,
+  parentPath,
+  parentTitle,
+}: Props) {
   const actions = useBoardActions();
   const contexts = useContexts();
   const { cardNextTodos } = useSettings();
@@ -70,8 +83,13 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
   const showActions = !confirming && editing == null;
   const canComplete = actions.doneColumnId != null && fm.status !== actions.doneColumnId;
 
+  // An inline todo has no note of its own: its checklist line lives in its parent, so every action
+  // that needs a file addresses the parent, and the tile's own actions are the todo actions.
+  const todoRef = card.todoRef;
+  const notePath = todoRef ? todoRef.parentPath : card.path;
+
   const open = () => {
-    if (!isDragging) actions.open(card.path);
+    if (!isDragging) actions.open(notePath);
   };
   // Right-click opens a context-aware menu. preventDefault stops Obsidian's own context menu;
   // dnd-kit's PointerSensor only activates on the left button, so this never starts a drag.
@@ -81,16 +99,18 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
     const todoEl = (e.target as HTMLElement).closest(".folia-card-next-todo");
     const todoIndex = todoEl ? Number(todoEl.getAttribute("data-todo-index")) : NaN;
     setMenu(
-      todoEl && Number.isFinite(todoIndex)
-        ? { x: e.clientX, y: e.clientY, kind: "todo", todoIndex }
-        : { x: e.clientX, y: e.clientY, kind: "card" },
+      todoRef
+        ? { x: e.clientX, y: e.clientY, kind: "todo", todoIndex: todoRef.index }
+        : todoEl && Number.isFinite(todoIndex)
+          ? { x: e.clientX, y: e.clientY, kind: "todo", todoIndex }
+          : { x: e.clientX, y: e.clientY, kind: "card" },
     );
   };
   // Merge dnd-kit keyboard handling (Space = pick up) with Enter = open.
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      actions.open(card.path);
+      actions.open(notePath);
       return;
     }
     (listeners as { onKeyDown?: (e: KeyboardEvent) => void } | undefined)?.onKeyDown?.(e);
@@ -132,12 +152,15 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
       className={
         "folia-card" +
         (nested ? " folia-card--nested" : "") +
+        (parentPath ? " folia-card--subitem" : "") +
+        (todoRef ? " folia-card--todo" : "") +
         (selected ? " is-selected" : "") +
         (isDragging ? " is-dragging" : "") +
         (card.context ? " folia-card--has-context" : "")
       }
       data-testid="card"
       data-path={card.path}
+      data-subitem={parentPath ? (todoRef ? "todo" : "card") : undefined}
       data-prio={prio ?? undefined}
       data-context={card.context ?? undefined}
       data-urgency={urgency ?? undefined}
@@ -173,6 +196,20 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           />
         ) : (
           <div className="folia-card-title">{card.title}</div>
+        )}
+        {parentPath && (
+          <button
+            className="folia-card-parent-ref"
+            title={`Part of ${parentTitle ?? parentPath}`}
+            aria-label={`Part of ${parentTitle ?? parentPath}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.open(parentPath);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <span aria-hidden="true">↳</span> {parentTitle ?? parentPath}
+          </button>
         )}
         {(ctxLabel || chips.length > 0) && (
           <div className="folia-chips">
@@ -259,19 +296,21 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           )}
           <button
             className="folia-icon-btn"
-            aria-label={`Open note for "${card.title}"`}
+            aria-label={
+              todoRef ? `Open note holding "${card.title}"` : `Open note for "${card.title}"`
+            }
             title="Open note"
             onClick={(e) => {
               e.stopPropagation();
-              actions.openNote(card.path);
+              actions.openNote(notePath);
             }}
           >
             <Icon name="external-link" size={15} />
           </button>
           <button
             className="folia-icon-btn folia-action-delete"
-            aria-label={`Delete "${card.title}"`}
-            title="Delete card"
+            aria-label={todoRef ? `Remove todo "${card.title}"` : `Delete "${card.title}"`}
+            title={todoRef ? "Remove todo" : "Delete card"}
             onClick={(e) => {
               e.stopPropagation();
               setConfirming(true);
@@ -283,17 +322,22 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
       )}
 
       {confirming && (
-        <div className="folia-card-confirm" role="alertdialog" aria-label={`Delete ${card.title}?`}>
-          <span>Delete card?</span>
+        <div
+          className="folia-card-confirm"
+          role="alertdialog"
+          aria-label={todoRef ? `Remove todo ${card.title}?` : `Delete ${card.title}?`}
+        >
+          <span>{todoRef ? "Remove todo?" : "Delete card?"}</span>
           <div className="folia-row-actions">
             <button
               className="folia-btn folia-btn-danger"
               onClick={(e) => {
                 e.stopPropagation();
-                actions.remove(card.path);
+                if (todoRef) actions.removeTodo(todoRef.parentPath, todoRef.index);
+                else actions.remove(card.path);
               }}
             >
-              Delete
+              {todoRef ? "Remove" : "Delete"}
             </button>
             <button
               className="folia-btn"
@@ -315,7 +359,8 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
           return (
             <CardContextMenu
               target={menu}
-              path={card.path}
+              path={notePath}
+              todoColumn={todoRef ? String(fm.status ?? "") : ""}
               priority={typeof fm.priority === "string" ? fm.priority : ""}
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
@@ -353,6 +398,11 @@ export const CardItem = memo(
     a.today === b.today &&
     a.card.path === b.card.path &&
     a.card.title === b.card.title &&
-    a.card.frontmatter === b.card.frontmatter &&
+    a.parentPath === b.parentPath &&
+    a.parentTitle === b.parentTitle &&
+    a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
+    a.card.todoRef?.index === b.card.todoRef?.index &&
+    a.card.frontmatter.status === b.card.frontmatter.status &&
+    (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
     sameStats(a.card.stats, b.card.stats),
 );

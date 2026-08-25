@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
-import { columnOf, moveCard, moveColumn, relationCounts, resolveDrop } from "../model/board";
+import {
+  columnOf,
+  findDoneColumn,
+  moveCard,
+  moveColumn,
+  moveSubtask,
+  parseTodoPath,
+  reassignColumn,
+  relationCounts,
+  resolveDrop,
+} from "../model/board";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -21,13 +31,14 @@ import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
 import { boardPriorities, matchCard, parseFilter } from "./cardView";
 
-const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
-
 /** Stable empty contexts map (#14) so the provider value identity doesn't churn pre-load. */
 const EMPTY_CONTEXTS = {} as const;
 
 /** Stable empty relation-count map, same reason. */
 const EMPTY_RELATION_COUNTS = {} as const;
+
+/** Stable empty column list, so the actions object keeps its identity before the board loads. */
+const EMPTY_COLUMNS: readonly ColumnDef[] = [];
 
 /** Translate `addCardOpenMode` into a presentation override; 'default' means "use the global". */
 function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | null {
@@ -43,15 +54,6 @@ function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | 
     default:
       return null;
   }
-}
-
-/** Pick the column that means "finished": exact id "done", else a title/id that reads as done. */
-function findDoneColumn(board: BoardModel): string | null {
-  const cols = board.config.columns;
-  const exact = cols.find((c) => c.id.toLowerCase() === "done");
-  if (exact) return exact.id;
-  const fuzzy = cols.find((c) => DONE_RE.test(c.id) || DONE_RE.test(c.title));
-  return fuzzy?.id ?? null;
 }
 
 /**
@@ -186,7 +188,10 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     [repo, load, settings.addCardFlow, settings.addCardOpenMode, reportError],
   );
 
-  const doneColumnId = useMemo(() => (board ? findDoneColumn(board) : null), [board]);
+  const doneColumnId = useMemo(
+    () => (board ? findDoneColumn(board.config.columns) : null),
+    [board],
+  );
 
   const moveTo = useCallback(
     async (path: string, columnId: string) => {
@@ -271,7 +276,10 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setFocusNew(false);
     setFocusAddSubcard(false);
     setCreateColumn(null);
-    setSelected(path);
+    // An inline todo placed in its own column has no note of its own, so opening its tile opens the
+    // note that owns the checklist line — where the todo is edited, exactly as it always was. One
+    // place, so no caller has to know which kind of tile it just handed us.
+    setSelected(parseTodoPath(path)?.parentPath ?? path);
   }, []);
 
   const actions = useMemo<BoardActions>(
@@ -368,6 +376,21 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           }
         })();
       },
+      moveTodo: (path, index, columnId) => {
+        const b = boardRef.current;
+        if (!b) return;
+        const mut = moveSubtask(b, path, index, columnId);
+        if (!mut) return;
+        void (async () => {
+          try {
+            await repo.applyMove(mut);
+          } catch (e) {
+            reportError(e);
+          } finally {
+            await load();
+          }
+        })();
+      },
       removeTodo: (path, index) => {
         void (async () => {
           try {
@@ -380,6 +403,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       doneColumnId,
+      columns: board?.config.columns ?? EMPTY_COLUMNS,
       priorities,
       renameColumn: (id, title) => {
         const b = boardRef.current;
@@ -455,10 +479,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         if (!neighbor) return;
         const orphans = b.columns[id] ?? [];
         void (async () => {
-          // Reassign this column's cards to a neighbour so none are orphaned.
+          // Reassign this column's items to a neighbour so none are orphaned — cards through their
+          // frontmatter, placed inline todos through their own checklist line.
           for (const p of orphans) {
+            const mut = reassignColumn(b, p, neighbor.id);
+            if (!mut) continue;
             try {
-              await repo.setFrontmatter(p, { status: neighbor.id });
+              await repo.applyMove(mut);
             } catch {
               /* best-effort */
             }
@@ -498,6 +525,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       showToast,
       reportError,
       settings.addCardOpenMode,
+      board?.config.columns,
     ],
   );
 

@@ -30,6 +30,7 @@ import {
   removeTimestampedLine,
   setDescription as setDescriptionText,
   setSubtaskDone,
+  setSubtaskStatus as setSubtaskStatusText,
   splitFrontmatter,
   updateTimestampedLine,
 } from "../model/card";
@@ -228,7 +229,8 @@ export class VaultRepository implements CardRepository {
           throw new DataCorruptionError(`Card "${f.path}" has invalid frontmatter`, { cause: e });
         }
       }
-      const childLinks = parseSubtasks(text)
+      const subItems = parseSubtasks(text);
+      const childLinks = subItems
         .filter((s) => s.kind === "card" && s.link)
         .map((s) => s.link ?? "")
         .filter((l) => l !== "");
@@ -240,6 +242,7 @@ export class VaultRepository implements CardRepository {
         titleSource: source,
         frontmatter: fm,
         childLinks,
+        subItems,
         stats: cardStats(text),
       });
     }
@@ -332,6 +335,15 @@ export class VaultRepository implements CardRepository {
   async applyMove(mutation: CardMutation): Promise<void> {
     if (mutation.setFrontmatter)
       await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
+    if (mutation.setSubtaskStatus) {
+      // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
+      // where a subitem sits, so writing them separately would leave a moment where the board
+      // reloads on a line that says two different things.
+      const { index, status, done } = mutation.setSubtaskStatus;
+      await this.editBody(mutation.path, (t) =>
+        setSubtaskStatusText(setSubtaskDone(t, index, done), index, status),
+      );
+    }
     if (mutation.history) {
       const historyLine = mutation.history;
       await this.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));

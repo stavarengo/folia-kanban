@@ -11,6 +11,7 @@ import {
   addTodo,
   addSubcard,
   setSubtaskDone,
+  setSubtaskStatus,
   removeSubtask,
   setDescription,
   cardStats,
@@ -552,5 +553,73 @@ All three landed.
     // changes for all of them at once.
     const fenced = "# T\n\ndesc\n\n```md\n## Comments\n- _t:_ sample\n```\n";
     expect(parseBody(fenced).description).toBe("desc\n\n```md");
+  });
+});
+
+describe("inline subtask status (a checklist line's own column)", () => {
+  const doc =
+    "# T\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n- [ ] Stay home\n- [x] [[Child]]\n";
+
+  it("reads the field off the line and keeps it out of the text people see", () => {
+    const items = parseSubtasks(doc);
+    expect(items[0]).toMatchObject({ kind: "todo", text: "Write the docs", status: "doing" });
+    expect(items[1]).toMatchObject({ kind: "todo", text: "Stay home" });
+    expect(items[1]?.status).toBeUndefined();
+  });
+
+  it("still reads a subcard link that carries a field, as a link", () => {
+    const items = parseSubtasks("# T\n\n## Subtasks\n- [ ] [[Child]] [status:: done]\n");
+    expect(items[0]).toMatchObject({ kind: "card", link: "Child", text: "[[Child]]" });
+  });
+
+  it("treats an empty field as no claim at all", () => {
+    expect(
+      parseSubtasks("# T\n\n## Subtasks\n- [ ] Thing [status::  ]\n")[0]?.status,
+    ).toBeUndefined();
+  });
+
+  it("tolerates a hand-typed field with no space after the colons", () => {
+    expect(parseSubtasks("# T\n\n## Subtasks\n- [ ] Thing [status::doing]\n")[0]?.status).toBe(
+      "doing",
+    );
+  });
+
+  it("keeps the field out of the parent's inline next-todos text", () => {
+    expect(cardStats(doc).nextTodos.map((t) => t.text)).toEqual(["Write the docs", "Stay home"]);
+  });
+
+  it("adds a field to a line that has none, touching nothing else", () => {
+    const out = setSubtaskStatus(doc, 1, "done");
+    expect(out.split("\n")[4]).toBe("- [ ] Stay home [status:: done]");
+    expect(out.split("\n")[3]).toBe("- [ ] Write the docs [status:: doing]");
+    expect(out.split("\n")[5]).toBe("- [x] [[Child]]");
+  });
+
+  it("rewrites a field in place rather than appending a second one", () => {
+    const out = setSubtaskStatus(doc, 0, "done");
+    expect(out.split("\n")[3]).toBe("- [ ] Write the docs [status:: done]");
+    expect(parseSubtasks(out)[0]?.status).toBe("done");
+  });
+
+  it("clears a field with null and leaves no double space behind", () => {
+    const out = setSubtaskStatus("# T\n\n## Subtasks\n- [ ] A [status:: doing] tail\n", 0, null);
+    expect(out.split("\n")[3]).toBe("- [ ] A tail");
+  });
+
+  it("keeps the bullet prefix, indent and frontmatter byte-identical", () => {
+    const src = "---\nstatus: todo\n---\n# T\n\n## Subtasks\n  * [x] Deep one\n";
+    const out = setSubtaskStatus(src, 0, "doing");
+    expect(out.split("\n")[6]).toBe("  * [x] Deep one [status:: doing]");
+    expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(src).fmText);
+  });
+
+  it("round-trips through the checkbox writer without losing the field", () => {
+    const out = setSubtaskStatus(setSubtaskDone(doc, 0, true), 0, "done");
+    expect(out.split("\n")[3]).toBe("- [x] Write the docs [status:: done]");
+  });
+
+  it("is a no-op when the card has no Subtasks section", () => {
+    const src = "# T\n\nJust prose.\n";
+    expect(setSubtaskStatus(src, 0, "doing")).toBe(src);
   });
 });

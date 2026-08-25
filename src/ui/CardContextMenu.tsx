@@ -20,6 +20,8 @@ interface Props {
   priority: string;
   /** Whether the card already sits in the board's "done" column (hides "Mark done"). */
   isDone: boolean;
+  /** For a todo target: the column its line currently claims, `""` when it claims none. */
+  todoColumn?: string;
   canMoveUp: boolean;
   canMoveDown: boolean;
   /** Enter inline title-rename on the card (#12). Single click can't trigger it — that opens the
@@ -33,6 +35,7 @@ export function CardContextMenu({
   path,
   priority,
   isDone,
+  todoColumn = "",
   canMoveUp,
   canMoveDown,
   onRename,
@@ -141,6 +144,39 @@ export function CardContextMenu({
               danger: true,
             },
           )}
+          <div className="folia-menu-divider" />
+          <span className="folia-menu-label">Column</span>
+          <div className="folia-menu-columns" role="group" aria-label="Move todo to a column">
+            {a.columns.map((c) => (
+              <button
+                key={c.id}
+                className={"folia-menu-column" + (c.id === todoColumn ? " is-active" : "")}
+                role="menuitemradio"
+                aria-checked={c.id === todoColumn}
+                onClick={() => {
+                  actioned.current = true;
+                  if (target.todoIndex !== undefined) a.moveTodo(path, target.todoIndex, c.id);
+                  onClose();
+                }}
+              >
+                {c.title}
+              </button>
+            ))}
+            <button
+              className={"folia-menu-column" + (todoColumn === "" ? " is-active" : "")}
+              role="menuitemradio"
+              aria-checked={todoColumn === ""}
+              title="Show it inside its card again"
+              onClick={() => {
+                actioned.current = true;
+                if (target.todoIndex !== undefined) a.moveTodo(path, target.todoIndex, null);
+                onClose();
+              }}
+            >
+              With its card
+            </button>
+          </div>
+
           <div className="folia-menu-divider" />
           {item("Open card", "external-link", () => a.open(path))}
         </>

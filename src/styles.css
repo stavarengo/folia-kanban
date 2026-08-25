@@ -587,6 +587,28 @@
   color: var(--text-muted);
 }
 
+/* The "put this todo in a column" picker, same shape as the priority row above it. */
+.folia-menu-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 4px;
+}
+.folia-menu-column {
+  font: inherit;
+  font-size: var(--folia-font-size-sm);
+  padding: 3px 9px;
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r-pill);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.folia-menu-column.is-active {
+  color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
+}
+
 /* ------------------------------------------------------------------ add column */
 .folia-add-column {
   flex: 0 0 220px;
@@ -802,6 +824,34 @@
 }
 .folia-card--nested .folia-card-title {
   font-size: var(--folia-font-size-sm-plus);
+}
+
+/* ------------------------------------------------- subitems in their own column
+   A subitem that claims a column of its own leaves its parent's nested group and stands in that
+   column like any card. The nesting is then gone as the sign of whose work it is, so the tile
+   carries a `↳ parent` reference in its place. A dashed left edge keeps it distinguishable from a
+   card at a glance without shrinking it (it IS a first-class item in that column now). */
+.folia-card--subitem {
+  border-left: 2px dashed color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 60%, transparent);
+}
+.folia-card-parent-ref {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-xs);
+  line-height: 1.3;
+  cursor: pointer;
+}
+.folia-card-parent-ref:hover {
+  color: var(--folia-accent);
+  text-decoration: underline;
 }
 
 /* drag overlay (the lifted ghost) — the card the cursor actually carries. A faint lift (scale + tilt)
@@ -1406,6 +1456,20 @@
 .folia-subtask input[type="checkbox"] {
   flex: 0 0 auto;
   margin-top: 2px;
+}
+/* The subitem's own column. Quiet until hovered/focused: most subitems live with their card, so
+   the control should not compete with the subtask text for attention. */
+.folia-subtask-column {
+  flex: 0 0 auto;
+  margin-left: auto;
+  max-width: 40%;
+  font-size: var(--folia-font-size-xs);
+  padding: 1px 4px;
+  opacity: var(--folia-opacity-subtle);
+}
+.folia-subtask:hover .folia-subtask-column,
+.folia-subtask-column:focus {
+  opacity: 1;
 }
 /* One relationship row: the linked card, then either its remove button or a note saying the link
    is declared on the other card (see RelationRow). */
