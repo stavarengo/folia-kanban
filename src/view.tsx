@@ -18,6 +18,14 @@ export class KanbanView extends FileView {
   /** The board can sit in a leaf that has no file yet (a fresh tab, a stale saved layout). */
   override allowNoFile = true;
 
+  /**
+   * A `FileView` is navigable by default, which would make the board's tab a candidate for
+   * "open this file in the current pane" — and since the board accepts any `.md`, opening a card
+   * from the board would quietly replace the board with that card, in place, in the same tab.
+   * The board is a place you open things *from*, so it is not one Obsidian may navigate away.
+   */
+  override navigation = false;
+
   private root: Root | null = null;
   private repo: VaultRepository | null = null;
   private repoPath: string | null = null;
@@ -81,15 +89,6 @@ export class KanbanView extends FileView {
     await super.onRename(file);
     this.rebindTo(file.path);
     this.renderApp();
-  }
-
-  override async onUnloadFile(file: TFile): Promise<void> {
-    await super.onUnloadFile(file);
-    this.repo = null;
-    this.repoPath = null;
-    // Drop the old board from the screen too, so nothing is left rendering against a repository
-    // that is gone. Only when a root already exists — during teardown there is nothing to draw.
-    if (this.root) this.renderApp();
   }
 
   override async onOpen(): Promise<void> {

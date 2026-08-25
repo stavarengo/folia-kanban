@@ -60,6 +60,8 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   private readonly patchState: PatchState = { redirectToBoard: null };
 
+  private unloaded = false;
+
   override async onload(): Promise<void> {
     await this.loadSettings();
 
@@ -97,8 +99,16 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
     // Without this, disabling the plugin leaves its buttons in the headers of open notes, still
     // clickable, still calling into a view type Obsidian no longer knows about.
-    this.register(() => this.removeMarkdownActions());
-    this.app.workspace.onLayoutReady(() => this.syncMarkdownActions());
+    this.register(() => {
+      this.unloaded = true;
+      this.removeMarkdownActions();
+    });
+    // `onLayoutReady` cannot be unregistered, and it can still fire after an unload that happened
+    // during startup — which would put the buttons straight back, wired to a view type Obsidian
+    // no longer has.
+    this.app.workspace.onLayoutReady(() => {
+      if (!this.unloaded) this.syncMarkdownActions();
+    });
   }
 
   /**
