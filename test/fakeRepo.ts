@@ -185,7 +185,7 @@ export class FakeRepo implements CardRepository {
   async applyMove(mutation: {
     path: string;
     setFrontmatter?: Partial<CardFrontmatter>;
-    setSubtaskStatus?: { index: number; status: string | null; done: boolean };
+    setSubtaskStatus?: { index: number; status: string | null; done?: boolean };
     history?: string;
   }) {
     if (mutation.setFrontmatter)
@@ -193,7 +193,11 @@ export class FakeRepo implements CardRepository {
     if (mutation.setSubtaskStatus) {
       const { index, status, done } = mutation.setSubtaskStatus;
       const e = this.entry(mutation.path);
-      e.body = setSubtaskStatus(setSubtaskDone(e.body, index, done), index, status);
+      e.body = setSubtaskStatus(
+        done === undefined ? e.body : setSubtaskDone(e.body, index, done),
+        index,
+        status,
+      );
     }
     if (mutation.history) {
       const e = this.entry(mutation.path);

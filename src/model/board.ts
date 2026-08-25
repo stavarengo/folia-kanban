@@ -650,10 +650,11 @@ export interface CardMutation {
   setFrontmatter?: Partial<CardFrontmatter>;
   /**
    * An inline todo's placement, written to its own `## Subtasks` line instead of to frontmatter:
-   * the line's `[status:: …]` field (`null` clears it) and its checkbox. Mutually exclusive with
+   * the line's `[status:: …]` field (`null` clears it) and, when the move states one, its checkbox.
+   * An absent `done` leaves the box exactly as the note has it. Mutually exclusive with
    * `setFrontmatter` — a checklist line has no frontmatter of its own.
    */
-  setSubtaskStatus?: { index: number; status: string | null; done: boolean };
+  setSubtaskStatus?: { index: number; status: string | null; done?: boolean };
   /** History event text to append (timestamp added by the adapter). */
   history?: string;
 }
@@ -732,10 +733,10 @@ export function planDrop(
  * context menu and the detail panel — so a todo cannot end up in a state one of them can produce
  * and another cannot read.
  *
- * The checkbox moves with it: landing in the done column checks the line, leaving it unchecks it.
- * That keeps the two ways a todo can say "finished" from disagreeing, since a checked line reads as
- * done wherever its field points. Coming home leaves the checkbox alone — it says nothing about
- * which column the line claims, because it no longer claims one.
+ * The checkbox moves with it: landing in the done column checks the line, any other column unchecks
+ * it. That keeps the two ways a todo can say "finished" from disagreeing, since a line sitting in
+ * the done column reads as done whether or not anyone ticked its box. Coming home does not touch
+ * the checkbox at all — it says where a todo shows, never whether the work is over.
  */
 export function moveSubtask(
   board: Board,
@@ -758,10 +759,17 @@ export function moveSubtask(
     item.status !== undefined && board.config.columns.some((c) => c.id === item.status)
       ? item.status
       : null;
+  // Sending a todo home says nothing about whether it is finished, so the checkbox is left out of
+  // the write entirely rather than written back to what we believe it currently is — the board we
+  // are reading may be one reload behind the note, and a stale belief would tick or untick the
+  // wrong way. Only a move to an actual column states a done-ness, and that one is not a belief.
   const done =
-    toColumnId === null ? item.done : toColumnId === findDoneColumn(board.config.columns);
-  if (claim === toColumnId && item.done === done) return null; // the line already says this
-  const setSubtaskStatus = { index, status: toColumnId, done };
+    toColumnId === null ? undefined : toColumnId === findDoneColumn(board.config.columns);
+  if (claim === toColumnId && (done === undefined || item.done === done)) {
+    return null; // the line already says this
+  }
+  const setSubtaskStatus =
+    done === undefined ? { index, status: toColumnId } : { index, status: toColumnId, done };
   const label = item.text || "todo";
   return {
     path: parentPath,

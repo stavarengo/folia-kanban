@@ -341,7 +341,11 @@ export class VaultRepository implements CardRepository {
       // reloads on a line that says two different things.
       const { index, status, done } = mutation.setSubtaskStatus;
       await this.editBody(mutation.path, (t) =>
-        setSubtaskStatusText(setSubtaskDone(t, index, done), index, status),
+        setSubtaskStatusText(
+          done === undefined ? t : setSubtaskDone(t, index, done),
+          index,
+          status,
+        ),
       );
     }
     if (mutation.history) {

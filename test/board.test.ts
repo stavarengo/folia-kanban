@@ -851,20 +851,21 @@ describe("subitems in a column of their own", () => {
     // It renders with its card, but the line still claims `todo` — sending it home must write.
     expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, status: null, done: false },
+      setSubtaskStatus: { index: 0, status: null },
     });
     // Asking for the claim it already makes writes nothing.
     expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")).toBeNull();
   });
 
-  it("sends a todo home without reopening it — that is a move, not a claim", () => {
-    // Deliberate: "with its card" says where a todo shows, never whether it is finished. Dragging
-    // it to another column is the move that reopens it.
+  it("sends a todo home without touching its checkbox — that is a move, not a claim", () => {
+    // Deliberate: "with its card" says where a todo shows, never whether it is finished, so the
+    // write leaves the box out entirely. Dragging it to another column is the move that reopens it.
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [todo("Finished", 0, "done", true)]),
     ]);
-    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
-      setSubtaskStatus: { index: 0, status: null, done: true },
+    expect(moveSubtask(b, "Tasks/Root.md", 0, null)?.setSubtaskStatus).toEqual({
+      index: 0,
+      status: null,
     });
     expect(moveSubtask(b, "Tasks/Root.md", 0, "doing")).toMatchObject({
       setSubtaskStatus: { index: 0, status: "doing", done: false },
