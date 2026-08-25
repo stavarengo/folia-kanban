@@ -87,6 +87,35 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// The `##` headings the plugin itself owns. Deliberately built with the SAME shape as
+// `headingIndex` (exactly two hashes, no indent, no trailing hashes, case-insensitive), because
+// the description boundary and the section readers must agree line for line: if one of them
+// recognized `## comments` and the other did not, the same text would show up in two boxes and
+// saving the description would rewrite a section it does not own.
+const OWNED_HEADING_RE = new RegExp(
+  "^##\\s+(?:" + Object.values(SECTION).map(escapeRegExp).join("|") + ")\\s*$",
+  "i",
+);
+
+/**
+ * The half-open line range `[from, to)` holding a card's description: everything after the `#`
+ * title heading (or from the top when there is none) up to the first section the plugin owns.
+ * Headings the plugin does not own stay inside the range — a note that keeps its whole body under
+ * `## Question` / `## Answer` is still a description, and round-tripping it must not reshape it.
+ */
+function descriptionRange(lines: string[]): { from: number; to: number } {
+  const h1 = lines.findIndex((l) => /^#\s+/.test(l));
+  const from = h1 === -1 ? 0 : h1 + 1;
+  let to = lines.length;
+  for (let i = from; i < lines.length; i++) {
+    if (OWNED_HEADING_RE.test(lines[i] ?? "")) {
+      to = i;
+      break;
+    }
+  }
+  return { from, to };
+}
+
 /** Append a single line to a section, creating the section at end if absent. */
 function appendToSection(body: string, name: string, line: string): string {
   const lines = body.split("\n");
@@ -161,18 +190,8 @@ export function parseBody(text: string): CardBody {
   const h1Line = h1 === -1 ? "" : (lines[h1] ?? "");
   const title = h1 === -1 ? "" : h1Line.replace(/^#\s+/, "").trim();
 
-  let descEnd = lines.length;
-  for (let i = h1 === -1 ? 0 : h1 + 1; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    if (/^##\s+/.test(line)) {
-      descEnd = i;
-      break;
-    }
-  }
-  const description = lines
-    .slice(h1 === -1 ? 0 : h1 + 1, descEnd)
-    .join("\n")
-    .trim();
+  const { from, to } = descriptionRange(lines);
+  const description = lines.slice(from, to).join("\n").trim();
 
   return {
     title,
@@ -336,20 +355,15 @@ export function removeTimestampedLine(text: string, section: string, index: numb
   });
 }
 
-/** Replace the description region (between the H1 title and the first `##` section). */
+/**
+ * Replace the description region — between the `#` title heading and the first section the plugin
+ * owns. Mirrors what `parseBody` reads, so writing back an unedited description is a no-op beyond
+ * blank-line normalization, and the note's own headings survive the round trip verbatim.
+ */
 export function setDescription(text: string, description: string): string {
   return withBody(text, (body) => {
     const lines = body.split("\n");
-    const h1 = lines.findIndex((l) => /^#\s+/.test(l));
-    const from = h1 === -1 ? 0 : h1 + 1;
-    let to = lines.length;
-    for (let i = from; i < lines.length; i++) {
-      const line = lines[i] ?? "";
-      if (/^##\s+/.test(line)) {
-        to = i;
-        break;
-      }
-    }
+    const { from, to } = descriptionRange(lines);
     const desc = description.trim();
     const block = desc === "" ? [""] : ["", ...desc.split("\n"), ""];
     const tail = to < lines.length ? lines.slice(to) : [];

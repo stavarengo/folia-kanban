@@ -432,3 +432,103 @@ describe("round-trip on fixture cards", () => {
     });
   }
 });
+
+// --- The description is everything the plugin does NOT own: a note that keeps its body under its
+// own headings (`## Question` / `## Answer`) must read back whole, and survive being written back.
+describe("description spanning the note's own headings", () => {
+  const ownHeadings = `---
+status: doing
+---
+
+# Rename the widget factory helpers
+
+Context: [overview.md](../overview.md)
+
+## Question
+
+Apply the renames that still stand.
+
+## Answer
+
+All three landed.
+`;
+
+  it("keeps foreign headings in the description", () => {
+    const b = parseBody(ownHeadings);
+    expect(b.title).toBe("Rename the widget factory helpers");
+    expect(b.description).toBe(
+      [
+        "Context: [overview.md](../overview.md)",
+        "",
+        "## Question",
+        "",
+        "Apply the renames that still stand.",
+        "",
+        "## Answer",
+        "",
+        "All three landed.",
+      ].join("\n"),
+    );
+  });
+
+  it("stops at the first section the plugin owns, and still reads that section", () => {
+    const mixed = `${ownHeadings}
+## Comments
+- _2026-08-21 11:49:_ Applied and checked.
+
+## History
+- _2026-08-21 11:00:_ Created
+`;
+    const b = parseBody(mixed);
+    expect(b.description).toBe(parseBody(ownHeadings).description);
+    expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", text: "Applied and checked." }]);
+    expect(b.history).toEqual([{ timestamp: "2026-08-21 11:00", text: "Created" }]);
+  });
+
+  it("agrees with the section readers on a lowercase owned heading", () => {
+    // The boundary and `headingIndex` are both case-insensitive on purpose: if they disagreed,
+    // `## comments` would show inside the description AND in the comments list.
+    const b = parseBody("# T\n\ndesc\n\n## comments\n- _2026-08-21 11:49:_ hi\n");
+    expect(b.description).toBe("desc");
+    expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", text: "hi" }]);
+  });
+
+  it("reads the whole body when the note has no H1", () => {
+    const b = parseBody("## Question\n\nWhy?\n\n## Comments\n- _t:_ x\n");
+    expect(b.title).toBe("");
+    expect(b.description).toBe("## Question\n\nWhy?");
+  });
+
+  it("leaves a foreign heading that follows an owned section on disk, outside the description", () => {
+    const trailing =
+      "# T\n\ndesc\n\n## Comments\n- _2026-08-21 11:49:_ hi\n\n## Appendix\n\nkept\n";
+    expect(parseBody(trailing).description).toBe("desc");
+    const out = setDescription(trailing, "edited");
+    expect(out).toContain("## Appendix\n\nkept\n");
+    expect(parseBody(out).comments).toHaveLength(1);
+  });
+
+  it("round-trips an unedited description without reshaping the note", () => {
+    const once = setDescription(ownHeadings, parseBody(ownHeadings).description);
+    expect(parseBody(once).description).toBe(parseBody(ownHeadings).description);
+    // Writing again changes nothing: the only difference from the original is the blank-line
+    // normalization `setDescription` has always applied around the region.
+    expect(setDescription(once, parseBody(once).description)).toBe(once);
+  });
+
+  it("survives an edit that adds a heading of the note's own", () => {
+    const edited = `${parseBody(ownHeadings).description}\n\n## Notes\n\nOne more.`;
+    const out = setDescription(ownHeadings, edited);
+    expect(parseBody(out).description).toBe(edited);
+    expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(ownHeadings).fmText);
+  });
+
+  it("is fence-blind, like every other heading lookup here (known limitation)", () => {
+    // `card.ts` does not track code fences anywhere — `headingIndex`/`sectionEnd` don't either.
+    // The description boundary matches that blindness on purpose: making only this one
+    // fence-aware would desync it from the section readers. Pinned so the day it changes, it
+    // changes for all of them at once.
+    const fenced = "# T\n\ndesc\n\n```md\n## Comments\n- _t:_ sample\n```\n";
+    expect(parseBody(fenced).description).toBe("desc\n\n```md");
+  });
+});
