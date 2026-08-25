@@ -5,6 +5,7 @@
     "requireBranch": "main",
     "requireUpstream": true,
     "requireCommits": true,
+    "tagExclude": "*[-]*",
     "addUntrackedFiles": false,
     "commit": true,
     "commitMessage": "chore(release): ${version} :rocket:",
@@ -23,5 +24,61 @@
     "publish": false,
     "ignoreVersion": true,
     "allowSameVersion": true
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": {
+        "name": "conventionalcommits",
+        "types": [
+          {
+            "type": "feat",
+            "section": "Features"
+          },
+          {
+            "type": "fix",
+            "section": "Bug Fixes"
+          },
+          {
+            "type": "revert",
+            "section": "Reverts"
+          },
+          {
+            "type": "perf",
+            "section": "Performance"
+          },
+          {
+            "type": "refactor",
+            "section": "Refactoring"
+          },
+          {
+            "type": "docs",
+            "section": "Documentation"
+          },
+          {
+            "type": "test",
+            "section": "Tests"
+          },
+          {
+            "type": "build",
+            "section": "Build & Tooling"
+          },
+          {
+            "type": "ci",
+            "section": "Build & Tooling"
+          },
+          {
+            "type": "style",
+            "section": "Styling"
+          },
+          {
+            "type": "chore",
+            "effect": "hidden"
+          }
+        ]
+      },
+      "infile": "CHANGELOG.md",
+      "header": "# Changelog",
+      "ignoreRecommendedBump": true
+    }
   }
 }
