@@ -1,4 +1,6 @@
-name: OSV-Scanner Scheduled Scan
+# Scans the whole dependency tree on every push to main (fast feedback on a
+# freshly landed lockfile) and monthly (new advisories against unchanged deps).
+name: OSV-Scanner Main & Scheduled Scan
 
 on:
   schedule:
@@ -12,5 +14,8 @@ permissions:
   contents: read
 
 jobs:
+  # The code-scanning analysis key is derived from this file's path, so
+  # renaming the file would orphan the alerts already filed under it.
   scan-scheduled:
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8"
+    name: Scan main
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.1"

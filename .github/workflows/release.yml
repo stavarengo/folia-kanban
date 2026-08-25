@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -54,10 +54,10 @@ jobs:
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -90,6 +90,49 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Extract release notes from the changelog
+        id: notes
+        if: steps.release.outputs.exists == 'false'
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # release-it writes one CHANGELOG.md section per tag from the
+          # Conventional Commits since the previous tag. Take that section's
+          # body (heading excluded, the release title already carries the tag).
+          # --generate-notes is not usable here: it summarises merged pull
+          # requests, and this repository lands commits straight on main.
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="$TAG" '
+              /^#+ / {
+                match($0, /^#+/)
+                level = RLENGTH
+                if (found) {
+                  # A heading at the version level (or above) ends the section;
+                  # deeper ones are its own "### Features"-style subsections.
+                  if (level <= found) { exit }
+                  print
+                  next
+                }
+                line = $0
+                gsub(/[][()<>\/]/, " ", line)
+                n = split(line, field, / +/)
+                for (i = 1; i <= n; i++) {
+                  if (field[i] == tag) { found = level; break }
+                }
+                next
+              }
+              found { print }
+            ' CHANGELOG.md > release-notes.md
+          fi
+
+          if [ -s release-notes.md ] && grep -q '[^[:space:]]' release-notes.md; then
+            echo "file=release-notes.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No CHANGELOG.md section for $TAG; releasing without notes."
+            echo "file=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub release
         if: steps.release.outputs.exists == 'false'
         env:
@@ -98,8 +141,13 @@ jobs:
           args=(
             "${{ steps.version.outputs.tag }}"
             --title "${{ steps.version.outputs.tag }}"
-            --generate-notes
           )
+
+          if [ -n "${{ steps.notes.outputs.file }}" ]; then
+            args+=(--notes-file "${{ steps.notes.outputs.file }}")
+          else
+            args+=(--notes "")
+          fi
 
           if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
             args+=(--prerelease)
