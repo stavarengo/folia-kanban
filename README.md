@@ -116,13 +116,13 @@ That signature is ordinary Markdown, so anyone — a colleague, a script, an age
 From there the board tracks what you have already read:
 
 - The comment badge on a card tile turns **blue with a dot** while the card holds comments you have not read, and its label says so (*"3 comments, 2 unread"*).
-- It turns **purple with an arrow** — *"a reply to yours"* — when one of those unread comments landed after a comment of your own. There is no threading in a flat list of comments, so that ordering is the closest thing to "someone answered me", and it is usually right. Dot versus arrow, not only blue versus purple, so the two states stay apart without relying on colour.
+- It turns **purple with an arrow** — *"a reply to yours"* — when one of those unread comments landed after a comment of your own. There is no threading in a flat list of comments, so that ordering is all there is to go on: once you have commented on a card, anything new on it reads as a reply. Dot versus arrow, not only blue versus purple, so the two states stay apart without relying on colour, and the tile's own accessible name carries the words for a screen reader.
 - Inside the detail panel, the unread ones are tinted and tagged **new** — and the one that actually followed a comment of yours is tagged **reply** — under a **New** rule marking where what you had already read ends.
 - Opening a card marks its comments as read. The markers stay put for that visit, so you can actually read what was new before it goes quiet.
 
 Read-state is **per install**, stored in the plugin's own data — never in your notes. "Alex has read this" is not a fact the vault should carry to everyone who has the file, so it does not travel with the note, sync between your machines, or say anything about what a collaborator has read. The flip side: a card the plugin has never seen you open counts as fully unread, so the first time you turn this on, every card with comments lights up. One visit each clears them.
 
-Two limits are worth knowing. Only comments carrying a timestamp can be tracked — a `## Comments` bullet typed by hand without one is still shown, but nothing can order it against "what I had already read", so it never lights up. And an author is one word: `@alex_smith` is fine, `@Ana Maria` is not, so a name you set with spaces in it is written with those spaces turned into dashes.
+Three limits are worth knowing. Only comments carrying a timestamp can be tracked — a `## Comments` bullet typed by hand without one is still shown, but nothing can order it against "what I had already read", so it never lights up. What the board remembers is a high-water mark, one per card, so a comment that reaches you *out of order* — written earlier by a collaborator, delivered later by sync or by git — arrives already below the mark and stays quiet; your own comments are kept out of that mark so they can never cause it. And an author is one word: `@alex_smith` is fine, `@Ana Maria` is not, so a name you set with spaces in it is written with those spaces turned into dashes.
 
 ## Features
 

@@ -726,3 +726,13 @@ describe("comment authorship — an optional @name inside the italic prefix", ()
     ]);
   });
 });
+
+describe("author names are sanitized into something the line grammar can hold", () => {
+  it("strips the markdown characters that would break out of the italic prefix", () => {
+    const out = appendComment(SAMPLE_CARD, "hi", "2026-06-13 10:00", "*Al*[x]@");
+    expect(out).toContain("- _2026-06-13 10:00 @Alx:_ hi");
+    expect(parseBody(out).comments).toEqual([
+      { timestamp: "2026-06-13 10:00", author: "Alx", text: "hi" },
+    ]);
+  });
+});

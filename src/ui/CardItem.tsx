@@ -203,7 +203,11 @@ function CardItemInner({
         {...(nested ? {} : listeners)}
         onClick={open}
         onKeyDown={onKeyDown}
-        aria-label={card.title}
+        // Unread comments are folded into the tile's OWN accessible name: everything inside this
+        // element is a descendant of a `role="button"`, so a label on the badge itself is never
+        // announced. The name is the only place a screen reader can hear that a card has something
+        // waiting on it.
+        aria-label={unread.kind === "none" ? card.title : `${card.title}, ${unreadWords(unread)}`}
         aria-current={selected ? "true" : undefined}
       >
         {editing != null ? (
@@ -462,9 +466,14 @@ function CardItemInner({
  */
 function commentsTitle(total: number, unread: UnreadState): string {
   const base = `${total} comment${total === 1 ? "" : "s"}`;
-  if (unread.kind === "none") return base;
-  const news = `${unread.indices.length} unread`;
-  return unread.kind === "reply" ? `${base}, ${news} \u2014 a reply to yours` : `${base}, ${news}`;
+  return unread.kind === "none" ? base : `${base}, ${unreadWords(unread)}`;
+}
+
+/** "2 unread comments" / "2 unread comments, one a reply to yours". */
+function unreadWords(unread: UnreadState): string {
+  const n = unread.indices.length;
+  const news = `${n} unread comment${n === 1 ? "" : "s"}`;
+  return unread.kind === "reply" ? `${news}, one a reply to yours` : news;
 }
 
 /** The claims a card's checklist lines make, as one comparable string (see the memo below). */

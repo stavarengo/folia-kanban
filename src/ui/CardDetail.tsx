@@ -447,6 +447,8 @@ export function CardDetail({
   // the panel SNAPSHOTS the seen-marker as the card opens and renders "new" against that snapshot,
   // while the effect writes the fresh marker. Reading against the live value instead would clear
   // the markers in the same breath as showing them.
+  /** Set when the comment box below posts, so the effect knows the new line is the reader's own. */
+  const justCommented = useRef(false);
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
     seen: settings.commentsSeen[path],
@@ -471,10 +473,22 @@ export function CardDetail({
   // Opening a card marks everything on it as seen. Keyed on the newest timestamp (a string), not on
   // the comments array, which is a fresh reference after every board reload; the equality guard
   // stops the settings write it triggers from coming straight back round.
-  const marker = seenMarker(commentMarks);
+  const marker = seenMarker(commentMarks, settings.userName);
   const seenNow = settings.commentsSeen[path];
+  // What was last written from here, so StrictMode's double-invoked effect (and any re-render that
+  // arrives before the settings write lands) does not save the same marker to disk twice.
+  const wrote = useRef("");
   useEffect(() => {
-    if (!marker || seenNow === marker) return;
+    const stamped = `${path}\u0000${marker}`;
+    if (!marker || seenNow === marker || wrote.current === stamped) return;
+    wrote.current = stamped;
+    // A comment you just typed here is not news to you: move the snapshot up with the marker, or
+    // the panel would tag your own line NEW — which is what happens with no name set, since an
+    // unsigned comment cannot be recognized as yours.
+    if (justCommented.current) {
+      justCommented.current = false;
+      seenOnOpen.current = { path, seen: marker };
+    }
     updateSettings({ commentsSeen: { ...settings.commentsSeen, [path]: marker } });
   }, [path, marker, seenNow, settings.commentsSeen, updateSettings]);
   const isSide = mode !== "modal";
@@ -1245,6 +1259,7 @@ export function CardDetail({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
                   e.preventDefault();
+                  justCommented.current = true;
                   void mutate(() => repo.addComment(path, newComment.trim()));
                   setNewComment("");
                 }

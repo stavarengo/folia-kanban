@@ -62,6 +62,12 @@ interface Comment {
 interface HistoryEntry {
   timestamp: string;
   text: string;
+  /**
+   * Always `null` for anything the plugin wrote — `appendHistory` never signs a line. It exists
+   * because the reader is shared with `## Comments`, so a hand-signed history line is carried
+   * rather than quietly dropped, and the type says what the reader actually returns.
+   */
+  author: string | null;
 }
 
 /** Read-only parse of a card markdown body, for display. */

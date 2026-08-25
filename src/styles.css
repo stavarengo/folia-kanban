@@ -1637,6 +1637,9 @@
   color: var(--text-muted);
   font-weight: var(--folia-font-weight-medium);
 }
+/* Tinted like the priority chips above, and for their reason: mixing the hue INTO `--text-normal`
+   and laying it over a translucent wash of itself keeps the contrast the theme already guarantees,
+   where white-on-hue at this size would land near 3:1 in either theme. */
 .folia-comment-flag {
   font-size: var(--folia-font-size-xxs);
   font-weight: var(--folia-font-weight-semibold);
@@ -1644,11 +1647,12 @@
   letter-spacing: 0.04em;
   border-radius: var(--folia-r-pill);
   padding: 0 6px;
-  color: var(--folia-on-accent);
-  background: var(--folia-unread);
+  color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
+  background: color-mix(in srgb, var(--folia-unread) 20%, transparent);
 }
 .folia-comment-reply .folia-comment-flag {
-  background: var(--folia-unread-reply);
+  color: color-mix(in srgb, var(--folia-unread-reply) 55%, var(--text-normal));
+  background: color-mix(in srgb, var(--folia-unread-reply) 22%, transparent);
 }
 .folia-comments li.folia-comment-unread,
 .folia-comments li.folia-comment-reply {
@@ -1675,8 +1679,10 @@
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--folia-unread);
-  padding: 2px 0 0;
+  color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
+  /* Left padding matches the comments beneath it, so the word lines up with them instead of
+     hanging out into the border gutter. */
+  padding: 2px 0 0 10px;
 }
 .folia-comments li.folia-comments-divider::after {
   content: "";

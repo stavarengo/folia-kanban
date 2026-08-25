@@ -148,3 +148,21 @@ describe("unreadComments — the marker's count, and which comment is the reply"
     });
   });
 });
+
+describe("seenMarker leaves your own comments out of the watermark", () => {
+  it("does not let a comment of yours hide an older one that syncs in later", () => {
+    // You reply at 14:00 on a card whose newest comment from anyone else is 13:00...
+    const seen = seenMarker(
+      [at("2026-06-13 13:00", "agent"), at("2026-06-13 14:00", "rafa")],
+      "rafa",
+    );
+    expect(seen).toBe("2026-06-13 13:00#1");
+    // ...so a colleague's 13:30, delivered by sync afterwards, still reads as unread.
+    const arrived = [
+      at("2026-06-13 13:00", "agent"),
+      at("2026-06-13 13:30", "bob"),
+      at("2026-06-13 14:00", "rafa"),
+    ];
+    expect(unreadComments(arrived, seen, "rafa").indices).toEqual([1]);
+  });
+});

@@ -163,7 +163,7 @@ describe("board rendering", () => {
     expect(within(alpha).getByTitle("Subcards")).toHaveTextContent("1"); // 1 subcard
     // The badge names what it counts AND what is new: no card has been opened, so its one comment
     // (unsigned, so not "mine") is unread.
-    expect(within(alpha).getByTitle("1 comment, 1 unread")).toHaveTextContent("1");
+    expect(within(alpha).getByTitle("1 comment, 1 unread comment")).toHaveTextContent("1");
 
     const gamma = screen.getByText("Gamma").closest(".folia-card") as HTMLElement;
     expect(within(gamma).getByTitle("Due 2026-06-01")).toHaveTextContent("12d ago"); // overdue, relative
@@ -2393,15 +2393,22 @@ describe("unread comments", () => {
     render_(conversation(), asRafa);
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     // Two comments, one of them yours — so only the agent's counts, and it came after yours.
-    expect(within(alpha).getByTitle("2 comments, 1 unread — a reply to yours")).toHaveClass(
-      "folia-comments-reply",
-    );
+    expect(
+      within(alpha).getByTitle("2 comments, 1 unread comment, one a reply to yours"),
+    ).toHaveClass("folia-comments-reply");
+    // The tile's own name carries it too: everything in the tile is inside a role="button", so a
+    // label on the badge alone would never be announced.
+    expect(
+      within(alpha).getByLabelText("Alpha, 1 unread comment, one a reply to yours"),
+    ).toBeInTheDocument();
   });
 
   it("with no name set nothing is yours, so both comments read as plain unread", async () => {
     render_(conversation());
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
-    expect(within(alpha).getByTitle("2 comments, 2 unread")).toHaveClass("folia-comments-unread");
+    expect(within(alpha).getByTitle("2 comments, 2 unread comments")).toHaveClass(
+      "folia-comments-unread",
+    );
   });
 
   it("opening a card shows the New divider, keeps it for the visit, and quiets the tile", async () => {

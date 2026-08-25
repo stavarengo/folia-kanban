@@ -45,10 +45,14 @@ const NOTHING_UNREAD: UnreadState = { kind: "none", indices: [], replyIndex: nul
  * Underscores survive: `alex_smith` is a name people actually have, and the grammar can hold it.
  */
 export function normalizeAuthor(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^@+/, "")
-    .replace(/[\s:]+/g, "-");
+  return (
+    raw
+      .trim()
+      .replace(/^@+/, "")
+      // Characters that would reopen markdown inside the italic prefix, or start a second author.
+      .replace(/[*`[\]@]/g, "")
+      .replace(/[\s:]+/g, "-")
+  );
 }
 
 /** Case-insensitive "did I write this?", false whenever either side is unknown/unset. */
@@ -67,13 +71,17 @@ export function isMine(author: string | null, userName: string): boolean {
  * inside that same minute, permanently. Reading three comments stamped 10:00 records `10:00#3`, so
  * a fourth one stamped 10:00 still counts as unread.
  *
- * Empty when no comment on the card carries a timestamp; callers store nothing in that case.
+ * Your own comments are left out of it. They are never unread, so they have nothing to mark — and
+ * counting them would drag the watermark past comments by other people that a later sync has yet to
+ * deliver, hiding them for good.
+ *
+ * Empty when nothing on the card carries a timestamp; callers store nothing in that case.
  */
-export function seenMarker(comments: readonly CommentMark[]): string {
+export function seenMarker(comments: readonly CommentMark[], userName = ""): string {
   let max = "";
   let count = 0;
   for (const c of comments) {
-    if (!c.timestamp) continue;
+    if (!c.timestamp || isMine(c.author, userName)) continue;
     if (c.timestamp > max) {
       max = c.timestamp;
       count = 1;
