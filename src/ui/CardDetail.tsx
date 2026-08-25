@@ -277,18 +277,31 @@ function RelationRow({
 }
 
 /**
- * The wikilink target a typed suggestion means: the file name of the card whose displayed title
- * (or file name) it matches, since that is what a `[[link]]` binds to. Text matching no card is
- * kept as typed — it becomes a link to a card that does not exist yet, which the lists show as
- * missing rather than swallow.
+ * What the relationship field offers, as `typed text → the file name to link`, since a wikilink
+ * binds to file names rather than displayed titles.
+ *
+ * A card is offered under its displayed title and, when that differs, its file name too. A label
+ * that would name more than one card is dropped rather than bound to whichever came first: the
+ * board already refuses to resolve an ambiguous link, and a picker that silently guesses would be
+ * the one place where the two disagree. The card being edited is never on offer — it cannot block
+ * itself.
  */
-function relationTargetFor(board: Board, text: string, selfPath: string): string {
-  const value = text.trim();
+function relationChoices(board: Board, selfPath: string): Map<string, string> {
+  const choices = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  const offer = (label: string, basename: string) => {
+    const seen = choices.get(label);
+    if (seen === undefined) choices.set(label, basename);
+    else if (seen !== basename) ambiguous.add(label);
+  };
   for (const p in board.cards) {
     const c = board.cards[p];
-    if (p !== selfPath && c && (c.title === value || c.basename === value)) return c.basename;
+    if (!c || p === selfPath) continue;
+    offer(c.title, c.basename);
+    if (c.basename !== c.title) offer(c.basename, c.basename);
   }
-  return value;
+  for (const label of ambiguous) choices.delete(label);
+  return choices;
 }
 
 export function CardDetail({
@@ -597,6 +610,7 @@ export function CardDetail({
   const fm = card.frontmatter;
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? { blocks: [], blockedBy: [] };
+  const blockChoices = relationChoices(board, path);
   const curPriority = String(fm.priority ?? "");
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
@@ -962,20 +976,21 @@ export function CardDetail({
               aria-label="Add a card this one blocks"
               onChange={(e) => setNewBlocks(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key !== "Enter" || !newBlocks.trim()) return;
+                const typed = newBlocks.trim();
+                if (e.key !== "Enter" || !typed) return;
                 e.preventDefault();
+                // Text naming no card is kept as typed: it becomes a link to a card that is not
+                // there, which the list shows as missing rather than swallow.
                 void mutate(() =>
-                  repo.addRelation(path, "blocks", relationTargetFor(board, newBlocks, path)),
+                  repo.addRelation(path, "blocks", blockChoices.get(typed) ?? typed),
                 );
                 setNewBlocks("");
               }}
             />
             <datalist id={blocksListId}>
-              {Object.values(board.cards)
-                .filter((c) => c.path !== path)
-                .map((c) => (
-                  <option key={c.path} value={c.title} />
-                ))}
+              {[...blockChoices.keys()].map((label) => (
+                <option key={label} value={label} />
+              ))}
             </datalist>
           </div>
         </section>

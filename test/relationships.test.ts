@@ -3,6 +3,7 @@ import { buildBoard, relationCounts } from "../src/model/board";
 import {
   RELATION_KEYS,
   relationKey,
+  isSelfRelation,
   relationLinkText,
   relationTarget,
   readBlockedBy,
@@ -83,6 +84,24 @@ describe("relationship frontmatter", () => {
     expect([...RELATION_KEYS]).toEqual(["blocks", "blocked-by"]);
     expect(relationLinkText("A")).toBe("[[A]]");
   });
+
+  it("never double-wraps a target that already arrives bracketed", () => {
+    expect(relationLinkText("[[A]]")).toBe("[[A]]");
+    expect(relationLinkText("  [[A]] ")).toBe("[[A]]");
+  });
+
+  it("recognises a self-link in every form a target can be written", () => {
+    const self = (t: string) => isSelfRelation("Tasks/A.md", "A", t);
+    expect(self("A")).toBe(true);
+    expect(self("[[A]]")).toBe(true);
+    expect(self("A.md")).toBe(true);
+    expect(self("Tasks/A")).toBe(true);
+    expect(self("[[A|see this]]")).toBe(true);
+    expect(self("[[A#Notes]]")).toBe(true);
+    expect(self("   ")).toBe(true);
+    expect(self("B")).toBe(false);
+    expect(self("Other/B")).toBe(false);
+  });
 });
 
 describe("history lines for relationships", () => {
@@ -134,6 +153,19 @@ describe("buildBoard relationships", () => {
     ]);
     expect(b.cards["Tasks/A.md"]?.relations?.blocks).toHaveLength(1);
     expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toHaveLength(1);
+  });
+
+  it("keeps the blocker's own declaration whichever order the cards arrive in", () => {
+    // The `blocks` end is the one the plugin writes, so it must decide whether the panel offers a
+    // remove button — never the order the vault happened to list the two notes in.
+    for (const order of [0, 1]) {
+      const pair = [
+        card("A", { status: "todo", blocks: ["[[B]]"] }),
+        card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
+      ];
+      const b = buildBoard(config, order === 0 ? pair : pair.reverse());
+      expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.source).toBe("own");
+    }
   });
 
   it("keeps a target that matches no card, marked unresolved", () => {

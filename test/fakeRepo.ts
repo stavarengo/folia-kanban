@@ -32,7 +32,12 @@ import {
 } from "../src/model/card";
 
 import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
-import { relationKey, withRelation, withoutRelation } from "../src/model/relationships";
+import {
+  isSelfRelation,
+  relationKey,
+  withRelation,
+  withoutRelation,
+} from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {
   commentAddedLine,
@@ -243,6 +248,8 @@ export class FakeRepo implements CardRepository {
   }
 
   async addRelation(path: string, type: RelationType, target: string): Promise<void> {
+    // Mirrors the vault adapter: a card never stores a link to itself.
+    if (isSelfRelation(path, this.entry(path).basename, target)) return;
     if (this.editRelations(path, type, (fm) => withRelation(fm, type, target)))
       this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }

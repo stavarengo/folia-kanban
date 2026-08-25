@@ -33,7 +33,7 @@ import {
   splitFrontmatter,
   updateTimestampedLine,
 } from "../model/card";
-import { relationKey, withRelation, withoutRelation } from "../model/relationships";
+import { isSelfRelation, relationKey, withRelation, withoutRelation } from "../model/relationships";
 import {
   commentAddedLine,
   commentEditedLine,
@@ -408,6 +408,9 @@ export class VaultRepository implements CardRepository {
   }
 
   async addRelation(path: string, type: RelationType, target: string): Promise<void> {
+    // Refused at the write, not just hidden at the read: a self-link is dropped when the board is
+    // built, so storing one would put a line in the note that no panel can show or take back.
+    if (isSelfRelation(path, this.file(path).basename, target)) return;
     const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, target));
     if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }

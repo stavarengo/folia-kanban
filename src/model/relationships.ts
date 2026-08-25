@@ -43,9 +43,29 @@ export function relationTarget(value: string): string {
   return (m?.[1] ?? trimmed).trim();
 }
 
-/** How a target is written back. Always a wikilink, so Obsidian's own link tooling sees it. */
+/**
+ * How a target is written back. Always exactly one pair of brackets, so a target that ARRIVES
+ * bracketed (someone typing `[[Other card]]` into the field, rather than picking a suggestion)
+ * cannot come out as `[[[[Other card]]]]`.
+ */
 export function relationLinkText(target: string): string {
-  return `[[${target}]]`;
+  return `[[${relationTarget(target)}]]`;
+}
+
+/**
+ * Does `target` name the card that declares it? A card cannot block itself — the board drops such
+ * a link rather than show one card as both ends — so writing one would leave data in the note that
+ * nothing on the board can show or undo. Both ends refuse it instead.
+ *
+ * A bare name matching this card's file name counts even when another folder holds a same-named
+ * card: the board refuses to bind an ambiguous name at all, so that link would be dead anyway.
+ */
+export function isSelfRelation(path: string, basename: string, target: string): boolean {
+  const raw = relationTarget(target).split("#")[0]?.split("|")[0]?.trim() ?? "";
+  if (!raw) return true;
+  const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
+  if (withMd === path) return true;
+  return (raw.split("/").pop() ?? raw).replace(/\.md$/i, "") === basename;
 }
 
 /**

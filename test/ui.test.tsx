@@ -1789,6 +1789,53 @@ describe("blocking relationships", () => {
     expect(within(cardOf("Loose")).queryByText(/^Blocks/)).toBeNull();
   });
 
+  it("refuses a link to the card itself, which the board would only drop again", async () => {
+    const user = userEvent.setup();
+    const repo = blockRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Add a card this one blocks"), "Loose{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Loose.md")!.fm).not.toHaveProperty("blocks"));
+  });
+
+  it("writes a single-bracket history line when the target is typed as a wikilink", async () => {
+    const user = userEvent.setup();
+    const repo = blockRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    // fireEvent, not user.type: `[` opens a key descriptor in userEvent's typing syntax.
+    const input = within(detail).getByLabelText("Add a card this one blocks");
+    fireEvent.change(input, { target: { value: "[[Waiting]]" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toEqual(["[[Waiting]]"]),
+    );
+    expect(repo.files.get("Tasks/Loose.md")!.body).toContain("Blocks added: [[Waiting]]");
+    expect(repo.files.get("Tasks/Loose.md")!.body).not.toContain("[[[[");
+  });
+
+  it("offers each card once, and drops a title two cards share rather than guess", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
+      // Two cards, different files, the same displayed title.
+      "Tasks/dup-1.md": { fm: { type: "task", status: "todo", title: "Review" }, body: "\n" },
+      "Tasks/dup-2.md": { fm: { type: "task", status: "todo", title: "Review" }, body: "\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Here"));
+    const detail = await screen.findByTestId("card-detail");
+    const options = [
+      ...(detail.querySelectorAll("datalist option") as NodeListOf<HTMLOptionElement>),
+    ].map((o) => o.value);
+    // The shared title is not on offer; each file name still is, since those are unambiguous.
+    expect(options).not.toContain("Review");
+    expect(options).toEqual(expect.arrayContaining(["dup-1", "dup-2"]));
+    expect(options).not.toContain("Here"); // the card being edited is never offered
+  });
+
   it("keeps the relationship keys out of the generic property rows and the add form", async () => {
     const user = userEvent.setup();
     render_(blockRepo());

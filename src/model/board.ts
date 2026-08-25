@@ -233,6 +233,9 @@ function buildRelations(
     }
   };
 
+  // Two passes, `blocks` first, so an edge stated at BOTH ends always keeps the declaration the
+  // plugin itself writes. Reading them card by card would hand that to whichever note the vault
+  // happened to list first, and with it whether the panel offers a remove button.
   for (const c of cards) {
     for (const target of readRelations(c.frontmatter, "blocks")) {
       addEdge(
@@ -241,6 +244,8 @@ function buildRelations(
         "blocker",
       );
     }
+  }
+  for (const c of cards) {
     for (const target of readBlockedBy(c.frontmatter)) {
       addEdge(
         { path: resolveLink(target, byBasename, cardsByPath), target },
