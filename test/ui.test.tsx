@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
-import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
+import { DEFAULT_SETTINGS, applySettingsPatch, type KanbanSettings } from "../src/settings";
 import { SettingsContext, useSettings } from "../src/ui/context";
 
 const config: BoardConfig = {
@@ -53,7 +53,7 @@ function renderStateful(
       <App
         repo={repo}
         settings={settings}
-        onUpdateSettings={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+        onUpdateSettings={(patch) => setSettings((s) => applySettingsPatch(s, patch))}
         today="2026-06-13"
       />
     );
@@ -2477,6 +2477,91 @@ describe("unread comments", () => {
     const flags = within(detail).getAllByText("new");
     expect(flags).toHaveLength(1);
     expect(flags[0]?.closest("li")).toHaveTextContent("take a look");
+  });
+
+  it("keeps the tile quiet for a comment you wrote unsigned, during the visit and after it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    const box = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, DEFAULT_SETTINGS, box);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() =>
+      expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 09:00#1"),
+    );
+    await user.type(within(detail).getByLabelText("Write a comment"), "on it{Enter}");
+    await within(detail).findByText("on it");
+    // Unsigned in the note, so to the tile it is nobody's — the marker has to cover it, or the
+    // reader's own words light the badge.
+    const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe(`${repo.ts}#1`));
+    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    // Reopening the card must not tag the reader's own line as new either.
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    await user.click(screen.getByText("Alpha"));
+    const again = await screen.findByTestId("card-detail");
+    expect(within(again).queryByText("new")).toBeNull();
+  });
+
+  it("recognises its own signed comment under a name the grammar rewrites, and leaves it out of the marker", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+        },
+      },
+      () => "moves",
+      () => "Ana Maria",
+    );
+    const box = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, { ...DEFAULT_SETTINGS, userName: "Ana Maria" }, box);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "on it{Enter}");
+    await within(detail).findByText("on it");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toContain(`_${repo.ts} @Ana-Maria:_ on it`);
+    // Only the agent's line is new; the reader's own is recognised through its written signature.
+    const flags = within(detail).getAllByText("new");
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.closest("li")).toHaveTextContent("take a look");
+    // A signed own comment stays out of the watermark, so a colleague's line that syncs in later,
+    // dated between the two, still counts.
+    await waitFor(() =>
+      expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 09:00#1"),
+    );
+    const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
+    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+  });
+
+  it("does not mistake someone else's comment for yours because you typed the same words", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ ok\n",
+      },
+    });
+    const box = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, DEFAULT_SETTINGS, box);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "ok{Enter}");
+    await waitFor(() => expect(within(detail).getAllByText("ok")).toHaveLength(2));
+    // The agent's "ok" keeps its tag; the reader's identical "ok" gets none.
+    const flags = within(detail).getAllByText("new");
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.closest("li")).toHaveTextContent("2026-06-13 09:00");
+    // And the marker moved forward rather than being thrown away.
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe(`${repo.ts}#1`));
   });
 
   it("still calls it a reply when the answer lands inside the same minute as yours", async () => {

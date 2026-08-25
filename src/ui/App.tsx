@@ -16,7 +16,7 @@ import {
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
-import type { KanbanSettings } from "../settings";
+import type { KanbanSettings, SettingsPatch } from "../settings";
 import {
   BoardActionsContext,
   ContextsContext,
@@ -79,8 +79,9 @@ interface Props {
   repo: CardRepository;
   /** Live settings, sourced from the plugin via the view. */
   settings: KanbanSettings;
-  /** Pushes a settings patch back to the plugin (persist + re-render open views). */
-  onUpdateSettings: (patch: Partial<KanbanSettings>) => void;
+  /** Pushes a settings patch back to the plugin (persist + re-render open views). The function
+   *  form reads the settings as they are at write time — for patches to the path-keyed maps. */
+  onUpdateSettings: (patch: SettingsPatch) => void;
   /** Overridable for deterministic tests; defaults to the real date. */
   today?: string;
 }
@@ -128,13 +129,6 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
-  // Same reason, for settings: `actions` only lists `settings.addCardOpenMode` as a memo
-  // dependency, so any other settings field read directly off `settings` inside it would close
-  // over a stale snapshot (e.g. renameCard's collapsedCards migration below missing a toggle
-  // that landed between actions recomputes).
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-
   const load = useCallback(async () => {
     try {
       setBoard(await repo.loadBoard());
@@ -321,32 +315,30 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             // Prune the per-path plugin data this card owned — its collapse-state override
             // (§ collapse) and its comments-seen marker (§ unread). Left behind, either would
             // silently hand its state to an unrelated card someone later creates at this same
-            // path. One patch, because two calls would each build on the same stale snapshot.
-            const prune: Partial<KanbanSettings> = {};
-            if (settingsRef.current.collapsedCards[path] !== undefined) {
-              const nextCollapsed = { ...settingsRef.current.collapsedCards };
-              delete nextCollapsed[path];
-              prune.collapsedCards = nextCollapsed;
-            }
-            if (settingsRef.current.commentsSeen[path] !== undefined) {
-              const nextSeen = { ...settingsRef.current.commentsSeen };
-              delete nextSeen[path];
-              prune.commentsSeen = nextSeen;
-            }
-            if (Object.keys(prune).length) onUpdateSettings(prune);
+            // path. Built from the settings at write time, not this render's snapshot, so another
+            // view's write landing in between is not undone.
+            onUpdateSettings((s) => {
+              const prune: Partial<KanbanSettings> = {};
+              if (s.collapsedCards[path] !== undefined)
+                prune.collapsedCards = withoutKey(s.collapsedCards, path);
+              if (s.commentsSeen[path] !== undefined)
+                prune.commentsSeen = withoutKey(s.commentsSeen, path);
+              return prune;
+            });
             await load();
           }
         })();
       },
       openNote: (path) => void repo.openCard(path),
-      markCommentsSeen: (path, marker) => {
-        const current = settingsRef.current.commentsSeen;
-        if ((current[path] ?? "") === marker) return;
-        const next = { ...current };
-        if (marker) next[path] = marker;
-        else delete next[path];
-        onUpdateSettings({ commentsSeen: next });
-      },
+      markCommentsSeen: (path, marker) =>
+        onUpdateSettings((s) => {
+          if ((s.commentsSeen[path] ?? "") === marker) return {};
+          return {
+            commentsSeen: marker
+              ? { ...s.commentsSeen, [path]: marker }
+              : withoutKey(s.commentsSeen, path),
+          };
+        }),
       setPriority: (path, value) => setPriorityAndReload(path, value),
       renameCard: (path, title) => {
         const t = title.trim();
@@ -361,26 +353,21 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
               // Per-path plugin data is keyed by path in settings, same as selection — follow it
               // to the new path, or a toggled card silently resets to the board default and its
               // already-read comments all light up again; the vacated path could also later hand
-              // that state to an unrelated card reusing it. Both maps move in ONE patch, because
-              // two calls would each build on the same stale settings snapshot.
-              const migrated: Partial<KanbanSettings> = {};
-              const collapsedCards = settingsRef.current.collapsedCards;
-              const collapsed = collapsedCards[path];
-              if (collapsed !== undefined) {
-                const nextCollapsed = { ...collapsedCards };
-                delete nextCollapsed[path];
-                nextCollapsed[newPath] = collapsed;
-                migrated.collapsedCards = nextCollapsed;
-              }
-              const commentsSeen = settingsRef.current.commentsSeen;
-              const seen = commentsSeen[path];
-              if (seen !== undefined) {
-                const nextSeen = { ...commentsSeen };
-                delete nextSeen[path];
-                nextSeen[newPath] = seen;
-                migrated.commentsSeen = nextSeen;
-              }
-              if (Object.keys(migrated).length) onUpdateSettings(migrated);
+              // that state to an unrelated card reusing it. Read at write time (see the prune
+              // above), so nothing another view wrote meanwhile is lost.
+              onUpdateSettings((s) => {
+                const migrated: Partial<KanbanSettings> = {};
+                const collapsed = s.collapsedCards[path];
+                if (collapsed !== undefined)
+                  migrated.collapsedCards = {
+                    ...withoutKey(s.collapsedCards, path),
+                    [newPath]: collapsed,
+                  };
+                const seen = s.commentsSeen[path];
+                if (seen !== undefined)
+                  migrated.commentsSeen = { ...withoutKey(s.commentsSeen, path), [newPath]: seen };
+                return migrated;
+              });
             }
           } catch (e) {
             reportError(e);
@@ -774,4 +761,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       </RepoContext.Provider>
     </SettingsContext.Provider>
   );
+}
+
+/** A copy of a path-keyed map without one entry. */
+function withoutKey<T>(map: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...map };
+  delete next[key];
+  return next;
 }

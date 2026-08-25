@@ -158,8 +158,9 @@ export interface BoardActions {
    *
    * An action rather than a settings patch built in the panel: `commentsSeen` is one map, a patch
    * replaces it whole, and two board views open at once would each build theirs from their own
-   * render's snapshot — the second save silently dropping the first card's marker. This merges
-   * against the live settings instead.
+   * render's snapshot — the second save silently dropping the first card's marker. This writes
+   * through the function form of the settings patch, which reads the map as it is when the write
+   * happens.
    */
   markCommentsSeen(path: string, marker: string): void;
   /** Id of the column treated as "done", or null if the board has none. */

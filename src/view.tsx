@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App as BoardApp } from "./ui/App";
 import { VaultRepository } from "./obsidian/vaultRepo";
-import type { KanbanSettings } from "./settings";
+import type { KanbanSettings, SettingsPatch } from "./settings";
 
 export const VIEW_TYPE_KANBAN = "folia-kanban-view";
 
@@ -33,7 +33,7 @@ export class KanbanView extends FileView {
   constructor(
     leaf: WorkspaceLeaf,
     private getSettings: () => KanbanSettings,
-    private updateSettings: (patch: Partial<KanbanSettings>) => void,
+    private updateSettings: (patch: SettingsPatch) => void,
     private openAsMarkdown: (view: KanbanView) => void,
   ) {
     super(leaf);

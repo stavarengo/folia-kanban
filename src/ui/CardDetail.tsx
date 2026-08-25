@@ -12,7 +12,7 @@ import {
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
 import { RELATION_KEYS } from "../model/relationships";
-import { SELF, seenMarker, unreadComments } from "../model/unread";
+import { SELF, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
 import { priorityOptions } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
@@ -448,13 +448,20 @@ export function CardDetail({
   // while the effect writes the fresh marker. Reading against the live value instead would clear
   // the markers in the same breath as showing them.
   /**
-   * Texts this panel has posted on the card it is showing. A comment you typed here is yours even
-   * when there is no name to sign it with, so it is treated as such below — without it the panel
-   * hands your own line straight back to you tagged NEW, which is what every reader who has not set
-   * a name would see.
+   * Comments this panel has posted on the card it is showing, each as the position it was appended
+   * at plus its text. A comment you typed here is yours even when there is no name to sign it with,
+   * so it is treated as such below — without it the panel hands your own line straight back to you
+   * tagged NEW, which is what every reader who has not set a name would see. Position AND text,
+   * because text alone is not an identity: answering "ok" to someone's "ok" must not reclassify
+   * theirs as yours.
    */
-  const postedHere = useRef<{ path: string; texts: Set<string> }>({ path, texts: new Set() });
-  if (postedHere.current.path !== path) postedHere.current = { path, texts: new Set() };
+  const postedHere = useRef<{ path: string; posts: { index: number; text: string }[] }>({
+    path,
+    posts: [],
+  });
+  if (postedHere.current.path !== path) postedHere.current = { path, posts: [] };
+  const postedHereAt = (index: number, text: string): boolean =>
+    postedHere.current.posts.some((p) => p.index === index && p.text === text);
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
     seen: seenMarkerFor(settings, path),
@@ -463,23 +470,29 @@ export function CardDetail({
     seenOnOpen.current = { path, seen: seenMarkerFor(settings, path) };
   const seenAtOpen = seenOnOpen.current.seen;
   /**
-   * Who "me" is for this panel. With a name set it is that name; with none, a value no author can
+   * Who "me" is for this panel. With a name set it is that name as the line grammar writes it
+   * (`Ana Maria` signs as `Ana-Maria`, and must recognise itself); with none, a value no author can
    * ever spell, so an unsigned comment by someone else still reads as theirs while the ones typed
    * here read as the reader's own.
    */
-  const me = settings.userName || SELF;
+  const me = normalizeAuthor(settings.userName) || SELF;
   // `body` outlives the card it was read from: navigating to another card re-renders with the
   // PREVIOUS card's body still in state, and only then does the loader below replace it. Pairing it
   // with the path it came from keeps the marker written below from being the old card's.
-  const commentMarks = useMemo(
+  const noteMarks = useMemo(
     () =>
       bodyPath === path
-        ? (body?.comments ?? []).map((c) => ({
-            timestamp: c.timestamp,
-            author: postedHere.current.texts.has(c.text) ? me : c.author,
-          }))
+        ? (body?.comments ?? []).map((c) => ({ timestamp: c.timestamp, author: c.author }))
         : [],
-    [body, bodyPath, path, me],
+    [body, bodyPath, path],
+  );
+  const commentMarks = useMemo(
+    () =>
+      noteMarks.map((m, i) =>
+        postedHereAt(i, body?.comments[i]?.text ?? "") ? { ...m, author: me } : m,
+      ),
+    // `postedHere` is a ref, not a dependency: what it holds only changes together with `body`.
+    [noteMarks, body, me],
   );
   const unread = useMemo(
     () => unreadComments(commentMarks, seenAtOpen, me),
@@ -488,7 +501,12 @@ export function CardDetail({
   // Opening a card marks everything on it as seen. Keyed on the newest timestamp (a string), not on
   // the comments array, which is a fresh reference after every board reload; the equality guard
   // stops the settings write it triggers from coming straight back round.
-  const marker = seenMarker(commentMarks, me);
+  //
+  // Built from the note's own authorship and the name in settings — the tile's view of "mine" —
+  // not from the panel's. The two must agree on what the marker leaves out: a comment posted here
+  // without a name is unsigned in the note, so to the tile it is someone else's, and a marker that
+  // skipped it would light the tile for the reader's own words.
+  const marker = seenMarker(noteMarks, settings.userName);
   const seenNow = settings.commentsSeen[path];
   // What was last written from here, so StrictMode's double-invoked effect (and any re-render that
   // arrives before the settings write lands) does not save the same marker to disk twice.
@@ -1271,7 +1289,10 @@ export function CardDetail({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
                   e.preventDefault();
-                  postedHere.current.texts.add(newComment.trim());
+                  postedHere.current.posts.push({
+                    index: body?.comments.length ?? 0,
+                    text: newComment.trim(),
+                  });
                   void mutate(() => repo.addComment(path, newComment.trim()));
                   setNewComment("");
                 }

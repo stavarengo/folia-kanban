@@ -46,9 +46,26 @@ export interface KanbanSettings {
    * never changed after that. It stands in for the marker of every card without a `commentsSeen`
    * entry: comments written up to that minute count as already read, later ones as unread. Without
    * it, the first board opened after an upgrade would light up every card that has ever been
-   * commented on. Empty only in `DEFAULT_SETTINGS`, where it means "no baseline, everything counts".
+   * commented on. The whole first minute is on the read side (it is a bare marker, no `#count`), so
+   * a comment by someone else landing in that same minute goes unnoticed — accepted, one minute
+   * once per install. Empty only in `DEFAULT_SETTINGS`, where it means "no baseline, everything
+   * counts".
    */
   commentsBaseline: string;
+}
+
+/**
+ * What a settings write accepts: a plain patch, or a function of the settings as they are at the
+ * moment of writing. The function form is for patches that replace one of the path-keyed maps
+ * (`collapsedCards`, `commentsSeen`): built from a render's snapshot, two board views writing back
+ * to back would each replace the map with their own copy and the second would drop the first's entry.
+ */
+export type SettingsPatch =
+  | Partial<KanbanSettings>
+  | ((current: KanbanSettings) => Partial<KanbanSettings>);
+
+export function applySettingsPatch(current: KanbanSettings, patch: SettingsPatch): KanbanSettings {
+  return { ...current, ...(typeof patch === "function" ? patch(current) : patch) };
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {

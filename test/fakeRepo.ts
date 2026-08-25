@@ -82,6 +82,8 @@ export class FakeRepo implements CardRepository {
     public config: BoardConfig,
     initial: Record<string, { fm: CardFrontmatter; body: string }> = {},
     public getHistoryScope: () => HistoryScope = () => "moves",
+    /** Mirrors VaultRepository's: the name new comments are signed with; empty = unsigned. */
+    public getUserName: () => string = () => "",
   ) {
     for (const [path, e] of Object.entries(initial)) {
       this.files.set(path, { basename: basename(path), fm: { ...e.fm }, body: e.body });
@@ -209,7 +211,7 @@ export class FakeRepo implements CardRepository {
     this.entry(path).body = setDescription(this.entry(path).body, description);
   }
   async addComment(path: string, text: string) {
-    this.entry(path).body = appendComment(this.entry(path).body, text, this.ts);
+    this.entry(path).body = appendComment(this.entry(path).body, text, this.ts, this.getUserName());
     this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, index: number, text: string) {

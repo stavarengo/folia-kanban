@@ -15,8 +15,10 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
+  applySettingsPatch,
   hydrateSettings,
   type KanbanSettings,
+  type SettingsPatch,
 } from "./settings";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
@@ -313,8 +315,8 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  reads a patch back off the live `settings` prop to build its next one — the subitems-collapse
    *  toggle does this on every click (§ collapse) — because waiting on the write first would let a
    *  second update land before the first was visible anywhere, and silently lose it. */
-  async updateSettings(patch: Partial<KanbanSettings>): Promise<void> {
-    this.settings = { ...this.settings, ...patch };
+  async updateSettings(patch: SettingsPatch): Promise<void> {
+    this.settings = applySettingsPatch(this.settings, patch);
     this.refreshViews();
     await this.saveSettings();
   }
