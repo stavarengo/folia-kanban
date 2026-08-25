@@ -40,4 +40,4 @@ columns:
 
 The "kitchen-sink" board for **Folia Kanban** — it exercises every feature of the plugin in one place. Open `README.md` in this folder for the guided tour and the things to try (search queries, settings, drag, right-click).
 
-Run **"Open Folia Kanban board"** with this note focused, or click the layout-grid ribbon icon.
+Clicking this note in the file explorer opens it as the board — the **"Open Folia Kanban board"** command and the layout-grid ribbon icon get you there too. You are reading this in the Markdown editor; the button in the tab header swaps between the two.

@@ -1,4 +1,4 @@
-import type { ViewState, WorkspaceLeaf } from "obsidian";
+import type { ViewState } from "obsidian";
 import {
   FuzzySuggestModal,
   MarkdownView,
@@ -7,6 +7,7 @@ import {
   PluginSettingTab,
   Setting,
   TFile,
+  WorkspaceLeaf,
   type App,
 } from "obsidian";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
@@ -94,7 +95,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       this.markdownPins.get(leaf) === filePath;
     const shouldOpenAsBoard = (filePath: string): boolean => this.shouldOpenAsBoard(filePath);
     const isPatchActive = (): boolean => this.patchActive;
-    const leafProto = Object.getPrototypeOf(this.app.workspace.getLeaf(false)) as WorkspaceLeaf;
+    const leafProto = WorkspaceLeaf.prototype;
     const original = leafProto.setViewState;
     const patched = function (
       this: WorkspaceLeaf,
