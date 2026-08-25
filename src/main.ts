@@ -132,6 +132,10 @@ export default class FoliaKanbanPlugin extends Plugin {
       this.shouldOpenAsBoard(filePath);
 
     const leafProto = WorkspaceLeaf.prototype;
+    // The unbound reference is never invoked detached: it is only re-attached to the prototype on
+    // unregister, and every call below goes through `original.call(this, ...)`, which supplies the
+    // leaf explicitly.
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- see the note above
     const original = leafProto.setViewState;
     const patched = function (
       this: WorkspaceLeaf,

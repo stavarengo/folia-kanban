@@ -194,7 +194,7 @@ function CardItemInner({
       {/* #14 context grouping: a left accent strip, shown only when the context defines a color
           (inset past the priority bar so the two left-edge cues don't overlap). */}
       {ctxColor && <span className="folia-card-context-strip" aria-hidden="true" />}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit nested branch */}
+      {/* a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit nested branch */}
       <div
         className="folia-card-main"
         // Nested cards aren't draggable: skip the drag listeners/attributes (which also supply

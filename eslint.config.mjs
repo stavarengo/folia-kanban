@@ -14,9 +14,6 @@ export default [
   {
     files: ["src/**/*.{ts,tsx}"],
     ...jsxA11yTyped.flatConfigs.recommended,
-    // This block keeps the a11y gate. The 5 orphaned `react-hooks/*` inline directives
-    // reference a plugin we intentionally don't load here, so don't fail on them.
-    linterOptions: { reportUnusedDisableDirectives: "off" },
     rules: {
       ...jsxA11yTyped.flatConfigs.recommended.rules,
       // autofocus is deliberate focus management for modals/inline-edit (good a11y here).
@@ -133,6 +130,30 @@ export default [
     },
   },
   {
+    // Deliberate a11y exceptions, kept here rather than as `eslint-disable-next-line` comments:
+    // Obsidian's community-directory scanner runs ESLint with its own config, which does not load
+    // eslint-plugin-jsx-a11y, and an inline directive naming a rule that config has never heard of
+    // is a hard "Definition for rule ... was not found" error on the submission scan. Each call
+    // site still carries its `a11y exception (...)` comment explaining the specific case.
+    //  - the dialog surfaces (`role="dialog"` + `aria-modal`, focus-managed) take onKeyDown to
+    //    drive Escape, which the rule reads as an interaction on a non-interactive element;
+    //  - the drag handles get their role/tabIndex from spread dnd-kit attributes, which the rule
+    //    cannot see, and the detail resize handle is a pointer-only `role="separator"`;
+    //  - click-to-edit on the description is a convenience with a real keyboard equivalent (the
+    //    "Edit description" button rendered next to it).
+    // Kept scoped to the exact rule/file pairs the call sites need, so nothing else is relaxed.
+    files: ["src/ui/CardDetail.tsx", "src/ui/ColumnEditModal.tsx", "src/ui/ColumnMenu.tsx"],
+    rules: { "jsx-a11y/no-noninteractive-element-interactions": "off" },
+  },
+  {
+    files: ["src/ui/CardDetail.tsx", "src/ui/CardItem.tsx", "src/ui/Column.tsx"],
+    rules: { "jsx-a11y/no-static-element-interactions": "off" },
+  },
+  {
+    files: ["src/ui/CardDetail.tsx"],
+    rules: { "jsx-a11y/click-events-have-key-events": "off" },
+  },
+  {
     // Tests must not be skipped or focused (blueprint §22).
     files: ["test/**/*.{ts,tsx}"],
     plugins: { vitest },
@@ -165,6 +186,12 @@ export default [
       ? c
       : { ...c, files: ["src/**/*.{ts,tsx}"] },
   ),
+  {
+    // The obsidianmd preset (spread just above) turns `unbound-method` off; Obsidian's
+    // community-directory scan runs it, so turn it back on here and keep the two in step.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: { "@typescript-eslint/unbound-method": "error" },
+  },
   {
     // no-undef is redundant with the TS type-checker, and `activeWindow`/`activeDocument` are
     // valid Obsidian ambient globals. Disable it for the TS sources the preset enables it on.

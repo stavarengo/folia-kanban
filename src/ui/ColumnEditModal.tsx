@@ -106,7 +106,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- dialog surface: onKeyDown drives Escape on a role=dialog + aria-modal + focus-managed modal */}
+      {/* a11y exception (no-noninteractive-element-interactions): dialog surface: onKeyDown drives Escape on a role=dialog + aria-modal + focus-managed modal */}
       <div
         className="folia-modal folia-col-edit"
         ref={ref}

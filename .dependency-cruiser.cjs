@@ -6,7 +6,7 @@
 //   ui       — React board; depends on model + the port, never the adapter
 // The plugin shell (main.ts, view.tsx) wires the adapter into Obsidian.
 // The "only the adapter/shell may import the 'obsidian' package" rule is enforced
-// in eslint.config.js via no-restricted-imports (precise specifier match).
+// in eslint.config.mjs via no-restricted-imports (precise specifier match).
 module.exports = {
   forbidden: [
     {

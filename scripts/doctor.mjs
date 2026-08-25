@@ -94,7 +94,7 @@ existsSync(join(root, "pnpm-lock.yaml"))
     }
   };
   for (const d of SCAN_DIRS) walk(d);
-  for (const f of ["package.json", "tsconfig.json", "eslint.config.js", "vitest.config.ts"]) {
+  for (const f of ["package.json", "tsconfig.json", "eslint.config.mjs", "vitest.config.ts"]) {
     if (existsSync(join(root, f))) {
       readFileSync(join(root, f), "utf8")
         .split("\n")

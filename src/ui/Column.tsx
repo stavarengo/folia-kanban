@@ -343,7 +343,7 @@ export function Column({
           // ONE header DOM, two intents (§4): the title span is the drag handle (activator +
           // listeners) AND the click target for inline edit. dnd's distance:5 sensor decides:
           // ≥5px movement → drag (the click never fires); a clean click → enterEdit.
-          // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- role + tabIndex come from the spread dnd attributes (drag handle); click enters rename
+          // a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (drag handle); click enters rename
           <span
             ref={setActivatorNodeRef}
             className="folia-column-title"

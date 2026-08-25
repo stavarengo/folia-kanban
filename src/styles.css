@@ -1559,12 +1559,15 @@
 }
 .folia-link-missing {
   color: var(--text-muted);
-  text-decoration: underline dashed;
-  text-underline-offset: 2px;
+  /* Drawn as a border, not a dashed text-decoration: Obsidian's community-directory CSS scan
+     flags every text-decoration-* longhand and every multi-keyword shorthand as only partially
+     supported, so the dashed underline has to come from somewhere else. */
+  border-bottom: 1px dashed;
   cursor: help;
 }
 .folia-done {
-  text-decoration-line: line-through;
+  /* Single-keyword shorthand on purpose — see the note above; the longhand form is flagged. */
+  text-decoration: line-through;
   color: var(--text-muted);
 }
 .folia-comments li,

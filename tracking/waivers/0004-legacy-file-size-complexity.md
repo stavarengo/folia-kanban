@@ -11,7 +11,7 @@
 | **Owner** | @stavarengo |
 | **Created date** | 2026-06-18 |
 | **Expiry date** | 2026-12-31 (review — split the worst offenders before this) |
-| **Scope** | Exactly the 15 files listed in the `eslint.config.js` override block. `max-params` and `max-depth` are NOT waived (already within limits). Every other file is fully gated. |
+| **Scope** | Exactly the 15 files listed in the `eslint.config.mjs` override block. `max-params` and `max-depth` are NOT waived (already within limits). Every other file is fully gated. |
 
 ## Reason
 
@@ -48,7 +48,7 @@ src/model/card.ts       a parse arrow complexity 12
 
 ## Exit plan
 
-Split top-down, removing each file from the `eslint.config.js` override as it clears the limits:
+Split top-down, removing each file from the `eslint.config.mjs` override as it clears the limits:
 
 1. **UI components** — extract sub-components and custom hooks (e.g. `CardDetail` → header / body /
    comments / history sections; `CardItem` → presentational + interaction hook; `Column` →
