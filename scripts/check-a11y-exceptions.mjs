@@ -141,11 +141,16 @@ for (const result of results) {
   });
 }
 
-// A file named in an off-block that ESLint never linted would pass vacuously.
+// A file named in an off-block that ESLint never actually lints would pass vacuously — and
+// `lintFiles` still returns a result for an ignored file, so the result list alone proves nothing.
 const linted = new Set(results.map((r) => relative(root, r.filePath)));
 for (const file of files) {
-  if (!linted.has(relative(root, resolve(root, file)))) {
-    problems.push(`${file} — named in an eslint.config.mjs jsx-a11y off-block but never linted`);
+  if (await eslint.isPathIgnored(file)) {
+    problems.push(
+      `${file} — declared in a11yExceptions but ignored by eslint.config.mjs, so nothing lints it`,
+    );
+  } else if (!linted.has(relative(root, resolve(root, file)))) {
+    problems.push(`${file} — declared in a11yExceptions but ESLint never linted it`);
   }
 }
 
