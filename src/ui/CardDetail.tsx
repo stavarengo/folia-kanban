@@ -453,7 +453,8 @@ export function CardDetail({
    * so it is treated as such below — without it the panel hands your own line straight back to you
    * tagged NEW, which is what every reader who has not set a name would see. Position AND text,
    * because text alone is not an identity: answering "ok" to someone's "ok" must not reclassify
-   * theirs as yours.
+   * theirs as yours. Edits and deletions made from this panel keep the list in step (see
+   * `postedHereEdited` / `postedHereRemoved`); the note only ever grows at the end otherwise.
    */
   const postedHere = useRef<{ path: string; posts: { index: number; text: string }[] }>({
     path,
@@ -462,6 +463,14 @@ export function CardDetail({
   if (postedHere.current.path !== path) postedHere.current = { path, posts: [] };
   const postedHereAt = (index: number, text: string): boolean =>
     postedHere.current.posts.some((p) => p.index === index && p.text === text);
+  const postedHereEdited = (index: number, text: string): void => {
+    for (const p of postedHere.current.posts) if (p.index === index) p.text = text;
+  };
+  const postedHereRemoved = (index: number): void => {
+    postedHere.current.posts = postedHere.current.posts
+      .filter((p) => p.index !== index)
+      .map((p) => (p.index > index ? { ...p, index: p.index - 1 } : p));
+  };
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
     seen: seenMarkerFor(settings, path),
@@ -1261,8 +1270,14 @@ export function CardDetail({
                   unread={mark}
                   text={c.text}
                   sourcePath={path}
-                  onSave={(val) => void mutate(() => repo.updateComment(path, i, val))}
-                  onDelete={() => void mutate(() => repo.removeComment(path, i))}
+                  onSave={(val) => {
+                    postedHereEdited(i, val);
+                    void mutate(() => repo.updateComment(path, i, val));
+                  }}
+                  onDelete={() => {
+                    postedHereRemoved(i);
+                    void mutate(() => repo.removeComment(path, i));
+                  }}
                 />
               );
               return isFirstUnread

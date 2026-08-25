@@ -4,7 +4,7 @@ import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
-import { seenMarkerFor, type KanbanSettings } from "../settings";
+import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
 
 /**
  * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
@@ -46,7 +46,7 @@ export function useRepo(): CardRepository {
 /** Live settings plus an updater, provided by App and fed from the view/plugin. */
 export interface SettingsContextValue {
   settings: KanbanSettings;
-  update: (patch: Partial<KanbanSettings>) => void;
+  update: (patch: SettingsPatch) => void;
 }
 
 export const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -57,7 +57,7 @@ export function useSettings(): KanbanSettings {
   return c.settings;
 }
 
-export function useSettingsUpdater(): (patch: Partial<KanbanSettings>) => void {
+export function useSettingsUpdater(): (patch: SettingsPatch) => void {
   const c = useContext(SettingsContext);
   if (!c) throw new Error("SettingsContext missing");
   return c.update;
@@ -84,15 +84,19 @@ export function useSubitemsCollapse(): SubitemsCollapse {
     () => ({
       isCollapsed: (path) =>
         settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed",
-      toggle: (path) => {
-        const cur = settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed";
-        update({ collapsedCards: { ...settings.collapsedCards, [path]: !cur } });
-      },
-      setMany: (paths, collapsed) => {
-        const next = { ...settings.collapsedCards };
-        for (const p of paths) next[p] = collapsed;
-        update({ collapsedCards: next });
-      },
+      // Both write through the function form: the map is replaced whole, and built from this
+      // render's snapshot it would drop an override another board view wrote a moment ago.
+      toggle: (path) =>
+        update((s) => {
+          const cur = s.collapsedCards[path] ?? s.subitemsDefault === "collapsed";
+          return { collapsedCards: { ...s.collapsedCards, [path]: !cur } };
+        }),
+      setMany: (paths, collapsed) =>
+        update((s) => {
+          const next = { ...s.collapsedCards };
+          for (const p of paths) next[p] = collapsed;
+          return { collapsedCards: next };
+        }),
     }),
     [settings.collapsedCards, settings.subitemsDefault, update],
   );

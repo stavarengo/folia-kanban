@@ -2509,6 +2509,33 @@ describe("unread comments", () => {
     expect(within(again).queryByText("new")).toBeNull();
   });
 
+  it("still knows a comment is yours after you edit it, or delete the one above it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "on it{Enter}");
+    const mine = (await within(detail).findByText("on it")).closest("li") as HTMLElement;
+    // Edit the reader's own line: the text changes, the ownership must not.
+    await user.click(within(mine).getByRole("button", { name: "Edit comment" }));
+    const box = within(mine).getByLabelText("Edit comment");
+    await user.clear(box);
+    await user.type(box, "on it now{Enter}");
+    await within(detail).findByText("on it now");
+    expect(within(detail).getAllByText("new")).toHaveLength(1);
+    // Delete the agent's line above it: the reader's own shifts up one slot, still theirs.
+    const theirs = within(detail).getByText("take a look").closest("li") as HTMLElement;
+    await user.click(within(theirs).getByRole("button", { name: "Delete comment" }));
+    await waitFor(() => expect(within(detail).queryByText("take a look")).toBeNull());
+    expect(within(detail).queryByText("new")).toBeNull();
+  });
+
   it("recognises its own signed comment under a name the grammar rewrites, and leaves it out of the marker", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(
