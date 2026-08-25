@@ -51,7 +51,7 @@ function PropRow({
   onRemove: () => void;
 }) {
   const [draft, setDraft] = useState(value);
-  // Resync when the persisted value changes (e.g. after reload) and no edit is mid-flight.
+  // Resync when the persisted value changes (e.g. after a reload picked up an external edit).
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
     if (draft !== value) onCommit(draft);
@@ -104,7 +104,7 @@ function PriorityField({
 }) {
   const listId = useId();
   const [draft, setDraft] = useState(value);
-  // Resync when the persisted value changes (e.g. after reload) and no edit is mid-flight.
+  // Resync when the persisted value changes (e.g. after a reload picked up an external edit).
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
     const next = draft.trim();
@@ -614,6 +614,9 @@ export function CardDetail({
               ))}
             </select>
           </label>
+          {/* The one field that does not go through `mutate`: setting a priority also teaches the
+              board note its vocabulary, which lives in the shared action, and that action already
+              reloads the board. Going through `mutate` would reload it a second time. */}
           <PriorityField
             value={curPriority}
             options={priorityOptions(actions.priorities, curPriority)}

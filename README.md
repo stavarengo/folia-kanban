@@ -121,7 +121,7 @@ That list is why a value **outlives the last card that used it**: delete every `
 
 Its order matters in one place. A column with `sort: priority` orders cards by severity first (the built-in colour ramp, where `A`/`urgent`/`p1` are strongest and `D`/`trivial` weakest) and falls back to this list to break ties — so a scale the ramp knows nothing about (`blocker`, `someday`, `whenever`) sorts the way you listed it instead of collapsing into one undifferentiated heap.
 
-## Where card titles come from
+### Where card titles come from
 
 Plenty of people name card files as numbered slugs — `01-fix-the-export-path.md` — because the number carries the order and the slug keeps the folder readable. That slug is not what the card is *called*; the note's own first heading usually is. So the board decides per card, and the board note's `card-title` property sets the policy:
 

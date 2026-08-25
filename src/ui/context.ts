@@ -86,9 +86,10 @@ export interface BoardActions {
   /** Id of the column treated as "done", or null if the board has none. */
   doneColumnId: string | null;
   /**
-   * The priority values this board offers, most pressing first: what its note remembers plus what
-   * its cards use, or the todo.txt `A`/`B`/`C` starting set when it knows none yet. The pickers
-   * suggest these and `sort: priority` uses the order to break ties between equal severities.
+   * The priority values this board offers: what its note remembers, in the order the note lists
+   * them, followed by what its cards use — or the todo.txt `A`/`B`/`C` starting set when it knows
+   * none yet. The pickers suggest these, and `sort: priority` uses the order to break ties between
+   * equal severities, which is why it is the note's order and not one the plugin decides.
    */
   priorities: string[];
 

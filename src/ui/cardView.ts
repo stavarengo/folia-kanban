@@ -56,9 +56,11 @@ export function priorityTone(value: string): ChipTone {
  *
  * The remembered values come first and keep the board note's order, because that order is the
  * user's to edit and it is what breaks ties when a column sorts by priority. Newly discovered
- * values are appended in a deterministic order — strongest severity first (so a word scale reads
- * urgent → high → medium → low rather than alphabetically), then alphabetically among equals — so
- * a board that has never been through the UI still suggests its own scheme in a sensible order.
+ * values are appended by severity tone first, then alphabetically within a tone, so a board that
+ * has never been through the UI still suggests its own scheme in a defensible order rather than a
+ * random one. The tone is coarse — four buckets — so a word scale comes out roughly, not exactly,
+ * strongest-first: `urgent` and `high` share the strongest tone and the alphabetical tie-break
+ * decides between them. Anything finer is the user's to fix by reordering the board note's list.
  *
  * Comes back EMPTY for a board that has never seen a priority. The empty case is the caller's to
  * interpret: a picker substitutes the todo.txt `A`/`B`/`C` starting set, but nothing remembers it,
@@ -454,7 +456,10 @@ const DUE_GROUP_LABEL: Record<DueUrgency | "none", string> = {
  *    `muted` tone and used to collapse into one tie, and now order the way the board note lists
  *    them — an order the user can rearrange by editing that list.
  *
- * A value the vocabulary does not hold sorts after the ones it does, within its own tone.
+ * A value the vocabulary does not hold sorts after the ones it does, within its own tone; a card
+ * with no priority sorts after both, so having a priority — even a weak, unrecognised one — ranks
+ * a card above having none. (Before the vocabulary existed those two tied and fell back to board
+ * order, which read as arbitrary.)
  */
 function priorityKey(card: Card, vocabulary: readonly string[]): { tone: number; index: number } {
   const p = card.frontmatter.priority;

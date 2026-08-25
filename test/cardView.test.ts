@@ -255,13 +255,14 @@ describe("boardPriorities (the board's own vocabulary)", () => {
     expect(boardPriorities([], [card({ priority: "a" })])).toEqual(["a"]);
   });
 
-  it("learns the values the cards use, strongest severity first then alphabetically", () => {
+  it("learns the values the cards use, ordered by severity tone then alphabetically", () => {
     const cards = [
       card({ priority: "low" }, "1"),
       card({ priority: "urgent" }, "2"),
       card({ priority: "medium" }, "3"),
       card({ priority: "high" }, "4"),
     ];
+    // `high` and `urgent` share the strongest tone, so the alphabetical tie-break separates them.
     expect(boardPriorities([], cards)).toEqual(["high", "urgent", "medium", "low"]);
   });
 
@@ -362,6 +363,19 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     });
     if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["U", "C"]);
+  });
+
+  it("sort: priority ranks a weak-but-real priority above no priority at all", () => {
+    const cards = [card({}, "None"), card({ priority: "someday" }, "Someday")];
+    const out = groupAndSortCards(cards, {
+      group: "none",
+      sort: "priority",
+      today,
+      doneColumnId: done,
+      priorities: ["A", "someday"],
+    });
+    if (!out[0]) throw new Error("expected group at index 0");
+    expect(names(out[0])).toEqual(["Someday", "None"]);
   });
 
   it("sort: due orders most-pressing-first; no-due cards rank as future", () => {
