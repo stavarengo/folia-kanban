@@ -835,8 +835,11 @@
   border-left: 2px dashed color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 60%, transparent);
 }
 /* Sits BELOW `.folia-card-main` rather than inside it (that div is the drag handle and carries
-   role="button"), pulled up tight against the card body and indented to its text. */
-.folia-card-parent-ref {
+   role="button"), pulled up tight against the card body and indented to its text.
+   Selected through `.folia-card` on purpose: Obsidian themes style plain buttons through
+   `button:not(.clickable-icon)`, which out-specifies a lone class and would give this quiet
+   reference line a raised button face. */
+.folia-card .folia-card-parent-ref {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -846,14 +849,15 @@
   padding: 0 12px 9px;
   text-align: left;
   border: 0;
+  border-radius: 0;
   box-shadow: none;
-  background: transparent;
+  background: none;
   color: var(--text-muted);
   font-size: var(--folia-font-size-xs);
   line-height: 1.3;
   cursor: pointer;
 }
-.folia-card-parent-ref:hover {
+.folia-card .folia-card-parent-ref:hover {
   color: var(--folia-accent);
   text-decoration: underline;
 }
