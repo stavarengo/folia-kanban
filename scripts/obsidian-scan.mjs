@@ -363,7 +363,7 @@ const BASELINE = [
     // Obsidian's declarative settings API is @since 1.13.0, and obsidian.d.ts states display() is
     // not called once getSettingDefinitions() returns a non-empty array. With minAppVersion 1.7.2
     // adopting it means either two parallel settings UIs or broken settings below 1.13.
-    // docs/ai/backlog/20260826.01.settings-tab-is-invisible-to-obsidian-settings-search.md
+    // docs/ai/backlog/20260826.04.settings-tab-is-invisible-to-obsidian-settings-search.md
   },
 ];
 
