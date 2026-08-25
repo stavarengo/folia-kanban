@@ -39,6 +39,8 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 | `04-tune-the-search-index.md` | Tune the search index | the filename is a numbered slug, so the first heading that looks like a real title wins |
 | `Ship the release notes.md` | Cut the 1.0 release notes | a `title:` key in the card's own frontmatter beats every other source |
 
+**A note written under its own headings** — `Decide the export format.md` keeps its whole body under `## Question` and `## Answer`, the shape an issue-style note (or an agent) tends to produce. Open it: the Description box shows all of it, headings and all, because a card's description is everything between the title and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Edit the description and save, and that structure comes back unchanged.
+
 ## Things to try (features you can't see in a static file)
 
 - **Open a card** (click it) to see the **detail panel** — edit status, priority, due date, custom properties, subtasks, comments. The priority field is free text with the board's own values as suggestions: type `blocker`, and it joins the board note's `priorities` list and shows up as a suggestion from then on, even after you delete the card again. Try both presentations: Settings → *Card details — presentation* → `side` vs `modal`.

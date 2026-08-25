@@ -53,7 +53,7 @@ Description text…
 - _2026-06-13 14:30:_ Moved from Todo to Doing
 ```
 
-The description is everything between the title heading and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Headings of your own — `## Question`, `## Answer`, whatever the note needs — sit inside it and are shown and saved verbatim, so a note written under its own structure keeps that structure when you edit it from the panel.
+The description is everything between the title heading and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Headings of your own — `## Question`, `## Answer`, whatever the note needs — sit inside it and are shown and saved verbatim, so a note written under its own structure keeps that structure when you edit it from the panel. The flip side is that the Description box owns all of it: emptying the box empties those sections too.
 
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
 
