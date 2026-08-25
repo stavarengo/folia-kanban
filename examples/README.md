@@ -24,13 +24,23 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 | --- | --- |
 | **Todo** | plain string column (auto-titlecased from `todo`) |
 | **Next Up** | object column with a custom `color` |
-| **In Progress** | a soft **WIP limit** of 2 — it holds 3 cards, so the header nudges (alert icon, never blocks) — plus `sort: priority` (A → B → D, top to bottom) |
+| **In Progress** | a soft **WIP limit** of 2 — it holds 3 cards plus one placed subtask, so the header nudges (alert icon, never blocks) — plus `sort: priority` (A → B → D, top to bottom) |
 | **In Review** | `group: due` — cards bucket into Overdue / Today / Soon / Later / No due date |
 | **⭐ A-priority lane** | a `filter: "priority:a"` **lane** — it pulls every A-priority card from *all* columns, regardless of status. A lane is a view, not an owner: a card can appear here *and* in its real column at once. |
 | **Parked** | `parked: true` + `opacity: 0.45` + `hoverOpacity: 0.95` — a faded "someday" lane that brightens on hover |
 | **Done** | done column; past-due cards here stay neutral (done is never "overdue") |
 
 **Cards** — across the board you'll find every priority (`A`/`B`/`C`/`D`, plus an unknown `someday` that renders muted; the board note's `priorities` property lists exactly that vocabulary, which is what the priority field and the right-click chips suggest — type a new value there and the board learns it), every due-date state (overdue, today, soon, later, none), tags (list and string form), an `area:`, custom properties (`energy`, `effort`), subtask checklists with progress, **subcards** (`- [ ] [[Child]]` rendered nested), comments, and auto-history. The cards live in context subfolders (`Cards/Engineering/`, `Cards/Design/`); each folder's `_context.md` gives its cards a coloured accent strip + badge.
+
+**Subitems in a column of their own** — `Plan the v1.0 launch` (in Todo) carries all three cases of one rule at once, so you can compare them side by side:
+
+| Subitem | Kind | Where it renders | Because |
+| --- | --- | --- | --- |
+| `Cut the release branch` | plain todo | **In Progress**, with a `↳ Plan the v1.0 launch` reference | its checklist line carries the inline field `[status:: doing]` |
+| `Write the changelog` | subcard file | **Next Up**, with the same reference | the child note's own `status: next` |
+| `Record the launch demo` | subcard file | nested under its parent in **Todo** | it claims nothing, which is the default for every subitem |
+
+All three still count towards the parent's progress bar — moving the work somewhere visible does not take it off its ticket. Try dragging the `Cut the release branch` tile into **Done**: its line becomes `- [x] Cut the release branch [status:: done]`, and the parent's progress ticks up. Drag it back and it reopens. Right-click any of them for a column picker (**With its card** puts it back where its parent is), or open `Plan the v1.0 launch` and use the picker on each row under *Subtasks & subcards* — the same control for both kinds.
 
 **Where card titles come from** — two cards demonstrate that the tile's title isn't always the file name (the board runs in the default `auto` mode, so it decides per card):
 
@@ -56,7 +66,7 @@ Open either card's detail panel: the **Blocks** field adds and removes links (ty
 - **Next actions on cards:** Settings → *Card — next todos shown* → `3`. Cards now surface their next unchecked todos inline.
 - **Search:** press `/` and try `priority:a`, `due:overdue`, `due:soon`, `area:work`, `tag:bug`, `context:Engineering`. Tokens **AND** together; quotes allow spaces (`area:"release plan"`); there's no negation. The **Overdue** / **Due soon** chips are shortcuts for `due:overdue` / `due:soon`.
 - **Drag** a card between columns (pointer or keyboard — pick up with Space, drop with Space). The card's `status`, a fractional `order`, and a `## History` line are written to its file.
-- **Right-click** a card for the context menu (mark done, change priority, move, add subcard, delete). Right-click a surfaced next-todo to toggle or remove it.
+- **Right-click** a card for the context menu (mark done, change priority, move, add subcard, delete). Right-click a surfaced next-todo to toggle it, remove it, or send it to a column of its own.
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
 - **Live reload:** edit a card `.md` in another pane and watch the board update.
 - **Swap the tab's view:** the tab header button flips between the board and the note's Markdown. Settings → *Board notes — open as* picks which one a board note starts in, and adding `folia-view: markdown` to one board note's frontmatter overrides that for that note alone.

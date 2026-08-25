@@ -46,7 +46,8 @@ Description text…
 ## Subtasks
 - [ ] a plain todo
 - [x] a done todo
-- [ ] [[A Subcard]]      ← a nested child card (its own file)
+- [ ] in the Doing column [status:: doing]   ← a todo that claims a column of its own
+- [ ] [[A Subcard]]      ← a child card (its own file; its own `status` places it)
 
 ## Comments
 - _2026-06-13 14:32:_ looks good
@@ -63,6 +64,31 @@ Parentage has a single source of truth: a card is a subcard of P **iff** P's `##
 
 The card's displayed title usually is the file name, but that `# Card title` heading can take over when the file name is a slug — see [Where card titles come from](#where-card-titles-come-from).
 
+## Subitems in their own column
+
+A card's `## Subtasks` checklist holds two kinds of line, and both are *subitems*: a plain todo, and a `[[wikilink]]` to a child card that is a file of its own. By default a subitem lives wherever its card lives — nested in the bordered group under it, or listed inside the tile. That is unchanged, and it stays the default forever.
+
+But work does not always sit still with its ticket. A subitem can claim a column of its own, and then it leaves the group and stands in that column like any card: same tile, same drag, same place in the column's `sort`, `group`, `filter` and WIP count. In place of the nesting it carries a small **`↳ parent`** reference, so you can always see whose work it is (and click through to it).
+
+**Where the claim is written** is the only difference between the two kinds, and it is the natural place for each:
+
+| Kind of subitem | Its column is | Written as |
+| --- | --- | --- |
+| Subcard file (`- [ ] [[Child]]`) | the child note's own `status` | `status: doing` in that file's frontmatter — the same key every card uses |
+| Plain todo (`- [ ] text`) | an inline field on its checklist line | `- [ ] Cut the release branch [status:: doing]` |
+
+The inline field is [Obsidian's own inline-field syntax](https://help.obsidian.md/properties), hand-editable and invisible in reading view, so a note stays a note. Leave it out and the todo lives with its card, exactly as before. A **checked** line (`- [x]`) reads as done wherever its field points, so a finished subitem shows up in the Done column instead of hiding inside a card in Todo.
+
+**Three ways to move one**, all writing the same thing:
+
+- **Drag** its tile to another column, once it has one.
+- **Right-click** a todo — on its tile, or on a next-todo row surfaced on its card — and pick a column from the menu (**With its card** puts it back).
+- **The detail panel** — every row under *Subtasks & subcards* has a column picker, for both kinds.
+
+Whichever you use, the card keeps counting the subitem in its progress bar: moving the work somewhere visible does not take it off its ticket. Landing in the Done column checks the todo's box; leaving Done unchecks it, so the checkbox and the column never disagree.
+
+One deliberate limit: a plain todo carries no `order`, so dragging it *within* a column does not stick (it sorts after the ordered cards, alphabetically). Moving it *between* columns — the thing this is for — always does.
+
 ## Features
 
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
@@ -70,6 +96,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 - **Next actions on the card** — optionally surface the next *N* unchecked todos inline, so the board shows the next step without opening anything.
 - **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority is a free-text combobox that suggests [your board's own scale](#priorities-are-your-scale-not-ours), never one the plugin picked for you.
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
+- **Subitems can hold a column of their own** — drag a subtask into any column and it stands there like a card, carrying a `↳ parent` reference. Works the same for a plain todo and for a subcard file (see [Subitems in their own column](#subitems-in-their-own-column)).
 - **Blocking relationships** — say that one card blocks another with a `blocks: ["[[Other card]]"]` list. The detail panel adds and removes them with suggestions from the board's own cards, and shows the derived **Blocked by** side; the tiles get a *Blocked* / *Blocks n* marker while both ends are unfinished. Typed from the start, so other kinds of link can follow. It marks, it never refuses a move.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
 - **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.

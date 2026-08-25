@@ -368,6 +368,35 @@ describe("card detail", () => {
     expect(await within(detail).findByText("extra task")).toBeInTheDocument();
   });
 
+  it("gives every subitem the same column picker, whichever kind it is", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+
+    // An inline todo: the claim is written on its own checklist line.
+    await user.selectOptions(within(detail).getByLabelText("Column for first todo"), "doing");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(
+        /- \[ \] first todo \[status:: doing\]/,
+      ),
+    );
+
+    // A subcard file: the same control, written to the child note's own frontmatter.
+    await user.selectOptions(within(detail).getByLabelText("Column for [[Beta]]"), "done");
+    await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBe("done"));
+
+    // Both now stand in their own columns, out of Alpha's group.
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    expect(await within(doing).findByText("first todo")).toBeInTheDocument();
+    const done = document.querySelector('[data-column="done"]') as HTMLElement;
+    expect(within(done).getByText("Beta")).toBeInTheDocument();
+    expect(within(done).getByText("Beta").closest(".folia-card")).toHaveClass(
+      "folia-card--subitem",
+    );
+  });
+
   it("navigates to a subcard via its link", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
@@ -1068,6 +1097,29 @@ describe("card context menu", () => {
     await user.click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
     // Index 1 is the first undone todo ("real one"); toggling it checks that line.
     await waitFor(() => expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[x\] real one/));
+  });
+
+  it("sends a plain todo to a column of its own from the todo menu, then brings it back", async () => {
+    const repo = ctxRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
+    const todoRow = card.querySelector('.folia-card-next-todo[data-todo-index="1"]') as HTMLElement;
+    fireEvent.contextMenu(todoRow);
+    const user = userEvent.setup();
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    await user.click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[ \] real one \[status:: doing\]/),
+    );
+    // It is now a tile in Doing, right-clickable back to living with its card.
+    const doing = screen.getByText("Doing").closest("section") as HTMLElement;
+    const tile = await within(doing).findByText("real one");
+    fireEvent.contextMenu(tile);
+    const tileMenu = await screen.findByRole("menu", { name: "Todo actions" });
+    await user.click(within(tileMenu).getByRole("menuitemradio", { name: "With its card" }));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[ \] real one\n/),
+    );
   });
 
   it("removes a todo from the todo menu", async () => {
