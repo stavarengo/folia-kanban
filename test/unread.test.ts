@@ -166,3 +166,37 @@ describe("seenMarker leaves your own comments out of the watermark", () => {
     expect(unreadComments(arrived, seen, "rafa").indices).toEqual([1]);
   });
 });
+
+describe("the marker and the reader count the same comments", () => {
+  it("does not resurrect an already-read comment sharing a minute with one of yours", () => {
+    const comments = [at("2026-06-13 10:00", "rafa"), at("2026-06-13 10:00", "agent")];
+    const seen = seenMarker(comments, "rafa");
+    // Only the agent's line is counted on the way in, so only it may be counted on the way out.
+    expect(seen).toBe("2026-06-13 10:00#1");
+    expect(unreadComments(comments, seen, "rafa").indices).toEqual([]);
+  });
+});
+
+describe("timestamps order by date, not by their characters", () => {
+  it("does not let a hand-typed unpadded date hide the comment that came after it", () => {
+    const first = [at("2026-12-1 00:00", "agent")];
+    const seen = seenMarker(first, "rafa");
+    const later = [...first, at("2026-12-02 09:00", "agent")];
+    // Compared as plain strings, "2026-12-1…" sorts ABOVE "2026-12-02…" and would swallow it.
+    expect(unreadComments(later, seen, "rafa").indices).toEqual([1]);
+  });
+});
+
+describe("a reply is judged by time, not by line order", () => {
+  it("ignores an older comment that a merge dropped below yours in the file", () => {
+    const comments = [
+      at("2026-06-13 10:00", "rafa"),
+      at("2026-06-13 09:00", "agent"), // written BEFORE yours, merged in after it
+    ];
+    expect(unreadComments(comments, undefined, "rafa")).toEqual({
+      kind: "unread",
+      indices: [1],
+      replyIndex: null,
+    });
+  });
+});

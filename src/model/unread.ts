@@ -63,6 +63,16 @@ export function isMine(author: string | null, userName: string): boolean {
 }
 
 /**
+ * A timestamp turned into something that string-compares chronologically: every run of digits is
+ * zero-padded to a common width, so a hand-typed `2026-12-1 9:00` orders next to the
+ * `2026-12-02 09:00` that `stamp()` writes instead of after it. Two spellings of the same instant
+ * therefore also compare equal, which is what "the same minute" has to mean.
+ */
+function sortKey(timestamp: string): string {
+  return timestamp.replace(/\d+/g, (n) => n.padStart(4, "0"));
+}
+
+/**
  * The marker recording "I have seen every comment on this card right now", as one string:
  * `"<newest timestamp>#<how many comments carry it>"`.
  *
@@ -79,13 +89,16 @@ export function isMine(author: string | null, userName: string): boolean {
  */
 export function seenMarker(comments: readonly CommentMark[], userName = ""): string {
   let max = "";
+  let maxKey = "";
   let count = 0;
   for (const c of comments) {
     if (!c.timestamp || isMine(c.author, userName)) continue;
-    if (c.timestamp > max) {
+    const key = sortKey(c.timestamp);
+    if (key > maxKey) {
       max = c.timestamp;
+      maxKey = key;
       count = 1;
-    } else if (c.timestamp === max) count++;
+    } else if (key === maxKey) count++;
   }
   return max ? `${max}#${count}` : "";
 }
@@ -113,9 +126,8 @@ function parseMarker(marker: string | undefined): Marker | null {
  *
  * A comment counts as unread when it is not the reader's own AND it sorts after `seen` (the stored
  * marker from `seenMarker`; `undefined` = this card was never opened, so everything counts).
- * Timestamps are the fixed-width `YYYY-MM-DD HH:mm` that `stamp()` writes, so a plain string
- * compare orders them; a hand-typed timestamp that is not zero-padded sorts by its characters
- * rather than by its date, which is the price of reading whatever people wrote.
+ * Ordering runs through `sortKey`, so the fixed-width `YYYY-MM-DD HH:mm` that `stamp()` writes and
+ * a hand-typed `2026-12-1 9:00` sort by their dates rather than by their characters.
  *
  * A bullet with no timestamp at all cannot be ordered against the marker and is therefore never
  * reported as unread. Deliberate: it has nothing to compare, so it would either stay lit forever or
@@ -128,17 +140,32 @@ export function unreadComments(
 ): UnreadState {
   const indices = unreadIndices(comments, parseMarker(seen), userName);
   if (indices.length === 0) return NOTHING_UNREAD;
-  // The reply is the first unread comment standing after ANY comment of yours, so it is the first
-  // one past your earliest — not simply the first unread one, which may well predate you entirely.
-  const firstMine = comments.findIndex((c) => isMine(c.author, userName));
-  const replyIndex = firstMine === -1 ? null : (indices.find((i) => i > firstMine) ?? null);
+  // "After one of yours" is measured in time, like everything else here — not in line order, which
+  // an externally merged note can put out of sequence with the timestamps it carries.
+  const mineLatest = latestOfMine(comments, userName);
+  const replyIndex =
+    mineLatest === null
+      ? null
+      : (indices.find((i) => sortKey(comments[i]?.timestamp ?? "") > mineLatest) ?? null);
   return { kind: replyIndex === null ? "unread" : "reply", indices, replyIndex };
 }
 
+/** Sort key of the reader's newest own comment, or `null` when they have written none here. */
+function latestOfMine(comments: readonly CommentMark[], userName: string): string | null {
+  let max: string | null = null;
+  for (const c of comments) {
+    if (!c.timestamp || !isMine(c.author, userName)) continue;
+    const key = sortKey(c.timestamp);
+    if (max === null || key > max) max = key;
+  }
+  return max;
+}
+
 /** Is this comment past the marker? `ordinal` = how many comments of its own minute came up to it. */
-function isAfterMarker(timestamp: string, marker: Marker | null, ordinal: number): boolean {
+function isAfterMarker(key: string, marker: Marker | null, ordinal: number): boolean {
   if (marker === null) return true;
-  if (timestamp !== marker.ts) return timestamp > marker.ts;
+  const markerKey = sortKey(marker.ts);
+  if (key !== markerKey) return key > markerKey;
   return ordinal > marker.count;
 }
 
@@ -148,15 +175,16 @@ function unreadIndices(
   userName: string,
 ): number[] {
   const out: number[] = [];
-  // How many comments stamped at exactly the marker's minute have gone by, so the ones past the
-  // count recorded when it was written still read as new.
+  // How many comments stamped at the marker's own minute have gone by, so the ones past the count
+  // recorded when it was written still read as new. Counted over the same comments `seenMarker`
+  // counted — the reader's own left out — or the two would disagree and the tally would drift.
   let atMarker = 0;
   for (let i = 0; i < comments.length; i++) {
     const c = comments[i];
-    if (!c?.timestamp) continue;
-    if (marker !== null && c.timestamp === marker.ts) atMarker++;
-    if (isMine(c.author, userName)) continue;
-    if (isAfterMarker(c.timestamp, marker, atMarker)) out.push(i);
+    if (!c?.timestamp || isMine(c.author, userName)) continue;
+    const key = sortKey(c.timestamp);
+    if (marker !== null && key === sortKey(marker.ts)) atMarker++;
+    if (isAfterMarker(key, marker, atMarker)) out.push(i);
   }
   return out;
 }

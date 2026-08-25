@@ -447,8 +447,8 @@ export function CardDetail({
   // the panel SNAPSHOTS the seen-marker as the card opens and renders "new" against that snapshot,
   // while the effect writes the fresh marker. Reading against the live value instead would clear
   // the markers in the same breath as showing them.
-  /** Set when the comment box below posts, so the effect knows the new line is the reader's own. */
-  const justCommented = useRef(false);
+  /** The card the comment box below just posted to, so the effect only trusts it for THAT card. */
+  const justCommented = useRef<string | null>(null);
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
     seen: settings.commentsSeen[path],
@@ -479,18 +479,22 @@ export function CardDetail({
   // arrives before the settings write lands) does not save the same marker to disk twice.
   const wrote = useRef("");
   useEffect(() => {
+    // Nothing to say until this card's own body has arrived; `commentMarks` is empty both while it
+    // loads and when the card genuinely has no trackable comment, and only the second means "forget
+    // whatever marker is stored" (its comments may have been rewritten out from under us).
+    if (bodyPath !== path) return;
     const stamped = `${path}\u0000${marker}`;
-    if (!marker || seenNow === marker || wrote.current === stamped) return;
+    if ((seenNow ?? "") === marker || wrote.current === stamped) return;
     wrote.current = stamped;
     // A comment you just typed here is not news to you: move the snapshot up with the marker, or
     // the panel would tag your own line NEW — which is what happens with no name set, since an
     // unsigned comment cannot be recognized as yours.
-    if (justCommented.current) {
-      justCommented.current = false;
+    if (justCommented.current === path) {
+      justCommented.current = null;
       seenOnOpen.current = { path, seen: marker };
     }
-    updateSettings({ commentsSeen: { ...settings.commentsSeen, [path]: marker } });
-  }, [path, marker, seenNow, settings.commentsSeen, updateSettings]);
+    actions.markCommentsSeen(path, marker);
+  }, [path, bodyPath, marker, seenNow, actions]);
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
@@ -1259,7 +1263,7 @@ export function CardDetail({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
                   e.preventDefault();
-                  justCommented.current = true;
+                  justCommented.current = path;
                   void mutate(() => repo.addComment(path, newComment.trim()));
                   setNewComment("");
                 }

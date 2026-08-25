@@ -339,6 +339,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       openNote: (path) => void repo.openCard(path),
+      markCommentsSeen: (path, marker) => {
+        const current = settingsRef.current.commentsSeen;
+        if ((current[path] ?? "") === marker) return;
+        const next = { ...current };
+        if (marker) next[path] = marker;
+        else delete next[path];
+        onUpdateSettings({ commentsSeen: next });
+      },
       setPriority: (path, value) => setPriorityAndReload(path, value),
       renameCard: (path, title) => {
         const t = title.trim();

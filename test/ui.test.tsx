@@ -2458,6 +2458,24 @@ describe("unread comments", () => {
     expect(box.current.commentsSeen["Tasks/Older.md"]).toBe("2026-06-13 10:00#1");
   });
 
+  it("forgets a stale marker when the card's timestamped comments are gone", async () => {
+    const user = userEvent.setup();
+    const box = { current: asRafa };
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" },
+    });
+    // A marker left over from comments that a hand edit has since removed. Kept, it would file a
+    // later comment dated before it as already read.
+    renderStateful(
+      repo,
+      { ...asRafa, commentsSeen: { "Tasks/Alpha.md": "2026-06-20 10:00#1" } },
+      box,
+    );
+    await user.click(await screen.findByText("Alpha"));
+    await screen.findByTestId("card-detail");
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBeUndefined());
+  });
+
   it("shows no markers once the card has been seen", async () => {
     const user = userEvent.setup();
     render_(conversation(), {
