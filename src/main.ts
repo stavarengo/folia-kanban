@@ -302,11 +302,15 @@ export default class FoliaKanbanPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  /** Apply a settings patch, persist it, then push it live into every open board. */
+  /** Apply a settings patch and push it live into every open board immediately, then persist in
+   *  the background. Refreshing before the write resolves (not after) matters for any caller that
+   *  reads a patch back off the live `settings` prop to build its next one — the subitems-collapse
+   *  toggle does this on every click (§ collapse) — because waiting on the write first would let a
+   *  second update land before the first was visible anywhere, and silently lose it. */
   async updateSettings(patch: Partial<KanbanSettings>): Promise<void> {
     this.settings = { ...this.settings, ...patch };
-    await this.saveSettings();
     this.refreshViews();
+    await this.saveSettings();
   }
 
   /** Re-render all open Folia Kanban views so settings changes reflect without a reload. */

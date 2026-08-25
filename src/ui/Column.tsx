@@ -66,6 +66,17 @@ function SubcardGroup({
   );
 }
 
+// A card gets a subitems toggle at all only when something is actually nested under it — mirrors
+// CardItem's own `hasNestedSubitems` (subcard children OR an inline-todos preview the current
+// `cardNextTodos` setting would show). Column and SubcardGroup both need this to decide which
+// paths a collapse-all/expand-all should touch: writing an override for a card with no toggle
+// would be a wasted `data.json` entry nothing ever reads.
+function hasNestedSubitems(board: Board, cardNextTodos: number, path: string): boolean {
+  if ((board.childrenOf[path]?.length ?? 0) > 0) return true;
+  const nextTodos = board.cards[path]?.stats?.nextTodos.length ?? 0;
+  return cardNextTodos > 0 && nextTodos > 0;
+}
+
 // Stable per-column accent when the board hasn't assigned a color, so even a plain
 // `columns: [todo, doing, done]` board reads as colour-coded (easier to scan at a glance).
 function autoColor(id: string): string {
@@ -410,18 +421,22 @@ export function Column({
             // the lane rule and the global search filter), so a filtered column only touches what
             // the user can see. The whole family, not just the top-level tiles: an "expand all"
             // that stopped there would leave a grandchild collapsed from an earlier individual
-            // toggle still hidden. Filtered to cards that actually have children — a leaf card has
-            // no toggle and no group to hide, so giving it an override would just be a wasted
-            // `data.json` entry nothing ever reads.
+            // toggle still hidden. Filtered to cards that actually have a toggle (subcard children
+            // OR an inline-todos preview) — a card with neither has no state to change, so giving
+            // it an override would just be a wasted `data.json` entry nothing ever reads.
             onCollapseAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths).filter((p) => (board.childrenOf[p]?.length ?? 0) > 0),
+                subtreePaths(board, paths).filter((p) =>
+                  hasNestedSubitems(board, settings.cardNextTodos, p),
+                ),
                 true,
               )
             }
             onExpandAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths).filter((p) => (board.childrenOf[p]?.length ?? 0) > 0),
+                subtreePaths(board, paths).filter((p) =>
+                  hasNestedSubitems(board, settings.cardNextTodos, p),
+                ),
                 false,
               )
             }

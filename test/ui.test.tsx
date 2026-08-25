@@ -1022,6 +1022,18 @@ describe("collapse/expand subitems", () => {
     expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
   });
 
+  it("column menu's collapse-all also reaches a card whose only subitem is an inline-todos preview", async () => {
+    const user = userEvent.setup();
+    renderStateful(nextTodosRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    expect(todoCol.querySelectorAll(".folia-card-next-todo")).toHaveLength(2);
+
+    await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
+    await user.click(screen.getByRole("button", { name: "Collapse all subitems" }));
+
+    expect(todoCol.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
+  });
+
   it("a file-name rename carries the card's collapsed override to its new path", async () => {
     const user = userEvent.setup();
     renderStateful(makeRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
