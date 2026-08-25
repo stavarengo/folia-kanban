@@ -226,13 +226,15 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   /**
    * Set a card's priority and let the board note learn from it.
    *
-   * The note is only ever written when the user sets a priority — never while loading — and the
-   * list written is everything the board knows at that moment, so a value hand-written into a card
-   * gets remembered too and outlives that card. Clearing a priority learns nothing: it is a
+   * The note only ever learns when the user sets a priority — never while loading — and what it
+   * learns is everything the board knows at that moment, so a value hand-written straight into a
+   * card gets remembered too and outlives that card. Clearing a priority learns nothing: it is a
    * removal, and the point of remembering is that the vocabulary survives its last card.
    */
   const setPriorityAndReload = useCallback(
-    async (path: string, value: string) => {
+    async (path: string, raw: string) => {
+      // Whitespace-only is no priority at all, the way every other priority path reads it.
+      const value = raw.trim();
       // Read what the board knows BEFORE the write. Afterwards the card no longer carries the
       // value it is replacing, so learning from the post-write board would drop the outgoing
       // value — the very thing remembering is supposed to prevent. Only real values are learned:
