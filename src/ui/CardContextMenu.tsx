@@ -175,10 +175,12 @@ export function CardContextMenu({
             ))}
             <button
               className={
-                "folia-menu-prio folia-menu-prio-none" + (priority === "" ? " is-active" : "")
+                "folia-menu-prio folia-menu-prio-none" +
+                (samePriority(priority, "") ? " is-active" : "")
               }
               role="menuitemradio"
-              aria-checked={priority === ""}
+              // Whitespace-only reads as absent here too, the way every other priority path treats it.
+              aria-checked={samePriority(priority, "")}
               aria-label="No priority"
               title="No priority"
               onClick={() => {

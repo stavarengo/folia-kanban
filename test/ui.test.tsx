@@ -970,6 +970,20 @@ describe("card context menu", () => {
     );
   });
 
+  it("treats a whitespace-only priority as no priority at all", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo", order: 1, priority: "   " },
+        body: "\n# First\n",
+      },
+    });
+    const { menu } = await openCardMenu("First", repo);
+    expect(within(menu).getByRole("menuitemradio", { name: "No priority" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
   it("remembers a chosen priority in the board note so it outlives its last card", async () => {
     const { repo, menu } = await openCardMenu("First");
     const user = userEvent.setup();
