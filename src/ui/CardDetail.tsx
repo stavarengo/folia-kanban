@@ -2,13 +2,14 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Board, CardBody, RelationLink } from "../model/types";
+import type { Board, Card, CardBody, RelationLink } from "../model/types";
 import { RELATION_KEYS } from "../model/relationships";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
@@ -241,40 +242,65 @@ function RelationRow({
   board: Board;
   onNavigate: ((path: string) => void) | undefined;
   onRemove?: (() => void) | undefined;
-  note?: string | undefined;
+  note?: { text: string; title: string } | undefined;
 }) {
   const target = link.path;
+  // What the row reads as, so the button that removes it announces the same card the row shows.
+  const label = (target !== null ? board.cards[target]?.title : undefined) ?? link.target;
   return (
     <li className="folia-relation">
       {target ? (
         <button className="folia-link" onClick={() => onNavigate?.(target)}>
-          {board.cards[target]?.title ?? link.target}
+          {label}
         </button>
       ) : (
         <span className="folia-link-missing" title="No card with this name on the board">
-          {link.target}
+          {label}
         </span>
       )}
       {onRemove ? (
         <button
           className="folia-icon-btn folia-mini"
-          aria-label={`Remove relationship to ${link.target}`}
+          aria-label={`Remove relationship to ${label}`}
           title="Remove"
           onClick={onRemove}
         >
           <Icon name="close" size={13} />
         </button>
       ) : note ? (
-        <span
-          className="folia-relation-note folia-muted"
-          title="Declared by the other card — remove it there"
-        >
-          {note}
+        <span className="folia-relation-note folia-muted" title={note.title}>
+          {note.text}
         </span>
       ) : null}
     </li>
   );
 }
+
+/** What an un-removable row says instead of a button, per where the link actually lives. */
+const RELATION_NOTES: Record<"inverse" | "both", { text: string; title: string }> = {
+  inverse: {
+    text: "via blocked-by",
+    title: "Declared by that card's blocked-by property — remove it there",
+  },
+  both: {
+    text: "also via blocked-by",
+    title:
+      "Both notes state this link, so clearing it here would leave the other to bring it back — remove that card's blocked-by property too",
+  },
+};
+
+/** The Blocked by list is derived, so its only affordance is saying where each link is written. */
+const BLOCKED_BY_NOTES: Record<"own" | "inverse" | "both", { text: string; title: string }> = {
+  own: {
+    text: "from this note",
+    title: "Written in this note's own blocked-by property — edit the note to change it",
+  },
+  inverse: { text: "", title: "" },
+  both: {
+    text: "from this note",
+    title: "Written in this note's own blocked-by property, and stated by that card as well",
+  },
+};
 
 /**
  * What the relationship field offers, as `typed text → the file name to link`, since a wikilink
@@ -287,21 +313,26 @@ function RelationRow({
  * itself.
  */
 function relationChoices(board: Board, selfPath: string): Map<string, string> {
-  const choices = new Map<string, string>();
+  const choices = new Map<string, { path: string; basename: string }>();
   const ambiguous = new Set<string>();
-  const offer = (label: string, basename: string) => {
+  const offer = (label: string, card: Card) => {
     const seen = choices.get(label);
-    if (seen === undefined) choices.set(label, basename);
-    else if (seen !== basename) ambiguous.add(label);
+    if (seen === undefined) choices.set(label, { path: card.path, basename: card.basename });
+    // Compared by card, not by file name: two cards sharing a file name across folders are the
+    // case the board refuses to bind at all, so offering that name would hand out a dead link.
+    else if (seen.path !== card.path) ambiguous.add(label);
   };
   for (const p in board.cards) {
     const c = board.cards[p];
     if (!c || p === selfPath) continue;
-    offer(c.title, c.basename);
-    if (c.basename !== c.title) offer(c.basename, c.basename);
+    offer(c.title, c);
+    if (c.basename !== c.title) offer(c.basename, c);
   }
-  for (const label of ambiguous) choices.delete(label);
-  return choices;
+  const out = new Map<string, string>();
+  for (const [label, card] of choices) {
+    if (!ambiguous.has(label)) out.set(label, card.basename);
+  }
+  return out;
 }
 
 export function CardDetail({
@@ -352,6 +383,8 @@ export function CardDetail({
   const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
   const blocksListId = useId();
+  // Rebuilt only when the board or the open card changes — not on every keystroke in any field.
+  const blockChoices = useMemo(() => relationChoices(board, path), [board, path]);
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
@@ -610,7 +643,6 @@ export function CardDetail({
   const fm = card.frontmatter;
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? { blocks: [], blockedBy: [] };
-  const blockChoices = relationChoices(board, path);
   const curPriority = String(fm.priority ?? "");
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
@@ -961,7 +993,7 @@ export function CardDetail({
                       onRemove: () =>
                         void mutate(() => repo.removeRelation(path, l.type, l.target)),
                     }
-                  : { note: "via blocked-by" })}
+                  : { note: RELATION_NOTES[l.source] })}
               />
             ))}
             {relations.blocks.length === 0 && (
@@ -1006,6 +1038,7 @@ export function CardDetail({
                 link={l}
                 board={board}
                 onNavigate={onNavigate}
+                {...(BLOCKED_BY_NOTES[l.source].text ? { note: BLOCKED_BY_NOTES[l.source] } : {})}
               />
             ))}
             {relations.blockedBy.length === 0 && (

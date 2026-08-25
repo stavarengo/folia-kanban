@@ -80,10 +80,13 @@ export type RelationType = "blocks";
 /**
  * Where a link was declared, which decides whether the card showing it may also remove it.
  *
- * `own` — this card's own frontmatter holds it, so removing it is a write to this note.
+ * `own` — this card's own frontmatter holds it, and nothing else does, so removing it is one write
+ * to this note and the relationship is gone.
  * `inverse` — the OTHER card declared it, so it is shown here but only that note can drop it.
+ * `both` — each note states it from its own end. Removing either alone would leave the other to
+ * re-derive it on the next load, so neither side offers a button that could not keep its promise.
  */
-type RelationSource = "own" | "inverse";
+type RelationSource = "own" | "inverse" | "both";
 
 /** One end of a relationship, as one card sees it. */
 export interface RelationLink {

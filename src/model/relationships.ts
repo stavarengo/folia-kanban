@@ -80,15 +80,27 @@ export function isSelfRelation(path: string, basename: string, target: string): 
 }
 
 /**
- * The targets stored under one key, de-duplicated, in the order the note lists them. Tolerates
- * the single-scalar form (`blocks: "[[A]]"`) as well as the list form the plugin writes.
+ * The targets stored under one key, de-duplicated, in the order the note lists them.
+ *
+ * Deliberately forgiving about the shape, because the point of reading these keys is that people
+ * write them by hand. The single-scalar form (`blocks: "[[A]]"`) works. So does the unquoted list
+ * item someone typing into a note produces: YAML reads `- [[A]]` as a nested sequence rather than
+ * a string, so nesting is flattened instead of dropped — the plugin writes the quoted form, but it
+ * must not silently ignore the one a person is most likely to type.
  */
+function collectStrings(value: unknown, out: string[]): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) collectStrings(entry, out);
+    return;
+  }
+  if (typeof value === "string") out.push(value);
+}
+
 function readTargets(fm: Record<string, unknown>, key: string): string[] {
-  const value = fm[key];
-  const raw = Array.isArray(value) ? value : [value];
+  const raw: string[] = [];
+  collectStrings(fm[key], raw);
   const out: string[] = [];
   for (const entry of raw) {
-    if (typeof entry !== "string") continue;
     const target = relationTarget(entry);
     if (target && !out.includes(target)) out.push(target);
   }

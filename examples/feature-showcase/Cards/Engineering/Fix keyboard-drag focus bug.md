@@ -6,7 +6,6 @@ due: 2026-06-29
 tags:
   - bug
   - a11y
-blocked: true
 ---
 
 # Fix keyboard-drag focus bug

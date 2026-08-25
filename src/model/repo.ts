@@ -48,12 +48,14 @@ export interface CardRepository {
   /**
    * Declare a relationship FROM this card TO `target` (a wikilink target, e.g. another card's
    * file name). Only the declaring end is written — the inverse is derived when the board loads,
-   * so the two ends can never drift apart. A relationship the card already declares is a no-op.
+   * so a link written here has no second copy anywhere to fall out of step with. A relationship
+   * the card already declares is a no-op, and so is one naming the card itself.
    */
   addRelation(path: string, type: RelationType, target: string): Promise<void>;
   /**
-   * Drop a relationship this card declares. A target it does not declare is a no-op — in
-   * particular, a card cannot remove a link the OTHER note declared about it.
+   * Drop a relationship this card declares, in every form its list writes it. A target it does
+   * not declare is a no-op — in particular, a card cannot remove a link the OTHER note declared
+   * about it, which is why the panel does not offer the button in that case.
    */
   removeRelation(path: string, type: RelationType, target: string): Promise<void>;
 

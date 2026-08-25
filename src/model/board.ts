@@ -189,10 +189,10 @@ function isGenuinelyNested(path: string, parentOf: Record<string, string>): bool
  * hang the result on the cards themselves (the `context` precedent).
  *
  * The two keys describe the SAME kind of edge from opposite ends, so both are read into one graph
- * and an edge declared from both ends is kept once. `source` records which note declared it, which
- * is what tells the detail panel whether the card in front of you may remove the link or only
- * report it. A card cannot block itself: a self-link is dropped rather than shown as both a
- * blocker and a blocked card.
+ * and an edge declared from both ends is kept once — as `both` rather than as either end's own,
+ * because neither note can end it alone. `source` is what tells the detail panel whether the card
+ * in front of you may remove the link or only report where it lives. A card cannot block itself:
+ * a self-link is dropped rather than shown as both a blocker and a blocked card.
  */
 function buildRelations(
   cards: Card[],
@@ -201,10 +201,16 @@ function buildRelations(
 ): void {
   const blocks: Record<string, RelationLink[]> = {};
   const blockedBy: Record<string, RelationLink[]> = {};
-  const seen = new Set<string>();
-  // One end of an edge, for dedupe: its card path, or the raw target when nothing resolved (so
+  // Every edge already registered, so a second statement of the same one is folded into it rather
+  // than added twice — and so the fact that it WAS stated twice is not lost, which is what decides
+  // whether one note can end the relationship on its own.
+  const seen = new Map<
+    string,
+    { declarer: string | null; out?: RelationLink; in?: RelationLink }
+  >();
+  // One end of an edge, for that key: its card path, or the raw target when nothing resolved (so
   // two notes pointing at the same missing card still count as one edge).
-  const endKey = (path: string | null, target: string) => path ?? "?" + target.toLowerCase();
+  const endKey = (path: string | null, target: string) => path ?? "?" + target;
 
   const addEdge = (
     blocker: { path: string | null; target: string },
@@ -213,24 +219,38 @@ function buildRelations(
   ) => {
     if (blocker.path !== null && blocker.path === blocked.path) return; // no card blocks itself
     const key = endKey(blocker.path, blocker.target) + ">" + endKey(blocked.path, blocked.target);
-    if (seen.has(key)) return;
-    seen.add(key);
+    const declarer = declaredBy === "blocker" ? blocker.path : blocked.path;
+    const existing = seen.get(key);
+    if (existing) {
+      // Stated a second time by the OTHER note: both ends declare it, so deleting the blocker's
+      // own list would not end it — the inverse would simply be derived again on the next load.
+      // Say so on both rows instead of offering a remove button that quietly does nothing.
+      if (existing.declarer !== declarer) {
+        if (existing.out) existing.out.source = "both";
+        if (existing.in) existing.in.source = "both";
+      }
+      return;
+    }
+    const record: { declarer: string | null; out?: RelationLink; in?: RelationLink } = { declarer };
     if (blocker.path !== null) {
-      (blocks[blocker.path] ??= []).push({
+      record.out = {
         type: "blocks",
         target: blocked.target,
         path: blocked.path,
         source: declaredBy === "blocker" ? "own" : "inverse",
-      });
+      };
+      (blocks[blocker.path] ??= []).push(record.out);
     }
     if (blocked.path !== null) {
-      (blockedBy[blocked.path] ??= []).push({
+      record.in = {
         type: "blocks",
         target: blocker.target,
         path: blocker.path,
         source: declaredBy === "blocked" ? "own" : "inverse",
-      });
+      };
+      (blockedBy[blocked.path] ??= []).push(record.in);
     }
+    seen.set(key, record);
   };
 
   // Two passes, `blocks` first, so an edge stated at BOTH ends always keeps the declaration the

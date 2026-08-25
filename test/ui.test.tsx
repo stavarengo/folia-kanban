@@ -1681,6 +1681,12 @@ describe("blocking relationships", () => {
     );
   }
 
+  // The panel has more than one datalist (priority has one too), so read the one this field points at.
+  const blockSuggestions = (detail: HTMLElement) => {
+    const input = within(detail).getByLabelText("Add a card this one blocks") as HTMLInputElement;
+    return [...(input.list?.options ?? [])].map((o) => o.value);
+  };
+
   // The detail panel repeats the card's title, so pick the occurrence that is a board tile.
   const cardOf = (title: string) =>
     screen
@@ -1789,6 +1795,78 @@ describe("blocking relationships", () => {
     expect(within(cardOf("Loose")).queryByText(/^Blocks/)).toBeNull();
   });
 
+  it("offers no remove button when both notes state the link, and says why", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Blocker.md": {
+        fm: { type: "task", status: "todo", blocks: ["[[Waiting]]"] },
+        body: "\n# Blocker\n",
+      },
+      "Tasks/Waiting.md": {
+        fm: { type: "task", status: "doing", "blocked-by": ["[[Blocker]]"] },
+        body: "\n# Waiting\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Blocker"));
+    const detail = await screen.findByTestId("card-detail");
+    // Clearing only this note's `blocks` would leave Waiting's `blocked-by` to re-derive the edge,
+    // so the row explains where else it lives instead of offering a button that cannot deliver.
+    expect(within(detail).getByText("also via blocked-by")).toBeInTheDocument();
+    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+  });
+
+  it("says where a hand-written blocked-by lives, since the derived list cannot edit it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Blocker.md": { fm: { type: "task", status: "todo" }, body: "\n# Blocker\n" },
+      "Tasks/Waiting.md": {
+        fm: { type: "task", status: "doing", "blocked-by": ["[[Blocker]]"] },
+        body: "\n# Waiting\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Waiting"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("from this note")).toBeInTheDocument();
+  });
+
+  it("writes the file name, not the displayed title, when a card is picked by title", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
+      // A slug file name, so the board titles this card from its heading instead.
+      "Tasks/04-tune-the-index.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Tune the search index\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Here"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("Add a card this one blocks");
+    await user.type(input, "Tune the search index{Enter}");
+    // A wikilink binds to the file name, so that is what must land in the property.
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Here.md")!.fm["blocks"]).toEqual(["[[04-tune-the-index]]"]),
+    );
+  });
+
+  it("does not offer a file name two cards share, which the board refuses to bind", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
+      "Tasks/One/B.md": { fm: { type: "task", status: "todo" }, body: "\n" },
+      "Tasks/Two/B.md": { fm: { type: "task", status: "todo" }, body: "\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Here"));
+    const detail = await screen.findByTestId("card-detail");
+    // Both candidates answer to the same file name, which the board refuses to resolve, so the
+    // field offers nothing rather than hand out a link that would land dead.
+    expect(blockSuggestions(detail)).toEqual([]);
+  });
+
   it("refuses a link to the card itself, which the board would only drop again", async () => {
     const user = userEvent.setup();
     const repo = blockRepo();
@@ -1827,9 +1905,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Here"));
     const detail = await screen.findByTestId("card-detail");
-    const options = [
-      ...(detail.querySelectorAll("datalist option") as NodeListOf<HTMLOptionElement>),
-    ].map((o) => o.value);
+    const options = blockSuggestions(detail);
     // The shared title is not on offer; each file name still is, since those are unambiguous.
     expect(options).not.toContain("Review");
     expect(options).toEqual(expect.arrayContaining(["dup-1", "dup-2"]));

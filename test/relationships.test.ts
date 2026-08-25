@@ -51,6 +51,13 @@ describe("relationship frontmatter", () => {
     expect(readRelations({ blocks: ["[[A]]", 42, null, "[[A]]"] }, "blocks")).toEqual(["A"]);
   });
 
+  it("reads the unquoted list item YAML turns into a nested sequence", () => {
+    // `blocks:\n  - [[A]]` (no quotes) is what a person typing into a note produces, and YAML
+    // reads it as a sequence inside a sequence rather than as a string.
+    expect(readRelations({ blocks: [["A"]] }, "blocks")).toEqual(["A"]);
+    expect(readBlockedBy({ "blocked-by": [["A"], "[[B]]"] })).toEqual(["A", "B"]);
+  });
+
   it("reads an absent or empty list as no relationships", () => {
     expect(readRelations({}, "blocks")).toEqual([]);
     expect(readRelations({ blocks: [] }, "blocks")).toEqual([]);
@@ -158,26 +165,30 @@ describe("buildBoard relationships", () => {
     ]);
   });
 
-  it("counts an edge stated from BOTH ends once", () => {
-    const b = buildBoard(config, [
-      card("A", { status: "todo", blocks: ["[[B]]"] }),
-      card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
-    ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks).toHaveLength(1);
-    expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toHaveLength(1);
-  });
-
-  it("keeps the blocker's own declaration whichever order the cards arrive in", () => {
-    // The `blocks` end is the one the plugin writes, so it must decide whether the panel offers a
-    // remove button — never the order the vault happened to list the two notes in.
+  it("counts an edge stated from BOTH ends once, marked as stated by both", () => {
+    // Neither note can end it alone — deleting A's `blocks` would leave B's `blocked-by` to derive
+    // it again on the next load — so neither row claims to own it. Order must not change that.
     for (const order of [0, 1]) {
       const pair = [
         card("A", { status: "todo", blocks: ["[[B]]"] }),
         card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
       ];
       const b = buildBoard(config, order === 0 ? pair : pair.reverse());
-      expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.source).toBe("own");
+      expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
+        { type: "blocks", target: "B", path: "Tasks/B.md", source: "both" },
+      ]);
+      expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
+        { type: "blocks", target: "A", path: "Tasks/A.md", source: "both" },
+      ]);
     }
+  });
+
+  it("does not mistake one note's two ways of writing the same link for two notes", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo", blocks: ["[[B]]", "[[B|see this]]"] }),
+      card("B", { status: "todo" }),
+    ]);
+    expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.source).toBe("own");
   });
 
   it("keeps a target that matches no card, marked unresolved", () => {
