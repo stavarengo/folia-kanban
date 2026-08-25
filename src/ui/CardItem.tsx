@@ -366,8 +366,14 @@ function CardItemInner({
               path={notePath}
               // The line's OWN words, not where the tile renders: a checked line sits in the done
               // column whatever it claims, and the menu must not offer to "move" it to the column
-              // it is already showing while quietly rewriting the line to something else.
-              todoColumn={todoRef?.claim ?? ""}
+              // it is already showing while quietly rewriting the line to something else. Read off
+              // the tile for a placed todo, and off this card's checklist for a next-todo row
+              // surfaced on it — the same line either way, so the two must not answer differently.
+              todoColumn={
+                todoRef
+                  ? todoRef.claim
+                  : (card.subItems?.find((i) => i.index === menu.todoIndex)?.status ?? "")
+              }
               priority={typeof fm.priority === "string" ? fm.priority : ""}
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
@@ -379,6 +385,11 @@ function CardItemInner({
         })()}
     </div>
   );
+}
+
+/** The claims a card's checklist lines make, as one comparable string (see the memo below). */
+function claimsOf(card: Card): string {
+  return (card.subItems ?? []).map((i) => `${i.index}:${i.status ?? ""}`).join("|");
 }
 
 function sameStats(a?: CardStats, b?: CardStats): boolean {
@@ -410,6 +421,9 @@ export const CardItem = memo(
     a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
     a.card.todoRef?.index === b.card.todoRef?.index &&
     a.card.todoRef?.claim === b.card.todoRef?.claim &&
+    // Setting a claim on a todo that stays inline changes neither the stats nor the frontmatter
+    // reference, so without this the row's context menu would go on showing the old column.
+    claimsOf(a.card) === claimsOf(b.card) &&
     a.card.frontmatter.status === b.card.frontmatter.status &&
     (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
     sameStats(a.card.stats, b.card.stats),

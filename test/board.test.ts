@@ -854,8 +854,34 @@ describe("subitems in a column of their own", () => {
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 0, status: null },
     });
-    // Asking for the claim it already makes writes nothing.
+    // Naming that same column is the same request, so it clears the claim rather than restating it:
+    // a claim pinning a todo to its card's column would detach the todo the day the card moves.
+    expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")?.setSubtaskStatus).toEqual({
+      index: 0,
+      status: null,
+      done: false,
+    });
+  });
+
+  it("writes nothing when an unclaimed todo is sent to the column it already shows in", () => {
+    const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("Plain", 0)])]);
     expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toBeNull();
+  });
+
+  it("leaves a claim alone when the board has no done column to move it to", () => {
+    const twoCols: BoardConfig = {
+      ...config,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "doing", title: "Doing" },
+      ],
+    };
+    const b = buildBoard(twoCols, [
+      withTodos("Root", { status: "todo" }, [todo("Placed", 0, "doing")]),
+    ]);
+    // Ticking the box must not erase the placement the user made — there is nowhere to move it to.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, true)).toBeNull();
   });
 
   it("sends a todo home without touching its checkbox — that is a move, not a claim", () => {
@@ -971,8 +997,11 @@ describe("subitems in a column of their own", () => {
       setSubtaskStatus: { index: 0, status: "done", done: true },
       history: 'Moved subtask "Write docs" from Doing to Done',
     });
-    expect(moveCard(b, p, "todo", 0)).toMatchObject({
-      setSubtaskStatus: { index: 0, status: "todo", done: false },
+    // `todo` is the card's own column, so the line goes back to claiming nothing at all.
+    expect(moveCard(b, p, "todo", 0)?.setSubtaskStatus).toEqual({
+      index: 0,
+      status: null,
+      done: false,
     });
   });
 
@@ -992,9 +1021,11 @@ describe("subitems in a column of their own", () => {
       path: "Tasks/Other.md",
       setFrontmatter: { status: "todo" },
     });
+    // No checkbox in the write: a column going away rehomes what it held, it does not decide the
+    // work in it is unfinished — deleting the done column must not reopen everything that was in it.
     expect(reassignColumn(b, makeTodoPath("Tasks/Root.md", 0), "todo")).toEqual({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, status: "todo", done: false },
+      setSubtaskStatus: { index: 0, status: "todo" },
     });
   });
 });

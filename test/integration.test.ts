@@ -225,12 +225,9 @@ describe("subitem drag persistence", () => {
     // Nothing is placed yet — the board looks exactly as it did before subitems could move.
     expect(board.columns["doing"]).toEqual([]);
 
-    // Drag it into Doing: the write lands on the line, and the note keeps its own frontmatter.
-    await repo.applyMove(moveCard(board, "Tasks/Root.md", "todo", 0) ?? { path: "Tasks/Root.md" });
-    board = await repo.loadBoard();
     const todoPath = makeTodoPath("Tasks/Root.md", 0);
-    // The tile does not exist until the line claims a column, so the move starts from the parent's
-    // detail/board state — simulate the drop the UI would produce once it is placed.
+    // The tile does not exist until the line claims a column (that first placement comes from the
+    // context menu or the detail picker), so stand in for it here and drag from there on.
     const placed =
       "\n# Root\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n- [ ] Stay home\n";
     repo.files.get("Tasks/Root.md")!.body = placed;
@@ -248,12 +245,21 @@ describe("subitem drag persistence", () => {
       'Moved subtask "Write the docs" from Doing to Done',
     );
 
-    // And back to the parent's own column: the tile disappears and the todo is open again.
+    // And back to the parent's own column: the tile disappears, the todo is open again, and the
+    // line stops claiming anything — a claim pinning it to its card's column would pop it back out
+    // as its own tile the next time the card itself moved.
     const back = moveCard(board, todoPath, "todo", 0)!;
     await repo.applyMove(back);
     board = await repo.loadBoard();
     expect(board.columns["todo"]).toEqual(["Tasks/Root.md"]);
-    expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [ ] Write the docs [status:: todo]");
+    expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [ ] Write the docs\n");
+    expect(repo.files.get("Tasks/Root.md")!.body).not.toContain("[status::");
+
+    // Proof of the point: moving the CARD now takes the todo with it, instead of stranding it.
+    await repo.applyMove(moveCard(board, "Tasks/Root.md", "doing", 0)!);
+    board = await repo.loadBoard();
+    expect(board.columns["doing"]).toEqual(["Tasks/Root.md"]);
+    expect(board.columns["todo"]).toEqual([]);
   });
 
   it("drags a file subcard out of its parent's group into a column of its own", async () => {

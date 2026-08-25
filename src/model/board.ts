@@ -757,24 +757,29 @@ export function moveSubtask(
   const home = columnOf(board, parentPath);
   const from = columnOf(board, makeTodoPath(parentPath, index)) ?? home;
   const target = toColumnId ?? home;
+  // "The column my card is in" and "no claim of my own" name the same place, and only one of them
+  // keeps naming it after the card moves. So a move that lands on the card's own column is written
+  // as no claim at all: otherwise dragging a todo back onto its parent would leave a field pinning
+  // it to that column, and the todo would pop out on its own the next time the card was dragged.
+  const claimTo = toColumnId !== null && toColumnId === home ? null : toColumnId;
   // What the line LITERALLY says, unnormalised — including a value naming no column of this board
   // (a typo, or a column since renamed). The board graph ignores such a value, but the write path
   // must not: normalising it to "no claim" here would make the guard below skip the one write that
   // can clear it, leaving a field no interface could reach and the todo free to detach the day a
-  // column with that id appears. Compared against what is about to be written rather than against
-  // where the todo RENDERS, so a claim naming its card's own column stays clearable too.
+  // column with that id appears.
   const claim = item.status ?? null;
-  // Sending a todo home says nothing about whether it is finished, so the checkbox is left out of
-  // the write entirely rather than written back to what we believe it currently is — the board we
-  // are reading may be one reload behind the note, and a stale belief would tick or untick the
-  // wrong way. Only a move to an actual column states a done-ness, and that one is not a belief.
+  // Naming a column states a done-ness; sending a todo home does not. In that second case the
+  // checkbox is left out of the write entirely rather than written back to what we believe it
+  // currently is — the board we are reading may be one reload behind the note, and a stale belief
+  // would tick or untick the wrong way. Read from `toColumnId`, not `claimTo`: dropping a finished
+  // todo on its card's Todo column reopens it, even though the claim that lands is "none".
   const done =
     toColumnId === null ? undefined : toColumnId === findDoneColumn(board.config.columns);
-  if (claim === toColumnId && (done === undefined || item.done === done)) {
+  if (claim === claimTo && (done === undefined || item.done === done)) {
     return null; // the line already says this
   }
   const setSubtaskStatus =
-    done === undefined ? { index, status: toColumnId } : { index, status: toColumnId, done };
+    done === undefined ? { index, status: claimTo } : { index, status: claimTo, done };
   const label = item.text || "todo";
   return {
     path: parentPath,
@@ -793,7 +798,8 @@ export function moveSubtask(
  * nobody chose: the todo goes back to living with its card, which is where it started.
  *
  * A line claiming nothing is left entirely alone. Ticking a plain todo has never placed it
- * anywhere, and it must not start now.
+ * anywhere, and it must not start now — and neither does a board with no done column at all, where
+ * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
  */
 export function syncSubtaskClaim(
   board: Board,
@@ -805,8 +811,9 @@ export function syncSubtaskClaim(
   const item = parent?.subItems?.find((s) => s.index === index && s.kind === "todo");
   if (!item || item.status === undefined) return null; // claims nothing — nothing to keep in step
   const doneCol = findDoneColumn(board.config.columns);
+  if (done && doneCol === null) return null; // nowhere to move the claim to; leave the line's own
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
-  if (next === undefined || next === item.status) return null;
+  if (next === item.status) return null;
   return { path: parentPath, setSubtaskStatus: { index, status: next } };
 }
 
@@ -825,10 +832,12 @@ export function reassignColumn(
   if (!card) return null;
   const todoRef = card.todoRef;
   if (!todoRef) return { path, setFrontmatter: { status: toColumnId } };
-  const done = toColumnId === findDoneColumn(board.config.columns);
+  // The checkbox is left out: a column going away rehomes what it held, it does not decide that the
+  // work in it is finished or unfinished. Stating one here would reopen a ticked line every time
+  // someone deleted the done column, in their own note, with nothing to undo it.
   return {
     path: todoRef.parentPath,
-    setSubtaskStatus: { index: todoRef.index, status: toColumnId, done },
+    setSubtaskStatus: { index: todoRef.index, status: toColumnId },
   };
 }
 

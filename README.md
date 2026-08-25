@@ -87,7 +87,7 @@ The inline field is [Obsidian's own inline-field syntax](https://help.obsidian.m
 
 Whichever you use, the card keeps counting the subitem in its progress bar: moving the work somewhere visible does not take it off its ticket. Landing in the Done column checks the todo's box; moving it to any other column unchecks it, so the checkbox and the column never disagree. It works the other way too: a line you write by hand as `- [ ] Ship it [status:: done]` is finished, because sitting in Done and being finished are the same statement — the card counts it as done rather than showing it outstanding under a tile in Done.
 
-The pickers also offer **With its card**, which is a different thing from picking a column: it drops the claim so the subitem goes back to living with its card, and says nothing about whether the work is finished. A done todo sent back with its card stays a checked line — reopening it is what picking another column is for.
+Sending a todo to the column its own card is in means the same thing as **With its card**, and is written the same way: the field goes, rather than being left pinning the todo to a column its card might leave tomorrow. The difference between the two is only the checkbox — naming a column says whether the work is finished (Todo reopens it, Done closes it), while **With its card** says nothing about that and leaves the box exactly as it is.
 
 One deliberate limit: a plain todo carries no `order`, so dragging it *within* a column does not stick (it sorts after the ordered cards, alphabetically). Moving it *between* columns — the thing this is for — always does.
 

@@ -1180,6 +1180,31 @@ describe("card context menu", () => {
     );
   });
 
+  it("shows the line's real claim on a next-todo row, not a blank one", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "doing" },
+        body: "\n# First\n\n## Subtasks\n- [ ] pinned [status:: doing]\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    // The line claims its card's own column, so it renders inline — but it DOES claim one, and the
+    // menu opened from the row has to say so or it would offer to "move" it where it already is.
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="0"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    expect(within(menu).getByRole("menuitemradio", { name: "Doing" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    // Choosing that same column is a request to stop claiming it, not a no-op with a history line.
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+    await waitFor(() => expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[ \] pinned\n/));
+    expect(repo.files.get("Tasks/First.md")!.body).not.toContain("[status::");
+  });
+
   it("removes a todo from the todo menu", async () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
