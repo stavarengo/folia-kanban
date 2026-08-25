@@ -308,15 +308,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         void (async () => {
           try {
             await repo.deleteCard(path);
-          } catch (e) {
-            reportError(e);
-          } finally {
-            setSelected((cur) => (cur === path ? null : cur));
             // Prune the per-path plugin data this card owned — its collapse-state override
             // (§ collapse) and its comments-seen marker (§ unread). Left behind, either would
             // silently hand its state to an unrelated card someone later creates at this same
             // path. Built from the settings at write time, not this render's snapshot, so another
-            // view's write landing in between is not undone.
+            // view's write landing in between is not undone. Only once the file is actually gone:
+            // a delete that failed leaves the card, and it must keep what it had.
             onUpdateSettings((s) => {
               const prune: Partial<KanbanSettings> = {};
               if (s.collapsedCards[path] !== undefined)
@@ -325,6 +322,10 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
                 prune.commentsSeen = withoutKey(s.commentsSeen, path);
               return prune;
             });
+          } catch (e) {
+            reportError(e);
+          } finally {
+            setSelected((cur) => (cur === path ? null : cur));
             await load();
           }
         })();
@@ -349,12 +350,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             // When the title comes from the file name, a rename changes the path. If the renamed
             // card was selected, follow it to its new path so the detail/selection holds.
             if (newPath !== path) {
-              setSelected((cur) => (cur === path ? newPath : cur));
               // Per-path plugin data is keyed by path in settings, same as selection — follow it
               // to the new path, or a toggled card silently resets to the board default and its
               // already-read comments all light up again; the vacated path could also later hand
               // that state to an unrelated card reusing it. Read at write time (see the prune
-              // above), so nothing another view wrote meanwhile is lost.
+              // above), so nothing another view wrote meanwhile is lost. Settings move BEFORE the
+              // selection does: the panel snapshots the card's read marker on the render that
+              // first shows the new path, and it must find the migrated one there.
               onUpdateSettings((s) => {
                 const migrated: Partial<KanbanSettings> = {};
                 const collapsed = s.collapsedCards[path];
@@ -368,6 +370,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
                   migrated.commentsSeen = { ...withoutKey(s.commentsSeen, path), [newPath]: seen };
                 return migrated;
               });
+              setSelected((cur) => (cur === path ? newPath : cur));
             }
           } catch (e) {
             reportError(e);

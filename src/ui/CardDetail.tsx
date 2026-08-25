@@ -12,7 +12,7 @@ import {
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
 import { RELATION_KEYS } from "../model/relationships";
-import { SELF, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
+import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
 import { priorityOptions } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
@@ -453,39 +453,48 @@ export function CardDetail({
    * comment you typed here is yours even when there is no name to sign it with, so it is treated as
    * such below — without it the panel hands your own line straight back to you tagged NEW, which is
    * what every reader who has not set a name would see. Text alone is not an identity (answering
-   * "ok" to someone's "ok" must not reclassify theirs as yours), so a post claims the LAST comment
-   * at or past its floor that carries its text: sending two in a row before the first reload lands,
-   * or a comment from elsewhere arriving while the panel is open, still leaves each post its own
-   * line. Edits and deletions made from this panel keep the list in step (see `postedHereEdited` /
-   * `postedHereRemoved`).
+   * "ok" to someone's "ok" must not reclassify theirs as yours), so a post can only claim a line
+   * that carries no other author, and claims the LAST such line at or past its floor with its text,
+   * newest post first: sending two in a row before the first reload lands, or a comment from
+   * elsewhere arriving while the panel is open, still leaves each post its own line. Edits and
+   * deletions made from this panel keep the list in step (see `postedHereEdited` /
+   * `postedHereRemoved`), and a post is only recorded once its write has succeeded.
    */
   const postedHere = useRef<{ path: string; posts: { floor: number; text: string }[] }>({
     path,
     posts: [],
   });
   if (postedHere.current.path !== path) postedHere.current = { path, posts: [] };
-  const claimedByPosts = (texts: readonly string[]): Set<number> => {
-    const claimed = new Set<number>();
-    for (const p of postedHere.current.posts)
-      for (let i = texts.length - 1; i >= p.floor; i--)
-        if (texts[i] === p.text && !claimed.has(i)) {
-          claimed.add(i);
+  const claimable = (c: { author: string | null }): boolean =>
+    c.author === null || isMine(c.author, settings.userName);
+  /** Which comment each post owns, as a map from comment index to its position in `posts`. */
+  const claimedByPosts = (
+    comments: readonly { text: string; author: string | null }[],
+  ): Map<number, number> => {
+    const claimed = new Map<number, number>();
+    const posts = postedHere.current.posts;
+    for (let n = posts.length - 1; n >= 0; n--) {
+      const p = posts[n];
+      if (!p) continue;
+      for (let i = comments.length - 1; i >= p.floor; i--) {
+        const c = comments[i];
+        if (c && c.text === p.text && claimable(c) && !claimed.has(i)) {
+          claimed.set(i, n);
           break;
         }
+      }
+    }
     return claimed;
   };
   const postedHereEdited = (index: number, text: string): void => {
-    const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
-    if (!own.has(index)) return;
-    const before = body?.comments[index]?.text;
-    const post = postedHere.current.posts.find((p) => p.text === before && p.floor <= index);
+    const n = claimedByPosts(body?.comments ?? []).get(index);
+    const post = n === undefined ? undefined : postedHere.current.posts[n];
     if (post) post.text = text;
   };
   const postedHereRemoved = (index: number): void => {
-    const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
-    const gone = body?.comments[index]?.text;
+    const n = claimedByPosts(body?.comments ?? []).get(index);
     postedHere.current.posts = postedHere.current.posts
-      .filter((p) => !(own.has(index) && p.text === gone && p.floor <= index))
+      .filter((_, i) => i !== n)
       .map((p) => (p.floor > index ? { ...p, floor: p.floor - 1 } : p));
   };
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
@@ -514,7 +523,7 @@ export function CardDetail({
   );
   const commentMarks = useMemo(
     () => {
-      const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
+      const own = claimedByPosts(body?.comments ?? []);
       return noteMarks.map((m, i) => (own.has(i) ? { ...m, author: me } : m));
     },
     // `postedHere` is a ref, not a dependency: what it holds only changes together with `body`.
@@ -1287,14 +1296,18 @@ export function CardDetail({
                   unread={mark}
                   text={c.text}
                   sourcePath={path}
-                  onSave={(val) => {
-                    postedHereEdited(i, val);
-                    void mutate(() => repo.updateComment(path, i, val));
-                  }}
-                  onDelete={() => {
-                    postedHereRemoved(i);
-                    void mutate(() => repo.removeComment(path, i));
-                  }}
+                  onSave={(val) =>
+                    void mutate(async () => {
+                      await repo.updateComment(path, i, val);
+                      postedHereEdited(i, val);
+                    })
+                  }
+                  onDelete={() =>
+                    void mutate(async () => {
+                      await repo.removeComment(path, i);
+                      postedHereRemoved(i);
+                    })
+                  }
                 />
               );
               return isFirstUnread
@@ -1323,11 +1336,12 @@ export function CardDetail({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
                   e.preventDefault();
-                  postedHere.current.posts.push({
-                    floor: body?.comments.length ?? 0,
-                    text: newComment.trim(),
+                  const text = newComment.trim();
+                  const floor = body?.comments.length ?? 0;
+                  void mutate(async () => {
+                    await repo.addComment(path, text);
+                    postedHere.current.posts.push({ floor, text });
                   });
-                  void mutate(() => repo.addComment(path, newComment.trim()));
                   setNewComment("");
                 }
               }}

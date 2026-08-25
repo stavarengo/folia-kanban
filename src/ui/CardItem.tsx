@@ -469,11 +469,12 @@ function commentsTitle(total: number, unread: UnreadState): string {
   return unread.kind === "none" ? base : `${base}, ${unreadWords(unread)}`;
 }
 
-/** "2 unread comments" / "2 unread comments, one a reply to yours". */
+/** "2 unread comments" / "2 unread comments, one a reply to yours" / "1 unread comment, a reply to yours". */
 function unreadWords(unread: UnreadState): string {
   const n = unread.indices.length;
   const news = `${n} unread comment${n === 1 ? "" : "s"}`;
-  return unread.kind === "reply" ? `${news}, one a reply to yours` : news;
+  if (unread.kind !== "reply") return news;
+  return n === 1 ? `${news}, a reply to yours` : `${news}, one a reply to yours`;
 }
 
 /** The claims a card's checklist lines make, as one comparable string (see the memo below). */

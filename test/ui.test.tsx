@@ -2380,6 +2380,12 @@ describe("blocking relationships", () => {
 });
 
 describe("unread comments", () => {
+  /** The comment line holding `text`, which must carry no unread tint and no new/reply tag. */
+  const expectPlainLine = (detail: HTMLElement, text: string) => {
+    const li = within(detail).getByText(text).closest("li") as HTMLElement;
+    expect(li.className).not.toMatch(/folia-comment-(unread|reply)/);
+    expect(li.querySelector(".folia-comment-flag")).toBeNull();
+  };
   const conversation = () =>
     new FakeRepo(config, {
       "Tasks/Alpha.md": {
@@ -2393,13 +2399,13 @@ describe("unread comments", () => {
     render_(conversation(), asRafa);
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     // Two comments, one of them yours — so only the agent's counts, and it came after yours.
-    expect(
-      within(alpha).getByTitle("2 comments, 1 unread comment, one a reply to yours"),
-    ).toHaveClass("folia-comments-reply");
+    expect(within(alpha).getByTitle("2 comments, 1 unread comment, a reply to yours")).toHaveClass(
+      "folia-comments-reply",
+    );
     // The tile's own name carries it too: everything in the tile is inside a role="button", so a
     // label on the badge alone would never be announced.
     expect(
-      within(alpha).getByLabelText("Alpha, 1 unread comment, one a reply to yours"),
+      within(alpha).getByLabelText("Alpha, 1 unread comment, a reply to yours"),
     ).toBeInTheDocument();
   });
 
@@ -2553,11 +2559,94 @@ describe("unread comments", () => {
     await user.type(box, "on it now{Enter}");
     await within(detail).findByText("on it now");
     expect(within(detail).getAllByText("new")).toHaveLength(1);
+    expectPlainLine(detail, "on it now");
     // Delete the agent's line above it: the reader's own shifts up one slot, still theirs.
     const theirs = within(detail).getByText("take a look").closest("li") as HTMLElement;
     await user.click(within(theirs).getByRole("button", { name: "Delete comment" }));
     await waitFor(() => expect(within(detail).queryByText("take a look")).toBeNull());
     expect(within(detail).queryByText("new")).toBeNull();
+    expectPlainLine(detail, "on it now");
+  });
+
+  it("never claims a line signed by someone else, even with the same words as yours", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ ready?\n",
+      },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "yes{Enter}");
+    await within(detail).findByText("yes");
+    // The agent answers with the same word while the panel is open; the next reload shows it.
+    repo.files.get("Tasks/Alpha.md")!.body += `- _${repo.ts} @agent:_ yes\n`;
+    await user.type(within(detail).getByLabelText("Write a comment"), "great{Enter}");
+    await within(detail).findByText("great");
+    const lines = within(detail)
+      .getAllByText("yes")
+      .map((el) => el.closest("li") as HTMLElement);
+    expect(lines).toHaveLength(2);
+    // The reader's unsigned "yes" is theirs; the agent's signed "yes" is a reply to it.
+    expect(lines[0]?.querySelector(".folia-comment-flag")).toBeNull();
+    expect(lines[1]).toHaveClass("folia-comment-reply");
+    expectPlainLine(detail, "great");
+  });
+
+  it("keeps two own comments with the same words both yours, and forgets only the one deleted", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "ok{Enter}");
+    await within(detail).findByText("ok");
+    await user.type(within(detail).getByLabelText("Write a comment"), "ok{Enter}");
+    await waitFor(() => expect(within(detail).getAllByText("ok")).toHaveLength(2));
+    for (const el of within(detail).getAllByText("ok")) {
+      const li = el.closest("li") as HTMLElement;
+      expect(li.querySelector(".folia-comment-flag")).toBeNull();
+    }
+    // Delete the first "ok": the second stays the reader's own.
+    const first = within(detail).getAllByText("ok")[0]?.closest("li") as HTMLElement;
+    await user.click(within(first).getByRole("button", { name: "Delete comment" }));
+    await waitFor(() => expect(within(detail).getAllByText("ok")).toHaveLength(1));
+    expectPlainLine(detail, "ok");
+  });
+
+  it("keeps a card's read-state when deleting it fails", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    repo.deleteCard = async () => {
+      throw new Error("locked");
+    };
+    const box = { current: asRafa };
+    renderStateful(
+      repo,
+      { ...asRafa, commentsSeen: { "Tasks/Alpha.md": "2026-06-13 09:00#1" } },
+      box,
+    );
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(within(detail).getByRole("button", { name: "Delete card" }));
+    const dialog = await within(detail).findByRole("alertdialog", { name: "Confirm delete" });
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    // The card is still there, and so is what the reader had read on it.
+    expect(await screen.findByText("Alpha")).toBeInTheDocument();
+    expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 09:00#1");
   });
 
   it("recognises its own signed comment under a name the grammar rewrites, and leaves it out of the marker", async () => {
@@ -2626,7 +2715,7 @@ describe("unread comments", () => {
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     // Timestamps carry no seconds, so an agent answering straight away shares your minute.
     expect(
-      within(alpha).getByTitle("2 comments, 1 unread comment, one a reply to yours"),
+      within(alpha).getByTitle("2 comments, 1 unread comment, a reply to yours"),
     ).toBeInTheDocument();
   });
 
