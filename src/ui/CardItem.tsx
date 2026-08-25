@@ -2,9 +2,9 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
-import { cardChips, cardUrgency, priorityTone } from "./cardView";
+import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
-import { useBoardActions, useContexts, useSettings } from "./context";
+import { useBoardActions, useContexts, useRelationCounts, useSettings } from "./context";
 import { Icon } from "./icons";
 
 interface Props {
@@ -47,7 +47,10 @@ function CardItemInner({ card, dragId, today, selected, nested = false }: Props)
     // Keep it above settling neighbours so the dashed outline isn't clipped during the drop animation.
     zIndex: isDragging ? 1 : undefined,
   };
-  const chips = cardChips(card, today, actions.doneColumnId);
+  // Blocking markers come from the board graph (a link on ANOTHER card decides what this one
+  // shows), so they arrive through their own context rather than this card's memoized props.
+  const relations = useRelationCounts()[card.path];
+  const chips = [...relationChips(relations), ...cardChips(card, today, actions.doneColumnId)];
   const stats = card.stats;
   const fm = card.frontmatter;
   const prio = typeof fm.priority === "string" && fm.priority ? priorityTone(fm.priority) : null;

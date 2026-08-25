@@ -8,7 +8,8 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Board, CardBody } from "../model/types";
+import type { Board, CardBody, RelationLink } from "../model/types";
+import { RELATION_KEYS } from "../model/relationships";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
@@ -208,7 +209,87 @@ function resolveBasename(board: Board, link: string): string | null {
   return null;
 }
 
-const EDITED_KEYS = new Set(["status", "priority", "due", "order", "type", "created"]);
+// The frontmatter keys the panel edits through a dedicated control, so the generic property rows
+// never offer a second, conflicting way to write them. The relationship keys are in here for the
+// add-property form: an array value is already excluded from the rows themselves.
+const EDITED_KEYS = new Set([
+  "status",
+  "priority",
+  "due",
+  "order",
+  "type",
+  "created",
+  ...RELATION_KEYS,
+]);
+
+/**
+ * One relationship row: the linked card's displayed title (clicking it opens that card), or the
+ * raw target when nothing on the board matches it.
+ *
+ * A row is removable only where the note in front of you declares the link. `note` is what an
+ * editable list says instead of offering a button it would have to refuse — a link stated by the
+ * OTHER card is real, and saying where it comes from beats a silently missing control.
+ */
+function RelationRow({
+  link,
+  board,
+  onNavigate,
+  onRemove,
+  note,
+}: {
+  link: RelationLink;
+  board: Board;
+  onNavigate: ((path: string) => void) | undefined;
+  onRemove?: (() => void) | undefined;
+  note?: string | undefined;
+}) {
+  const target = link.path;
+  return (
+    <li className="folia-relation">
+      {target ? (
+        <button className="folia-link" onClick={() => onNavigate?.(target)}>
+          {board.cards[target]?.title ?? link.target}
+        </button>
+      ) : (
+        <span className="folia-link-missing" title="No card with this name on the board">
+          {link.target}
+        </span>
+      )}
+      {onRemove ? (
+        <button
+          className="folia-icon-btn folia-mini"
+          aria-label={`Remove relationship to ${link.target}`}
+          title="Remove"
+          onClick={onRemove}
+        >
+          <Icon name="close" size={13} />
+        </button>
+      ) : note ? (
+        <span
+          className="folia-relation-note folia-muted"
+          title="Declared by the other card — remove it there"
+        >
+          {note}
+        </span>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * The wikilink target a typed suggestion means: the file name of the card whose displayed title
+ * (or file name) it matches, since that is what a `[[link]]` binds to. Text matching no card is
+ * kept as typed — it becomes a link to a card that does not exist yet, which the lists show as
+ * missing rather than swallow.
+ */
+function relationTargetFor(board: Board, text: string, selfPath: string): string {
+  const value = text.trim();
+  for (const p in board.cards) {
+    const c = board.cards[p];
+    if (p !== selfPath && c && (c.title === value || c.basename === value)) return c.basename;
+  }
+  return value;
+}
 
 export function CardDetail({
   path,
@@ -244,6 +325,7 @@ export function CardDetail({
   const [newTodo, setNewTodo] = useState("");
   const [newSubcard, setNewSubcard] = useState("");
   const [newComment, setNewComment] = useState("");
+  const [newBlocks, setNewBlocks] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newPropKey, setNewPropKey] = useState("");
   const [newPropVal, setNewPropVal] = useState("");
@@ -256,6 +338,7 @@ export function CardDetail({
   // instead of pushing the panel past the screen. Re-measured on mount and window resize.
   const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
+  const blocksListId = useId();
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
@@ -512,6 +595,8 @@ export function CardDetail({
   }
 
   const fm = card.frontmatter;
+  // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
+  const relations = card.relations ?? { blocks: [], blockedBy: [] };
   const curPriority = String(fm.priority ?? "");
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
@@ -846,6 +931,72 @@ export function CardDetail({
               }}
             />
           </div>
+        </section>
+
+        <section className="folia-section">
+          <h3>Blocks</h3>
+          <ul className="folia-relations">
+            {relations.blocks.map((l) => (
+              <RelationRow
+                key={`${l.target}\u0000${l.path ?? ""}`}
+                link={l}
+                board={board}
+                onNavigate={onNavigate}
+                {...(l.source === "own"
+                  ? {
+                      onRemove: () =>
+                        void mutate(() => repo.removeRelation(path, l.type, l.target)),
+                    }
+                  : { note: "via blocked-by" })}
+              />
+            ))}
+            {relations.blocks.length === 0 && (
+              <li className="folia-muted">This card blocks nothing.</li>
+            )}
+          </ul>
+          <div className="folia-add-inline">
+            <input
+              list={blocksListId}
+              value={newBlocks}
+              placeholder="Blocks another card…"
+              aria-label="Add a card this one blocks"
+              onChange={(e) => setNewBlocks(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !newBlocks.trim()) return;
+                e.preventDefault();
+                void mutate(() =>
+                  repo.addRelation(path, "blocks", relationTargetFor(board, newBlocks, path)),
+                );
+                setNewBlocks("");
+              }}
+            />
+            <datalist id={blocksListId}>
+              {Object.values(board.cards)
+                .filter((c) => c.path !== path)
+                .map((c) => (
+                  <option key={c.path} value={c.title} />
+                ))}
+            </datalist>
+          </div>
+        </section>
+
+        <section className="folia-section">
+          {/* Derived, never written: this list is the inverse of other cards' `blocks` (plus this
+              card's own hand-written `blocked-by`), so there is nothing here to edit from here. */}
+          <h3>Blocked by</h3>
+          <ul className="folia-relations">
+            {relations.blockedBy.map((l) => (
+              <RelationRow
+                key={`${l.target}\u0000${l.path ?? ""}`}
+                link={l}
+                board={board}
+                onNavigate={onNavigate}
+              />
+            ))}
+            {relations.blockedBy.length === 0 && (
+              <li className="folia-muted">Nothing is blocking this card.</li>
+            )}
+          </ul>
         </section>
 
         <section className="folia-section">

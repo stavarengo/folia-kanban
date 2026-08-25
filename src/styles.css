@@ -1386,6 +1386,7 @@
 }
 
 .folia-subtasks,
+.folia-relations,
 .folia-comments,
 .folia-history {
   list-style: none;
@@ -1405,6 +1406,18 @@
 .folia-subtask input[type="checkbox"] {
   flex: 0 0 auto;
   margin-top: 2px;
+}
+/* One relationship row: the linked card, then either its remove button or a note saying the link
+   is declared on the other card (see RelationRow). */
+.folia-relation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--folia-font-size-md);
+  line-height: 1.4;
+}
+.folia-relation-note {
+  cursor: help;
 }
 .folia-link {
   background: transparent;

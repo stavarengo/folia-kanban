@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Board as BoardModel, ColumnDef } from "../model/types";
-import { columnOf, moveCard, moveColumn, resolveDrop } from "../model/board";
+import { columnOf, moveCard, moveColumn, relationCounts, resolveDrop } from "../model/board";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -9,6 +9,7 @@ import type { KanbanSettings } from "../settings";
 import {
   BoardActionsContext,
   ContextsContext,
+  RelationCountsContext,
   RepoContext,
   SettingsContext,
   type BoardActions,
@@ -24,6 +25,9 @@ const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
 
 /** Stable empty contexts map (#14) so the provider value identity doesn't churn pre-load. */
 const EMPTY_CONTEXTS = {} as const;
+
+/** Stable empty relation-count map, same reason. */
+const EMPTY_RELATION_COUNTS = {} as const;
 
 /** Translate `addCardOpenMode` into a presentation override; 'default' means "use the global". */
 function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | null {
@@ -512,6 +516,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const contextsKey = JSON.stringify(contextsValue);
   const stableContexts = useMemo(() => contextsValue, [contextsKey]);
 
+  // Blocking markers: the counts every card tile reads. Recomputed per board load — an edit to
+  // one card changes what its neighbours show, so this can't live on the memoized card props.
+  const relationCountsValue = useMemo(
+    () => (board ? relationCounts(board, doneColumnId) : EMPTY_RELATION_COUNTS),
+    [board, doneColumnId],
+  );
+
   // Parse the query once per change; Board/Column filter with this same parsed §1 Filter.
   const filter = useMemo(() => parseFilter(query), [query]);
 
@@ -613,59 +624,61 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       <RepoContext.Provider value={repo}>
         <BoardActionsContext.Provider value={actions}>
           <ContextsContext.Provider value={stableContexts}>
-            <div className="folia-root" ref={rootRef}>
-              <Toolbar
-                ref={searchRef}
-                query={query}
-                onChange={setQuery}
-                matchCount={counts.match}
-                totalCount={counts.total}
-              />
-              {board.cardFolderWarning && (
-                <div className="folia-card-folder-notice" role="status">
-                  {board.cardFolderWarning}
-                </div>
-              )}
-              <div className="folia-main" role="region" aria-label="Board">
-                <Board
-                  board={board}
-                  today={todayValue}
-                  selectedPath={selected}
-                  wipLimits={wipLimits}
-                  filter={filter}
-                  doneColumnId={doneColumnId}
-                  onMove={(activeId, overId) => void onMove(activeId, overId)}
-                  onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+            <RelationCountsContext.Provider value={relationCountsValue}>
+              <div className="folia-root" ref={rootRef}>
+                <Toolbar
+                  ref={searchRef}
+                  query={query}
+                  onChange={setQuery}
+                  matchCount={counts.match}
+                  totalCount={counts.total}
                 />
-                {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
-                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
-                {detailMode !== "modal" && detail}
-              </div>
-              {detailMode === "modal" &&
-                panelShown &&
-                rootRef.current &&
-                createPortal(
-                  <div
-                    className="folia-detail-modal-backdrop"
-                    onPointerDown={(e) => {
-                      if (e.target === e.currentTarget) closeDetail();
-                    }}
-                  >
-                    {detail}
-                  </div>,
-                  rootRef.current,
+                {board.cardFolderWarning && (
+                  <div className="folia-card-folder-notice" role="status">
+                    {board.cardFolderWarning}
+                  </div>
                 )}
-              {toast && (
-                <div
-                  className={"folia-toast folia-toast-" + toast.tone}
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
-                  {toast.text}
+                <div className="folia-main" role="region" aria-label="Board">
+                  <Board
+                    board={board}
+                    today={todayValue}
+                    selectedPath={selected}
+                    wipLimits={wipLimits}
+                    filter={filter}
+                    doneColumnId={doneColumnId}
+                    onMove={(activeId, overId) => void onMove(activeId, overId)}
+                    onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+                  />
+                  {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
+                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
+                  {detailMode !== "modal" && detail}
                 </div>
-              )}
-            </div>
+                {detailMode === "modal" &&
+                  panelShown &&
+                  rootRef.current &&
+                  createPortal(
+                    <div
+                      className="folia-detail-modal-backdrop"
+                      onPointerDown={(e) => {
+                        if (e.target === e.currentTarget) closeDetail();
+                      }}
+                    >
+                      {detail}
+                    </div>,
+                    rootRef.current,
+                  )}
+                {toast && (
+                  <div
+                    className={"folia-toast folia-toast-" + toast.tone}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
+                    {toast.text}
+                  </div>
+                )}
+              </div>
+            </RelationCountsContext.Provider>
           </ContextsContext.Provider>
         </BoardActionsContext.Provider>
       </RepoContext.Provider>

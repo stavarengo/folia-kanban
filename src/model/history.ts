@@ -5,10 +5,11 @@
 // the move/reorder path (handled directly in board.ts/applyMove, not gated here) is the only
 // thing that emits history — none of the field/comment/subtask kinds below do.
 
-import type { HistoryScope } from "./types";
+import type { HistoryScope, RelationType } from "./types";
+import { relationLinkText } from "./relationships";
 
 /** Mutation kinds consulted by the gating policy (move/reorder is handled directly in applyMove). */
-export type HistoryEventKind = "priority" | "due" | "status" | "comment" | "subtask";
+export type HistoryEventKind = "priority" | "due" | "status" | "comment" | "subtask" | "relation";
 
 const SCOPE_RANK: Record<HistoryScope, number> = { moves: 1, structural: 2, all: 3 };
 
@@ -19,6 +20,9 @@ const EVENT_MIN_RANK: Record<HistoryEventKind, number> = {
   status: 2,
   comment: 3,
   subtask: 3,
+  // A relationship is a `[[wikilink]]` graph edge added and removed from the detail panel, exactly
+  // like a subcard link — so it is logged under the same scope, not the stricter `structural` one.
+  relation: 3,
 };
 
 /** Does `scope` permit a history line for `kind`? */
@@ -57,4 +61,14 @@ export function subtaskReopenedLine(text: string): string {
 }
 export function subtaskRemovedLine(text: string): string {
   return `Subtask removed: ${text}`;
+}
+
+/** How a relationship type reads at the start of a history line. */
+const RELATION_LABEL: Record<RelationType, string> = { blocks: "Blocks" };
+
+export function relationAddedLine(type: RelationType, target: string): string {
+  return `${RELATION_LABEL[type]} added: ${relationLinkText(target)}`;
+}
+export function relationRemovedLine(type: RelationType, target: string): string {
+  return `${RELATION_LABEL[type]} removed: ${relationLinkText(target)}`;
 }

@@ -12,6 +12,7 @@ import type {
   ColumnDef,
   ContextConfig,
   HistoryScope,
+  RelationType,
 } from "../src/model/types";
 import { buildBoard, deriveContext } from "../src/model/board";
 import {
@@ -31,6 +32,7 @@ import {
 } from "../src/model/card";
 
 import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
+import { relationKey, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {
   commentAddedLine,
@@ -39,6 +41,8 @@ import {
   dueLine,
   historyAllows,
   priorityLine,
+  relationAddedLine,
+  relationRemovedLine,
   statusLine,
   subtaskAddedLine,
   subtaskDoneLine,
@@ -222,6 +226,30 @@ export class FakeRepo implements CardRepository {
     const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
     this.entry(path).body = removeSubtask(this.entry(path).body, index);
     this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
+  }
+
+  private editRelations(
+    path: string,
+    type: RelationType,
+    rewrite: (fm: CardFrontmatter) => string[] | null,
+  ): boolean {
+    const fm = this.entry(path).fm;
+    const next = rewrite(fm);
+    if (next === null) return false;
+    const key = relationKey(type);
+    if (next.length === 0) delete fm[key];
+    else fm[key] = next;
+    return true;
+  }
+
+  async addRelation(path: string, type: RelationType, target: string): Promise<void> {
+    if (this.editRelations(path, type, (fm) => withRelation(fm, type, target)))
+      this.maybeHistory(path, "relation", relationAddedLine(type, target));
+  }
+
+  async removeRelation(path: string, type: RelationType, target: string): Promise<void> {
+    if (this.editRelations(path, type, (fm) => withoutRelation(fm, type, target)))
+      this.maybeHistory(path, "relation", relationRemovedLine(type, target));
   }
 
   async createCard(title: string, status: string): Promise<string> {

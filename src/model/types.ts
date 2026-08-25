@@ -69,6 +69,41 @@ export interface CardStats {
 /** How aggressively non-move mutations append `## History` lines. Default `'moves'`. */
 export type HistoryScope = "moves" | "structural" | "all";
 
+/**
+ * The relationship vocabulary: a typed, NON-hierarchical link between two cards (parentage stays
+ * the `## Subtasks` checklist and is not a relationship type). Only `blocks` exists today; every
+ * link carries its type so a second one is additive rather than a reshape of what this version
+ * writes into people's notes.
+ */
+export type RelationType = "blocks";
+
+/**
+ * Where a link was declared, which decides whether the card showing it may also remove it.
+ *
+ * `own` — this card's own frontmatter holds it, so removing it is a write to this note.
+ * `inverse` — the OTHER card declared it, so it is shown here but only that note can drop it.
+ */
+type RelationSource = "own" | "inverse";
+
+/** One end of a relationship, as one card sees it. */
+export interface RelationLink {
+  type: RelationType;
+  /** The link text as the note holds it, e.g. `Other card` out of `[[Other card]]`. */
+  target: string;
+  /** Vault path of the card the target resolves to, or `null` when no card on the board matches. */
+  path: string | null;
+  source: RelationSource;
+}
+
+// Only referenced by Card below (not imported elsewhere), so kept module-private.
+/** Both directions of a card's relationships, already resolved against the board. */
+interface CardRelations {
+  /** Cards this one blocks (outgoing) — the direction that is written to frontmatter. */
+  blocks: RelationLink[];
+  /** Cards blocking this one (incoming) — derived at load time, never written. */
+  blockedBy: RelationLink[];
+}
+
 /** A card as the board needs it: identity + frontmatter + the child links it declares. */
 export interface Card {
   /** Vault-relative path, e.g. "Cards/My task.md". */
@@ -90,6 +125,12 @@ export interface Card {
    * a card directly in the card folder has no context. Fed by `deriveContext` during load.
    */
   context?: string;
+  /**
+   * Typed relationships to other cards, both directions, resolved against the board. Filled by
+   * `buildBoard` from the `blocks` / `blocked-by` frontmatter keys — derived, never written back
+   * as a whole (only the outgoing `blocks` list is ever written, by the card that declares it).
+   */
+  relations?: CardRelations;
 }
 
 /**

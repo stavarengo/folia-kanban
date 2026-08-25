@@ -9,6 +9,7 @@ import type {
   ColumnDef,
   ContextConfig,
   HistoryScope,
+  RelationType,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import { buildBoard, resolveCardFolder } from "../model/board";
@@ -32,6 +33,7 @@ import {
   splitFrontmatter,
   updateTimestampedLine,
 } from "../model/card";
+import { relationKey, withRelation, withoutRelation } from "../model/relationships";
 import {
   commentAddedLine,
   commentEditedLine,
@@ -39,6 +41,8 @@ import {
   dueLine,
   historyAllows,
   priorityLine,
+  relationAddedLine,
+  relationRemovedLine,
   statusLine,
   subtaskAddedLine,
   subtaskDoneLine,
@@ -370,6 +374,47 @@ export class VaultRepository implements CardRepository {
       parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
     await this.editBody(path, (t) => removeSubtaskText(t, index));
     await this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
+  }
+
+  /**
+   * Rewrite a card's stored list for one relationship type, INSIDE the frontmatter write.
+   *
+   * The read-modify-write happens in the `processFrontMatter` callback rather than against a
+   * `cachedRead` snapshot taken before it, so two edits landing back to back add up instead of
+   * clobbering each other (the same reason `rememberPriorities` merges inside its write). Returns
+   * whether anything actually changed, so an already-declared link writes no history line.
+   */
+  private async editRelations(
+    path: string,
+    type: RelationType,
+    rewrite: (fm: Record<string, unknown>) => string[] | null,
+  ): Promise<boolean> {
+    const key = relationKey(type);
+    let changed = false;
+    this.markWrite(path);
+    await this.app.fileManager.processFrontMatter(
+      this.file(path),
+      (fm: Record<string, unknown>) => {
+        const next = rewrite(fm);
+        if (next === null) return;
+        // An empty list means the card declares no such relationship any more, so the key goes
+        // with it — the note is left as if it had never had one, not carrying a `blocks: []`.
+        if (next.length === 0) delete fm[key];
+        else fm[key] = next;
+        changed = true;
+      },
+    );
+    return changed;
+  }
+
+  async addRelation(path: string, type: RelationType, target: string): Promise<void> {
+    const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, target));
+    if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, target));
+  }
+
+  async removeRelation(path: string, type: RelationType, target: string): Promise<void> {
+    const changed = await this.editRelations(path, type, (fm) => withoutRelation(fm, type, target));
+    if (changed) await this.maybeHistory(path, "relation", relationRemovedLine(type, target));
   }
 
   private async uniquePath(folder: string, title: string): Promise<string> {

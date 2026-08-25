@@ -2,7 +2,14 @@
 // tests use an in-memory fake. Keeping the UI behind this interface is what lets us
 // verify board behaviour headlessly.
 
-import type { Board, CardBody, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
+import type {
+  Board,
+  CardBody,
+  CardFrontmatter,
+  ColumnDef,
+  ContextConfig,
+  RelationType,
+} from "./types";
 import type { CardMutation } from "./board";
 
 export interface CardRepository {
@@ -37,6 +44,18 @@ export interface CardRepository {
   addTodo(path: string, text: string): Promise<void>;
   toggleSubtask(path: string, index: number, done: boolean): Promise<void>;
   removeSubtask(path: string, index: number): Promise<void>;
+
+  /**
+   * Declare a relationship FROM this card TO `target` (a wikilink target, e.g. another card's
+   * file name). Only the declaring end is written — the inverse is derived when the board loads,
+   * so the two ends can never drift apart. A relationship the card already declares is a no-op.
+   */
+  addRelation(path: string, type: RelationType, target: string): Promise<void>;
+  /**
+   * Drop a relationship this card declares. A target it does not declare is a no-op — in
+   * particular, a card cannot remove a link the OTHER note declared about it.
+   */
+  removeRelation(path: string, type: RelationType, target: string): Promise<void>;
 
   /** Create a new top-level card in a column. Returns its path. */
   createCard(title: string, status: string): Promise<string>;

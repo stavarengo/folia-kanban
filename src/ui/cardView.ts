@@ -1,6 +1,7 @@
 // Pure helpers that turn a card's data into the little chips shown on its board card.
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D) or a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones.
+import type { RelationCounts } from "../model/board";
 import { dedupePriorities, priorityIndex } from "../model/priorities";
 import type { Card, ColumnGroup, ColumnSort } from "../model/types";
 import type { IconName } from "./icons";
@@ -553,6 +554,39 @@ export function groupAndSortCards(
     }
   }
   return out;
+}
+
+/**
+ * The blocking markers a card shows, from its ACTIVE link counts (see `relationCounts`). Two
+ * distinct chips, because the two directions mean opposite things: "Blocked" is a reason this card
+ * cannot move yet, "Blocks n" is a reason other cards cannot. Neither enforces anything — the
+ * board still lets any card go anywhere; these only make the dependency visible.
+ *
+ * Separate from {@link cardChips} because the counts come from the board graph rather than the
+ * card's own frontmatter, and the two reach the card tile by different routes.
+ */
+export function relationChips(counts: RelationCounts | undefined): CardChip[] {
+  if (!counts) return [];
+  const chips: CardChip[] = [];
+  if (counts.blockedBy > 0) {
+    chips.push({
+      key: "blocked-by",
+      label: "Blocked",
+      tone: "danger",
+      icon: "ban",
+      title: `Blocked by ${counts.blockedBy} unfinished card${counts.blockedBy === 1 ? "" : "s"}`,
+    });
+  }
+  if (counts.blocks > 0) {
+    chips.push({
+      key: "blocks",
+      label: `Blocks ${counts.blocks}`,
+      tone: "accent",
+      icon: "octagon-alert",
+      title: `Blocking ${counts.blocks} unfinished card${counts.blocks === 1 ? "" : "s"}`,
+    });
+  }
+  return chips;
 }
 
 export function cardChips(card: Card, today: string, doneColumnId: string | null): CardChip[] {

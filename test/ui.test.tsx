@@ -1663,3 +1663,139 @@ describe("cross-column make-room (live relocation gap)", () => {
     expect(repo.files.get("Tasks/Alpha.md")!.fm.status).toBe("todo");
   });
 });
+
+describe("blocking relationships", () => {
+  // History scope "all" (the shipped default) so the relationship history lines are in play.
+  function blockRepo() {
+    return new FakeRepo(
+      config,
+      {
+        "Tasks/Blocker.md": {
+          fm: { type: "task", status: "todo", blocks: ["[[Waiting]]"] },
+          body: "\n# Blocker\n",
+        },
+        "Tasks/Waiting.md": { fm: { type: "task", status: "doing" }, body: "\n# Waiting\n" },
+        "Tasks/Loose.md": { fm: { type: "task", status: "todo" }, body: "\n# Loose\n" },
+      },
+      () => "all",
+    );
+  }
+
+  // The detail panel repeats the card's title, so pick the occurrence that is a board tile.
+  const cardOf = (title: string) =>
+    screen
+      .getAllByText(title)
+      .map((el) => el.closest(".folia-card"))
+      .find((el): el is HTMLElement => el !== null) as HTMLElement;
+
+  it("marks the blocked card and the blocker with distinct chips", async () => {
+    render_(blockRepo());
+    await screen.findByText("Blocker");
+    expect(within(cardOf("Waiting")).getByText("Blocked")).toHaveClass("folia-chip-danger");
+    expect(within(cardOf("Blocker")).getByText("Blocks 1")).toHaveClass("folia-chip-accent");
+    // A card in neither direction stays clean.
+    expect(within(cardOf("Loose")).queryByText("Blocked")).toBeNull();
+  });
+
+  it("stops marking the pair once the blocker is done", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Blocker.md": {
+        fm: { type: "task", status: "done", blocks: ["[[Waiting]]"] },
+        body: "\n# Blocker\n",
+      },
+      "Tasks/Waiting.md": { fm: { type: "task", status: "doing" }, body: "\n# Waiting\n" },
+    });
+    render_(repo);
+    await screen.findByText("Waiting");
+    expect(within(cardOf("Waiting")).queryByText("Blocked")).toBeNull();
+  });
+
+  it("shows both directions in the detail panel and navigates to the linked card", async () => {
+    const user = userEvent.setup();
+    render_(blockRepo());
+    await user.click(await screen.findByText("Waiting"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByRole("heading", { name: "Blocked by" })).toBeInTheDocument();
+    // "Blocked by" is derived, so its rows carry no remove control.
+    const row = within(detail).getByRole("button", { name: "Blocker" });
+    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+    await user.click(row);
+    expect(await screen.findByRole("heading", { name: "Blocker" })).toBeInTheDocument();
+  });
+
+  it("adds a blocking link from the detail panel, writing only the blocker's frontmatter", async () => {
+    const user = userEvent.setup();
+    const repo = blockRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("Add a card this one blocks");
+    await user.type(input, "Waiting{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toEqual(["[[Waiting]]"]),
+    );
+    // Only the declaring end is written; the inverse stays derived.
+    expect(repo.files.get("Tasks/Waiting.md")!.fm["blocked-by"]).toBeUndefined();
+    // Default history scope is "all", so the change is recorded.
+    expect(repo.files.get("Tasks/Loose.md")!.body).toContain("Blocks added: [[Waiting]]");
+  });
+
+  it("removes a link the card declares, dropping the key when the last one goes", async () => {
+    const user = userEvent.setup();
+    const repo = blockRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Blocker"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(within(detail).getByLabelText("Remove relationship to Waiting"));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Blocker.md")!.fm).not.toHaveProperty("blocks"),
+    );
+    expect(repo.files.get("Tasks/Blocker.md")!.body).toContain("Blocks removed: [[Waiting]]");
+  });
+
+  it("reads a hand-written blocked-by as the same edge, and says where it is declared", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Blocker.md": { fm: { type: "task", status: "todo" }, body: "\n# Blocker\n" },
+      "Tasks/Waiting.md": {
+        fm: { type: "task", status: "doing", "blocked-by": ["[[Blocker]]"] },
+        body: "\n# Waiting\n",
+      },
+    });
+    render_(repo);
+    await screen.findByText("Blocker");
+    expect(within(cardOf("Blocker")).getByText("Blocks 1")).toBeInTheDocument();
+    // The blocker's own "Blocks" list shows it, but points at where it is declared instead of
+    // offering a remove button it could not honour.
+    await user.click(screen.getByText("Blocker"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("via blocked-by")).toBeInTheDocument();
+    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+  });
+
+  it("shows a target that matches no card as missing rather than dropping it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Loose.md": {
+        fm: { type: "task", status: "todo", blocks: ["[[Ghost]]"] },
+        body: "\n# Loose\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("Ghost")).toHaveClass("folia-link-missing");
+    // Nothing on the board is actually waiting, so the tile stays unmarked.
+    expect(within(cardOf("Loose")).queryByText(/^Blocks/)).toBeNull();
+  });
+
+  it("keeps the relationship keys out of the generic property rows and the add form", async () => {
+    const user = userEvent.setup();
+    render_(blockRepo());
+    await user.click(await screen.findByText("Blocker"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).queryByLabelText("Value of blocks")).toBeNull();
+    await user.type(within(detail).getByLabelText("New property name"), "blocks");
+    expect(within(detail).getByRole("button", { name: "Add property" })).toBeDisabled();
+  });
+});

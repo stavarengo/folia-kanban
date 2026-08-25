@@ -39,6 +39,15 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 | `04-tune-the-search-index.md` | Tune the search index | the filename is a numbered slug, so the first heading that looks like a real title wins |
 | `Ship the release notes.md` | Cut the 1.0 release notes | a `title:` key in the card's own frontmatter beats every other source |
 
+**Blocking relationships** — two cards show the two ways a blocking link can be written, and the plugin treats them as the same thing:
+
+| Card file | Property | What you see |
+| --- | --- | --- |
+| `Decide the export format.md` | `blocks: ["[[Draft the announcement post]]"]` | this tile shows *Blocks 1*; `Draft the announcement post` shows *Blocked* and lists this card under a read-only **Blocked by** |
+| `Record the launch demo.md` | `blocked-by: ["[[Fix keyboard-drag focus bug]]"]` | the same edge stated from the other end — the bug card shows *Blocks 1*, with nothing written to it |
+
+Open either card's detail panel: the **Blocks** field adds and removes links (type to get suggestions from the board's own cards), while **Blocked by** is derived and read-only. The plugin only ever writes the `blocks` end, so the pair cannot fall out of sync; a `blocked-by` you wrote by hand stays exactly as you wrote it. A marker fades once either end reaches **Done** — finished work neither waits nor holds anything up. Nothing is enforced: drag a *Blocked* card wherever you like.
+
 **A note written under its own headings** — `Decide the export format.md` keeps its whole body under `## Question` and `## Answer`, the shape an issue-style note (or an agent) tends to produce. Open it: the Description box shows all of it, headings and all, because a card's description is everything between the title and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Edit the description and save, and that structure comes back unchanged.
 
 ## Things to try (features you can't see in a static file)

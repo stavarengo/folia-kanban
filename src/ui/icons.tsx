@@ -18,7 +18,9 @@ export type IconName =
   | "calendar"
   | "alert"
   | "more"
-  | "inbox";
+  | "inbox"
+  | "ban"
+  | "octagon-alert";
 
 const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M5 12h14M12 5v14" />,
@@ -85,6 +87,18 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="1" />
       <circle cx="19" cy="12" r="1" />
       <circle cx="5" cy="12" r="1" />
+    </>
+  ),
+  ban: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m5.6 5.6 12.8 12.8" />
+    </>
+  ),
+  "octagon-alert": (
+    <>
+      <path d="M8.3 2h7.4L22 8.3v7.4L15.7 22H8.3L2 15.7V8.3Z" />
+      <path d="M12 8v4M12 16h.01" />
     </>
   ),
   inbox: (

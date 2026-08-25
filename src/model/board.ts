@@ -4,7 +4,16 @@
 // checklist links to it (`- [ ] [[Child]]`). We invert those links to derive parent-of and
 // the top-level set. No `parent` frontmatter, so re-parenting is one write and can't desync.
 
-import type { Board, BoardConfig, Card, CardFrontmatter, ColumnDef, ContextConfig } from "./types";
+import type {
+  Board,
+  BoardConfig,
+  Card,
+  CardFrontmatter,
+  ColumnDef,
+  ContextConfig,
+  RelationLink,
+} from "./types";
+import { readBlockedBy, readRelations } from "./relationships";
 
 /** The folder a vault path lives in — `""` for a note sitting at the vault root. */
 function parentFolder(path: string): string {
@@ -175,6 +184,77 @@ function isGenuinelyNested(path: string, parentOf: Record<string, string>): bool
   return true;
 }
 
+/**
+ * Resolve every `blocks` / `blocked-by` declaration into the two directions each card sees, and
+ * hang the result on the cards themselves (the `context` precedent).
+ *
+ * The two keys describe the SAME kind of edge from opposite ends, so both are read into one graph
+ * and an edge declared from both ends is kept once. `source` records which note declared it, which
+ * is what tells the detail panel whether the card in front of you may remove the link or only
+ * report it. A card cannot block itself: a self-link is dropped rather than shown as both a
+ * blocker and a blocked card.
+ */
+function buildRelations(
+  cards: Card[],
+  byBasename: Map<string, string[]>,
+  cardsByPath: Record<string, Card>,
+): void {
+  const blocks: Record<string, RelationLink[]> = {};
+  const blockedBy: Record<string, RelationLink[]> = {};
+  const seen = new Set<string>();
+  // One end of an edge, for dedupe: its card path, or the raw target when nothing resolved (so
+  // two notes pointing at the same missing card still count as one edge).
+  const endKey = (path: string | null, target: string) => path ?? "?" + target.toLowerCase();
+
+  const addEdge = (
+    blocker: { path: string | null; target: string },
+    blocked: { path: string | null; target: string },
+    declaredBy: "blocker" | "blocked",
+  ) => {
+    if (blocker.path !== null && blocker.path === blocked.path) return; // no card blocks itself
+    const key = endKey(blocker.path, blocker.target) + ">" + endKey(blocked.path, blocked.target);
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (blocker.path !== null) {
+      (blocks[blocker.path] ??= []).push({
+        type: "blocks",
+        target: blocked.target,
+        path: blocked.path,
+        source: declaredBy === "blocker" ? "own" : "inverse",
+      });
+    }
+    if (blocked.path !== null) {
+      (blockedBy[blocked.path] ??= []).push({
+        type: "blocks",
+        target: blocker.target,
+        path: blocker.path,
+        source: declaredBy === "blocked" ? "own" : "inverse",
+      });
+    }
+  };
+
+  for (const c of cards) {
+    for (const target of readRelations(c.frontmatter, "blocks")) {
+      addEdge(
+        { path: c.path, target: c.basename },
+        { path: resolveLink(target, byBasename, cardsByPath), target },
+        "blocker",
+      );
+    }
+    for (const target of readBlockedBy(c.frontmatter)) {
+      addEdge(
+        { path: resolveLink(target, byBasename, cardsByPath), target },
+        { path: c.path, target: c.basename },
+        "blocked",
+      );
+    }
+  }
+
+  for (const c of cards) {
+    c.relations = { blocks: blocks[c.path] ?? [], blockedBy: blockedBy[c.path] ?? [] };
+  }
+}
+
 export function buildBoard(
   config: BoardConfig,
   cards: Card[],
@@ -196,6 +276,8 @@ export function buildBoard(
 
   const cardsByPath: Record<string, Card> = {};
   for (const c of cards) cardsByPath[c.path] = c;
+
+  buildRelations(cards, byBasename, cardsByPath);
 
   const parentOf: Record<string, string> = {};
   for (const c of cards) {
@@ -241,6 +323,42 @@ export function buildBoard(
   }
 
   return { config, columns, cards: cardsByPath, parentOf, childrenOf, contexts };
+}
+
+/** How many ACTIVE blocking links a card has in each direction (see {@link relationCounts}). */
+export interface RelationCounts {
+  /** Cards it is holding up. */
+  blocks: number;
+  /** Cards holding it up. */
+  blockedBy: number;
+}
+
+/**
+ * The blocking links worth showing a marker for, per card path. Only paths with at least one are
+ * present, so a lookup that misses means "nothing to show".
+ *
+ * A link counts while NEITHER end sits in the board's done column: a card is not held up by
+ * something already finished, and a finished card is not holding anything up. Unresolved targets
+ * never count — there is no card to be waiting on. This is presentation only; nothing about it
+ * restricts what a card may do, which stays true to the board's nudge-never-block posture.
+ */
+export function relationCounts(
+  board: Board,
+  doneColumnId: string | null,
+): Record<string, RelationCounts> {
+  const isDone = (path: string) =>
+    doneColumnId !== null && board.cards[path]?.frontmatter.status === doneColumnId;
+  const out: Record<string, RelationCounts> = {};
+  for (const [path, card] of Object.entries(board.cards)) {
+    if (isDone(path)) continue;
+    const relations = card.relations;
+    if (!relations) continue;
+    const live = (links: RelationLink[]) =>
+      links.filter((l) => l.path !== null && !isDone(l.path)).length;
+    const counts = { blocks: live(relations.blocks), blockedBy: live(relations.blockedBy) };
+    if (counts.blocks > 0 || counts.blockedBy > 0) out[path] = counts;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

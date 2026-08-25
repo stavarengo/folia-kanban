@@ -35,6 +35,8 @@ status: doing        # which column
 order: 2.5           # position within the column (fractional)
 priority: A
 due: 2026-06-15
+blocks:               # cards this one holds up (the inverse is derived, never written)
+  - "[[Another Card]]"
 ---
 
 # Card title
@@ -55,6 +57,8 @@ Description text…
 
 The description is everything between the title heading and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Headings of your own — `## Question`, `## Answer`, anything the note needs — sit inside it and are shown and saved verbatim, so a note written under its own structure keeps that structure when you edit it from the panel. Two limits are worth knowing: those three names belong to the plugin, so typing one into the Description box starts a real section rather than a heading of your own; and anything you wrote *after* a section the plugin owns stays safely on disk but is not part of the description. The flip side of the box owning that whole region is that emptying the box empties your own sections with it.
 
+Blocking works the same way — one end declares it. `blocks` lists the cards this one holds up; the card on the other end shows a read-only **Blocked by** entry the board derives when it loads, so the two ends cannot drift apart. A `blocked-by` list written by hand is read as the same relationship stated from the other side, and is left exactly as you wrote it. Both are markers, not rules: a blocked card can still be dragged anywhere, in keeping with the board nudging rather than refusing.
+
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
 
 The card's displayed title usually is the file name, but that `# Card title` heading can take over when the file name is a slug — see [Where card titles come from](#where-card-titles-come-from).
@@ -66,9 +70,10 @@ The card's displayed title usually is the file name, but that `# Card title` hea
 - **Next actions on the card** — optionally surface the next *N* unchecked todos inline, so the board shows the next step without opening anything.
 - **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date and your **custom properties** (area, energy, …), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority is a free-text combobox that suggests [your board's own scale](#priorities-are-your-scale-not-ours), never one the plugin picked for you.
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
+- **Blocking relationships** — say that one card blocks another with a `blocks: ["[[Other card]]"]` list. The detail panel adds and removes them with suggestions from the board's own cards, and shows the derived **Blocked by** side; the tiles get a *Blocked* / *Blocks n* marker while both ends are unfinished. Typed from the start, so other kinds of link can follow. It marks, it never refuses a move.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
 - **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.
-- **Soft WIP limits** — set a per-column limit; the board nudges (never blocks) when you go over.
+- **Soft WIP limits** — set a per-column limit; the board nudges (never refuses) when you go over.
 - **In-app column management** — add, rename, recolour, set limits, reorder and delete columns; changes are written back to the board note's `columns` frontmatter.
 - **Relative due dates** — *Today*, *Tomorrow*, *in 3d*, *Yesterday*, with overdue cards flagged.
 - **Comments** and auto-generated **history**, appended to the card file with timestamps.
@@ -165,7 +170,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **Add-card button — flow** — `inline` (add in the column), `inline-edit` (add, then open the new card's details), or `detail` (open a details form to create).
 - **Add-card — open new card's details as** — which presentation to use for the two detail-opening add flows.
 - **Card — next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
-- **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments and subtasks).
+- **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
 
 ## Keyboard & mouse
 

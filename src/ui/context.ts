@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { RelationCounts } from "../model/board";
 import type { CardRepository } from "../model/repo";
 import type { ColumnDef, ContextConfig } from "../model/types";
 import type { KanbanSettings } from "../settings";
@@ -21,6 +22,17 @@ export const ContextsContext = createContext<Record<string, ContextConfig>>({});
 
 export function useContexts(): Record<string, ContextConfig> {
   return useContext(ContextsContext);
+}
+
+/**
+ * Active blocking-link counts per card path, provided by App. Lives in its own React context, not
+ * a CardItem prop, for the same reason the contexts map does: the count on card A changes when
+ * card B is edited, and A's own memoized props are untouched by that edit.
+ */
+export const RelationCountsContext = createContext<Record<string, RelationCounts>>({});
+
+export function useRelationCounts(): Record<string, RelationCounts> {
+  return useContext(RelationCountsContext);
 }
 
 export function useRepo(): CardRepository {
