@@ -77,7 +77,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     // gains or loses the button, but the tab is never swapped out from under the user.
     this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
     this.app.workspace.onLayoutReady(() => {
-      this.sweepRestoredLeaves();
+      this.adoptRestoredLeaves();
       this.syncMarkdownActions();
     });
   }
@@ -122,17 +122,18 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   /**
-   * Tabs restored from a saved layout never pass through the patch above: the workspace is
-   * rebuilt before the metadata cache can answer "is this a board". Catch them once, when the
-   * layout is ready. Reading the leaf's view *state* rather than its view matters, because a
-   * background tab is deferred and has no `MarkdownView` to inspect yet.
+   * A tab that is *already* showing a board note as Markdown when we load keeps showing it that
+   * way. Obsidian saves a board tab as the board and a Markdown tab as Markdown, so a restored
+   * Markdown tab means the user put it there — by the toggle, or under a different setting — and
+   * a restart is not a reason to overrule them. Adopting those tabs as pinned also covers the
+   * moment a background tab is finally loaded, which would otherwise reach the patch above with
+   * no memory of the choice. Reading the leaf's view *state* rather than its view matters,
+   * because a background tab is deferred and has no `MarkdownView` to inspect yet.
    */
-  private sweepRestoredLeaves(): void {
+  private adoptRestoredLeaves(): void {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       const filePath = leaf.getViewState().state?.["file"];
-      if (typeof filePath !== "string") continue;
-      if (!this.shouldOpenAsBoard(filePath)) continue;
-      void this.showBoardIn(leaf, filePath, false);
+      if (typeof filePath === "string") this.markdownPins.set(leaf, filePath);
     }
   }
 
