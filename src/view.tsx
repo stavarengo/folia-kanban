@@ -87,6 +87,9 @@ export class KanbanView extends FileView {
     await super.onUnloadFile(file);
     this.repo = null;
     this.repoPath = null;
+    // Drop the old board from the screen too, so nothing is left rendering against a repository
+    // that is gone. Only when a root already exists — during teardown there is nothing to draw.
+    if (this.root) this.renderApp();
   }
 
   override async onOpen(): Promise<void> {

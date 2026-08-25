@@ -29,17 +29,23 @@ interface NavigableViewState extends ViewState {
   popstate?: boolean;
 }
 
+/** The only thing the prototype patch below closes over. Everything it needs to decide sits
+ *  behind this one field, so unloading the plugin can cut the link: a wrapper we were unable to
+ *  remove is then inert *and* holds nothing, instead of pinning the whole plugin in memory. */
+interface PatchState {
+  redirectToBoard: ((leaf: WorkspaceLeaf, filePath: string) => boolean) | null;
+}
+
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
 
-  /** Leaves the user has deliberately switched to the Markdown editor, and the file they did it
-   *  for. Keyed on the leaf itself so the entry dies with the tab, and scoped to the file so
-   *  opening a *different* board in that same tab still lands on the board. */
-  private markdownPins = new WeakMap<WorkspaceLeaf, string>();
+  /** Set only for the instant the toggle spends swapping a tab to the Markdown editor, so the
+   *  patch below lets that one call through instead of bouncing it straight back to the board.
+   *  Deliberately not durable state: which view a tab is in is a question the workspace already
+   *  answers, and a second copy of that answer is a second copy to get wrong. */
+  private pendingMarkdown: string | null = null;
 
-  /** The prototype patch outlives `onunload` if another plugin wrapped it after us; this makes
-   *  the wrapper a pass-through instead of leaving a board-hijacking stub behind. */
-  private patchActive = true;
+  private readonly patchState: PatchState = { redirectToBoard: null };
 
   override async onload(): Promise<void> {
     await this.loadSettings();
@@ -79,10 +85,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     // Without this, disabling the plugin leaves its buttons in the headers of open notes, still
     // clickable, still calling into a view type Obsidian no longer knows about.
     this.register(() => this.removeMarkdownActions());
-    this.app.workspace.onLayoutReady(() => {
-      this.adoptRestoredLeaves();
-      this.syncMarkdownActions();
-    });
+    this.app.workspace.onLayoutReady(() => this.syncMarkdownActions());
   }
 
   /**
@@ -93,11 +96,13 @@ export default class FoliaKanbanPlugin extends Plugin {
    * the same approach the Kanban and Excalidraw community plugins use.
    */
   private patchLeafSetViewState(): void {
-    // Arrows, not a `this` alias: the wrapper must be a `function` so `this` stays the leaf.
-    const isPinnedToMarkdown = (leaf: WorkspaceLeaf, filePath: string): boolean =>
-      this.markdownPins.get(leaf) === filePath;
-    const shouldOpenAsBoard = (filePath: string): boolean => this.shouldOpenAsBoard(filePath);
-    const isPatchActive = (): boolean => this.patchActive;
+    const patchState = this.patchState;
+    // An arrow, so the wrapper below can stay a `function` and keep `this` as the leaf.
+    patchState.redirectToBoard = (leaf, filePath) =>
+      this.pendingMarkdown !== filePath &&
+      this.isEditingSurface(leaf) &&
+      this.shouldOpenAsBoard(filePath);
+
     const leafProto = WorkspaceLeaf.prototype;
     const original = leafProto.setViewState;
     const patched = function (
@@ -107,11 +112,9 @@ export default class FoliaKanbanPlugin extends Plugin {
     ): Promise<void> {
       const filePath = state.state?.["file"];
       if (
-        isPatchActive() &&
         state.type === "markdown" &&
         typeof filePath === "string" &&
-        !isPinnedToMarkdown(this, filePath) &&
-        shouldOpenAsBoard(filePath)
+        patchState.redirectToBoard?.(this, filePath) === true
       ) {
         return original.call(this, { ...state, type: VIEW_TYPE_KANBAN }, eState);
       }
@@ -119,25 +122,10 @@ export default class FoliaKanbanPlugin extends Plugin {
     };
     leafProto.setViewState = patched;
     this.register(() => {
-      this.patchActive = false;
+      // Go inert first: if another plugin wrapped us, the restore below cannot take effect.
+      patchState.redirectToBoard = null;
       if (leafProto.setViewState === patched) leafProto.setViewState = original;
     });
-  }
-
-  /**
-   * A tab that is *already* showing a board note as Markdown when we load keeps showing it that
-   * way. Obsidian saves a board tab as the board and a Markdown tab as Markdown, so a restored
-   * Markdown tab means the user put it there — by the toggle, or under a different setting — and
-   * a restart is not a reason to overrule them. Adopting those tabs as pinned also covers the
-   * moment a background tab is finally loaded, which would otherwise reach the patch above with
-   * no memory of the choice. Reading the leaf's view *state* rather than its view matters,
-   * because a background tab is deferred and has no `MarkdownView` to inspect yet.
-   */
-  private adoptRestoredLeaves(): void {
-    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      const filePath = leaf.getViewState().state?.["file"];
-      if (typeof filePath === "string") this.markdownPins.set(leaf, filePath);
-    }
   }
 
   /** Give every open board note's Markdown editor a "back to the board" header button — and
@@ -171,7 +159,6 @@ export default class FoliaKanbanPlugin extends Plugin {
   async showBoardIn(leaf: WorkspaceLeaf, filePath: string, focus: boolean): Promise<void> {
     // Flush whatever the user typed before the editor goes away.
     if (leaf.view instanceof MarkdownView) await leaf.view.save();
-    this.markdownPins.delete(leaf);
     const state: NavigableViewState = {
       type: VIEW_TYPE_KANBAN,
       state: { file: filePath },
@@ -180,16 +167,19 @@ export default class FoliaKanbanPlugin extends Plugin {
     await leaf.setViewState(state, focus ? { focus: true } : undefined);
   }
 
-  /** Swap a tab to the Markdown editor, same leaf, same file, and remember that choice so the
-   *  patch above does not immediately bounce it back to the board. */
+  /** Swap a tab to the Markdown editor, same leaf, same file. */
   async showMarkdownIn(leaf: WorkspaceLeaf, filePath: string): Promise<void> {
-    this.markdownPins.set(leaf, filePath);
     const state: NavigableViewState = {
       type: "markdown",
       state: { file: filePath },
       popstate: true,
     };
-    await leaf.setViewState(state, { focus: true });
+    this.pendingMarkdown = filePath;
+    try {
+      await leaf.setViewState(state, { focus: true });
+    } finally {
+      this.pendingMarkdown = null;
+    }
     this.syncMarkdownActions();
   }
 
