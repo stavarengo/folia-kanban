@@ -834,13 +834,17 @@
 .folia-card--subitem {
   border-left: 2px dashed color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 60%, transparent);
 }
+/* Sits BELOW `.folia-card-main` rather than inside it (that div is the drag handle and carries
+   role="button"), pulled up tight against the card body and indented to its text. */
 .folia-card-parent-ref {
-  align-self: flex-start;
+  display: block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0;
+  margin: -5px 0 0;
+  padding: 0 12px 9px;
+  text-align: left;
   border: 0;
   box-shadow: none;
   background: transparent;

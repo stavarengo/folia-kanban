@@ -397,6 +397,40 @@ describe("card detail", () => {
     );
   });
 
+  it("offers no column for a subtask whose link names no card on the board", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Subtasks\n- [ ] [[Nowhere]]\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    // There is no note to write a status to, so the control says so rather than dropping a choice.
+    expect(within(detail).getByLabelText("Column for [[Nowhere]]")).toBeDisabled();
+  });
+
+  it("lets a claim naming no column of this board be selected away from", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Subtasks\n- [ ] Typo'd [status:: Doing]\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    const select = within(detail).getByLabelText("Column for Typo'd") as HTMLSelectElement;
+    // The board ignores `Doing` (no such column id), but the picker shows the note's own words —
+    // otherwise it would read as "With this card" and choosing that would fire nothing.
+    expect(select.value).toBe("Doing");
+    await user.selectOptions(select, "");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[ \] Typo'd\n/));
+  });
+
   it("navigates to a subcard via its link", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
@@ -1122,6 +1156,30 @@ describe("card context menu", () => {
     );
   });
 
+  it("keeps a placed todo's claim in step when its box is ticked from the menu", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] real one [status:: doing]\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    await screen.findByText("First", { selector: ".folia-card-title" });
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    fireEvent.contextMenu(within(doing).getByText("real one"));
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    // The menu shows what the LINE says, not where the tile happens to render.
+    expect(within(menu).getByRole("menuitemradio", { name: "Doing" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
+    // Ticking the box moves the claim with it — the tile never lands in a column its line denies.
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[x\] real one \[status:: done\]/),
+    );
+  });
+
   it("removes a todo from the todo menu", async () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
@@ -1832,6 +1890,32 @@ describe("blocking relationships", () => {
     expect(repo.files.get("Tasks/Waiting.md")!.fm["blocked-by"]).toBeUndefined();
     // Default history scope is "all", so the change is recorded.
     expect(repo.files.get("Tasks/Loose.md")!.body).toContain("Blocks added: [[Waiting]]");
+  });
+
+  it("keeps placed inline todos out of the blocking picker — they are lines, not notes", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Waiting.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Waiting\n\n## Subtasks\n- [ ] Write docs [status:: doing]\n",
+      },
+      "Tasks/Loose.md": { fm: { type: "task", status: "todo" }, body: "\n# Loose\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Loose", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("Add a card this one blocks") as HTMLInputElement;
+    const options = Array.from(input.list?.querySelectorAll("option") ?? []).map((o) => o.value);
+    // The subtask's own title is not a link target, and the note that owns it is still offered
+    // under its own name — the synthetic card borrows that name and must not make it ambiguous.
+    expect(options).toContain("Waiting");
+    expect(options).not.toContain("Write docs");
+    expect(options.some((o) => o.includes("#todo:"))).toBe(false);
+
+    await user.type(input, "Waiting{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toEqual(["[[Waiting]]"]),
+    );
   });
 
   it("removes a link the card declares, dropping the key when the last one goes", async () => {

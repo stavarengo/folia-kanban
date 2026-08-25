@@ -10,6 +10,7 @@ import {
   parseTodoPath,
   reassignColumn,
   relationCounts,
+  syncSubtaskClaim,
   resolveDrop,
 } from "../model/board";
 import { dateOnly } from "../model/dates";
@@ -369,6 +370,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         void (async () => {
           try {
             await repo.toggleSubtask(path, index, done);
+            // Ticking a box is also a statement about where the work belongs, for a line that
+            // claims a column: keep the claim and the checkbox from telling two stories. A second
+            // write rather than one, so the toggle keeps writing its own history line unchanged.
+            const b = boardRef.current;
+            const sync = b ? syncSubtaskClaim(b, path, index, done) : null;
+            if (sync) await repo.applyMove(sync);
           } catch (e) {
             reportError(e);
           } finally {

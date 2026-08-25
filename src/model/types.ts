@@ -74,8 +74,14 @@ export interface CardStats {
   /** Subcard-link checklist lines only (git-branch info). */
   subcards: number;
   comments: number;
-  /** The undone plain todos in document order, capped at the first 5 (inline display). `index` is
-   *  the `SubItem.index` (0-based among ALL checklist lines) so a rendered row can be toggled later. */
+  /**
+   * The outstanding plain todos in document order. `index` is the `SubItem.index` (0-based among
+   * ALL checklist lines) so a rendered row can be toggled later.
+   *
+   * Deliberately NOT capped here. `buildBoard` removes the ones standing in a column of their own,
+   * and a cap applied before that removal could empty the list of a card whose first few todos
+   * happen to be placed while others are still waiting. The render layer takes the first N.
+   */
   nextTodos: { text: string; index: number }[];
 }
 
@@ -146,11 +152,16 @@ export interface Card {
   subItems?: SubItem[];
   /**
    * Set ONLY on the synthetic cards `buildBoard` mints for an inline todo that sits in its own
-   * column: the file that owns the checklist line, and the line's `SubItem.index` inside it. Its
-   * `path` is synthetic (see `makeTodoPath`) and names no file, so every write path must route
-   * through the parent named here instead of treating `Card.path` as a vault path.
+   * column: the file that owns the checklist line, the line's `SubItem.index` inside it, and the
+   * `[status:: …]` value that line literally carries. Its `path` is synthetic (see `makeTodoPath`)
+   * and names no file, so every write path must route through the parent named here instead of
+   * treating `Card.path` as a vault path.
+   *
+   * `claim` is the line's own words, NOT where the tile renders — a checked line sits in the done
+   * column whatever it claims. A picker must show the claim, or choosing the column it already
+   * displays would silently rewrite the line to something else.
    */
-  todoRef?: { parentPath: string; index: number };
+  todoRef?: { parentPath: string; index: number; claim: string };
   /** Optional precomputed display stats (ignored by board logic). */
   stats?: CardStats;
   /**

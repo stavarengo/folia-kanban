@@ -197,20 +197,6 @@ function CardItemInner({
         ) : (
           <div className="folia-card-title">{card.title}</div>
         )}
-        {parentPath && (
-          <button
-            className="folia-card-parent-ref"
-            title={`Part of ${parentTitle ?? parentPath}`}
-            aria-label={`Part of ${parentTitle ?? parentPath}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              actions.open(parentPath);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <span aria-hidden="true">↳</span> {parentTitle ?? parentPath}
-          </button>
-        )}
         {(ctxLabel || chips.length > 0) && (
           <div className="folia-chips">
             {ctxLabel && (
@@ -278,6 +264,24 @@ function CardItemInner({
           </div>
         )}
       </div>
+
+      {/* Sibling of `.folia-card-main`, never inside it: that div carries `role="button"` (from the
+          drag attributes, or the explicit nested branch), and a button within it is unreachable to
+          assistive tech — the same reason the action cluster below lives out here. */}
+      {parentPath && (
+        <button
+          className="folia-card-parent-ref"
+          title={`Part of ${parentTitle ?? parentPath}`}
+          aria-label={`Part of ${parentTitle ?? parentPath}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.open(parentPath);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span aria-hidden="true">↳</span> {parentTitle ?? parentPath}
+        </button>
+      )}
 
       {showActions && (
         <div className="folia-card-actions">
@@ -360,7 +364,10 @@ function CardItemInner({
             <CardContextMenu
               target={menu}
               path={notePath}
-              todoColumn={todoRef ? String(fm.status ?? "") : ""}
+              // The line's OWN words, not where the tile renders: a checked line sits in the done
+              // column whatever it claims, and the menu must not offer to "move" it to the column
+              // it is already showing while quietly rewriting the line to something else.
+              todoColumn={todoRef?.claim ?? ""}
               priority={typeof fm.priority === "string" ? fm.priority : ""}
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
@@ -402,6 +409,7 @@ export const CardItem = memo(
     a.parentTitle === b.parentTitle &&
     a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
     a.card.todoRef?.index === b.card.todoRef?.index &&
+    a.card.todoRef?.claim === b.card.todoRef?.claim &&
     a.card.frontmatter.status === b.card.frontmatter.status &&
     (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
     sameStats(a.card.stats, b.card.stats),

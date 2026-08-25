@@ -30,9 +30,11 @@ function makeRepo() {
   return new FakeRepo(config, {
     "Tasks/Alpha.md": {
       fm: { type: "task", status: "todo", priority: "A", area: "home" },
-      body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
+      // `placed todo` and `[[Beta]]` both claim a column of their own, so the gate covers the tiles
+      // a subitem renders as out in a column — not only the nested rendering.
+      body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [ ] placed todo [status:: doing]\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- [2026-06-13 09:00] hi there\n",
     },
-    "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "\n# Beta\n" },
+    "Tasks/Beta.md": { fm: { type: "task", status: "done" }, body: "\n# Beta\n" },
     "Tasks/Gamma.md": {
       fm: { type: "task", status: "doing", due: "2026-06-01" },
       body: "\n# Gamma\n",
@@ -60,7 +62,8 @@ const summarize = (violations: Awaited<ReturnType<typeof axe>>["violations"]) =>
 describe("a11y axe gate (no violations)", () => {
   it("board view (columns + cards) has no axe violations", async () => {
     render_(makeRepo());
-    await screen.findByText("Alpha"); // board fully painted
+    // "Alpha" also appears on each placed subitem's `↳ parent` button, so anchor on the card title.
+    await screen.findByText("Alpha", { selector: ".folia-card-title" }); // board fully painted
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);
   }, 30000);
@@ -68,7 +71,7 @@ describe("a11y axe gate (no violations)", () => {
   it("card detail panel open has no axe violations", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
-    await user.click(await screen.findByText("Alpha"));
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     await screen.findByTestId("card-detail"); // detail surface mounted
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);

@@ -244,9 +244,11 @@ export function cardStats(text: string): CardStats {
     checklistDone: b.subtasks.filter((s) => s.done).length,
     subcards: b.subtasks.filter((s) => s.kind === "card").length,
     comments: b.comments.length,
+    // Every outstanding todo, uncapped: the board still has to drop the ones placed in a column of
+    // their own, and capping before that could hide todos that are genuinely waiting. The card tile
+    // shows the first `cardNextTodos` of what survives.
     nextTodos: b.subtasks
       .filter((s) => s.kind === "todo" && !s.done)
-      .slice(0, 5)
       .map((s) => ({ text: s.text, index: s.index })),
   };
 }

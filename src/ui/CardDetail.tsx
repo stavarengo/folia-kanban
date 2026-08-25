@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
+import { syncSubtaskClaim } from "../model/board";
 import { RELATION_KEYS } from "../model/relationships";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN } from "../settings";
 import { priorityOptions } from "./cardView";
@@ -206,25 +207,36 @@ function CommentItem({
 }
 
 function resolveBasename(board: Board, link: string): string | null {
-  for (const p in board.cards) if (board.cards[p]?.basename === link) return p;
+  for (const p in board.cards) {
+    const c = board.cards[p];
+    // Skip the synthetic cards minted for placed inline todos: they borrow their note's file name,
+    // so one would answer to a `[[wikilink]]` that names a real card.
+    if (c && !c.todoRef && c.basename === link) return p;
+  }
   return null;
 }
 
 /**
- * The value the per-subitem column picker shows: the column this line claims for itself, or `""`
- * for "with this card". Deliberately the CLAIM and not where the item renders — a checked todo
- * shows in the done column, but the picker must still say which column it would go back to when
- * reopened, or reopening would silently move it.
+ * What the per-subitem column picker is looking at: the column this line claims for itself, `""`
+ * for "with this card", and whether that claim names a column this board actually has.
+ *
+ * Deliberately the CLAIM and not where the item renders — a checked todo shows in the done column,
+ * but the picker must still say which column it would go back to when reopened, or reopening would
+ * silently move it. A claim naming no column (a typo, or one since renamed) is reported as it is
+ * written rather than flattened to "with this card": the board ignores such a value, but it is
+ * sitting in the note, and a picker that pretends it is absent is the one place it can never be
+ * removed from.
  */
-function subtaskColumn(board: Board, item: SubItem): string {
-  if (item.kind === "card") {
-    const child = item.link ? resolveBasename(board, item.link) : null;
-    const status = child ? String(board.cards[child]?.frontmatter.status ?? "") : "";
-    return board.config.columns.some((c) => c.id === status) ? status : "";
-  }
-  const status = item.status ?? "";
-  // A claim naming no column of this board is no claim at all, the way the board graph reads it.
-  return board.config.columns.some((c) => c.id === status) ? status : "";
+function subtaskColumn(board: Board, item: SubItem): { value: string; known: boolean } {
+  const raw =
+    item.kind === "card"
+      ? (() => {
+          const child = item.link ? resolveBasename(board, item.link) : null;
+          return child ? String(board.cards[child]?.frontmatter.status ?? "") : "";
+        })()
+      : (item.status ?? "");
+  if (raw === "") return { value: "", known: true };
+  return { value: raw, known: board.config.columns.some((c) => c.id === raw) };
 }
 
 // The frontmatter keys the panel edits through a dedicated control, so the generic property rows
@@ -332,11 +344,12 @@ const BLOCKED_BY_NOTES: Record<"own" | "inverse" | "both", { text: string; title
 function relationChoices(board: Board, selfPath: string): Map<string, string> {
   // A file name two cards share cannot be linked BY that name — the board refuses to bind it — so
   // such a card is offered as its full path instead, which names exactly one note.
+  // Only real notes: a placed inline todo is a checklist line, not a file. It borrows its note's
+  // file name, so counting it would make every card holding one look like two cards sharing a name
+  // — and offering it would write a link to a `#todo:` path that names nothing on disk.
+  const linkable = Object.values(board.cards).filter((c): c is Card => c != null && !c.todoRef);
   const nameCount = new Map<string, number>();
-  for (const p in board.cards) {
-    const c = board.cards[p];
-    if (c) nameCount.set(c.basename, (nameCount.get(c.basename) ?? 0) + 1);
-  }
+  for (const c of linkable) nameCount.set(c.basename, (nameCount.get(c.basename) ?? 0) + 1);
   const targetFor = (c: Card) =>
     (nameCount.get(c.basename) ?? 0) > 1 ? c.path.replace(/\.md$/i, "") : c.basename;
 
@@ -349,9 +362,8 @@ function relationChoices(board: Board, selfPath: string): Map<string, string> {
     // is one the field must not offer, whichever of them it would happen to pick.
     else if (seen.path !== card.path) ambiguous.add(label);
   };
-  for (const p in board.cards) {
-    const c = board.cards[p];
-    if (!c || p === selfPath) continue;
+  for (const c of linkable) {
+    if (c.path === selfPath) continue;
     offer(c.title, c);
     if (c.basename !== c.title) offer(c.basename, c);
     // A card whose file name another folder repeats is also offered under its path, which is
@@ -941,7 +953,15 @@ export function CardDetail({
                   type="checkbox"
                   checked={s.done}
                   aria-label={`Toggle ${s.text}`}
-                  onChange={() => void mutate(() => repo.toggleSubtask(path, s.index, !s.done))}
+                  onChange={() =>
+                    void mutate(async () => {
+                      await repo.toggleSubtask(path, s.index, !s.done);
+                      // Same rule the board's own toggle follows: a line that claims a column has
+                      // its claim moved with its checkbox, so the two never tell different stories.
+                      const sync = syncSubtaskClaim(board, path, s.index, !s.done);
+                      if (sync) await repo.applyMove(sync);
+                    })
+                  }
                 />
                 {s.kind === "card" && s.link ? (
                   (() => {
@@ -966,34 +986,48 @@ export function CardDetail({
                 )}
                 {/* Where this subitem sits on the board. One control, both kinds: a todo claims a
                     column on its own checklist line, a subcard through its note's own `status` —
-                    and either way "With this card" means "wherever this card is". */}
-                <select
-                  className="folia-subtask-column"
-                  aria-label={`Column for ${s.text}`}
-                  title="Column"
-                  value={subtaskColumn(board, s)}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (s.kind === "card") {
-                      const child = s.link ? resolveBasename(board, s.link) : null;
-                      if (!child) return;
-                      void mutate(() =>
-                        value === ""
-                          ? repo.unsetFrontmatterKey(child, "status")
-                          : repo.setFrontmatter(child, { status: value }),
-                      );
-                      return;
-                    }
-                    actions.moveTodo(path, s.index, value === "" ? null : value);
-                  }}
-                >
-                  <option value="">With this card</option>
-                  {board.config.columns.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-                </select>
+                    and either way "With this card" means "wherever this card is". A subtask whose
+                    link names no card on the board has nothing to write to, so the control says so
+                    rather than accepting a choice it would drop. */}
+                {(() => {
+                  const child = s.kind === "card" && s.link ? resolveBasename(board, s.link) : null;
+                  const orphanLink = s.kind === "card" && child === null;
+                  const claim = subtaskColumn(board, s);
+                  return (
+                    <select
+                      className="folia-subtask-column"
+                      aria-label={`Column for ${s.text}`}
+                      title={orphanLink ? "No card on the board to place" : "Column"}
+                      disabled={orphanLink}
+                      value={claim.value}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (s.kind === "card") {
+                          if (!child) return;
+                          void mutate(() =>
+                            value === ""
+                              ? repo.unsetFrontmatterKey(child, "status")
+                              : repo.setFrontmatter(child, { status: value }),
+                          );
+                          return;
+                        }
+                        actions.moveTodo(path, s.index, value === "" ? null : value);
+                      }}
+                    >
+                      <option value="">With this card</option>
+                      {board.config.columns.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                      {/* The board has no such column, so nothing above can be showing — offer the
+                          written value itself, or there would be no way to select away from it. */}
+                      {!claim.known && (
+                        <option value={claim.value}>{claim.value} (no such column)</option>
+                      )}
+                    </select>
+                  );
+                })()}
                 <button
                   className="folia-icon-btn folia-mini"
                   aria-label="Remove"

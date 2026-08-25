@@ -9,6 +9,7 @@ import {
   findDoneColumn,
   makeTodoPath,
   moveSubtask,
+  syncSubtaskClaim,
   parseTodoPath,
   reassignColumn,
   isComputedOrder,
@@ -869,6 +870,94 @@ describe("subitems in a column of their own", () => {
     });
     expect(moveSubtask(b, "Tasks/Root.md", 0, "doing")).toMatchObject({
       setSubtaskStatus: { index: 0, status: "doing", done: false },
+    });
+  });
+
+  it("counts a done claim even when the card is already in that column and nothing moves", () => {
+    const parent: Card = {
+      ...card("Foo", { status: "done" }),
+      subItems: [todo("Ship it", 0, "done")],
+      stats: {
+        checklist: 1,
+        checklistDone: 0,
+        subcards: 0,
+        comments: 0,
+        nextTodos: [{ text: "Ship it", index: 0 }],
+      },
+    };
+    const b = buildBoard(config, [parent]);
+    // No tile is minted (there is nowhere to move it to), but the card must not go on calling it
+    // outstanding — sitting in Done and being finished are the same statement either way.
+    expect(b.columns["done"]).toEqual(["Tasks/Foo.md"]);
+    expect(b.cards["Tasks/Foo.md"]?.stats).toMatchObject({ checklist: 1, checklistDone: 1 });
+    expect(b.cards["Tasks/Foo.md"]?.stats?.nextTodos).toEqual([]);
+  });
+
+  it("keeps every outstanding todo reachable when the first ones are placed", () => {
+    const parent: Card = {
+      ...card("Root", { status: "todo" }),
+      subItems: [
+        todo("p1", 0, "doing"),
+        todo("p2", 1, "doing"),
+        todo("p3", 2, "doing"),
+        todo("p4", 3, "doing"),
+        todo("p5", 4, "doing"),
+        todo("open1", 5),
+        todo("open2", 6),
+      ],
+      stats: {
+        checklist: 7,
+        checklistDone: 0,
+        subcards: 0,
+        comments: 0,
+        nextTodos: [
+          { text: "p1", index: 0 },
+          { text: "p2", index: 1 },
+          { text: "p3", index: 2 },
+          { text: "p4", index: 3 },
+          { text: "p5", index: 4 },
+          { text: "open1", index: 5 },
+          { text: "open2", index: 6 },
+        ],
+      },
+    };
+    const b = buildBoard(config, [parent]);
+    expect(b.cards["Tasks/Root.md"]?.stats?.nextTodos.map((t) => t.text)).toEqual([
+      "open1",
+      "open2",
+    ]);
+  });
+
+  it("keeps a claim in step with the checkbox, and only for a line that makes one", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [
+        todo("Placed", 0, "doing"),
+        todo("Plain", 1),
+        todo("Finished", 2, "done", true),
+      ]),
+    ]);
+    // Ticking a placed line moves its claim to done, so the tile does not teleport past its words.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, true)).toEqual({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 0, status: "done" },
+    });
+    // Un-ticking one that claims done drops the claim: it goes back to living with its card.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", 2, false)).toEqual({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 2, status: null },
+    });
+    // A line claiming nothing is left alone — ticking a plain todo has never placed it anywhere.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", 1, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, false)).toBeNull(); // still claims doing
+  });
+
+  it("can clear a claim that names no column of this board", () => {
+    // Wrong case, or a column since renamed. The graph ignores the value, but it is in the note —
+    // if the write path ignored it too, no interface could ever remove it.
+    const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("X", 0, "Doing")])]);
+    expect(b.columns["doing"]).toEqual([]); // not placed: no such column id
+    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
+      setSubtaskStatus: { index: 0, status: null },
     });
   });
 

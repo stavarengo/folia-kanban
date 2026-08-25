@@ -429,6 +429,15 @@ export function buildBoard(
       // up sitting in Done while the card it belongs to still calls it outstanding.
       const finished = item.done || claimed === doneCol;
       const target = finished && doneCol ? doneCol : claimed;
+      // The card's own reading of the line comes first, and holds whether or not a tile is minted:
+      // a line claiming the done column is finished even when its card is ALREADY in that column
+      // and there is nothing to move it to, which is exactly where the tile is skipped below.
+      let placed = placedTodos.get(c.path);
+      if (!placed) placedTodos.set(c.path, (placed = { indices: new Set(), doneByColumn: 0 }));
+      if (finished && !item.done) {
+        placed.indices.add(item.index); // finished work is not an outstanding next action
+        placed.doneByColumn++;
+      }
       if (target === parentColumn) continue; // back home: renders inside its parent again
       const path = makeTodoPath(c.path, item.index);
       const todoCard: Card = {
@@ -438,16 +447,13 @@ export function buildBoard(
         titleSource: "subtask",
         frontmatter: { status: target },
         childLinks: [],
-        todoRef: { parentPath: c.path, index: item.index },
+        todoRef: { parentPath: c.path, index: item.index, claim: item.status ?? "" },
       };
       if (c.context !== undefined) todoCard.context = c.context;
       cardsByPath[path] = todoCard;
       parentOf[path] = c.path;
       placedOf[path] = c.path;
-      let placed = placedTodos.get(c.path);
-      if (!placed) placedTodos.set(c.path, (placed = { indices: new Set(), doneByColumn: 0 }));
       placed.indices.add(item.index);
-      if (finished && !item.done) placed.doneByColumn++;
       place(todoCard, target);
     }
   }
@@ -751,14 +757,13 @@ export function moveSubtask(
   const home = columnOf(board, parentPath);
   const from = columnOf(board, makeTodoPath(parentPath, index)) ?? home;
   const target = toColumnId ?? home;
-  // The claim the line makes right now, ignoring one that names no column of this board (the graph
-  // ignores it too). Compared against what we are about to write rather than against where the todo
-  // RENDERS: a claim that happens to name its card's own column still has to be clearable, or the
-  // todo would detach again the moment its card moves.
-  const claim =
-    item.status !== undefined && board.config.columns.some((c) => c.id === item.status)
-      ? item.status
-      : null;
+  // What the line LITERALLY says, unnormalised — including a value naming no column of this board
+  // (a typo, or a column since renamed). The board graph ignores such a value, but the write path
+  // must not: normalising it to "no claim" here would make the guard below skip the one write that
+  // can clear it, leaving a field no interface could reach and the todo free to detach the day a
+  // column with that id appears. Compared against what is about to be written rather than against
+  // where the todo RENDERS, so a claim naming its card's own column stays clearable too.
+  const claim = item.status ?? null;
   // Sending a todo home says nothing about whether it is finished, so the checkbox is left out of
   // the write entirely rather than written back to what we believe it currently is — the board we
   // are reading may be one reload behind the note, and a stale belief would tick or untick the
@@ -776,6 +781,33 @@ export function moveSubtask(
     setSubtaskStatus,
     history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
   };
+}
+
+/**
+ * The follow-up write that keeps a placed todo's claim in step with its checkbox, or `null` when
+ * there is nothing to keep in step.
+ *
+ * Ticking a line's box says the work is finished, and finished work belongs in the done column — so
+ * a line that claims a column has its claim moved there rather than left saying something the board
+ * no longer renders. Unticking one that claims done drops the claim instead of inventing a column
+ * nobody chose: the todo goes back to living with its card, which is where it started.
+ *
+ * A line claiming nothing is left entirely alone. Ticking a plain todo has never placed it
+ * anywhere, and it must not start now.
+ */
+export function syncSubtaskClaim(
+  board: Board,
+  parentPath: string,
+  index: number,
+  done: boolean,
+): CardMutation | null {
+  const parent = board.cards[parentPath];
+  const item = parent?.subItems?.find((s) => s.index === index && s.kind === "todo");
+  if (!item || item.status === undefined) return null; // claims nothing — nothing to keep in step
+  const doneCol = findDoneColumn(board.config.columns);
+  const next = done ? doneCol : item.status === doneCol ? null : item.status;
+  if (next === undefined || next === item.status) return null;
+  return { path: parentPath, setSubtaskStatus: { index, status: next } };
 }
 
 /**

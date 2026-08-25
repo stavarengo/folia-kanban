@@ -189,7 +189,7 @@ describe("cardStats — progress counts EVERY checklist line by its checkbox", (
   });
 });
 
-describe("nextTodos — undone plain todos, in order, capped at 5", () => {
+describe("nextTodos — the outstanding plain todos, in order", () => {
   it("excludes done todos and subcard-links, carrying each todo's checklist index", () => {
     const text = [
       "# C",
@@ -209,15 +209,21 @@ describe("nextTodos — undone plain todos, in order, capped at 5", () => {
     ]);
   });
 
-  it("caps at the first 5 undone todos", () => {
+  it("caps nothing — the board still has placed todos to drop, and the tile takes the first N", () => {
+    // A cap here would be applied BEFORE `buildBoard` removes the todos standing in a column of
+    // their own, so a card whose first few todos are placed could end up showing no next action at
+    // all while others are still waiting on it.
     const text =
       "# C\n\n## Subtasks\n" + Array.from({ length: 8 }, (_, i) => `- [ ] t${i}`).join("\n") + "\n";
-    expect(cardStats(text).nextTodos).toEqual([
-      { text: "t0", index: 0 },
-      { text: "t1", index: 1 },
-      { text: "t2", index: 2 },
-      { text: "t3", index: 3 },
-      { text: "t4", index: 4 },
+    expect(cardStats(text).nextTodos.map((t) => t.text)).toEqual([
+      "t0",
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
+      "t7",
     ]);
   });
 });
