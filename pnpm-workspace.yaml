@@ -3,7 +3,15 @@ allowBuilds:
   lefthook: false
 # Security overrides — force the patched version past parents that hard-pin a vulnerable one.
 overrides:
-  js-yaml: ^4.2.0 # CVE-2026-53550 - merge-key DoS, deduped and dismissed
+  brace-expansion@1: ^1.1.18 # GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 — three majors live in the tree, each pinned on its own line
+  brace-expansion@2: ^2.1.4 # same three advisories, 2.x branch
+  brace-expansion@5: ^5.0.9 # same three advisories, 5.x branch
+  fast-uri: ^3.1.5 # GHSA-4c8g-83qw-93j6, GHSA-7p8r-x3mc-p8w7, GHSA-v2hh-gcrm-f6hx
+  ip-address: ^10.3.1 # GHSA-22jq-vg5j-6vgg, GHSA-4xrf-jv44-h6hh, GHSA-mwp4-54f8-5fhr
+  js-yaml: ^4.3.1 # CVE-2026-53550 - merge-key DoS, plus GHSA-52cp-r559-cp3m and GHSA-5p4m-2wfm-xmqj
+  linkify-it: ^5.0.2 # GHSA-v245-v573-v5vm
   markdown-it: ^14.2.0 # CVE-2026-48988 - smartquotes went quadratic; we didn't
-  undici: ^6.27.0 # CVE-2026-1525 (+9) - request smuggling, shown the door
+  nanoid@3: ^3.3.18 # GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8
+  postcss: ^8.5.23 # GHSA-fxqj-rqcc-2cmp, GHSA-r28c-9q8g-f849
+  undici: ^6.28.0 # CVE-2026-1525 (+9) - request smuggling, shown the door; also GHSA-8xcm-r25x-g524, GHSA-m8rv-5g2x-5cg5, GHSA-v3r7-h72x-cjcm
   vite: ^6.4.3 # GHSA-fx2h-pf6j-xcff (+2) - 5.x never got patched, so we moved to 6.4.3
