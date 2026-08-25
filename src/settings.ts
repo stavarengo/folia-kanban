@@ -64,8 +64,11 @@ export type SettingsPatch =
   | Partial<KanbanSettings>
   | ((current: KanbanSettings) => Partial<KanbanSettings>);
 
+/** Returns `current` itself (same reference) when the patch has nothing in it, so callers can skip
+ *  the refresh and the disk write an empty patch would otherwise cost. */
 export function applySettingsPatch(current: KanbanSettings, patch: SettingsPatch): KanbanSettings {
-  return { ...current, ...(typeof patch === "function" ? patch(current) : patch) };
+  const p = typeof patch === "function" ? patch(current) : patch;
+  return Object.keys(p).length === 0 ? current : { ...current, ...p };
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
@@ -94,6 +97,9 @@ export function hydrateSettings(
   now: string,
 ): { settings: KanbanSettings; stampedBaseline: boolean } {
   const settings: KanbanSettings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+  // A hand-edited data.json can carry `null` for a map; every tile reads these, so it must not.
+  if (!settings.collapsedCards) settings.collapsedCards = {};
+  if (!settings.commentsSeen) settings.commentsSeen = {};
   if (settings.commentsBaseline) return { settings, stampedBaseline: false };
   return { settings: { ...settings, commentsBaseline: now }, stampedBaseline: true };
 }

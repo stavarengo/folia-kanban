@@ -116,7 +116,7 @@ That signature is ordinary Markdown, so anyone — a colleague, a script, an age
 From there the board tracks what you have already read:
 
 - The comment badge on a card tile turns **blue with a dot** while the card holds comments you have not read, and its label says so (*"3 comments, 2 unread comments"*).
-- It turns **purple with an arrow** — *"a reply to yours"* — when one of those unread comments landed after a comment of your own. There is no threading in a flat list of comments, so that ordering is all there is to go on: once you have commented on a card, anything new on it reads as a reply. Dot versus arrow, not only blue versus purple, so the two states stay apart without relying on colour, and the tile's own accessible name carries the words for a screen reader.
+- It turns **purple with an arrow** — *"a reply to yours"* — when one of those unread comments landed after a comment of your own (or inside the same minute — timestamps carry no seconds, and an agent answering straight away shares yours). There is no threading in a flat list of comments, so that ordering is all there is to go on: once you have commented on a card, anything new on it reads as a reply. Dot versus arrow, not only blue versus purple, so the two states stay apart without relying on colour, and the tile's own accessible name carries the words for a screen reader.
 - Inside the detail panel, the unread ones are tinted and tagged **new** — and the one that actually followed a comment of yours is tagged **reply** — under a **New** rule marking where what you had already read ends.
 - Opening a card marks its comments as read. The markers stay put for that visit, so you can actually read what was new before it goes quiet.
 

@@ -448,28 +448,45 @@ export function CardDetail({
   // while the effect writes the fresh marker. Reading against the live value instead would clear
   // the markers in the same breath as showing them.
   /**
-   * Comments this panel has posted on the card it is showing, each as the position it was appended
-   * at plus its text. A comment you typed here is yours even when there is no name to sign it with,
-   * so it is treated as such below — without it the panel hands your own line straight back to you
-   * tagged NEW, which is what every reader who has not set a name would see. Position AND text,
-   * because text alone is not an identity: answering "ok" to someone's "ok" must not reclassify
-   * theirs as yours. Edits and deletions made from this panel keep the list in step (see
-   * `postedHereEdited` / `postedHereRemoved`); the note only ever grows at the end otherwise.
+   * Comments this panel has posted on the card it is showing: each one's text, and how many
+   * comments the card held when it was sent, i.e. the lowest position it can have landed at. A
+   * comment you typed here is yours even when there is no name to sign it with, so it is treated as
+   * such below — without it the panel hands your own line straight back to you tagged NEW, which is
+   * what every reader who has not set a name would see. Text alone is not an identity (answering
+   * "ok" to someone's "ok" must not reclassify theirs as yours), so a post claims the LAST comment
+   * at or past its floor that carries its text: sending two in a row before the first reload lands,
+   * or a comment from elsewhere arriving while the panel is open, still leaves each post its own
+   * line. Edits and deletions made from this panel keep the list in step (see `postedHereEdited` /
+   * `postedHereRemoved`).
    */
-  const postedHere = useRef<{ path: string; posts: { index: number; text: string }[] }>({
+  const postedHere = useRef<{ path: string; posts: { floor: number; text: string }[] }>({
     path,
     posts: [],
   });
   if (postedHere.current.path !== path) postedHere.current = { path, posts: [] };
-  const postedHereAt = (index: number, text: string): boolean =>
-    postedHere.current.posts.some((p) => p.index === index && p.text === text);
+  const claimedByPosts = (texts: readonly string[]): Set<number> => {
+    const claimed = new Set<number>();
+    for (const p of postedHere.current.posts)
+      for (let i = texts.length - 1; i >= p.floor; i--)
+        if (texts[i] === p.text && !claimed.has(i)) {
+          claimed.add(i);
+          break;
+        }
+    return claimed;
+  };
   const postedHereEdited = (index: number, text: string): void => {
-    for (const p of postedHere.current.posts) if (p.index === index) p.text = text;
+    const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
+    if (!own.has(index)) return;
+    const before = body?.comments[index]?.text;
+    const post = postedHere.current.posts.find((p) => p.text === before && p.floor <= index);
+    if (post) post.text = text;
   };
   const postedHereRemoved = (index: number): void => {
+    const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
+    const gone = body?.comments[index]?.text;
     postedHere.current.posts = postedHere.current.posts
-      .filter((p) => p.index !== index)
-      .map((p) => (p.index > index ? { ...p, index: p.index - 1 } : p));
+      .filter((p) => !(own.has(index) && p.text === gone && p.floor <= index))
+      .map((p) => (p.floor > index ? { ...p, floor: p.floor - 1 } : p));
   };
   const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
     path,
@@ -496,10 +513,10 @@ export function CardDetail({
     [body, bodyPath, path],
   );
   const commentMarks = useMemo(
-    () =>
-      noteMarks.map((m, i) =>
-        postedHereAt(i, body?.comments[i]?.text ?? "") ? { ...m, author: me } : m,
-      ),
+    () => {
+      const own = claimedByPosts((body?.comments ?? []).map((c) => c.text));
+      return noteMarks.map((m, i) => (own.has(i) ? { ...m, author: me } : m));
+    },
     // `postedHere` is a ref, not a dependency: what it holds only changes together with `body`.
     [noteMarks, body, me],
   );
@@ -1283,8 +1300,10 @@ export function CardDetail({
               return isFirstUnread
                 ? [
                     // A plain <li>: a `role="separator"` here would stop being a listitem and
-                    // break the <ul>'s list semantics (axe `list`).
-                    <li key={`new-${i}`} className="folia-comments-divider">
+                    // break the <ul>'s list semantics (axe `list`). Hidden from assistive tech:
+                    // it would only add an item that says "New" and shift every count after it,
+                    // while each unread line already carries its own tag.
+                    <li key={`new-${i}`} className="folia-comments-divider" aria-hidden="true">
                       <span>New</span>
                     </li>,
                     item,
@@ -1305,7 +1324,7 @@ export function CardDetail({
                 if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
                   e.preventDefault();
                   postedHere.current.posts.push({
-                    index: body?.comments.length ?? 0,
+                    floor: body?.comments.length ?? 0,
                     text: newComment.trim(),
                   });
                   void mutate(() => repo.addComment(path, newComment.trim()));

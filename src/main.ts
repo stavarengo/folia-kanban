@@ -316,7 +316,9 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  toggle does this on every click (§ collapse) — because waiting on the write first would let a
    *  second update land before the first was visible anywhere, and silently lose it. */
   async updateSettings(patch: SettingsPatch): Promise<void> {
-    this.settings = applySettingsPatch(this.settings, patch);
+    const next = applySettingsPatch(this.settings, patch);
+    if (next === this.settings) return;
+    this.settings = next;
     this.refreshViews();
     await this.saveSettings();
   }

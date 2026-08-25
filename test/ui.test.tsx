@@ -2509,6 +2509,30 @@ describe("unread comments", () => {
     expect(within(again).queryByText("new")).toBeNull();
   });
 
+  it("keeps two comments sent back to back both yours", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Alpha.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @agent:_ take a look\n",
+      },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    // The second Enter lands before the first post's reload has come back.
+    const input = within(detail).getByLabelText("Write a comment");
+    fireEvent.change(input, { target: { value: "first" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.change(input, { target: { value: "second" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await within(detail).findByText("second");
+    await within(detail).findByText("first");
+    const flags = within(detail).getAllByText("new");
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.closest("li")).toHaveTextContent("take a look");
+  });
+
   it("still knows a comment is yours after you edit it, or delete the one above it", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {

@@ -24,6 +24,12 @@ describe("hydrateSettings", () => {
     expect(settings.commentsSeen).toEqual({});
   });
 
+  it("repairs a hand-edited data.json that carries null for a per-card map", () => {
+    const { settings } = hydrateSettings({ commentsSeen: null, collapsedCards: null }, NOW);
+    expect(settings.commentsSeen).toEqual({});
+    expect(settings.collapsedCards).toEqual({});
+  });
+
   it("keeps an existing baseline: it is when tracking started, not the last launch", () => {
     const { settings, stampedBaseline } = hydrateSettings(
       {

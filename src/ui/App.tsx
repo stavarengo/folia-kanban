@@ -575,6 +575,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       reportError,
       settings.addCardOpenMode,
       board?.config.columns,
+      onUpdateSettings,
     ],
   );
 
