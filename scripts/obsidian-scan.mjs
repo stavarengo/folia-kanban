@@ -7,11 +7,12 @@
 //  - it only fails on stylelint exit code 2 (errors), so warning-severity findings are reported
 //    on the portal but do not fail its own gate. We fail on ANY finding, warning or error,
 //    because the goal is a zero-warning listing.
-//  - `ignoreFiles` is inert in stylelint 17.6.0 for the way lint.ts invokes it (verified against
-//    both the CLI and the Node API), so the bot really lints every `**/*.css` in the checkout.
-//    It clones a fresh tree, where that is only the source stylesheet; here a local `pnpm build`
-//    would add an identical copy under dist/, so the CSS file list is filtered explicitly below
-//    to keep the check deterministic. IGNORES is still passed through unchanged.
+//  - it lints a fresh clone, so it only ever sees files git tracks. A working copy also holds
+//    build output, scratch directories and anything else gitignored, and stylelint's `ignoreFiles`
+//    turns out to be inert in 17.6.0 for the way lint.ts invokes it (verified against both the CLI
+//    and the Node API), so nothing upstream would keep those out. Both passes below are therefore
+//    restricted to `git ls-files`, which is exactly what the bot would clone. IGNORES is still
+//    passed through unchanged, and ESLint's own ignore handling still applies on top.
 //
 // Known limit of the reproduction: the bot npm-installs its own tool versions at run time
 // (stylelint 17.6.0, stylelint-no-unsupported-browser-features 8.1.1, eslint 9.37.0,
@@ -26,7 +27,8 @@
 // the way lint.ts does it, so knip cannot see the dependency — it is listed in knip.json's
 // ignoreDependencies for that reason.
 
-import { glob, readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { relative as relativePath, resolve } from "node:path";
 import process from "node:process";
 import { ESLint } from "eslint";
@@ -283,20 +285,22 @@ const eslintConfig = () => [
   { ignores: ["eslint.config.scanner.mjs", "main.js", "styles.css", "manifest.json"] },
 ];
 
-// Build output and vendored trees are the same bytes as their sources, or not ours at all; see
-// the header note on why this filtering is done here instead of through `ignoreFiles`.
-const NOT_OURS = /(^|\/)(node_modules|dist|build|pkg|coverage|\.pnpm-store|\.obsidian|\.git)\//;
+// What a fresh clone of this repo would contain — see the header note.
+const trackedFiles = () =>
+  execFileSync("git", ["ls-files", "-z"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  })
+    .split("\0")
+    .filter(Boolean);
 
-const cssFiles = async () => {
-  const found = [];
-  for await (const f of glob("**/*.css", { cwd: root })) {
-    if (!NOT_OURS.test(f)) found.push(f);
-  }
-  return found.sort();
-};
+// The extensions the scanner's ESLint config has a matching block for. Handing it a `.md` or a
+// `.css` path would only produce "no matching configuration" noise.
+const LINTABLE = /\.(m?ts|c?ts|tsx|m?js|c?js|jsx|json)$/;
 
 const runStylelint = async (minElectron) => {
-  const files = await cssFiles();
+  const files = trackedFiles().filter((f) => f.endsWith(".css"));
   if (files.length === 0) return { linted: [], findings: [] };
   const { results } = await stylelint.lint({
     cwd: root,
@@ -325,7 +329,11 @@ const runEslint = async () => {
     overrideConfig: eslintConfig(),
     errorOnUnmatchedPattern: false,
   });
-  const results = await eslint.lintFiles(["."]);
+  const candidates = trackedFiles().filter((f) => LINTABLE.test(f));
+  const files = [];
+  for (const f of candidates) if (!(await eslint.isPathIgnored(f))) files.push(f);
+  if (files.length === 0) return { linted: [], findings: [] };
+  const results = await eslint.lintFiles(files);
 
   const linted = results.map((r) => r.filePath);
   const findings = results.flatMap((r) =>
