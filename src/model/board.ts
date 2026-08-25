@@ -390,8 +390,11 @@ export function buildBoard(
     if (bucket) bucket.push(card);
   };
 
-  // Which nested subcards were pulled OUT of their parent's group into a column of their own, so
-  // the nested view below skips them (they must render once, not twice).
+  // Every subitem standing in a column of its own, mapped to the card it belongs to. This is what
+  // the render layer reads for the `↳ parent` reference — NOT `parentOf`, which also links the
+  // members of a subcard cycle to each other and would give a top-level card a parent it does not
+  // visibly have.
+  const placedOf: Record<string, string> = {};
   const placedChildren = new Set<string>();
   for (const c of cards) {
     const nested = isGenuinelyNested(c.path, parentOf);
@@ -403,6 +406,7 @@ export function buildBoard(
     const own = effectiveColumnOf(c.path);
     if (parent !== undefined && own !== undefined && own !== effectiveColumnOf(parent)) {
       placedChildren.add(c.path);
+      placedOf[c.path] = parent;
       place(c, own);
     }
   }
@@ -411,7 +415,7 @@ export function buildBoard(
   // the board already has — order, sort, group, filter, WIP count, drag — applies to them without
   // a second implementation. A line with no `[status:: …]` field claims nothing and keeps rendering
   // inside its parent card, exactly as before; a checked line is done wherever its field points.
-  const placedTodos = new Map<string, Set<number>>();
+  const placedTodos = new Map<string, { indices: Set<number>; doneByColumn: number }>();
   for (const c of cards) {
     const parentColumn = effectiveColumnOf(c.path);
     for (const item of c.subItems ?? []) {
@@ -419,7 +423,12 @@ export function buildBoard(
       const claimed =
         item.status !== undefined && colIds.has(item.status) ? item.status : undefined;
       if (claimed === undefined) continue;
-      const target = item.done && doneCol ? doneCol : claimed;
+      // Done has one meaning, reached two ways: the line is checked, or its field names the done
+      // column. Either says the work is finished, so both put it there and both count as finished
+      // on the parent's progress bar — a line hand-written as `- [ ] X [status:: done]` cannot end
+      // up sitting in Done while the card it belongs to still calls it outstanding.
+      const finished = item.done || claimed === doneCol;
+      const target = finished && doneCol ? doneCol : claimed;
       if (target === parentColumn) continue; // back home: renders inside its parent again
       const path = makeTodoPath(c.path, item.index);
       const todoCard: Card = {
@@ -434,20 +443,27 @@ export function buildBoard(
       if (c.context !== undefined) todoCard.context = c.context;
       cardsByPath[path] = todoCard;
       parentOf[path] = c.path;
-      let indices = placedTodos.get(c.path);
-      if (!indices) placedTodos.set(c.path, (indices = new Set()));
-      indices.add(item.index);
+      placedOf[path] = c.path;
+      let placed = placedTodos.get(c.path);
+      if (!placed) placedTodos.set(c.path, (placed = { indices: new Set(), doneByColumn: 0 }));
+      placed.indices.add(item.index);
+      if (finished && !item.done) placed.doneByColumn++;
       place(todoCard, target);
     }
   }
 
   // A todo showing as its own tile must not ALSO show in its parent's "next todos" list. Its
-  // checklist line still counts towards the parent's progress: the work is still the card's.
-  for (const [path, indices] of placedTodos) {
+  // checklist line still counts towards the parent's progress: the work is still the card's — and
+  // one sitting in the done column counts as finished there even if nobody ticked its box.
+  for (const [path, placed] of placedTodos) {
     const card = cardsByPath[path];
     const stats = card?.stats;
     if (!card || !stats) continue;
-    card.stats = { ...stats, nextTodos: stats.nextTodos.filter((t) => !indices.has(t.index)) };
+    card.stats = {
+      ...stats,
+      checklistDone: stats.checklistDone + placed.doneByColumn,
+      nextTodos: stats.nextTodos.filter((t) => !placed.indices.has(t.index)),
+    };
   }
 
   const columns: Record<string, string[]> = {};
@@ -470,7 +486,7 @@ export function buildBoard(
     childrenOf[parent] = columnEffectiveOrders(childGroups[parent] ?? []).map((x) => x.card.path);
   }
 
-  return { config, columns, cards: cardsByPath, parentOf, childrenOf, contexts };
+  return { config, columns, cards: cardsByPath, parentOf, placedOf, childrenOf, contexts };
 }
 
 /** How many ACTIVE blocking links a card has in each direction (see {@link relationCounts}). */
@@ -734,11 +750,18 @@ export function moveSubtask(
   const home = columnOf(board, parentPath);
   const from = columnOf(board, makeTodoPath(parentPath, index)) ?? home;
   const target = toColumnId ?? home;
-  if (from === target) return null; // already where it is being sent
-  const setSubtaskStatus =
-    toColumnId === null
-      ? { index, status: null, done: item.done }
-      : { index, status: toColumnId, done: toColumnId === findDoneColumn(board.config.columns) };
+  // The claim the line makes right now, ignoring one that names no column of this board (the graph
+  // ignores it too). Compared against what we are about to write rather than against where the todo
+  // RENDERS: a claim that happens to name its card's own column still has to be clearable, or the
+  // todo would detach again the moment its card moves.
+  const claim =
+    item.status !== undefined && board.config.columns.some((c) => c.id === item.status)
+      ? item.status
+      : null;
+  const done =
+    toColumnId === null ? item.done : toColumnId === findDoneColumn(board.config.columns);
+  if (claim === toColumnId && item.done === done) return null; // the line already says this
+  const setSubtaskStatus = { index, status: toColumnId, done };
   const label = item.text || "todo";
   return {
     path: parentPath,

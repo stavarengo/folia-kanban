@@ -82,10 +82,12 @@ The inline field is [Obsidian's own inline-field syntax](https://help.obsidian.m
 **Three ways to move one**, all writing the same thing:
 
 - **Drag** its tile to another column, once it has one.
-- **Right-click** a todo — on its tile, or on a next-todo row surfaced on its card — and pick a column from the menu (**With its card** puts it back).
+- **Right-click** a todo — on its tile, or on a next-todo row surfaced on its card — and pick a column from the menu.
 - **The detail panel** — every row under *Subtasks & subcards* has a column picker, for both kinds.
 
-Whichever you use, the card keeps counting the subitem in its progress bar: moving the work somewhere visible does not take it off its ticket. Landing in the Done column checks the todo's box; leaving Done unchecks it, so the checkbox and the column never disagree.
+Whichever you use, the card keeps counting the subitem in its progress bar: moving the work somewhere visible does not take it off its ticket. Landing in the Done column checks the todo's box; moving it to any other column unchecks it, so the checkbox and the column never disagree. It works the other way too: a line you write by hand as `- [ ] Ship it [status:: done]` is finished, because sitting in Done and being finished are the same statement — the card counts it as done rather than showing it outstanding under a tile in Done.
+
+The pickers also offer **With its card**, which is a different thing from picking a column: it drops the claim so the subitem goes back to living with its card, and says nothing about whether the work is finished. A done todo sent back with its card stays a checked line — reopening it is what picking another column is for.
 
 One deliberate limit: a plain todo carries no `order`, so dragging it *within* a column does not stick (it sorts after the ordered cards, alphabetically). Moving it *between* columns — the thing this is for — always does.
 

@@ -252,6 +252,13 @@ export interface Board {
   parentOf: Record<string, string>;
   /** parent path -> ordered child paths; subcards are rendered nested, not in columns. */
   childrenOf: Record<string, string[]>;
+  /**
+   * The subitems standing in a column of their own — inline todos and subcard files alike — mapped
+   * to the card they belong to. A path is present here exactly when it renders as a tile in a column
+   * yet is somebody's subitem, which is what makes it the right source for the `↳ parent` reference:
+   * `parentOf` also links the members of a subcard cycle to each other, and those render top-level.
+   */
+  placedOf: Record<string, string>;
   /** Context configs keyed by subfolder name (#14). Empty when the board has no subfolders. */
   contexts: Record<string, ContextConfig>;
   /**

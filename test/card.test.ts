@@ -618,6 +618,23 @@ describe("inline subtask status (a checklist line's own column)", () => {
     expect(out.split("\n")[3]).toBe("- [x] Write the docs [status:: done]");
   });
 
+  it("leaves the author's own spacing alone when it reads the field off the line", () => {
+    const items = parseSubtasks("# T\n\n## Subtasks\n- [ ] Deploy  to  prod [status:: doing]\n");
+    expect(items[0]?.text).toBe("Deploy  to  prod");
+  });
+
+  it("replaces the field where it sits, touching no other byte of the line", () => {
+    const src = "# T\n\n## Subtasks\n- [ ] Deploy  to  prod [status:: doing] (soon)\n";
+    const out = setSubtaskStatus(src, 0, "next");
+    expect(out.split("\n")[3]).toBe("- [ ] Deploy  to  prod [status:: next] (soon)");
+  });
+
+  it("closes only the gap the field leaves when it is cleared", () => {
+    const src = "# T\n\n## Subtasks\n- [ ] Deploy  to  prod [status:: doing] (soon)\n";
+    const out = setSubtaskStatus(src, 0, null);
+    expect(out.split("\n")[3]).toBe("- [ ] Deploy  to  prod (soon)");
+  });
+
   it("is a no-op when the card has no Subtasks section", () => {
     const src = "# T\n\nJust prose.\n";
     expect(setSubtaskStatus(src, 0, "doing")).toBe(src);

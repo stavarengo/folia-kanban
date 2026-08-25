@@ -153,6 +153,17 @@ function sectionLines(body: string, name: string): string[] {
 // ---------------------------------------------------------------------------
 
 /**
+ * Rejoin what sat on either side of a removed inline field, closing only the gap the field left
+ * behind. Whitespace anywhere else in the line is the author's and is passed through — a todo
+ * reading `Deploy  to  prod` must not be respaced just because it also carries a field.
+ */
+function closeGap(left: string, right: string): string {
+  const l = left.replace(/[ \t]+$/, "");
+  const r = right.replace(/^[ \t]+/, "");
+  return l !== "" && r !== "" ? `${l} ${r}` : l + r;
+}
+
+/**
  * Split a checklist line's text into the part people read and the inline `[status:: …]` field.
  * The field is taken out of the text so it never shows up as part of a todo's title, and an empty
  * or whitespace-only value reads as no claim at all (the same as omitting the field).
@@ -160,9 +171,7 @@ function sectionLines(body: string, name: string): string[] {
 function splitInlineStatus(text: string): { text: string; status?: string } {
   const m = INLINE_STATUS_RE.exec(text);
   if (!m) return { text };
-  const rest = (text.slice(0, m.index) + text.slice(m.index + m[0].length))
-    .replace(/\s+/g, " ")
-    .trim();
+  const rest = closeGap(text.slice(0, m.index), text.slice(m.index + m[0].length)).trim();
   const value = (m[1] ?? "").trim();
   return value === "" ? { text: rest } : { text: rest, status: value };
 }
@@ -315,15 +324,14 @@ export function setSubtaskStatus(text: string, index: number, status: string | n
         const content = (m[3] ?? "").replace(/\r$/, "");
         const field = status === null ? "" : `[status:: ${status}]`;
         const existing = INLINE_STATUS_RE.exec(content);
+        const before = existing ? content.slice(0, existing.index) : "";
+        const after = existing ? content.slice(existing.index + existing[0].length) : "";
         let next: string;
-        if (existing) {
-          next = (
-            content.slice(0, existing.index) +
-            field +
-            content.slice(existing.index + existing[0].length)
-          )
-            .replace(/[ \t]{2,}/g, " ")
-            .trimEnd();
+        if (existing && field !== "") {
+          // Replace the field exactly where it sits: every other byte of the line is the author's.
+          next = before + field + after;
+        } else if (existing) {
+          next = closeGap(before, after).trimEnd();
         } else {
           next = field === "" ? content : `${content.trimEnd()} ${field}`;
         }

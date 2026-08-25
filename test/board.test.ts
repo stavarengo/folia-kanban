@@ -8,6 +8,7 @@ import {
   deriveContext,
   findDoneColumn,
   makeTodoPath,
+  moveSubtask,
   parseTodoPath,
   reassignColumn,
   isComputedOrder,
@@ -140,8 +141,8 @@ describe("childrenOf (nested subcard rendering)", () => {
     expect(b.childrenOf["Tasks/Root.md"]).toBeUndefined();
     expect(b.childrenOf["Tasks/Mid.md"]).toBeUndefined();
     // ...but the parentage the `↳ parent` reference reads is still there.
-    expect(b.parentOf["Tasks/Mid.md"]).toBe("Tasks/Root.md");
-    expect(b.parentOf["Tasks/Leaf.md"]).toBe("Tasks/Mid.md");
+    expect(b.placedOf["Tasks/Mid.md"]).toBe("Tasks/Root.md");
+    expect(b.placedOf["Tasks/Leaf.md"]).toBe("Tasks/Mid.md");
   });
 
   it("carries a placed subcard's own nested subtree with it", () => {
@@ -165,6 +166,9 @@ describe("childrenOf (nested subcard rendering)", () => {
     ]);
     expect((b.columns["todo"] ?? []).sort()).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
     expect(Object.keys(b.childrenOf)).toEqual([]);
+    // `parentOf` links every cycle member, but none of them is anybody's placed subitem — so no
+    // tile claims a `↳ parent` it does not visibly have.
+    expect(Object.keys(b.placedOf)).toEqual([]);
   });
 });
 
@@ -765,7 +769,7 @@ describe("subitems in a column of their own", () => {
       frontmatter: { status: "doing" },
       todoRef: { parentPath: "Tasks/Root.md", index: 0 },
     });
-    expect(b.parentOf[p]).toBe("Tasks/Root.md");
+    expect(b.placedOf[p]).toBe("Tasks/Root.md");
   });
 
   it("keeps a todo home when its claim names the column its parent is already in", () => {
@@ -817,6 +821,54 @@ describe("subitems in a column of their own", () => {
     const stats = b.cards["Tasks/Root.md"]?.stats;
     expect(stats?.nextTodos).toEqual([{ text: "Stays", index: 1 }]);
     expect(stats?.checklist).toBe(2);
+  });
+
+  it("counts a todo claiming the done column as done, ticked or not", () => {
+    const parent: Card = {
+      ...card("Root", { status: "todo" }),
+      subItems: [todo("Hand-written", 0, "done"), todo("Open", 1)],
+      stats: {
+        checklist: 2,
+        checklistDone: 0,
+        subcards: 0,
+        comments: 0,
+        nextTodos: [
+          { text: "Hand-written", index: 0 },
+          { text: "Open", index: 1 },
+        ],
+      },
+    };
+    const b = buildBoard(config, [parent]);
+    // It sits in Done, so the card it belongs to cannot still call it outstanding.
+    expect(b.columns["done"]).toEqual([makeTodoPath("Tasks/Root.md", 0)]);
+    expect(b.cards["Tasks/Root.md"]?.stats).toMatchObject({ checklist: 2, checklistDone: 1 });
+  });
+
+  it("clears a claim that names its card's own column, so the todo cannot detach later", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Pinned home", 0, "todo")]),
+    ]);
+    // It renders with its card, but the line still claims `todo` — sending it home must write.
+    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 0, status: null, done: false },
+    });
+    // Asking for the claim it already makes writes nothing.
+    expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")).toBeNull();
+  });
+
+  it("sends a todo home without reopening it — that is a move, not a claim", () => {
+    // Deliberate: "with its card" says where a todo shows, never whether it is finished. Dragging
+    // it to another column is the move that reopens it.
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Finished", 0, "done", true)]),
+    ]);
+    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
+      setSubtaskStatus: { index: 0, status: null, done: true },
+    });
+    expect(moveSubtask(b, "Tasks/Root.md", 0, "doing")).toMatchObject({
+      setSubtaskStatus: { index: 0, status: "doing", done: false },
+    });
   });
 
   it("moves a placed todo by writing its line, not frontmatter", () => {
