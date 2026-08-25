@@ -143,18 +143,21 @@ export function withRelation(
 }
 
 /**
- * The stored list after removing `target`, or `null` when the target was not there. Every entry
- * naming the same card goes, not just the one written the same way, so removing the single row the
- * board shows for them really clears it. An empty result comes back as an empty array; the caller
- * drops the key rather than leave a `blocks: []`.
+ * The stored list after removing every one of `targets`, or `null` when none of them was there.
+ *
+ * A set, not one string, because the board shows ONE row for a link its note spells more than one
+ * way, and clearing that row has to clear every spelling — in a single rewrite, so a failure
+ * cannot leave half a relationship behind. An empty result comes back as an empty array; the
+ * caller drops the key rather than leave a `blocks: []`.
  */
 export function withoutRelation(
   fm: Record<string, unknown>,
   type: RelationType,
-  target: string,
+  targets: readonly string[],
 ): string[] | null {
+  const gone = new Set(targets.map(targetIdentity).filter((t) => t !== ""));
+  if (gone.size === 0) return null;
   const current = readRelations(fm, type);
-  const gone = targetIdentity(target);
-  if (!current.some((t) => targetIdentity(t) === gone)) return null;
-  return current.filter((t) => targetIdentity(t) !== gone).map(relationLinkText);
+  if (!current.some((t) => gone.has(targetIdentity(t)))) return null;
+  return current.filter((t) => !gone.has(targetIdentity(t))).map(relationLinkText);
 }

@@ -53,11 +53,12 @@ export interface CardRepository {
    */
   addRelation(path: string, type: RelationType, target: string): Promise<void>;
   /**
-   * Drop a relationship this card declares, in every form its list writes it. A target it does
-   * not declare is a no-op — in particular, a card cannot remove a link the OTHER note declared
-   * about it, which is why the panel does not offer the button in that case.
+   * Drop one relationship this card declares, naming every form its list writes it in (a note can
+   * spell the same link more than once). One write, one history line. Targets it does not declare
+   * are a no-op — in particular, a card cannot remove a link the OTHER note declared about it,
+   * which is why the panel does not offer the button in that case.
    */
-  removeRelation(path: string, type: RelationType, target: string): Promise<void>;
+  removeRelation(path: string, type: RelationType, targets: readonly string[]): Promise<void>;
 
   /** Create a new top-level card in a column. Returns its path. */
   createCard(title: string, status: string): Promise<string>;

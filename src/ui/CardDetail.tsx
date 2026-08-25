@@ -1003,12 +1003,10 @@ export function CardDetail({
                 onNavigate={onNavigate}
                 {...(l.source === "own"
                   ? {
+                      // Every spelling the note uses for this one link, so the row it showed does
+                      // not come straight back on the next load.
                       onRemove: () =>
-                        void mutate(async () => {
-                          // Every spelling the note uses for this one link, so the row it showed
-                          // does not come straight back on the next load.
-                          for (const t of l.targets) await repo.removeRelation(path, l.type, t);
-                        }),
+                        void mutate(() => repo.removeRelation(path, l.type, l.targets)),
                     }
                   : { note: RELATION_NOTES[l.source] })}
               />

@@ -254,9 +254,14 @@ export class FakeRepo implements CardRepository {
       this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }
 
-  async removeRelation(path: string, type: RelationType, target: string): Promise<void> {
-    if (this.editRelations(path, type, (fm) => withoutRelation(fm, type, target)))
-      this.maybeHistory(path, "relation", relationRemovedLine(type, target));
+  async removeRelation(
+    path: string,
+    type: RelationType,
+    targets: readonly string[],
+  ): Promise<void> {
+    const shown = targets[0];
+    if (this.editRelations(path, type, (fm) => withoutRelation(fm, type, targets)) && shown)
+      this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
   async createCard(title: string, status: string): Promise<string> {

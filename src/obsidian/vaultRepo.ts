@@ -415,9 +415,18 @@ export class VaultRepository implements CardRepository {
     if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }
 
-  async removeRelation(path: string, type: RelationType, target: string): Promise<void> {
-    const changed = await this.editRelations(path, type, (fm) => withoutRelation(fm, type, target));
-    if (changed) await this.maybeHistory(path, "relation", relationRemovedLine(type, target));
+  async removeRelation(
+    path: string,
+    type: RelationType,
+    targets: readonly string[],
+  ): Promise<void> {
+    const changed = await this.editRelations(path, type, (fm) =>
+      withoutRelation(fm, type, targets),
+    );
+    // One line for the relationship, named by the form the panel showed — not one per spelling.
+    const shown = targets[0];
+    if (changed && shown !== undefined)
+      await this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
   private async uniquePath(folder: string, title: string): Promise<string> {

@@ -77,9 +77,14 @@ describe("relationship frontmatter", () => {
   });
 
   it("removes a target, and reports 'not there' as null", () => {
-    expect(withoutRelation({ blocks: ["[[A]]", "[[B]]"] }, "blocks", "A")).toEqual(["[[B]]"]);
-    expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", "A")).toEqual([]);
-    expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", "Z")).toBeNull();
+    expect(withoutRelation({ blocks: ["[[A]]", "[[B]]"] }, "blocks", ["A"])).toEqual(["[[B]]"]);
+    expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", ["A"])).toEqual([]);
+    expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", ["Z"])).toBeNull();
+    expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", [])).toBeNull();
+    // Every spelling the panel showed as one row goes in one rewrite.
+    expect(
+      withoutRelation({ blocks: ["[[A]]", "[[Sub/A]]", "[[B]]"] }, "blocks", ["A", "Sub/A"]),
+    ).toEqual(["[[B]]"]);
   });
 
   it("reads two ways of writing one target as the single relationship they are", () => {
@@ -97,7 +102,7 @@ describe("relationship frontmatter", () => {
     expect(withRelation({ blocks: ["[[A|see this]]"] }, "blocks", "A")).toBeNull();
     expect(withRelation({ blocks: ["[[A#Notes]]"] }, "blocks", "A")).toBeNull();
     expect(
-      withoutRelation({ blocks: ["[[A|see this]]", "[[A]]", "[[B]]"] }, "blocks", "A"),
+      withoutRelation({ blocks: ["[[A|see this]]", "[[A]]", "[[B]]"] }, "blocks", ["A"]),
     ).toEqual(["[[B]]"]);
     // Case is kept, matching how the board itself binds a link.
     expect(withRelation({ blocks: ["[[A]]"] }, "blocks", "a")).toEqual(["[[A]]", "[[a]]"]);
