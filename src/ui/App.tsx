@@ -128,6 +128,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
+  // Same reason, for settings: `actions` only lists `settings.addCardOpenMode` as a memo
+  // dependency, so any other settings field read directly off `settings` inside it would close
+  // over a stale snapshot (e.g. renameCard's collapsedCards migration below missing a toggle
+  // that landed between actions recomputes).
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   const load = useCallback(async () => {
     try {
@@ -326,7 +332,20 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             const newPath = await repo.renameCard(path, t);
             // When the title comes from the file name, a rename changes the path. If the renamed
             // card was selected, follow it to its new path so the detail/selection holds.
-            if (newPath !== path) setSelected((cur) => (cur === path ? newPath : cur));
+            if (newPath !== path) {
+              setSelected((cur) => (cur === path ? newPath : cur));
+              // Subitems-collapse state (§ collapse) is keyed by path in settings, same as
+              // selection — follow it too, or a toggled card silently resets to the board default,
+              // and its vacated path could later hand that state to an unrelated card reusing it.
+              const collapsedCards = settingsRef.current.collapsedCards;
+              const collapsed = collapsedCards[path];
+              if (collapsed !== undefined) {
+                const nextCollapsed = { ...collapsedCards };
+                delete nextCollapsed[path];
+                nextCollapsed[newPath] = collapsed;
+                onUpdateSettings({ collapsedCards: nextCollapsed });
+              }
+            }
           } catch (e) {
             reportError(e);
           } finally {

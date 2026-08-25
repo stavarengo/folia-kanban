@@ -293,10 +293,12 @@ function CardItemInner({
         <button
           className="folia-card-subitems-toggle"
           aria-expanded={!subitemsCollapsed}
+          // Names the card, not just the state: several of these buttons can sit in one screen
+          // reader's buttons list at once, and "Hide subitems" alone can't tell them apart.
           aria-label={
             subitemsCollapsed
-              ? `Show ${stats?.checklist ?? 0} subitems, ${stats?.checklistDone ?? 0} done`
-              : "Hide subitems"
+              ? `Show ${stats?.checklist ?? 0} subitems, ${stats?.checklistDone ?? 0} done, for "${card.title}"`
+              : `Hide subitems for "${card.title}"`
           }
           onClick={(e) => {
             e.stopPropagation();

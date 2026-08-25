@@ -926,19 +926,21 @@ describe("collapse/expand subitems", () => {
     // Expanded by default (board-wide default is "expanded"): both forms of subitem show.
     expect(within(alpha).getByText("first todo")).toBeInTheDocument();
     expect(alphaTree.querySelector(".folia-subcard-group")).not.toBeNull();
-    const toggle = within(alpha).getByRole("button", { name: "Hide subitems" });
+    const toggle = within(alpha).getByRole("button", { name: 'Hide subitems for "Alpha"' });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     await user.click(toggle);
 
     // Alpha has 3 checklist lines total (2 todos + 1 subcard link), 1 already done.
     expect(
-      within(alpha).getByRole("button", { name: "Show 3 subitems, 1 done" }),
+      within(alpha).getByRole("button", { name: 'Show 3 subitems, 1 done, for "Alpha"' }),
     ).toBeInTheDocument();
     expect(within(alpha).queryByText("first todo")).toBeNull();
     expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
 
-    await user.click(within(alpha).getByRole("button", { name: "Show 3 subitems, 1 done" }));
+    await user.click(
+      within(alpha).getByRole("button", { name: 'Show 3 subitems, 1 done, for "Alpha"' }),
+    );
     expect(within(alpha).getByText("first todo")).toBeInTheDocument();
     expect(alphaTree.querySelector(".folia-subcard-group")).not.toBeNull();
   });
@@ -949,7 +951,7 @@ describe("collapse/expand subitems", () => {
     const card = (await screen.findByText("WithTodos")).closest(".folia-card") as HTMLElement;
     expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(2);
 
-    await user.click(within(card).getByRole("button", { name: "Hide subitems" }));
+    await user.click(within(card).getByRole("button", { name: 'Hide subitems for "WithTodos"' }));
     expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
   });
 
@@ -962,7 +964,7 @@ describe("collapse/expand subitems", () => {
     const card = (await screen.findByText("WithTodos")).closest(".folia-card") as HTMLElement;
     expect(card.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
     expect(
-      within(card).getByRole("button", { name: "Show 3 subitems, 1 done" }),
+      within(card).getByRole("button", { name: 'Show 3 subitems, 1 done, for "WithTodos"' }),
     ).toBeInTheDocument();
   });
 
@@ -998,6 +1000,35 @@ describe("collapse/expand subitems", () => {
     // Expand-all reaches the grandchild too, not just Root's direct child.
     expect(within(todoCol).getByText("Mid")).toBeInTheDocument();
     expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
+  });
+
+  it("a file-name rename carries the card's collapsed override to its new path", async () => {
+    const user = userEvent.setup();
+    renderStateful(makeRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+
+    await user.click(within(todoCol).getByRole("button", { name: 'Hide subitems for "Alpha"' }));
+    expect(
+      within(todoCol).getByRole("button", { name: 'Show 3 subitems, 1 done, for "Alpha"' }),
+    ).toBeInTheDocument();
+
+    const alphaTitle = within(todoCol).getByText("Alpha").closest(".folia-card-title")!;
+    fireEvent.contextMenu(alphaTitle);
+    await user.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rename/ }),
+    );
+    const input = within(todoCol).getByLabelText("Card title") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "Renamed Alpha{Enter}");
+
+    // The collapsed override followed the card to its new path — it does not silently reset to
+    // the board's expanded default just because the file moved.
+    const renamed = await within(todoCol).findByText("Renamed Alpha");
+    expect(
+      within(renamed.closest(".folia-card") as HTMLElement).getByRole("button", {
+        name: 'Show 3 subitems, 1 done, for "Renamed Alpha"',
+      }),
+    ).toBeInTheDocument();
   });
 });
 
