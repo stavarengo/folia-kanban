@@ -7,7 +7,7 @@ area: docs
 
 # Decide the export format
 
-Context: [Design the on-disk format](<Design the on-disk format.md>)
+Context: [[Design the on-disk format]]
 
 ## Question
 

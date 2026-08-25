@@ -53,7 +53,7 @@ Description text…
 - _2026-06-13 14:30:_ Moved from Todo to Doing
 ```
 
-The description is everything between the title heading and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Headings of your own — `## Question`, `## Answer`, whatever the note needs — sit inside it and are shown and saved verbatim, so a note written under its own structure keeps that structure when you edit it from the panel. The flip side is that the Description box owns all of it: emptying the box empties those sections too.
+The description is everything between the title heading and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Headings of your own — `## Question`, `## Answer`, anything the note needs — sit inside it and are shown and saved verbatim, so a note written under its own structure keeps that structure when you edit it from the panel. Two limits are worth knowing: those three names belong to the plugin, so typing one into the Description box starts a real section rather than a heading of your own; and anything you wrote *after* a section the plugin owns stays safely on disk but is not part of the description. The flip side of the box owning that whole region is that emptying the box empties your own sections with it.
 
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
 
@@ -136,6 +136,8 @@ Any card can override all of that with a non-blank `title:` key in its own front
 A heading only ever becomes a title if it is *your* heading: `## Subtasks`, `## Comments` and `## History` are the sections the plugin itself parses, so they are skipped in every mode and no rename can overwrite them. Headings inside fenced code blocks are skipped too.
 
 Renaming a card from the board writes back to whichever source produced the title: the `title:` frontmatter key, the heading line, or the file name via Obsidian's link-aware rename. So renaming a slug-named card whose title comes from its heading rewrites that heading and leaves the `.md` file where it is. A heading rename replaces only that one line's text, keeping its `#` level and any closing hashes; the rest of the file is untouched, byte for byte.
+
+A heading that becomes the title stays part of the note's body, so it is also description text: renaming the card from the board rewrites that one line, and the description shows the new wording from then on.
 
 The file name is still the card's identity: `[[wikilinks]]` between cards, and therefore subcard parentage, always match the file name, never the displayed title. Two cards can safely show the same title.
 

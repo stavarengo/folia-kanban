@@ -509,11 +509,33 @@ All three landed.
   });
 
   it("round-trips an unedited description without reshaping the note", () => {
-    const once = setDescription(ownHeadings, parseBody(ownHeadings).description);
-    expect(parseBody(once).description).toBe(parseBody(ownHeadings).description);
+    // Deliberately the mixed shape: with owned sections present, `setDescription` has to splice
+    // the region back in ahead of a tail it must not touch. The section-less shape would leave
+    // that branch unexercised.
+    const withSections = `${ownHeadings}
+## Comments
+- _2026-08-21 11:49:_ Applied and checked.
+
+## History
+- _2026-08-21 11:00:_ Created
+`;
+    const once = setDescription(withSections, parseBody(withSections).description);
+    expect(parseBody(once).description).toBe(parseBody(withSections).description);
+    expect(parseBody(once).comments).toEqual(parseBody(withSections).comments);
+    expect(parseBody(once).history).toEqual(parseBody(withSections).history);
+    expect(once).toContain("## Comments\n- _2026-08-21 11:49:_ Applied and checked.");
     // Writing again changes nothing: the only difference from the original is the blank-line
     // normalization `setDescription` has always applied around the region.
     expect(setDescription(once, parseBody(once).description)).toBe(once);
+  });
+
+  it("keeps a heading the plugin owns as a section, wherever it is typed", () => {
+    // Pre-existing and unchanged by the description boundary: `## History` typed into the
+    // Description box starts a real History section rather than a heading of the note's own.
+    // Verified identical against the previous boundary rule; pinned so it stays a decision.
+    const out = setDescription("# My card\n\nIntro\n", "Intro\n\n## History\n\n- 2024: started");
+    expect(parseBody(out).description).toBe("Intro");
+    expect(parseBody(out).history).toEqual([{ timestamp: "", text: "2024: started" }]);
   });
 
   it("survives an edit that adds a heading of the note's own", () => {
