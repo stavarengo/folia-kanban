@@ -85,6 +85,7 @@ The card's displayed title usually is the file name, but that `# Card title` hea
    folia-board: true
    card-folder: Cards      # folder holding the card notes (or ./Cards, beside this note)
    card-title: auto        # where card titles come from: auto (default) | filename | heading
+   folia-view: board       # optional — this note's own view: board | markdown
    priorities: [A, B, C]   # optional — the board's own priority vocabulary; it learns as you go
    columns:
      - todo
@@ -93,7 +94,15 @@ The card's displayed title usually is the file name, but that `# Card title` hea
    ```
 
 2. Put card notes (each with a `status` matching a column) in that folder.
-3. Run the command **“Open Folia Kanban board”** or click the layout-grid ribbon icon.
+3. Open the board note the way you open any note — click it in the file explorer, follow a link, find it in search. It comes up as the board. (The command **“Open Folia Kanban board”** and the layout-grid ribbon icon still work, and are how you reach a board without going looking for its note.)
+
+### The board and the Markdown editor are the same tab
+
+A board note is still a note, and sometimes you want to see the raw Markdown — to fix a `columns` entry by hand, say. The tab header carries one button for that: on the board it says **Edit as markdown**, in the editor it says **Open as Folia Kanban board**. It swaps the tab in place, keeping the same file and the same tab; unsaved edits are written out before the editor goes away. Neither direction is recorded in the navigation history, so **Back** still means the note you were on before, not the other rendering of this one.
+
+Which view a board note *starts* in is Settings → **Board notes — open as**. Any single note overrides it with `folia-view: board` or `folia-view: markdown` in its own frontmatter, so a vault-wide preference can coexist with one board you always want to hand-edit. Notes without `folia-board: true` are never touched by any of this: no button, no swap.
+
+Two edge behaviours worth knowing. A note that gains or loses `folia-board` while it is already open gains or loses the button, but the tab is left as it is rather than swapped out from under you. And on the very first open of a session Obsidian may not have read the note's frontmatter yet; in that case the note opens as plain Markdown, and the button is right there to take you to the board.
 
 `card-folder` is read from the vault root, the way it always was for a plain folder name, and falls back to the same path read relative to the board note when **a folder actually exists there and none does at the root** — so a board sitting in `Projects/Acme/` finds an existing `Projects/Acme/Cards` from a bare `card-folder: Cards`. When neither exists, the vault-root reading still wins, so a brand-new board creates its folder exactly where it always did. Writing the path with a leading `./` or `../` (`./Cards`, `../shared/Cards`) skips the vault-root reading entirely and always means "relative to this note", whether that folder exists yet or not — which keeps a project folder portable: move the whole folder and the board still finds its cards. A `..` segment may climb inside the vault but never out of it, and the vault root itself isn't a valid card folder; either one is refused with a message rather than silently reinterpreted. Two spellings therefore behave differently than before: a `card-folder` of `/` (or an explicitly empty one) used to open as a permanently empty board and is now refused outright, and a path containing `.` or `..` used to be matched as literal text and is now resolved. If both readings exist, the board loads from the vault-root one and says so, so the ambiguity is visible instead of silently switching the day someone creates a same-named folder at the root.
 
@@ -145,6 +154,7 @@ The file name is still the card's identity: `[[wikilinks]]` between cards, and t
 
 Under **Settings → Folia Kanban** (changes apply live, no reload):
 
+- **Board notes — open as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
 - **Card details — presentation** — `side` (docked beside the board) or `modal` (centred dialog).
 - **Side panel — layout** — `split` (shrinks the columns to the left) or `float` (overlays the columns); used when presentation is `side`.
 - **Side panel — width** — the docked panel's width; you can also drag its left border.
@@ -164,6 +174,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 | Card menu (open, mark done, priority, move up/down, add subcard, delete) | Right-click a card |
 | Toggle or remove a surfaced todo | Right-click the todo |
 | Column menu (rename, recolour, WIP limit, reorder, delete) | The column's `⋯` button |
+| Swap the tab between the board and the Markdown editor | The button in the tab header |
 
 ## Your data stays yours
 

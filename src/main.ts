@@ -1,5 +1,14 @@
-import type { TFile } from "obsidian";
-import { FuzzySuggestModal, Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import type { ViewState, WorkspaceLeaf } from "obsidian";
+import {
+  FuzzySuggestModal,
+  MarkdownView,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TFile,
+  type App,
+} from "obsidian";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
 import {
   DEFAULT_SETTINGS,
@@ -7,9 +16,29 @@ import {
   DETAIL_WIDTH_MIN,
   type KanbanSettings,
 } from "./settings";
+import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
+
+/** Marks the header button this plugin adds to a board note's Markdown editor. */
+const BOARD_ACTION_CLASS = "folia-open-as-board";
+
+/** `popstate` is understood by Obsidian but missing from the public `ViewState` typing. Setting
+ *  it keeps a view swap out of the navigation history, so Back still means "the previous note"
+ *  rather than "the same note drawn differently". */
+interface NavigableViewState extends ViewState {
+  popstate?: boolean;
+}
 
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
+
+  /** Leaves the user has deliberately switched to the Markdown editor, and the file they did it
+   *  for. Keyed on the leaf itself so the entry dies with the tab, and scoped to the file so
+   *  opening a *different* board in that same tab still lands on the board. */
+  private markdownPins = new WeakMap<WorkspaceLeaf, string>();
+
+  /** The prototype patch outlives `onunload` if another plugin wrapped it after us; this makes
+   *  the wrapper a pass-through instead of leaving a board-hijacking stub behind. */
+  private patchActive = true;
 
   override async onload(): Promise<void> {
     await this.loadSettings();
@@ -21,6 +50,10 @@ export default class FoliaKanbanPlugin extends Plugin {
           leaf,
           () => this.settings,
           (p) => void this.updateSettings(p),
+          (view) => {
+            const file = view.file;
+            if (file) void this.showMarkdownIn(view.leaf, file.path);
+          },
         ),
     );
 
@@ -32,6 +65,135 @@ export default class FoliaKanbanPlugin extends Plugin {
     });
 
     this.addSettingTab(new KanbanSettingTab(this.app, this));
+
+    this.patchLeafSetViewState();
+    this.registerEvent(this.app.workspace.on("file-open", () => this.syncMarkdownActions()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.syncMarkdownActions()));
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => this.syncMarkdownActions()),
+    );
+    // The button follows the flag: a note that gains or loses `folia-board` while it is open
+    // gains or loses the button, but the tab is never swapped out from under the user.
+    this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
+    this.app.workspace.onLayoutReady(() => {
+      this.sweepRestoredLeaves();
+      this.syncMarkdownActions();
+    });
+  }
+
+  /**
+   * Make Obsidian open a board note as the board wherever a file is opened — the explorer, a
+   * link, search, the quick switcher, Back/Forward. Every one of those routes ends in
+   * `WorkspaceLeaf.setViewState({ type: "markdown", ... })`, so intercepting that one call is
+   * both complete and free of the flash a "open it, then swap it" listener would give. This is
+   * the same approach the Kanban and Excalidraw community plugins use.
+   */
+  private patchLeafSetViewState(): void {
+    // Arrows, not a `this` alias: the wrapper must be a `function` so `this` stays the leaf.
+    const isPinnedToMarkdown = (leaf: WorkspaceLeaf, filePath: string): boolean =>
+      this.markdownPins.get(leaf) === filePath;
+    const shouldOpenAsBoard = (filePath: string): boolean => this.shouldOpenAsBoard(filePath);
+    const isPatchActive = (): boolean => this.patchActive;
+    const leafProto = Object.getPrototypeOf(this.app.workspace.getLeaf(false)) as WorkspaceLeaf;
+    const original = leafProto.setViewState;
+    const patched = function (
+      this: WorkspaceLeaf,
+      state: ViewState,
+      eState?: unknown,
+    ): Promise<void> {
+      const filePath = state.state?.["file"];
+      if (
+        isPatchActive() &&
+        state.type === "markdown" &&
+        typeof filePath === "string" &&
+        !isPinnedToMarkdown(this, filePath) &&
+        shouldOpenAsBoard(filePath)
+      ) {
+        return original.call(this, { ...state, type: VIEW_TYPE_KANBAN }, eState);
+      }
+      return original.call(this, state, eState);
+    };
+    leafProto.setViewState = patched;
+    this.register(() => {
+      this.patchActive = false;
+      if (leafProto.setViewState === patched) leafProto.setViewState = original;
+    });
+  }
+
+  /**
+   * Tabs restored from a saved layout never pass through the patch above: the workspace is
+   * rebuilt before the metadata cache can answer "is this a board". Catch them once, when the
+   * layout is ready. Reading the leaf's view *state* rather than its view matters, because a
+   * background tab is deferred and has no `MarkdownView` to inspect yet.
+   */
+  private sweepRestoredLeaves(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const filePath = leaf.getViewState().state?.["file"];
+      if (typeof filePath !== "string") continue;
+      if (!this.shouldOpenAsBoard(filePath)) continue;
+      void this.showBoardIn(leaf, filePath, false);
+    }
+  }
+
+  /** Give every open board note's Markdown editor a "back to the board" header button — and
+   *  only board notes, so an ordinary note's header is untouched. */
+  private syncMarkdownActions(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) continue;
+      const wanted = view.file ? this.isBoard(view.file) : false;
+      const existing = view.containerEl.querySelector(`.view-actions .${BOARD_ACTION_CLASS}`);
+      if (wanted && !existing) {
+        const action = view.addAction("layout-grid", "Open as Folia Kanban board", () => {
+          // Read the file at click time: one MarkdownView outlives the file it started on.
+          const current = view.file;
+          if (current) void this.showBoardIn(leaf, current.path, true);
+        });
+        action.addClass(BOARD_ACTION_CLASS);
+      } else if (!wanted && existing) {
+        existing.remove();
+      }
+    }
+  }
+
+  /** Swap a tab to the board, same leaf, same file. */
+  async showBoardIn(leaf: WorkspaceLeaf, filePath: string, focus: boolean): Promise<void> {
+    // Flush whatever the user typed before the editor goes away.
+    if (leaf.view instanceof MarkdownView) await leaf.view.save();
+    this.markdownPins.delete(leaf);
+    const state: NavigableViewState = {
+      type: VIEW_TYPE_KANBAN,
+      state: { file: filePath },
+      popstate: true,
+    };
+    await leaf.setViewState(state, focus ? { focus: true } : undefined);
+  }
+
+  /** Swap a tab to the Markdown editor, same leaf, same file, and remember that choice so the
+   *  patch above does not immediately bounce it back to the board. */
+  async showMarkdownIn(leaf: WorkspaceLeaf, filePath: string): Promise<void> {
+    this.markdownPins.set(leaf, filePath);
+    const state: NavigableViewState = {
+      type: "markdown",
+      state: { file: filePath },
+      popstate: true,
+    };
+    await leaf.setViewState(state, { focus: true });
+    this.syncMarkdownActions();
+  }
+
+  /** The mode a note should open in, or `null` when it is not a board. A cold metadata cache
+   *  also answers `null`: opening a board as plain Markdown once is a nuisance, opening an
+   *  ordinary note as a board is a bug. */
+  private resolveMode(file: TFile): BoardViewMode | null {
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (!cache) return null;
+    return resolveBoardViewMode(cache.frontmatter, this.settings.boardNoteDefaultView);
+  }
+
+  private shouldOpenAsBoard(filePath: string): boolean {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    return file instanceof TFile && this.resolveMode(file) === "board";
   }
 
   async activateView(): Promise<void> {
@@ -67,15 +229,26 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   private isBoard(f: TFile): boolean {
-    return this.app.metadataCache.getFileCache(f)?.frontmatter?.["folia-board"] === true;
+    return isBoardFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter);
   }
 
   private async openBoard(boardPath: string): Promise<void> {
     const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE_KANBAN)[0] ?? null;
-    if (!leaf) leaf = workspace.getLeaf(true); // wide board → main area tab
-    await leaf.setViewState({ type: VIEW_TYPE_KANBAN, active: true, state: { boardPath } });
+    // A tab already holding this note — as the board or as Markdown — is the one the user means.
+    let leaf =
+      this.leafShowing(VIEW_TYPE_KANBAN, boardPath) ?? this.leafShowing("markdown", boardPath);
+    // Otherwise reuse an existing board tab, and only then open a new one (a board wants width).
+    leaf ??= workspace.getLeavesOfType(VIEW_TYPE_KANBAN)[0] ?? workspace.getLeaf(true);
+    await this.showBoardIn(leaf, boardPath, true);
     await workspace.revealLeaf(leaf);
+  }
+
+  private leafShowing(viewType: string, filePath: string): WorkspaceLeaf | null {
+    return (
+      this.app.workspace
+        .getLeavesOfType(viewType)
+        .find((l) => l.getViewState().state?.["file"] === filePath) ?? null
+    );
   }
 
   async loadSettings(): Promise<void> {
@@ -145,6 +318,24 @@ class KanbanSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const s = this.plugin.settings;
     containerEl.empty();
+
+    new Setting(containerEl)
+      .setName("Board notes — open as")
+      .setDesc(
+        "How a note with `folia-board: true` opens from the file explorer, a link, search or the quick switcher. A single note can override this with `folia-view: board` or `folia-view: markdown` in its own frontmatter, and the button in the tab header swaps between the two at any time.",
+      )
+      .addDropdown((d) =>
+        d
+          .addOption("board", "The board")
+          .addOption("markdown", "The markdown editor")
+          .setValue(s.boardNoteDefaultView)
+          .onChange(
+            (v) =>
+              void this.plugin.updateSettings({
+                boardNoteDefaultView: v as KanbanSettings["boardNoteDefaultView"],
+              }),
+          ),
+      );
 
     new Setting(containerEl)
       .setName("Card details — presentation")

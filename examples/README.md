@@ -6,7 +6,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 
 1. **Open this `examples/` folder as a vault** in Obsidian (`Open folder as vault` → pick this `examples/` folder). The Feature Showcase board points `card-folder` at `feature-showcase/Cards`, read **from the vault root**, so this folder needs to be the vault root for it to resolve.
 2. Enable **Folia Kanban** under Settings → Community plugins (install it manually first if needed — see the repo's main README). Trust the author if Obsidian prompts you.
-3. Open either board note (below) and run the command **"Open Folia Kanban board"**, or click the layout-grid ribbon icon.
+3. Click either board note (below) in the file explorer — it opens as the board. The command **"Open Folia Kanban board"** and the layout-grid ribbon icon do the same thing without hunting for the note first. To see the note's raw Markdown, use the **Edit as markdown** button in the tab header; the button in the editor takes you back.
 
 > [!note]
 > Want these in your own vault instead? Copy a board's folder anywhere. `basic/` just works — its `card-folder: ./Cards` travels with the note. For `feature-showcase/` you also edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`), or to `./Cards` to make it portable too.
@@ -50,6 +50,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 - **Right-click** a card for the context menu (mark done, change priority, move, add subcard, delete). Right-click a surfaced next-todo to toggle or remove it.
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
 - **Live reload:** edit a card `.md` in another pane and watch the board update.
+- **Swap the tab's view:** the tab header button flips between the board and the note's Markdown. Settings → *Board notes — open as* picks which one a board note starts in, and adding `folia-view: markdown` to one board note's frontmatter overrides that for that note alone.
 - **Rename a title-sourced card:** rename `04-tune-the-search-index` from the board and its `# ` heading is rewritten — the file keeps its slug name. Rename `Ship the release notes` and its `title:` frontmatter value changes instead.
 
 ## Authoring gotchas (worth knowing)

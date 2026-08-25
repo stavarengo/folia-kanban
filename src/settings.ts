@@ -1,4 +1,5 @@
 import type { HistoryScope } from "./model/types";
+import type { BoardViewMode } from "./viewMode";
 
 export interface KanbanSettings {
   detailPresentation: "side" | "modal";
@@ -13,6 +14,9 @@ export interface KanbanSettings {
    *  - "empty": plain left-drag pans, but only from an empty board-background area; cards/columns keep
    *    plain drag for their own interactions. (Middle-button drag still pans from anywhere.) */
   boardPan: "shift" | "empty";
+  /** Which view a board note opens in when it is opened as a file (explorer, link, search,
+   *  quick switcher, restored tab). A note's own `folia-view` property overrides it. */
+  boardNoteDefaultView: BoardViewMode;
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
@@ -24,6 +28,7 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   cardNextTodos: 0,
   historyScope: "all",
   boardPan: "shift",
+  boardNoteDefaultView: "board",
 };
 
 export const DETAIL_WIDTH_MIN = 280;
