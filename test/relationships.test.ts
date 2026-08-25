@@ -75,6 +75,18 @@ describe("relationship frontmatter", () => {
     expect(withoutRelation({ blocks: ["[[A]]"] }, "blocks", "Z")).toBeNull();
   });
 
+  it("treats an aliased or anchored target as the same relationship the board resolves it to", () => {
+    // `[[A|see this]]`, `[[A#Notes]]` and `[[A]]` all name card A, so the list must never hold two
+    // of them: the board shows one row, and one click on it has to clear the relationship.
+    expect(withRelation({ blocks: ["[[A|see this]]"] }, "blocks", "A")).toBeNull();
+    expect(withRelation({ blocks: ["[[A#Notes]]"] }, "blocks", "A")).toBeNull();
+    expect(
+      withoutRelation({ blocks: ["[[A|see this]]", "[[A]]", "[[B]]"] }, "blocks", "A"),
+    ).toEqual(["[[B]]"]);
+    // Case is kept, matching how the board itself binds a link.
+    expect(withRelation({ blocks: ["[[A]]"] }, "blocks", "a")).toEqual(["[[A]]", "[[a]]"]);
+  });
+
   it("normalizes a bare hand-written target only as a side effect of editing that list", () => {
     expect(withRelation({ blocks: ["A"] }, "blocks", "B")).toEqual(["[[A]]", "[[B]]"]);
   });

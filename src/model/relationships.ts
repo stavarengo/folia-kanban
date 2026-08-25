@@ -44,6 +44,17 @@ export function relationTarget(value: string): string {
 }
 
 /**
+ * The part of a target that decides WHICH card it names: the alias and the heading anchor dropped,
+ * since `buildBoard` resolves `[[A|see this]]`, `[[A#Notes]]` and `[[A]]` to the same card. Two
+ * stored entries that share an identity are one relationship, so the list must not hold both — the
+ * board would collapse them into a single row that one click could not clear. Case is kept, matching
+ * how the board itself binds a link.
+ */
+function targetIdentity(value: string): string {
+  return (relationTarget(value).split("#")[0]?.split("|")[0] ?? "").trim();
+}
+
+/**
  * How a target is written back. Always exactly one pair of brackets, so a target that ARRIVES
  * bracketed (someone typing `[[Other card]]` into the field, rather than picking a suggestion)
  * cannot come out as `[[[[Other card]]]]`.
@@ -61,7 +72,7 @@ export function relationLinkText(target: string): string {
  * card: the board refuses to bind an ambiguous name at all, so that link would be dead anyway.
  */
 export function isSelfRelation(path: string, basename: string, target: string): boolean {
-  const raw = relationTarget(target).split("#")[0]?.split("|")[0]?.trim() ?? "";
+  const raw = targetIdentity(target);
   if (!raw) return true;
   const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
   if (withMd === path) return true;
@@ -106,13 +117,15 @@ export function withRelation(
 ): string[] | null {
   const current = readRelations(fm, type);
   const next = relationTarget(target);
-  if (!next || current.includes(next)) return null;
+  if (!next || current.some((t) => targetIdentity(t) === targetIdentity(next))) return null;
   return [...current, next].map(relationLinkText);
 }
 
 /**
- * The stored list after removing `target`, or `null` when the target was not there. An empty
- * result comes back as an empty array; the caller drops the key rather than leave a `blocks: []`.
+ * The stored list after removing `target`, or `null` when the target was not there. Every entry
+ * naming the same card goes, not just the one written the same way, so removing the single row the
+ * board shows for them really clears it. An empty result comes back as an empty array; the caller
+ * drops the key rather than leave a `blocks: []`.
  */
 export function withoutRelation(
   fm: Record<string, unknown>,
@@ -120,7 +133,7 @@ export function withoutRelation(
   target: string,
 ): string[] | null {
   const current = readRelations(fm, type);
-  const gone = relationTarget(target);
-  if (!current.includes(gone)) return null;
-  return current.filter((t) => t !== gone).map(relationLinkText);
+  const gone = targetIdentity(target);
+  if (!current.some((t) => targetIdentity(t) === gone)) return null;
+  return current.filter((t) => targetIdentity(t) !== gone).map(relationLinkText);
 }
