@@ -1349,6 +1349,17 @@
 .folia-comment-text.markdown-rendered > :first-child {
   margin-top: 0;
 }
+/* A card's description can hold the note's own headings (`## Question`, `## Answer`, …), so they
+   render here. Left to the theme they come in at reading-view size — larger than the panel's own
+   card title — which inverts the panel's hierarchy in a narrow column. Cap them to the panel scale
+   and let weight, not size, carry the structure; the compound scope is for the same specificity
+   reason as above. */
+.folia-desc-rendered.markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
+  font-size: var(--folia-font-size-md-plus);
+  line-height: 1.35;
+  font-weight: var(--folia-font-weight-semibold);
+}
+
 .folia-desc-rendered.markdown-rendered > :last-child,
 .folia-comment-text.markdown-rendered > :last-child {
   margin-bottom: 0;
