@@ -38,10 +38,17 @@ const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
   render(<App repo={repo} settings={settings} onUpdateSettings={() => {}} today="2026-06-13" />);
 
 /** Same as `render_`, but settings updates (e.g. a subitems-collapse toggle) actually apply —
- *  needed for anything that reads its own patch back through `useSettings()`. */
-function renderStateful(repo: FakeRepo, initial: KanbanSettings) {
+ *  needed for anything that reads its own patch back through `useSettings()`. `settingsBox`, when
+ *  given, is kept pointed at the live settings object after every update, for assertions on state
+ *  that has no visible DOM signal (e.g. exactly which paths `collapsedCards` holds). */
+function renderStateful(
+  repo: FakeRepo,
+  initial: KanbanSettings,
+  settingsBox?: { current: KanbanSettings },
+) {
   function Stateful() {
     const [settings, setSettings] = useState(initial);
+    if (settingsBox) settingsBox.current = settings;
     return (
       <App
         repo={repo}
@@ -928,13 +935,19 @@ describe("collapse/expand subitems", () => {
     expect(alphaTree.querySelector(".folia-subcard-group")).not.toBeNull();
     const toggle = within(alpha).getByRole("button", { name: 'Hide subitems for "Alpha"' });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Icon() must merge a caller className onto its own base class, not replace it — this toggle
+    // is the first caller to pass one, and losing `folia-icon` would silently drop the icon's
+    // sizing/alignment rules along with the chevron-rotation state class.
+    expect(toggle.querySelector("svg")).toHaveClass("folia-icon");
 
     await user.click(toggle);
 
     // Alpha has 3 checklist lines total (2 todos + 1 subcard link), 1 already done.
-    expect(
-      within(alpha).getByRole("button", { name: 'Show 3 subitems, 1 done, for "Alpha"' }),
-    ).toBeInTheDocument();
+    const collapsedToggle = within(alpha).getByRole("button", {
+      name: 'Show 3 subitems, 1 done, for "Alpha"',
+    });
+    expect(collapsedToggle).toBeInTheDocument();
+    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "is-collapsed");
     expect(within(alpha).queryByText("first todo")).toBeNull();
     expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
 
@@ -981,7 +994,8 @@ describe("collapse/expand subitems", () => {
       },
       "Tasks/Leaf.md": { fm: { type: "task" }, body: "\n# Leaf\n" },
     });
-    renderStateful(repo, DEFAULT_SETTINGS);
+    const settingsBox = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, DEFAULT_SETTINGS, settingsBox);
     await screen.findByText("Root");
     const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
     // Everything is nested and visible up front.
@@ -993,6 +1007,12 @@ describe("collapse/expand subitems", () => {
 
     expect(within(todoCol).queryByText("Mid")).toBeNull();
     expect(within(todoCol).queryByText("Leaf")).toBeNull();
+    // Leaf has no children of its own — collapse-all writes an override only for cards whose
+    // own toggle actually does something, so Leaf never gets a wasted `data.json` entry.
+    expect(Object.keys(settingsBox.current.collapsedCards).sort()).toEqual([
+      "Tasks/Mid.md",
+      "Tasks/Root.md",
+    ]);
 
     await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
     await user.click(screen.getByRole("button", { name: "Expand all subitems" }));
@@ -1028,6 +1048,35 @@ describe("collapse/expand subitems", () => {
       within(renamed.closest(".folia-card") as HTMLElement).getByRole("button", {
         name: 'Show 3 subitems, 1 done, for "Renamed Alpha"',
       }),
+    ).toBeInTheDocument();
+  });
+
+  it("deleting a card prunes its collapsed override, so a later card at the same path isn't handed it", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    renderStateful(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    let todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    await user.click(within(todoCol).getByRole("button", { name: 'Hide subitems for "Alpha"' }));
+
+    const alpha = within(todoCol).getByText("Alpha").closest(".folia-card") as HTMLElement;
+    await user.click(within(alpha).getByRole("button", { name: /Delete "Alpha"/ }));
+    await user.click(within(alpha).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(repo.files.has("Tasks/Alpha.md")).toBe(false));
+
+    // Recreate a card at the exact same path and confirm it starts at the board default
+    // (expanded), not silently collapsed by Alpha's stale override.
+    repo.files.set("Tasks/Alpha.md", {
+      basename: "Alpha",
+      fm: { type: "task", status: "todo" },
+      body: "\n# Alpha\n\n## Subtasks\n- [ ] new todo\n- [ ] [[Beta]]\n",
+    });
+    repo.notify();
+    todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const newAlpha = await within(todoCol).findByText("new todo");
+    expect(newAlpha).toBeInTheDocument();
+    const newAlphaCard = newAlpha.closest(".folia-card") as HTMLElement;
+    expect(
+      within(newAlphaCard).getByRole("button", { name: 'Hide subitems for "Alpha"' }),
     ).toBeInTheDocument();
   });
 });

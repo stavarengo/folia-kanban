@@ -318,6 +318,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             reportError(e);
           } finally {
             setSelected((cur) => (cur === path ? null : cur));
+            // Prune its collapse-state override (§ collapse), same reason renameCard migrates
+            // one: left behind, it would silently hand its collapsed/expanded state to an
+            // unrelated card someone later creates at this same path.
+            if (settingsRef.current.collapsedCards[path] !== undefined) {
+              const nextCollapsed = { ...settingsRef.current.collapsedCards };
+              delete nextCollapsed[path];
+              onUpdateSettings({ collapsedCards: nextCollapsed });
+            }
             await load();
           }
         })();

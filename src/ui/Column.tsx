@@ -410,9 +410,21 @@ export function Column({
             // the lane rule and the global search filter), so a filtered column only touches what
             // the user can see. The whole family, not just the top-level tiles: an "expand all"
             // that stopped there would leave a grandchild collapsed from an earlier individual
-            // toggle still hidden.
-            onCollapseAll={() => subitems.setMany(subtreePaths(board, paths), true)}
-            onExpandAll={() => subitems.setMany(subtreePaths(board, paths), false)}
+            // toggle still hidden. Filtered to cards that actually have children — a leaf card has
+            // no toggle and no group to hide, so giving it an override would just be a wasted
+            // `data.json` entry nothing ever reads.
+            onCollapseAll={() =>
+              subitems.setMany(
+                subtreePaths(board, paths).filter((p) => (board.childrenOf[p]?.length ?? 0) > 0),
+                true,
+              )
+            }
+            onExpandAll={() =>
+              subitems.setMany(
+                subtreePaths(board, paths).filter((p) => (board.childrenOf[p]?.length ?? 0) > 0),
+                false,
+              )
+            }
           />
         )}
       </header>

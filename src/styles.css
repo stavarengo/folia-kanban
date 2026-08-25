@@ -1023,7 +1023,9 @@
 .folia-card-subitems-toggle .folia-icon {
   transition: transform var(--folia-dur-fast) var(--folia-ease);
 }
-.folia-card-subitems-toggle .folia-icon.is-collapsed {
+/* Unscoped so the same "points right when collapsed" reading also works for the static
+   collapse-all/expand-all menu icons (ColumnMenu), which aren't inside `.folia-card-subitems-toggle`. */
+.folia-icon.is-collapsed {
   transform: rotate(-90deg);
 }
 

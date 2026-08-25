@@ -116,10 +116,14 @@ interface IconProps extends SVGProps<SVGSVGElement> {
   size?: number;
 }
 
-export function Icon({ name, size = 16, ...rest }: IconProps): JSX.Element {
+export function Icon({ name, size = 16, className, ...rest }: IconProps): JSX.Element {
   return (
     <svg
-      className="folia-icon"
+      // `{...rest}` still wins for every other prop (a caller override is deliberate there), but
+      // `className` alone is additive: spreading it after the base class would drop `folia-icon`
+      // whenever a caller passes one (e.g. a state class like `is-collapsed`), and every consumer
+      // relies on `folia-icon` for sizing/alignment as well as any state-scoped CSS selector.
+      className={className ? `folia-icon ${className}` : "folia-icon"}
       width={size}
       height={size}
       viewBox="0 0 24 24"
