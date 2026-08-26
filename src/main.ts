@@ -367,13 +367,6 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Add the board properties to a note that already exists. */
   private async convertToBoard(file: TFile): Promise<void> {
     try {
-      // Flush the editor before the file is read and rewritten. The buffer of a note being typed in
-      // is ahead of the disk, and it gets written out when the tab swaps to the board a moment from
-      // now — after the properties have landed, which would take them straight back out again.
-      for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-        const view = leaf.view;
-        if (view instanceof MarkdownView && view.file === file) await view.save();
-      }
       await this.makeBoard(file);
     } catch (e) {
       new Notice(`Folia Kanban: could not convert this note into a board. ${String(e)}`, 8000);
@@ -384,6 +377,14 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  frontmatter API — which is what puts them at the very top, whether or not the note had any —
    *  give the board a card folder of its own, and show it. */
   private async makeBoard(file: TFile): Promise<void> {
+    // The tab the board will land in is settled first, because it is also the one whose editor has
+    // to be flushed *before* the write. A note being typed in has a buffer ahead of the disk, and
+    // `showBoardIn` writes that buffer out when the tab swaps — after the properties have landed,
+    // which would take them straight back out again. Only this one tab is saved: another tab on the
+    // same note has its own buffer, and saving that one too would let it overwrite this one.
+    const open = this.leafShowing("markdown", file.path);
+    if (open?.view instanceof MarkdownView) await open.view.save();
+
     const cards = cardFolderFor(file.parent?.path ?? "", (p) => this.exists(p));
     let ownFolder = false;
     await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
@@ -393,23 +394,18 @@ export default class FoliaKanbanPlugin extends Plugin {
     // nicety lost, not a step missed. Having it is what makes the first open an empty board rather
     // than the notice about a folder that is not there.
     if (ownFolder) await this.app.vault.createFolder(cards.path).catch(() => {});
-    await this.openNewBoard(file);
+
+    // Straight to the board view rather than through the file-open redirect: that one asks the
+    // metadata cache what the note is, and the cache has not read the frontmatter written a moment
+    // ago, so it would answer "ordinary note" and leave the user in the editor. A tab holding some
+    // *other* board is left alone too, which is where `openBoard` would have put this one.
+    const leaf = open ?? this.app.workspace.getLeaf(true);
+    await this.showBoardIn(leaf, file.path, true);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   private exists(path: string): boolean {
     return this.app.vault.getAbstractFileByPath(path) !== null;
-  }
-
-  /** Show a just-created or just-converted board. Two things it deliberately does not do, both of
-   *  which `openBoard` does: it does not go through the file-open redirect, which asks the metadata
-   *  cache what the note is and has not read the frontmatter written a moment ago, so it would
-   *  answer "ordinary note" and leave the user in the editor; and it does not retarget a tab holding
-   *  some *other* board, which would close the board the user was looking at. */
-  private async openNewBoard(file: TFile): Promise<void> {
-    const { workspace } = this.app;
-    const leaf = this.leafShowing("markdown", file.path) ?? workspace.getLeaf(true);
-    await this.showBoardIn(leaf, file.path, true);
-    await workspace.revealLeaf(leaf);
   }
 
   /** Every note flagged `folia-board: true` in its frontmatter. */
