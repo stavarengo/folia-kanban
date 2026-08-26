@@ -89,7 +89,7 @@ export function ColumnMenu({
   return createPortal(
     // a11y exception (no-noninteractive-element-interactions): dialog surface: onKeyDown drives Escape on a role=dialog + focus-managed menu
     <div
-      className="folia-menu"
+      className="folia-menu folia-scope"
       ref={ref}
       role="dialog"
       aria-label={`Column options: ${column.title}`}

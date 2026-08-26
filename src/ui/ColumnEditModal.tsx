@@ -101,7 +101,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
 
   return createPortal(
     <div
-      className="folia-modal-backdrop"
+      className="folia-modal-backdrop folia-scope"
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

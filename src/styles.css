@@ -9,9 +9,20 @@
    `background` or `box-shadow` on a <button> silently loses in the real app while looking correct
    in jsdom, where no theme is loaded. Naming the class twice matches exactly the same elements one
    specificity step higher, which is enough. `pnpm buttons:check` (scripts/check-button-styles.mjs)
-   holds the line so nobody has to remember the trap. */
+   holds the line so nobody has to remember the trap.
 
-.folia-root {
+   The token block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down
+   the tree, and several surfaces are portalled OUT of the board root — the card context menu and
+   the column popover to the document body, the edit-column modal to the body, the drag overlay to
+   the board's own body — so a token declared on the root alone resolves to nothing inside them:
+   priority chips lose their colour, radii, shadows and font sizes go dead. Every element the
+   plugin portals outside the root therefore carries `folia-scope` as well, which re-declares the
+   same tokens there. `pnpm portals:check` (scripts/check-portal-scope.mjs) keeps that pairing
+   honest, including the one portal that must NOT carry it: the detail panel is portalled INTO the
+   root, where the class would shadow the live `--folia-statusbar-clearance` App sets on the root
+   element with the static fallback below. */
+
+.folia-scope {
   /* radii */
   --folia-r-sm: 6px;
   --folia-r: 8px;
@@ -599,7 +610,14 @@
   /* Above cards (z 2), the float detail panel (z 55) and the modal backdrop (z 70). Stacking holds
      because the menu is portalled to <body> and the board containers create no stacking context. */
   z-index: var(--folia-z-index-modal);
-  width: 200px;
+  /* Sized to its longest label ("Copy path relative to board folder") instead of a fixed width that
+     clipped it. The clamp keeps a wide priority row wrapping rather than stretching the menu, and
+     the stable gutter stops the scrollbar — this menu is tall enough to scroll — from sitting on
+     top of the last few characters. */
+  width: max-content;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  scrollbar-gutter: stable;
   gap: 2px;
   padding: 6px;
 }
@@ -1765,7 +1783,7 @@
 }
 
 /* ------------------------------------------------------------------ focus visibility */
-.folia-root :focus-visible {
+.folia-scope :focus-visible {
   outline: 2px solid var(--folia-accent);
   outline-offset: 2px;
   border-radius: var(--folia-r-sm);
@@ -1931,7 +1949,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .folia-root *,
+  .folia-scope *,
   .folia-detail,
   .folia-menu,
   .folia-modal,

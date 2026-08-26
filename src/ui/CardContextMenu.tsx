@@ -121,7 +121,7 @@ export function CardContextMenu({
 
   return createPortal(
     <div
-      className="folia-menu folia-card-context"
+      className="folia-menu folia-card-context folia-scope"
       ref={ref}
       role="menu"
       tabIndex={-1}

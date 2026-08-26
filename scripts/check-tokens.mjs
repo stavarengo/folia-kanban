@@ -3,7 +3,7 @@
 //
 //   Direction 1 — for every token marked $extensions.folia.live === true, its value
 //   (resolvedValue when the $value is a {ref}) byte-matches the matching --folia-*
-//   declaration inside the .folia-root token block in src/styles.css. The mapping is
+//   declaration inside the .folia-scope token block in src/styles.css. The mapping is
 //   set-equal both ways: no live token without a declaration, no --folia-* declaration
 //   without a live token.
 //
@@ -67,12 +67,14 @@ for (const file of readdirSync(tokensDir).filter((f) => f.endsWith(".tokens.json
 }
 
 // ----------------------------------------------------- parse the styles.css block
-// The first `.folia-root { … }` block holds the --folia-* declarations. Only the
-// declaration lines (`^\s*--folia-…: …;`) inside that first block count, so later
-// blocks and `var(--folia-…)` usages elsewhere never leak in.
+// The `.folia-scope { … }` rule holds the --folia-* declarations. Only the declaration
+// lines (`^\s*--folia-…: …;`) inside it count, so later blocks and `var(--folia-…)`
+// usages elsewhere never leak in. The selector is matched at the start of a line so a
+// mention of it inside the file's header comment — which contains braces of its own —
+// can never be taken for the block itself.
 const css = readFileSync(cssPath, "utf8");
-const blockStart = css.indexOf(".folia-root");
-if (blockStart === -1) errors.push("[styles.css] no .folia-root block found");
+const blockStart = css.search(/^\.folia-scope\s*\{/m);
+if (blockStart === -1) errors.push("[styles.css] no .folia-scope block found");
 const braceOpen = css.indexOf("{", blockStart);
 const braceClose = css.indexOf("}", braceOpen);
 const block = css.slice(braceOpen + 1, braceClose);
@@ -106,7 +108,7 @@ for (const { file, path, node } of allTokens) {
   }
   if (!cssVars.has(cssVar)) {
     errors.push(
-      `[${file}] token ${path} expects ${cssVar} in the .folia-root block, but it is missing`,
+      `[${file}] token ${path} expects ${cssVar} in the .folia-scope block, but it is missing`,
     );
     continue;
   }

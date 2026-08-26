@@ -391,6 +391,10 @@ export function Board({
       {boardRef.current &&
         createPortal(
           <DragOverlay
+            // Portalled out of the root, so the wrapper carries the token scope itself — without it
+            // the lifted ghost draws with dead `--folia-*` vars (no radius, no shadow, no priority
+            // stripe). See the scope note at the top of styles.css.
+            className="folia-scope"
             // The live make-room gap (`dragReloc`) keeps the dragged card's placeholder at its
             // destination slot for BOTH same- and cross-column drops, so the overlay always tweens
             // cleanly from the cursor into that slot — one unconditional settle animation.

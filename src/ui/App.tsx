@@ -795,7 +795,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           <ContextsContext.Provider value={stableContexts}>
             <RelationCountsContext.Provider value={relationCountsValue}>
               <MatchContextContext.Provider value={matchCtx}>
-                <div className="folia-root" ref={rootRef}>
+                <div className="folia-root folia-scope" ref={rootRef}>
                   <Toolbar
                     ref={searchRef}
                     query={query}
