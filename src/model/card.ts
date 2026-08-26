@@ -295,10 +295,10 @@ type Timestamped = { timestamp: string; text: string; author: string | null };
  * comments", and prose has no timestamp at all.
  */
 function readEntry(lines: string[], entry: Entry): Timestamped {
-  const [first = "", ...rest] = lines
-    .slice(entry.from, entry.to)
-    .map((l) => l.replace(/\r$/, "").trim());
-  const withRest = (text: string) => [text, ...rest].join("\n").trim();
+  // Continuation lines keep their whitespace: two trailing spaces are a hard line break, and an
+  // indent may be a code block, both of which the panel renders as Markdown.
+  const [first = "", ...rest] = lines.slice(entry.from, entry.to).map((l) => l.replace(/\r$/, ""));
+  const withRest = (text: string) => [text.trimStart(), ...rest].join("\n").trim();
   if (!entry.bullet) return { timestamp: "", author: null, text: withRest(first) };
   const m = TS_LINE_RE.exec(first);
   if (m)

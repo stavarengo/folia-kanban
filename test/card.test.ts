@@ -691,9 +691,14 @@ describe("prose under Comments / History", () => {
         author: null,
         text: "**2026-08-21** — Applied and checked\nagainst the test suite.",
       },
-      { timestamp: "2026-08-22 09:00", author: null, text: "bullet\na continuation line" },
+      { timestamp: "2026-08-22 09:00", author: null, text: "bullet\n  a continuation line" },
       { timestamp: "", author: null, text: "A closing remark." },
     ]);
+  });
+
+  it("keeps a continuation line's whitespace, since a hard break or an indent means something", () => {
+    const text = parseBody("# T\n\n## Comments\n\nFirst line  \nsecond line\n").comments[0]?.text;
+    expect(text).toBe("First line  \nsecond line");
   });
 
   it("a bullet wrapped over two lines is one comment, edited and deleted as one", () => {
@@ -716,7 +721,7 @@ describe("prose under Comments / History", () => {
       );
       expect(parseBody(out).comments.map((c) => c.text)).toEqual([
         text,
-        "bullet\na continuation line",
+        "bullet\n  a continuation line",
         "A closing remark.",
       ]);
       expect(parseBody(out).history).toHaveLength(1);
