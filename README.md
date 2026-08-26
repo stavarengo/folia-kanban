@@ -147,11 +147,13 @@ Three limits are worth knowing. Only comments carrying a timestamp can be tracke
 
 ## Set up a board
 
-The quickest way is to let the plugin write the note for you. **Create board** in the command palette makes a new note that is already a board — properties in place, at the top of the file, with a `Cards` folder beside it ready for the first card. Right-clicking a folder in the file explorer offers **Create Folia board here**, which does the same thing inside that folder.
+The quickest way is to let the plugin write the note for you. **Create board** in the command palette makes a new note that is already a board — properties in place, at the top of the file, with its own `Cards` folder beside it, ready for the first card. Right-clicking a folder in the file explorer offers **Create Folia board here**, which does the same thing inside that folder.
 
-Already have a note you want to run as a board? **Convert this note into a board** in the command palette adds the properties to the note you are on, and **Convert to Folia board** does it from the file explorer's right-click menu or from the right-click menu inside the editor. Your existing text and your existing properties are left exactly as they are; only the missing board properties are added, so converting a note twice changes nothing the second time. Either way the board opens as soon as it is made.
+Already have a note you want to run as a board? **Convert this note into a board** in the command palette adds the properties to the note you are on, and **Convert to Folia board** does the same from a note's own menu — the file explorer, the tab header, or the right-click menu inside the editor. Your text is untouched and your own properties are kept: only `folia-board`, a `card-folder` and a `columns` list are added, and only where the note does not already have one, so converting a note twice changes nothing the second time. Either way the board opens as soon as it is made.
 
-Each of those three places has its own switch in Settings, so you can keep the commands and drop the menu entries (or the other way round) if a context menu is somewhere you would rather not see them.
+Each board gets a card folder of its own, named `Cards` beside the note (`Cards 1`, `Cards 2`… when that name is taken, so two boards in one folder never end up sharing one pile of cards). Move the board's folder and the cards come with it; point `card-folder` somewhere else at any time.
+
+Each of those three places — the command palette, file and folder menus, the editor menu — has its own switch in Settings, so you can keep the commands and drop the menu entries, or the other way round.
 
 Doing it by hand still works, and it is worth knowing what the guided path writes.
 
@@ -248,7 +250,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
 - **Board — horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
 - **Board setup — command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
-- **Board setup — file explorer menu** — whether right-clicking a folder offers **Create Folia board here**, and right-clicking a note offers **Convert to Folia board**.
+- **Board setup — file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
 - **Board setup — editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
 
 ## Keyboard & mouse

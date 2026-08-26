@@ -41,8 +41,8 @@ import {
 import {
   NEW_BOARD_BASENAME,
   applyBoardFrontmatter,
-  boardNoteContent,
-  cardFolderPathFor,
+  boardNoteBody,
+  cardFolderFor,
   uniqueNotePath,
 } from "./boardNote";
 import { stamp } from "./model/dates";
@@ -350,63 +350,64 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   /** Make a note that is already a board. `parent` is the folder the user right-clicked; without
-   *  one, the note lands wherever Obsidian's own "new note location" setting puts new notes. */
+   *  one, the note lands wherever Obsidian's own "new note location" setting puts new notes — which
+   *  is why the active file is passed along, since one of the settings means "beside it". */
   private async createBoard(parent: TFolder | null): Promise<void> {
-    const folder = parent ?? this.app.fileManager.getNewFileParent("");
-    const path = uniqueNotePath(
-      folder.path,
-      NEW_BOARD_BASENAME,
-      (p) => this.app.vault.getAbstractFileByPath(p) !== null,
-    );
     try {
+      const source = this.app.workspace.getActiveFile()?.path ?? "";
+      const folder = parent ?? this.app.fileManager.getNewFileParent(source);
+      const path = uniqueNotePath(folder.path, NEW_BOARD_BASENAME, (p) => this.exists(p));
       const title = path.slice(path.lastIndexOf("/") + 1, -".md".length);
-      const file = await this.app.vault.create(path, boardNoteContent(title));
-      await this.ensureCardFolder(file);
-      await this.openNewBoard(file);
+      await this.makeBoard(await this.app.vault.create(path, boardNoteBody(title)));
     } catch (e) {
       new Notice(`Folia Kanban: could not create the board note. ${String(e)}`, 8000);
     }
   }
 
-  /** Add the board properties to a note that already exists. `processFrontMatter` is what puts
-   *  them at the very top even when the note has no frontmatter yet, and leaves the rest of the
-   *  note's bytes alone. */
+  /** Add the board properties to a note that already exists. */
   private async convertToBoard(file: TFile): Promise<void> {
     try {
-      let ownFolder = false;
-      await this.app.fileManager.processFrontMatter(
-        file,
-        (frontmatter: Record<string, unknown>) => {
-          ownFolder = applyBoardFrontmatter(frontmatter);
-        },
-      );
-      if (ownFolder) await this.ensureCardFolder(file);
-      await this.openNewBoard(file);
+      // Flush the editor before the file is read and rewritten. The buffer of a note being typed in
+      // is ahead of the disk, and it gets written out when the tab swaps to the board a moment from
+      // now — after the properties have landed, which would take them straight back out again.
+      for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+        const view = leaf.view;
+        if (view instanceof MarkdownView && view.file === file) await view.save();
+      }
+      await this.makeBoard(file);
     } catch (e) {
       new Notice(`Folia Kanban: could not convert this note into a board. ${String(e)}`, 8000);
     }
   }
 
-  /** Create the folder a fresh board's `card-folder` names, so its first open is an empty board
-   *  rather than the notice about a folder that is not there. */
-  private async ensureCardFolder(boardNote: TFile): Promise<void> {
-    const path = cardFolderPathFor(boardNote.parent?.path ?? "");
-    if (this.app.vault.getAbstractFileByPath(path)) return;
-    await this.app.vault.createFolder(path).catch(() => {
-      // A board opens fine without it — the first card creates it — so this is a nicety, not a step.
+  /** The one step both guided paths share: write the board properties through Obsidian's own
+   *  frontmatter API — which is what puts them at the very top, whether or not the note had any —
+   *  give the board a card folder of its own, and show it. */
+  private async makeBoard(file: TFile): Promise<void> {
+    const cards = cardFolderFor(file.parent?.path ?? "", (p) => this.exists(p));
+    let ownFolder = false;
+    await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
+      ownFolder = applyBoardFrontmatter(frontmatter, cards.property);
     });
+    // A board opens fine without the folder — the first card creates it — so a failure here is a
+    // nicety lost, not a step missed. Having it is what makes the first open an empty board rather
+    // than the notice about a folder that is not there.
+    if (ownFolder) await this.app.vault.createFolder(cards.path).catch(() => {});
+    await this.openNewBoard(file);
   }
 
-  /** Show a just-created or just-converted board. It goes straight to the board view rather than
-   *  through the file-open redirect: that one asks the metadata cache what the note is, and the
-   *  cache has not read the frontmatter we wrote a moment ago, so it would answer "ordinary note"
-   *  and leave the user in the editor. */
+  private exists(path: string): boolean {
+    return this.app.vault.getAbstractFileByPath(path) !== null;
+  }
+
+  /** Show a just-created or just-converted board. Two things it deliberately does not do, both of
+   *  which `openBoard` does: it does not go through the file-open redirect, which asks the metadata
+   *  cache what the note is and has not read the frontmatter written a moment ago, so it would
+   *  answer "ordinary note" and leave the user in the editor; and it does not retarget a tab holding
+   *  some *other* board, which would close the board the user was looking at. */
   private async openNewBoard(file: TFile): Promise<void> {
     const { workspace } = this.app;
-    const leaf =
-      this.leafShowing(VIEW_TYPE_KANBAN, file.path) ??
-      this.leafShowing("markdown", file.path) ??
-      workspace.getLeaf(true);
+    const leaf = this.leafShowing("markdown", file.path) ?? workspace.getLeaf(true);
     await this.showBoardIn(leaf, file.path, true);
     await workspace.revealLeaf(leaf);
   }

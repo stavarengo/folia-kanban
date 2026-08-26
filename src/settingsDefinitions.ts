@@ -119,8 +119,8 @@ export const SETTING_COPY = {
     desc: "Offer the two board-setup actions in the command palette: one makes a new note that is already a board, the other adds the board properties to the note you have open.",
   },
   boardSetupFileMenu: {
-    name: "Board setup — file explorer menu",
-    desc: "Offer them when you right-click in the file explorer: on a folder, to make a board inside it; on a note, to turn that note into one.",
+    name: "Board setup — file menu",
+    desc: "Offer them wherever Obsidian gives a file or folder a menu — the file explorer, a tab header, a note's “More options”: on a folder, to make a board inside it; on a note, to turn that note into one.",
   },
   boardSetupEditorMenu: {
     name: "Board setup — editor menu",
