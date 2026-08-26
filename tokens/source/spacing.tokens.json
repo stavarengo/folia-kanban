@@ -1,5 +1,5 @@
 {
-  "$description": "Spacing scale. All live --folia-* tokens; values byte-match the .folia-root block in src/styles.css.",
+  "$description": "Spacing scale. All live --folia-* tokens; values byte-match the .folia-scope block in src/styles.css.",
   "spacing": {
     "$type": "dimension",
     "gap": {

@@ -1,5 +1,5 @@
 {
-  "$description": "Motion durations and easing. All live --folia-* tokens; values byte-match the .folia-root block in src/styles.css. (The raw 220ms toast duration at styles.css:91 is NOT a --folia-* token and is intentionally not captured here so the block mapping stays exact.)",
+  "$description": "Motion durations and easing. All live --folia-* tokens; values byte-match the .folia-scope block in src/styles.css. (The raw 220ms toast duration at styles.css:91 is NOT a --folia-* token and is intentionally not captured here so the block mapping stays exact.)",
   "motion": {
     "duration": {
       "$type": "duration",

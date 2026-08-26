@@ -5,20 +5,78 @@
 // jsdom cannot see this — it loads no stylesheet, so every test renders exactly what the component
 // wrote. This check is that missing eye, at the source level.
 //
-// The rule cuts both ways. A portal whose container is the board root (`rootRef`) is still INSIDE
-// the scope; putting the class on it would re-declare the static token fallbacks below the live
-// values App sets inline on the root element (`--folia-statusbar-clearance`), so those portals must
-// NOT carry it.
+// The rule cuts both ways. A portal whose container IS the board root (`rootRef.current`) never left
+// the scope, so the class there is redundant — and worse than redundant: it re-declares the whole
+// token block below the root, shadowing any value App sets live on the root element
+// (`--folia-statusbar-clearance` today) with the static fallback for everything underneath. So those
+// portals must not carry it. The container is matched exactly, not by substring: an expression such
+// as `rootRef.current.ownerDocument.body` names the BODY and is outside the scope like any other.
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
 
-const UI_DIR = "src/ui";
+const SRC_DIR = "src";
 const CSS_FILE = "src/styles.css";
 const SCOPE = "folia-scope";
-/** Container expressions that name a node inside the board root, where the scope already applies. */
-const INSIDE_ROOT = /rootRef/;
+/**
+ * Container expressions that ARE the board root, where the scope already applies. Matched whole:
+ * anything else — `activeDocument.body`, `x.ownerDocument.body`, a ref to some other node — counts
+ * as outside, which is the safe direction (it asks for the class rather than excusing its absence).
+ */
+const INSIDE_ROOT = [/^rootRef\.current$/];
+
+/**
+ * Characters after which a `'` can legitimately open a JS string. In JSX TEXT an apostrophe is just
+ * an apostrophe ("Don't"), and treating it as a quote would swallow the rest of the call; a real
+ * string literal always follows an operator, a bracket or a comma.
+ */
+const QUOTE_OPENERS = new Set([
+  "",
+  "(",
+  "[",
+  "{",
+  ",",
+  ":",
+  "=",
+  "?",
+  "&",
+  "|",
+  "!",
+  "+",
+  ";",
+  ">",
+]);
+
+/** True when the `'`/`"`/`` ` `` at `i` opens a string rather than sitting inside JSX text. */
+function opensString(src, i) {
+  if (src[i] !== "'") return true;
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(src[j])) j--;
+  return QUOTE_OPENERS.has(j < 0 ? "" : src[j]);
+}
+
+/** Index of the character after the string/comment starting at `i`, or `i` when nothing starts there. */
+function skipInert(src, i) {
+  const c = src[i];
+  if (c === '"' || c === "'" || c === "`") {
+    if (!opensString(src, i)) return i;
+    for (let j = i + 1; j < src.length; j++) {
+      if (src[j] === "\\") j++;
+      else if (src[j] === c) return j;
+    }
+    return src.length;
+  }
+  if (c === "/" && src[i + 1] === "/") {
+    const nl = src.indexOf("\n", i);
+    return nl === -1 ? src.length : nl;
+  }
+  if (c === "/" && src[i + 1] === "*") {
+    const end = src.indexOf("*/", i);
+    return end === -1 ? src.length : end + 1;
+  }
+  return i;
+}
 
 /**
  * Index just past the `)` that closes the call whose `(` is at `open`, ignoring parens inside
@@ -27,26 +85,12 @@ const INSIDE_ROOT = /rootRef/;
 function endOfCall(src, open) {
   let depth = 0;
   for (let i = open; i < src.length; i++) {
+    const skipped = skipInert(src, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
     const c = src[i];
-    if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      for (i++; i < src.length; i++) {
-        if (src[i] === "\\") i++;
-        else if (src[i] === quote) break;
-      }
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      i = src.indexOf("\n", i);
-      if (i === -1) return -1;
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "*") {
-      i = src.indexOf("*/", i);
-      if (i === -1) return -1;
-      i++;
-      continue;
-    }
     if (c === "(" || c === "[" || c === "{") depth++;
     else if (c === ")" || c === "]" || c === "}") {
       depth--;
@@ -62,26 +106,12 @@ function splitArgs(inner) {
   let depth = 0;
   let start = 0;
   for (let i = 0; i < inner.length; i++) {
+    const skipped = skipInert(inner, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
     const c = inner[i];
-    if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      for (i++; i < inner.length; i++) {
-        if (inner[i] === "\\") i++;
-        else if (inner[i] === quote) break;
-      }
-      continue;
-    }
-    if (c === "/" && inner[i + 1] === "/") {
-      i = inner.indexOf("\n", i);
-      if (i === -1) break;
-      continue;
-    }
-    if (c === "/" && inner[i + 1] === "*") {
-      i = inner.indexOf("*/", i);
-      if (i === -1) break;
-      i++;
-      continue;
-    }
     // JSX angle brackets are deliberately not counted: `=>` and `/>` would unbalance them. Parens
     // and braces are enough, since every comma that could matter sits inside one of those.
     if (c === "(" || c === "[" || c === "{") depth++;
@@ -96,10 +126,36 @@ function splitArgs(inner) {
   return args.filter((a) => a.trim() !== "");
 }
 
-/** The first `className=…` value in a JSX fragment: the portal root's own classes. */
-function firstClassName(jsx) {
-  const m = /className\s*=\s*(?:"([^"]*)"|\{([\s\S]*?)\})/.exec(jsx);
-  if (!m) return null;
+/**
+ * The portal root's own opening tag — from its `<` to the `>` that ends that tag, and no further,
+ * so a className on a CHILD can never be mistaken for the root's. Returns null when the first
+ * argument is not a JSX element literal (a variable, a call), which the caller reports rather than
+ * waves through: this check can only see classes written here.
+ */
+function openingTag(jsx) {
+  const start = jsx.indexOf("<");
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start + 1; i < jsx.length; i++) {
+    const skipped = skipInert(jsx, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
+    const c = jsx[i];
+    if (c === "{" || c === "(") depth++;
+    else if (c === "}" || c === ")") depth--;
+    else if (c === "<" && depth === 0)
+      return null; // a child tag before this one closed: malformed
+    else if (c === ">" && depth === 0) return jsx.slice(start, i + 1);
+  }
+  return null;
+}
+
+/** The `className=…` value on that opening tag, or "" when it declares none. */
+function rootClassName(tag) {
+  const m = /className\s*=\s*(?:"([^"]*)"|\{([\s\S]*)\})/.exec(tag);
+  if (!m) return "";
   return m[1] ?? m[2];
 }
 
@@ -121,7 +177,7 @@ if (!/^\.folia-scope\s*\{/m.test(css)) {
   errors.push(`[${CSS_FILE}] no .folia-scope rule — the token block must hang off the scope class`);
 }
 
-for (const file of (await tsxFiles(UI_DIR)).sort()) {
+for (const file of (await tsxFiles(SRC_DIR)).sort()) {
   const src = await readFile(file, "utf8");
   for (const m of src.matchAll(/createPortal\s*\(/g)) {
     const open = m.index + m[0].length - 1;
@@ -138,10 +194,20 @@ for (const file of (await tsxFiles(UI_DIR)).sort()) {
       continue;
     }
     checked++;
-    const classes = firstClassName(args[0]) ?? "";
-    const container = args[args.length - 1];
-    const scoped = classes.includes(SCOPE);
-    if (INSIDE_ROOT.test(container)) {
+    const tag = openingTag(args[0]);
+    if (tag === null) {
+      errors.push(
+        `[${where}] the portalled element is not a JSX literal here, so its classes cannot be ` +
+          `checked. Portal a real element and put \`${SCOPE}\` on it.`,
+      );
+      continue;
+    }
+    const classes = rootClassName(tag);
+    const container = args[args.length - 1].trim();
+    // Tokenised rather than split on whitespace, so a computed className (`{"a " + b}`) whose
+    // quotes cling to the first and last word is still read class by class.
+    const scoped = (classes.match(/[A-Za-z0-9_-]+/g) ?? []).includes(SCOPE);
+    if (INSIDE_ROOT.some((re) => re.test(container))) {
       if (scoped) {
         errors.push(
           `[${where}] portals into the board root but carries \`${SCOPE}\`: that re-declares the ` +

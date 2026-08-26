@@ -19,8 +19,9 @@
    plugin portals outside the root therefore carries `folia-scope` as well, which re-declares the
    same tokens there. `pnpm portals:check` (scripts/check-portal-scope.mjs) keeps that pairing
    honest, including the one portal that must NOT carry it: the detail panel is portalled INTO the
-   root, where the class would shadow the live `--folia-statusbar-clearance` App sets on the root
-   element with the static fallback below. */
+   root, where the tokens already inherit, so the class would only re-declare the block a second
+   time below the root — shadowing whatever App sets live on the root element
+   (`--folia-statusbar-clearance`) with the static fallback for everything under that portal. */
 
 .folia-scope {
   /* radii */
@@ -34,6 +35,7 @@
   --folia-gap: 10px;
   --folia-pad: 12px;
   --folia-col-w: 300px; /* single source for column width + drag-overlay width */
+  --folia-menu-w-max: 320px; /* widest a popover may grow to fit its longest label */
   --folia-detail-w: 380px; /* side panel width; overridden inline from settings.detailWidth */
   --folia-statusbar-clearance: 32px; /* fallback; App measures the real status bar and sets it live */
 
@@ -143,8 +145,13 @@
   height: 100%;
   min-height: 0;
   background: var(--background-primary);
-  font-size: var(--font-ui-small, 13px);
   position: relative;
+}
+/* The board's base size travels with the token scope, not with the root: a portalled menu sits in
+   the document body, where `font: inherit` on its buttons would otherwise mean the app's font
+   rather than the board's. */
+.folia-scope {
+  font-size: var(--font-ui-small, 13px);
 }
 .folia-main {
   display: flex;
@@ -616,7 +623,7 @@
      top of the last few characters. */
   width: max-content;
   min-width: 200px;
-  max-width: min(320px, calc(100vw - 16px));
+  max-width: min(var(--folia-menu-w-max), calc(100vw - 2 * var(--folia-pad)));
   scrollbar-gutter: stable;
   gap: 2px;
   padding: 6px;
@@ -1790,6 +1797,13 @@
 }
 .folia-card-main:focus-visible {
   outline-offset: -2px;
+}
+/* The rule above rounds an element that has no radius of its own; these three are pills and keep
+   their shape. They live only in portalled surfaces, which is where the rule started applying. */
+.folia-swatch:focus-visible,
+.folia-menu-prio:focus-visible,
+.folia-menu-column:focus-visible {
+  border-radius: var(--folia-r-pill);
 }
 
 /* ================================================================== col-config (#1,#6,#8,#10) */

@@ -1,5 +1,5 @@
 {
-  "$description": "Elevation shadows and the focus ring. card/card-hover/overlay/pop are live --folia-* tokens (byte-match the .folia-root block). ring/panel are NEW token homes for shadows currently raw outside the block (no --folia-* var yet).",
+  "$description": "Elevation shadows and the focus ring. card/card-hover/overlay/pop are live --folia-* tokens (byte-match the .folia-scope block). ring/panel are NEW token homes for shadows currently raw outside the block (no --folia-* var yet).",
   "shadow": {
     "$type": "shadow",
     "card": {

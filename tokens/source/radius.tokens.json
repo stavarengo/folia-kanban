@@ -1,5 +1,5 @@
 {
-  "$description": "Corner radius scale. sm/md/lg/xl are live --folia-* tokens (byte-match the .folia-root block). pill is a NEW token home for the raw 999px used ~10x outside the block (no --folia-* var yet).",
+  "$description": "Corner radius scale. sm/md/lg/xl are live --folia-* tokens (byte-match the .folia-scope block). pill is a NEW token home for the raw 999px used ~10x outside the block (no --folia-* var yet).",
   "radius": {
     "$type": "dimension",
     "sm": {

@@ -1,11 +1,16 @@
 {
-  "$description": "Layout/hit-target sizes. Both live --folia-* tokens; values byte-match the .folia-root block in src/styles.css.",
+  "$description": "Layout/hit-target sizes. All live --folia-* tokens; values byte-match the .folia-scope block in src/styles.css.",
   "size": {
     "$type": "dimension",
     "col-w": {
       "$description": "Single source for column width + drag-overlay width.",
       "$value": "300px",
       "$extensions": { "folia": { "cssVar": "--folia-col-w", "live": true } }
+    },
+    "menu-w-max": {
+      "$description": "Widest a popover may grow to fit its longest label (card context menu).",
+      "$value": "320px",
+      "$extensions": { "folia": { "cssVar": "--folia-menu-w-max", "live": true } }
     },
     "detail-w": {
       "$description": "Side-panel width; overridden inline from settings.detailWidth.",

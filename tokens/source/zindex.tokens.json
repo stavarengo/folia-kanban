@@ -1,5 +1,5 @@
 {
-  "$description": "NEW category. Captures the z-index ladder currently raw in src/styles.css (values 1, 2, 30, 50, 55, 60, 70, 80, 90) as a named scale by stacking role. The --folia-* z-index vars are now defined in the .folia-root token block; these tokens are byte-matched against it.",
+  "$description": "NEW category. Captures the z-index ladder currently raw in src/styles.css (values 1, 2, 30, 50, 55, 60, 70, 80, 90) as a named scale by stacking role. The --folia-* z-index vars are now defined in the .folia-scope token block; these tokens are byte-matched against it.",
   "z-index": {
     "$type": "number",
     "base": {

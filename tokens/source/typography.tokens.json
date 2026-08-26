@@ -1,5 +1,5 @@
 {
-  "$description": "NEW category. Captures the font-size and font-weight raw values currently in use in src/styles.css as a named typographic scale, so a source of truth exists. The --folia-* typography vars are now defined in the .folia-root token block; these tokens are byte-matched against it. Font-size names follow the usage ladder (xs..xl); weights named by role.",
+  "$description": "NEW category. Captures the font-size and font-weight raw values currently in use in src/styles.css as a named typographic scale, so a source of truth exists. The --folia-* typography vars are now defined in the .folia-scope token block; these tokens are byte-matched against it. Font-size names follow the usage ladder (xs..xl); weights named by role.",
   "font-size": {
     "$type": "dimension",
     "$description": "Distinct font-size literals in styles.css: 10, 10.5, 11, 12, 12.5, 13, 13.5, 15, 16 px.",
