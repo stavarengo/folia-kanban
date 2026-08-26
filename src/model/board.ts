@@ -1040,11 +1040,9 @@ export function moveCard(
 ): CardMutation | null {
   const card = board.cards[cardPath];
   if (!card) return null;
+  const fromStatus = String(card.frontmatter.status ?? "");
   const todoRef = card.todoRef;
   if (todoRef) return moveSubtask(board, todoRef.parentPath, todoRef.index, toColumnId);
-  // The column the tile is rendered in, not its `status`: a card with no `status`, or one naming
-  // a column since removed, sits in the first column, and a drop there is a reorder.
-  const fromColumn = columnOf(board, cardPath) ?? String(card.frontmatter.status ?? "");
   const colCards = (board.columns[toColumnId] ?? [])
     .filter((p) => p !== cardPath)
     .flatMap((p) => {
@@ -1055,13 +1053,16 @@ export function moveCard(
   const mutation: CardMutation = {
     path: cardPath,
     setFrontmatter: { status: toColumnId, order },
-    history: `Moved from ${columnTitle(board.config, fromColumn || "—")} to ${columnTitle(board.config, toColumnId)}`,
+    history: `Moved from ${columnTitle(board.config, fromStatus || "—")} to ${columnTitle(board.config, toColumnId)}`,
   };
-  // A reorder says nothing about finishing, so it leaves every parent's checkbox as it is.
-  if (fromColumn === toColumnId) {
+  // The history line records what the note said: a `status` naming no column of this board is a
+  // real change when it is overwritten, even though the tile did not visibly move.
+  if (fromStatus === toColumnId) {
     mutation.history = `Reordered within ${columnTitle(board.config, toColumnId)}`;
-    return mutation;
   }
+  // The checkbox follows what the tile did: a card with no `status`, or one naming a column since
+  // removed, renders in the first column, and a drop there says nothing about finishing.
+  if (columnOf(board, cardPath) === toColumnId) return mutation;
   const parentLines = syncSubcardLines(board, cardPath, toColumnId)?.parentLines;
   if (parentLines) mutation.parentLines = parentLines;
   return mutation;

@@ -33,6 +33,7 @@ import {
   parseBody,
   parseFrontmatter,
   parseSubtasks,
+  pendingSubcardLinks,
   removeSubtask as removeSubtaskText,
   removeTimestampedLine,
   setDescription as setDescriptionText,
@@ -372,16 +373,31 @@ export class VaultRepository implements CardRepository {
       const historyLine = mutation.history;
       await this.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));
     }
-    // Last, and after the moved note's own record: the parent's box is the same edit a click on
-    // it would make, so it leaves the same (scope-gated) trace, and a parent that has gone missing
-    // since the board loaded cannot stop the move itself from being recorded.
+    // Last, and after the moved note's own record, so a parent that has gone missing since the
+    // board loaded cannot stop the move itself from being recorded — nor the other parents from
+    // being written; the first failure is raised once every note has had its turn. Each parent is
+    // read first and left alone when it no longer needs the write. The box is the same edit a
+    // click on it would make, so it leaves the same (scope-gated) trace, naming only the links
+    // that actually changed.
+    let failure: Error | undefined;
     for (const { path, links, done } of mutation.parentLines ?? []) {
-      await this.editBody(path, (t) => setSubcardDone(t, links, done));
-      for (const link of links) {
-        const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
-        await this.maybeHistory(path, "subtask", line);
+      try {
+        const pending = pendingSubcardLinks(
+          await this.app.vault.cachedRead(this.file(path)),
+          links,
+          done,
+        );
+        if (pending.length === 0) continue;
+        await this.editBody(path, (t) => setSubcardDone(t, pending, done));
+        for (const link of pending) {
+          const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
+          await this.maybeHistory(path, "subtask", line);
+        }
+      } catch (e) {
+        failure ??= e instanceof Error ? e : new Error(String(e));
       }
     }
+    if (failure !== undefined) throw failure;
   }
 
   setDescription(path: string, description: string): Promise<void> {

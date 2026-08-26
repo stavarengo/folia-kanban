@@ -26,6 +26,7 @@ import {
   cardStats,
   parseBody,
   parseSubtasks,
+  pendingSubcardLinks,
   removeSubtask,
   removeTimestampedLine,
   setDescription,
@@ -200,14 +201,24 @@ export class FakeRepo implements CardRepository {
       const e = this.entry(mutation.path);
       e.body = appendHistory(e.body, mutation.history, this.ts);
     }
+    // Mirrors the vault adapter: only what still needs the write is written and logged, and a
+    // missing parent does not stop the others.
+    let failure: unknown;
     for (const { path, links, done } of mutation.parentLines ?? []) {
-      const e = this.entry(path);
-      e.body = setSubcardDone(e.body, links, done);
-      for (const link of links) {
-        const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
-        this.maybeHistory(path, "subtask", line);
+      try {
+        const e = this.entry(path);
+        const pending = pendingSubcardLinks(e.body, links, done);
+        if (pending.length === 0) continue;
+        e.body = setSubcardDone(e.body, pending, done);
+        for (const link of pending) {
+          const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
+          this.maybeHistory(path, "subtask", line);
+        }
+      } catch (e) {
+        failure ??= e;
       }
     }
+    if (failure !== undefined) throw failure;
   }
 
   async setDescription(path: string, description: string) {

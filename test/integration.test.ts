@@ -324,6 +324,38 @@ describe("subitem drag persistence", () => {
     expect(loud.files.get("Tasks/Root.md")!.body).toContain("Subtask done: [[Child]]");
   });
 
+  it("a parent edited under the board gets no write and no history, and a missing one does not stop the rest", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# A\n\n## Subtasks\n- [ ] [[Child]]\n",
+        },
+        "Tasks/B.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# B\n\n## Subtasks\n- [ ] [[Child]]\n",
+        },
+        "Tasks/C.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# C\n\n## Subtasks\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
+      },
+      () => "all",
+    );
+    const mut = moveCard(await repo.loadBoard(), "Tasks/Child.md", "done", 0)!;
+    expect(mut.parentLines?.map((p) => p.path)).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
+    // Between load and write: A no longer names the child, B is gone.
+    const edited = "\n# A\n\n## Subtasks\n- [ ] [[Something else]]\n";
+    repo.files.get("Tasks/A.md")!.body = edited;
+    repo.files.delete("Tasks/B.md");
+    await expect(repo.applyMove(mut)).rejects.toThrow("no such card Tasks/B.md");
+    expect(repo.files.get("Tasks/A.md")!.body).toBe(edited); // byte-identical, no false history
+    expect(repo.files.get("Tasks/C.md")!.body).toContain("- [x] [[Child]]"); // still written
+    expect(repo.files.get("Tasks/Child.md")!.fm.status).toBe("done");
+  });
+
   it("a child whose status was edited by hand still counts as done on its parent", async () => {
     const repo = new FakeRepo(config, {
       "Tasks/Root.md": {

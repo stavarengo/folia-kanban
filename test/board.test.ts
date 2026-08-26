@@ -308,9 +308,8 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       withItems("B", {}, [link("A", 0)]),
     ]);
     expect(b.columns["todo"]).toEqual(["Tasks/A.md", "Tasks/B.md"]);
-    expect(moveCard(b, "Tasks/B.md", "todo", 0)).toMatchObject({
-      history: "Reordered within Todo",
-    });
+    // The note's own record still says its `status` changed; only the checkbox reads it as a reorder.
+    expect(moveCard(b, "Tasks/B.md", "todo", 0)).toMatchObject({ history: "Moved from — to Todo" });
     expect(moveCard(b, "Tasks/B.md", "todo", 0)?.parentLines).toBeUndefined();
     expect(moveCard(b, "Tasks/B.md", "doing", 0)?.parentLines).toEqual([
       { path: "Tasks/A.md", links: ["B"], done: false },

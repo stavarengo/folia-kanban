@@ -443,9 +443,13 @@ describe("card detail", () => {
       ),
     );
 
-    // A subcard file: the same control, written to the child note's own frontmatter.
+    // A subcard file: the same control, written to the child note's own frontmatter — and Done
+    // ticks the line that names it here, as it does for the todo's own box.
     await user.selectOptions(within(detail).getByLabelText("Column for [[Beta]]"), "done");
     await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBe("done"));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[x\] \[\[Beta\]\]/),
+    );
 
     // Both now stand in their own columns, out of Alpha's group.
     const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
@@ -455,6 +459,22 @@ describe("card detail", () => {
     expect(within(done).getByText("Beta").closest(".folia-card")).toHaveClass(
       "folia-card--subitem",
     );
+  });
+
+  it("ticking a subcard's box in the detail panel sends the child to Done, and back", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.files.get("Tasks/Beta.md")!.fm.status = "doing"; // a child standing in a column of its own
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(within(detail).getByLabelText("Toggle [[Beta]]"));
+    await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBe("done"));
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[x\] \[\[Beta\]\]/);
+    // Unticking a child in Done drops its claim: it comes home to Alpha's group.
+    await user.click(await within(detail).findByLabelText("Toggle [[Beta]]"));
+    await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBeUndefined());
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[ \] \[\[Beta\]\]/);
   });
 
   it("offers no column for a subtask whose link names no card on the board", async () => {

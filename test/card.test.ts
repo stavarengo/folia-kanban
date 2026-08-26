@@ -10,6 +10,7 @@ import {
   appendHistory,
   addTodo,
   addSubcard,
+  pendingSubcardLinks,
   setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus,
@@ -229,6 +230,21 @@ describe("setSubcardDone — a subcard line is found by its link, never by a pos
     const tricky = doc.replace("- [x] Freeze", "- [ ] Child");
     expect(setSubcardDone(tricky, ["Child"], true)).toBe(
       tricky.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
+    );
+  });
+
+  it("reports each link that still needs the write once, so a writer can skip the rest", () => {
+    expect(pendingSubcardLinks(doc, ["Child", "Other", "Nobody"], true)).toEqual([
+      "Child",
+      "Other",
+    ]);
+    expect(pendingSubcardLinks(doc, ["Child"], false)).toEqual([]); // already unticked
+    const twice = doc.replace("- [ ] [[Other|alias]]", "- [ ] [[Child]]");
+    expect(pendingSubcardLinks(twice, ["Child", "Child"], true)).toEqual(["Child"]);
+    expect(setSubcardDone(twice, ["Child"], true)).toBe(
+      doc
+        .replace("- [ ] [[Child]]", "- [x] [[Child]]")
+        .replace("- [ ] [[Other|alias]]", "- [x] [[Child]]"),
     );
   });
 
