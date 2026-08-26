@@ -4,7 +4,9 @@
 // has nothing to import at runtime. `vitest.config.ts` aliases the module id to this file, which
 // keeps `instanceof TFile` / `instanceof TFolder` meaningful: the adapter and the test share one
 // class identity. TypeScript still sees the real `.d.ts` (the alias is vitest-only), so the fake is
-// free to model only the surface the adapter actually touches.
+// free to model only the surface the adapter actually touches. That is deliberately ALL it models:
+// a test that needs to import `src/view.tsx` or `src/main.ts` (which use `Plugin`, `FileView`,
+// `Setting`, `Notice` …) has to add those here first, and will fail loudly at import until it does.
 //
 // Deliberately NOT derived from each other: a file's text and its `metadataCache` entry are set
 // independently, because the adapter's freshness rules (read the text, not the cache) only mean
