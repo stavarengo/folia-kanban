@@ -24,6 +24,12 @@
    (`--folia-statusbar-clearance`) with the static fallback for everything under that portal. */
 
 .folia-scope {
+  /* The board's base size travels with the token scope, not with the root: a portalled menu sits in
+     the document body, where `font: inherit` on its buttons would otherwise mean the app's font
+     rather than the board's. It lives in this rule rather than in a second one wearing the same
+     selector, so `.folia-scope` names exactly one rule: the token block `pnpm tokens:check` reads. */
+  font-size: var(--font-ui-small, 13px);
+
   /* radii */
   --folia-r-sm: 6px;
   --folia-r: 8px;
@@ -35,6 +41,7 @@
   --folia-gap: 10px;
   --folia-pad: 12px;
   --folia-col-w: 300px; /* single source for column width + drag-overlay width */
+  --folia-menu-w-min: 200px; /* narrowest a popover may shrink to */
   --folia-menu-w-max: 320px; /* widest a popover may grow to fit its longest label */
   --folia-detail-w: 380px; /* side panel width; overridden inline from settings.detailWidth */
   --folia-statusbar-clearance: 32px; /* fallback; App measures the real status bar and sets it live */
@@ -146,12 +153,6 @@
   min-height: 0;
   background: var(--background-primary);
   position: relative;
-}
-/* The board's base size travels with the token scope, not with the root: a portalled menu sits in
-   the document body, where `font: inherit` on its buttons would otherwise mean the app's font
-   rather than the board's. */
-.folia-scope {
-  font-size: var(--font-ui-small, 13px);
 }
 .folia-main {
   display: flex;
@@ -622,7 +623,7 @@
      the stable gutter stops the scrollbar — this menu is tall enough to scroll — from sitting on
      top of the last few characters. */
   width: max-content;
-  min-width: 200px;
+  min-width: var(--folia-menu-w-min);
   max-width: min(var(--folia-menu-w-max), calc(100vw - 2 * var(--folia-pad)));
   scrollbar-gutter: stable;
   gap: 2px;

@@ -9,8 +9,15 @@
 // the scope, so the class there is redundant — and worse than redundant: it re-declares the whole
 // token block below the root, shadowing any value App sets live on the root element
 // (`--folia-statusbar-clearance` today) with the static fallback for everything underneath. So those
-// portals must not carry it. The container is matched exactly, not by substring: an expression such
-// as `rootRef.current.ownerDocument.body` names the BODY and is outside the scope like any other.
+// portals must not carry it.
+//
+// Which side a portal is on is therefore a real question, and this check refuses to guess: only two
+// container shapes are recognised, a document body (outside) and the board root ref (inside).
+// Anything else is reported as unclassifiable rather than defaulted, because BOTH defaults are
+// wrong in one direction — "assume outside" would tell an in-root portal to add the class and
+// reintroduce the shadowing, "assume inside" would excuse a body portal with dead tokens. Teach it
+// the new shape instead. Only `.tsx` and `.ts` under src/ are read, and only a JSX element literal
+// can be judged: a portal whose first argument is a variable is reported, not waved through.
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -19,12 +26,10 @@ import process from "node:process";
 const SRC_DIR = "src";
 const CSS_FILE = "src/styles.css";
 const SCOPE = "folia-scope";
-/**
- * Container expressions that ARE the board root, where the scope already applies. Matched whole:
- * anything else — `activeDocument.body`, `x.ownerDocument.body`, a ref to some other node — counts
- * as outside, which is the safe direction (it asks for the class rather than excusing its absence).
- */
+/** Container expressions that ARE the board root, where the scope already applies. */
 const INSIDE_ROOT = [/^rootRef\.current$/];
+/** Container expressions that name a document body, always outside the board root. */
+const OUTSIDE_ROOT = [/(^|\.)body$/];
 
 /**
  * Characters after which a `'` can legitimately open a JS string. In JSX TEXT an apostrophe is just
@@ -152,19 +157,39 @@ function openingTag(jsx) {
   return null;
 }
 
-/** The `className=…` value on that opening tag, or "" when it declares none. */
+/**
+ * The `className=…` value on that opening tag, or "" when it declares none. A braced value is read
+ * to its OWN matching `}`, never to the last one in the tag — otherwise every later attribute
+ * (`data-x={"folia-scope"}`, an aria-label) would count as a class and could satisfy the check.
+ */
 function rootClassName(tag) {
-  const m = /className\s*=\s*(?:"([^"]*)"|\{([\s\S]*)\})/.exec(tag);
-  if (!m) return "";
-  return m[1] ?? m[2];
+  const at = /className\s*=\s*/.exec(tag);
+  if (!at) return "";
+  const start = at.index + at[0].length;
+  if (tag[start] === '"' || tag[start] === "'") {
+    const end = tag.indexOf(tag[start], start + 1);
+    return end === -1 ? "" : tag.slice(start + 1, end);
+  }
+  if (tag[start] !== "{") return "";
+  let depth = 0;
+  for (let i = start; i < tag.length; i++) {
+    const skipped = skipInert(tag, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
+    if (tag[i] === "{") depth++;
+    else if (tag[i] === "}" && --depth === 0) return tag.slice(start + 1, i);
+  }
+  return "";
 }
 
-async function tsxFiles(dir) {
+async function sourceFiles(dir) {
   const out = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await tsxFiles(full)));
-    else if (entry.name.endsWith(".tsx")) out.push(full);
+    if (entry.isDirectory()) out.push(...(await sourceFiles(full)));
+    else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) out.push(full);
   }
   return out;
 }
@@ -177,7 +202,7 @@ if (!/^\.folia-scope\s*\{/m.test(css)) {
   errors.push(`[${CSS_FILE}] no .folia-scope rule — the token block must hang off the scope class`);
 }
 
-for (const file of (await tsxFiles(SRC_DIR)).sort()) {
+for (const file of (await sourceFiles(SRC_DIR)).sort()) {
   const src = await readFile(file, "utf8");
   for (const m of src.matchAll(/createPortal\s*\(/g)) {
     const open = m.index + m[0].length - 1;
@@ -207,6 +232,17 @@ for (const file of (await tsxFiles(SRC_DIR)).sort()) {
     // Tokenised rather than split on whitespace, so a computed className (`{"a " + b}`) whose
     // quotes cling to the first and last word is still read class by class.
     const scoped = (classes.match(/[A-Za-z0-9_-]+/g) ?? []).includes(SCOPE);
+    if (
+      !INSIDE_ROOT.some((re) => re.test(container)) &&
+      !OUTSIDE_ROOT.some((re) => re.test(container))
+    ) {
+      errors.push(
+        `[${where}] cannot tell whether the container \`${container}\` is inside the board root, and ` +
+          `guessing would be wrong either way. Teach INSIDE_ROOT/OUTSIDE_ROOT in this script about ` +
+          `the new shape.`,
+      );
+      continue;
+    }
     if (INSIDE_ROOT.some((re) => re.test(container))) {
       if (scoped) {
         errors.push(

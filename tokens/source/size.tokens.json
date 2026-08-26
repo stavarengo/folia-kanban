@@ -7,6 +7,11 @@
       "$value": "300px",
       "$extensions": { "folia": { "cssVar": "--folia-col-w", "live": true } }
     },
+    "menu-w-min": {
+      "$description": "Narrowest a popover may shrink to (card context menu).",
+      "$value": "200px",
+      "$extensions": { "folia": { "cssVar": "--folia-menu-w-min", "live": true } }
+    },
     "menu-w-max": {
       "$description": "Widest a popover may grow to fit its longest label (card context menu).",
       "$value": "320px",

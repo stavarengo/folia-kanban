@@ -73,10 +73,33 @@ for (const file of readdirSync(tokensDir).filter((f) => f.endsWith(".tokens.json
 // mention of it inside the file's header comment — which contains braces of its own —
 // can never be taken for the block itself.
 const css = readFileSync(cssPath, "utf8");
-const blockStart = css.search(/^\.folia-scope\s*\{/m);
-if (blockStart === -1) errors.push("[styles.css] no .folia-scope block found");
+const scopeRules = [...css.matchAll(/^\.folia-scope\s*\{/gm)];
+if (scopeRules.length === 0) errors.push("[styles.css] no .folia-scope block found");
+// Exactly one rule may carry the bare selector. A second one would be an inviting place to drop a
+// --folia-* declaration that this bijection would then never see.
+if (scopeRules.length > 1) {
+  errors.push(
+    `[styles.css] ${scopeRules.length} \`.folia-scope { … }\` rules; the token block must be the only one`,
+  );
+}
+const blockStart = scopeRules.length > 0 ? scopeRules[0].index : -1;
 const braceOpen = css.indexOf("{", blockStart);
-const braceClose = css.indexOf("}", braceOpen);
+// Scan to the rule's own closing brace, stepping over `/* … */` comments: a comment inside the
+// block may legitimately mention a brace, and taking the first `}` in the text would cut the block
+// short and report every token below it as missing.
+function closingBrace(text, open) {
+  for (let i = open + 1; i < text.length; i++) {
+    if (text[i] === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i);
+      if (end === -1) return -1;
+      i = end + 1;
+      continue;
+    }
+    if (text[i] === "}") return i;
+  }
+  return -1;
+}
+const braceClose = closingBrace(css, braceOpen);
 const block = css.slice(braceOpen + 1, braceClose);
 
 /** Map of --folia-* var name → declared value (trailing /* *​/ comment stripped). */
