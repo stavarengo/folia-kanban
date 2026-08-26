@@ -645,6 +645,12 @@ describe("code fences hide structure from every lookup at once", () => {
     expect(parseBody(out2).comments.map((c) => c.text)).toEqual(["real", "new"]);
   });
 
+  it("a backtick line whose info string holds a backtick is inline code, not a fence", () => {
+    const doc = "# T\n\n``` `\n\n## Comments\n- _2026-08-22 09:00:_ real\n";
+    expect(parseBody(doc).comments.map((c) => c.text)).toEqual(["real"]);
+    expect(parseBody("# T\n\n~~~ `\n## Comments\n- _t:_ quoted\n~~~\n").comments).toEqual([]);
+  });
+
   it("sees fences on CRLF notes too", () => {
     const doc =
       "# T\r\n\r\n```md\r\n## Comments\r\n- _t:_ quoted\r\n```\r\n\r\n## Comments\r\n- _2026-08-22 09:00:_ real\r\n";
