@@ -310,6 +310,7 @@ export class FakeRepo implements CardRepository {
 
   async deleteCard(path: string): Promise<void> {
     this.files.delete(path);
+    this.emitFileOp({ kind: "delete", path });
   }
 
   async renameCard(path: string, newTitle: string): Promise<string> {
@@ -344,6 +345,9 @@ export class FakeRepo implements CardRepository {
     for (const other of this.files.values()) {
       other.body = rewriteWikilinks(other.body, oldBase, base);
     }
+    // The vault reports the plugin's own file operations too, so the fake does the same — that is
+    // what makes a test cover the in-app path and the listener path running over each other.
+    this.emitFileOp({ kind: "rename", from: path, to: dest });
     return dest;
   }
 
@@ -382,6 +386,10 @@ export class FakeRepo implements CardRepository {
 
   /** test helper: simulate a rename/move/delete done outside the board (explorer, other plugin) */
   notifyFileOp(op: FileOp) {
+    this.emitFileOp(op);
+  }
+
+  private emitFileOp(op: FileOp) {
     for (const cb of this.fileOpListeners) cb(op);
   }
 }

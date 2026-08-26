@@ -3602,37 +3602,18 @@ describe("the previous card's description never seeds the next card's editor", (
     await waitFor(() => expect(within(detail).getByLabelText("Edit description")).toHaveValue(""));
     expect(repo.files.get("Tasks/Beta.md")!.body).not.toContain("typed on Alpha");
 describe("file operations done outside the board", () => {
-  /** Rename a card file the way the explorer does: the file moves, then the vault reports it. */
+  /**
+   * A rename the way Obsidian delivers it: the file moves, the vault reports the operation, and the
+   * board's reload arrives separately (the adapter debounces it by 150ms). Two `act`s, because one
+   * would batch them into a single render and hide the state the board is actually in between them.
+   */
   function renameOutside(repo: FakeRepo, from: string, to: string) {
     const entry = repo.files.get(from)!;
     repo.files.delete(from);
     repo.files.set(to, entry);
-    act(() => {
-      repo.notifyFileOp({ kind: "rename", from, to });
-      repo.notify();
-    });
+    act(() => repo.notifyFileOp({ kind: "rename", from, to }));
+    act(() => repo.notify());
   }
-
-  it("moves a card's collapse override and comments-seen marker to its new path", async () => {
-    const repo = makeRepo();
-    const box = { current: DEFAULT_SETTINGS };
-    renderStateful(
-      repo,
-      {
-        ...DEFAULT_SETTINGS,
-        collapsedCards: { "Tasks/Alpha.md": true },
-        commentsSeen: { "Tasks/Alpha.md": "2026-06-13 09:00#1" },
-      },
-      box,
-    );
-    await screen.findByText("Alpha");
-
-    renameOutside(repo, "Tasks/Alpha.md", "Tasks/Renamed.md");
-
-    await waitFor(() => expect(box.current.collapsedCards["Tasks/Renamed.md"]).toBe(true));
-    expect(box.current.collapsedCards["Tasks/Alpha.md"]).toBeUndefined();
-    expect(box.current.commentsSeen).toEqual({ "Tasks/Renamed.md": "2026-06-13 09:00#1" });
-  });
 
   it("keeps the detail panel on the card when its file is renamed from the explorer", async () => {
     const user = userEvent.setup();
@@ -3644,27 +3625,67 @@ describe("file operations done outside the board", () => {
     renameOutside(repo, "Tasks/Gamma.md", "Tasks/Gamma renamed.md");
 
     // The title lives in the note's heading, so it does not change — what must survive is the
-    // panel: a selection left pointing at the old path resolves to no card and closes it.
-    await waitFor(() => expect(screen.getByTestId("card-detail")).toBeInTheDocument());
-    expect(within(screen.getByTestId("card-detail")).getByText("Gamma")).toBeInTheDocument();
+    // panel. A selection left pointing at the old path resolves to no card, and the panel would
+    // close for good instead of coming back on the card's new path.
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("Gamma")).toBeInTheDocument();
   });
 
-  it("closes the panel and forgets the card's state when its file is deleted from the explorer", async () => {
+  it("follows a card whose whole folder was moved, which the vault reports as one operation", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
-    const box = { current: DEFAULT_SETTINGS };
-    renderStateful(repo, { ...DEFAULT_SETTINGS, collapsedCards: { "Tasks/Gamma.md": true } }, box);
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Gamma"));
+    expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
+
+    for (const [path, entry] of [...repo.files]) {
+      if (!path.startsWith("Tasks/")) continue;
+      repo.files.delete(path);
+      repo.files.set("Archive/Tasks" + path.slice("Tasks".length), entry);
+    }
+    act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks", to: "Archive/Tasks" }));
+    act(() => repo.notify());
+
+    // The board reads its cards from `config.cardFolder`, which still says `Tasks`, so the moved
+    // cards are out of scope for it now — the panel has nothing to hold and closes cleanly rather
+    // than pointing at a path nothing lives at.
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+  });
+
+  it("closes the panel when the open card's file is deleted from the explorer", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    renderStateful(repo, DEFAULT_SETTINGS);
     await user.click(await screen.findByText("Gamma"));
     expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
 
     repo.files.delete("Tasks/Gamma.md");
-    act(() => {
-      repo.notifyFileOp({ kind: "delete", path: "Tasks/Gamma.md" });
-      repo.notify();
-    });
+    act(() => repo.notifyFileOp({ kind: "delete", path: "Tasks/Gamma.md" }));
+    act(() => repo.notify());
 
     await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
-    expect(box.current.collapsedCards).toEqual({});
+  });
+
+  it("survives an in-app rename, where the action and the vault's report both move the selection", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    renderStateful(repo, DEFAULT_SETTINGS);
+    // Beta's title comes from its file name, so renaming it renames the file — and the fake reports
+    // that operation the way the vault does, so the action's own follow-up and the listener both run.
+    const beta = (await screen.findByText("Beta")).closest(".folia-card") as HTMLElement;
+    await user.click(within(beta).getByText("Beta"));
+    expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
+
+    fireEvent.contextMenu(beta.querySelector(".folia-card-title")!);
+    await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+    const input = screen.getByDisplayValue("Beta") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "Beta renamed{Enter}");
+
+    const detail = await screen.findByTestId("card-detail");
+    // The panel is still on the card, now under its new path — the two migrations did not undo
+    // each other, and neither left the selection pointing at the old one.
+    await waitFor(() => expect(within(detail).getByText("Beta renamed")).toBeInTheDocument());
   });
 });
 

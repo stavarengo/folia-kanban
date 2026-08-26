@@ -24,7 +24,7 @@ Re-checked on 2026-08-26 against the installed **obsidian 1.13.1** types, since 
 
 So the answer is unchanged: technically yes, cleanly no.
 
-**What would change this:** a public API for creating a leaf (or hosting an editor) outside the workspace tree, or a supported editable Markdown embed. Re-check the two greps above against the installed types before spiking again. Note also the deferred-leaf behaviour recorded in `AGENTS.md` — Obsidian defers background leaves, so an off-screen board stays empty until focused — which applies to whatever would host the two panes.
+**What would change this:** a public API for creating a leaf (or hosting an editor) outside the workspace tree, or a supported editable Markdown embed. Before spiking again, re-check the four facts above against the installed `node_modules/obsidian/obsidian.d.ts`: whether a leaf can be created outside the workspace tree, whether `WorkspaceSplit` is constructible, what `MarkdownEditView`'s constructor takes, and whether an embed registry (`embedRegistry` / `EmbedCreator` / `registerEmbed`) exists at all. Note also the deferred-leaf behaviour recorded in `AGENTS.md` — Obsidian defers background leaves, so an off-screen board stays empty until focused — which applies to whatever would host the two panes.
 
 Until then, the shipped answer is the swap: a board note opens as the board and the tab header button flips it to the Markdown editor and back, one tab either way (see the README, "The board and the Markdown editor are the same tab").
 
@@ -32,7 +32,7 @@ Until then, the shipped answer is the swap: a board note opens as the board and 
 
 **Decided 2026-08-26. Same-clock writers are the supported case.**
 
-Comment timestamps are written by `stamp()` (`src/model/dates.ts`) in local time with no timezone, and read-state compares those minute strings as text (`src/model/unread.ts`). A writer on another clock — most realistically an agent or script on a UTC server writing straight into a note — produces stamps systematically offset from the reader's marker, so its comments can sort below the marker and never light the card up.
+Comment timestamps are written by `stamp()` (`src/model/dates.ts`) in local time with no timezone, and read-state compares those minute strings as text (`src/model/unread.ts`). A writer on another clock — most realistically an agent or script on a UTC server writing straight into a note — produces stamps systematically offset from the reader's marker. Which way the offset runs decides the symptom: comments that sort below the marker and never light the card up, or already-read ones resurfacing as unread.
 
 The line grammar is what makes carrying a timezone expensive rather than cheap. `TS_LINE_RE` in `src/model/card.ts` restricts the timestamp capture to `[0-9: -]`, so `Z` or `+02:00` does not parse at all (a `-05:00` suffix would parse by accident), and `sortKey` in `src/model/unread.ts` orders comments by zero-padding each run of digits and comparing text — it has no notion of an offset to normalize. Carrying a timezone therefore means changing the parse, the ordering and the write format together, and doing it in a way every note already written stays readable through. That is a feature with a design, not a cheap addition, and nobody has asked for it.
 

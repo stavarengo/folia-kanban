@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SETTINGS,
@@ -90,5 +92,22 @@ describe("migratePathKeyedSettings", () => {
 
   it("returns an empty patch when the operation misses everything, so nothing is written", () => {
     expect(migratePathKeyedSettings(settings, { kind: "delete", path: "Other/X.md" })).toEqual({});
+  });
+});
+
+// src/main.ts cannot be imported here (it pulls in the obsidian runtime, which only exists inside
+// the app), so reading it as text is what is left. The migration above is worth nothing unless the
+// plugin itself listens for the vault operations that drive it — and it has to be the plugin, not
+// the board view: the maps are remembered whether or not a board is open.
+describe("the plugin follows external file operations", () => {
+  const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+
+  it("listens to the vault's rename and delete events", () => {
+    expect(main).toContain('this.app.vault.on("rename"');
+    expect(main).toContain('this.app.vault.on("delete"');
+  });
+
+  it("runs the path-keyed settings migration on them", () => {
+    expect(main).toContain("migratePathKeyedSettings");
   });
 });

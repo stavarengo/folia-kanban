@@ -17,7 +17,6 @@ import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
 import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
-import { migratePathKeyedSettings } from "../settings";
 import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
 import {
   BoardActionsContext,
@@ -97,7 +96,7 @@ function pathForm(
       return relativeToFolder(parentFolder(boardPath), path);
     case "name":
       return baseName(path);
-    default:
+    case "vault":
       return path;
   }
 }
@@ -173,20 +172,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     return off;
   }, [load, repo]);
 
-  // A card file renamed, moved, or deleted from OUTSIDE the board (the file explorer, another
-  // plugin, an edit on disk) takes its path-keyed UI state with it: the selection, and the per-card
-  // maps in plugin data. In-app renames/deletes already do this in `renameCard`/`remove`; without
-  // this, the same operation done in the explorer strands a card's collapse override and its
-  // comments-seen marker under a path nothing lives at any more — and hands them to whatever card
-  // is later created there. Written through the function form for the reason the other two writes
-  // document: the maps are replaced whole, and this render's snapshot can already be stale.
+  // The open card follows its file when that file is renamed, moved, or deleted from OUTSIDE the
+  // board (the file explorer, another plugin, an edit on disk), and the panel closes when the file
+  // is gone. In-app renames/deletes do this in `renameCard`/`remove`; this covers everything else.
+  // Only the selection: it belongs to this view. The per-card maps in plugin data are followed by
+  // the plugin itself (`followFileOp` in main.ts), which is also awake when no board is open.
   useEffect(
-    () =>
-      repo.onFileOp((op) => {
-        onUpdateSettings((s) => migratePathKeyedSettings(s, op));
-        setSelected((cur) => (cur === null ? cur : remapPath(cur, op)));
-      }),
-    [repo, onUpdateSettings],
+    () => repo.onFileOp((op) => setSelected((cur) => (cur === null ? cur : remapPath(cur, op)))),
+    [repo],
   );
 
   // Obsidian's status bar is fixed to the window bottom; reserve clearance so the columns and the

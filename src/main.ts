@@ -19,12 +19,15 @@ import {
   type App,
 } from "obsidian";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
+import type { FileOp } from "./model/pathOps";
+import { remapPath } from "./model/pathOps";
 import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
   applySettingsPatch,
   hydrateSettings,
+  migratePathKeyedSettings,
   type KanbanSettings,
   type SettingsPatch,
 } from "./settings";
@@ -127,6 +130,21 @@ export default class FoliaKanbanPlugin extends Plugin {
     // The button follows the flag: a note that gains or loses `folia-board` while it is open
     // gains or loses the button, but the tab is never swapped out from under the user.
     this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
+    // Everything the plugin remembers by path follows a file renamed, moved, or deleted from
+    // outside its own actions. It lives here rather than in the board view because the plugin
+    // remembers these things whether or not a board is open: a rename done with no board tab in
+    // sight would otherwise strand them, and a card later created at the vacated path would
+    // silently inherit them.
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        void this.followFileOp({ kind: "rename", from: oldPath, to: file.path });
+      }),
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        void this.followFileOp({ kind: "delete", path: file.path });
+      }),
+    );
     // Without this, disabling the plugin leaves its buttons in the headers of open notes, still
     // clickable, still calling into a view type Obsidian no longer knows about.
     this.register(() => {
@@ -218,6 +236,27 @@ export default class FoliaKanbanPlugin extends Plugin {
   private async openBoardFrom(leaf: WorkspaceLeaf, filePath: string): Promise<void> {
     if (this.isEditingSurface(leaf)) await this.showBoardIn(leaf, filePath, true);
     else await this.openBoard(filePath);
+  }
+
+  /**
+   * Follow a file operation the plugin did not make: re-point (or drop) everything it remembers by
+   * path. The vault reports a folder as a single operation covering everything inside it, which is
+   * what `remapPath` and `migratePathKeyedSettings` are built to expect.
+   */
+  private async followFileOp(op: FileOp): Promise<void> {
+    // The "this tab was deliberately put in the Markdown editor" record is keyed by leaf and holds
+    // a path; left pointing at the old one, the next state replay would send the tab back to the
+    // board — the exact thing the record exists to prevent. A WeakMap cannot be walked, so walk
+    // the leaves instead.
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const current = this.markdownTabs.get(leaf);
+      if (current === undefined) return;
+      const next = remapPath(current, op);
+      if (next === current) return;
+      if (next === null) this.markdownTabs.delete(leaf);
+      else this.markdownTabs.set(leaf, next);
+    });
+    await this.updateSettings((s) => migratePathKeyedSettings(s, op));
   }
 
   /** Swap a tab to the board, same leaf, same file. */
