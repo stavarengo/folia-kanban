@@ -94,6 +94,28 @@
   --folia-opacity-disabled: 0.4;
 }
 
+/* Every button the plugin draws itself, listed once so none of them inherits the theme's raised
+   face. Obsidian gives `button:not(.clickable-icon)` a `box-shadow`, and a rule that resets a
+   button's background while saying nothing about its shadow leaves the lift behind — the exact
+   shape of the bug this guards against. Each class is named twice to out-specify that theme rule
+   (see the header note), and this block sits ABOVE the component rules on purpose: a later rule of
+   equal weight, such as the selected-chip ring, still wins where a shadow IS wanted. */
+.folia-add-column.folia-add-column,
+.folia-btn.folia-btn,
+.folia-card-subitems-toggle.folia-card-subitems-toggle,
+.folia-column-add.folia-column-add,
+.folia-desc-empty.folia-desc-empty,
+.folia-filter-chip.folia-filter-chip,
+.folia-filter-suggest-item.folia-filter-suggest-item,
+.folia-icon-btn.folia-icon-btn,
+.folia-link.folia-link,
+.folia-menu-column.folia-menu-column,
+.folia-menu-item.folia-menu-item,
+.folia-menu-prio.folia-menu-prio,
+.folia-swatch.folia-swatch {
+  box-shadow: none;
+}
+
 /* The view content area has default padding; the board needs the full pane with no inset. */
 .workspace-leaf-content[data-type="folia-kanban-view"] {
   padding: 0;
@@ -505,8 +527,9 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.folia-swatch {
+.folia-swatch.folia-swatch {
   width: 24px;
+  color: inherit;
   height: 24px;
   border-radius: var(--folia-r-pill);
   border: 2px solid transparent;

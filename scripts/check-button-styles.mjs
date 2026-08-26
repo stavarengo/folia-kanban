@@ -62,8 +62,8 @@ function specificity(selector) {
  * ends in `-` is a class built at runtime (`"folia-chip-" + tone`), so it is kept as a PREFIX and
  * matches every rule for a class that starts with it — those rules style buttons too.
  */
-function buttonClasses(tsx) {
-  const found = new Set();
+function buttons(tsx) {
+  const out = [];
   for (let i = tsx.indexOf("<button"); i !== -1; i = tsx.indexOf("<button", i + 1)) {
     let depth = 0;
     let end = i;
@@ -73,12 +73,16 @@ function buttonClasses(tsx) {
       end += 1;
     }
     const tag = tsx.slice(i, end);
+    const classes = new Set();
     for (const match of tag.matchAll(/["'`]([^"'`]*)["'`]/g)) {
-      for (const cls of match[1].split(/\s+/)) if (/^folia-[\w-]+$/.test(cls)) found.add(cls);
-      for (const cls of match[1].split(/\s+/)) if (/^folia-[\w-]*-$/.test(cls)) found.add(cls);
+      for (const cls of match[1].split(/\s+/)) {
+        if (/^folia-[\w-]+$/.test(cls) || /^folia-[\w-]*-$/.test(cls)) classes.add(cls);
+      }
     }
+    if (classes.size > 0) out.push({ classes, styled: /\bstyle=/.test(tag) });
+    i = end;
   }
-  return found;
+  return out;
 }
 
 /** Every `selector { body }` pair, including the ones nested inside `@media`. */
@@ -91,8 +95,10 @@ function rules(css) {
 
 const files = (await readdir(UI_DIR)).filter((f) => f.endsWith(".tsx"));
 const tsx = (await Promise.all(files.map((f) => readFile(join(UI_DIR, f), "utf8")))).join("\n");
-const classes = buttonClasses(tsx);
+const elements = buttons(tsx);
+const classes = new Set(elements.flatMap((b) => [...b.classes]));
 const css = await readFile(CSS_FILE, "utf8");
+const parsed = rules(css);
 
 const setsContested = (body) =>
   body
@@ -101,7 +107,7 @@ const setsContested = (body) =>
 
 const problems = [];
 let checked = 0;
-for (const { selector, body } of rules(css)) {
+for (const { selector, body } of parsed) {
   if (!setsContested(body)) continue;
   for (const one of selector.split(",").map((s) => s.trim())) {
     const subject = one.split(/[\s>+~]+/).pop() ?? "";
@@ -119,6 +125,48 @@ for (const { selector, body } of rules(css)) {
         `${CSS_FILE}: \`${one}\` is (${spec.join(",")}) — it colours a <button> (.${hit}${family ? `, one of the runtime-built \`.${family}*\` classes` : ""}) but loses to \`button:not(.clickable-icon)\` (0,1,1), so the theme's face wins in the real app. Write it as \`${one.replace(`.${hit}`, `.${hit}.${hit}`)}\`.`,
       );
     }
+  }
+}
+
+// Second half: winning a property the plugin never writes is not the same as writing it. A rule
+// that resets `background` but says nothing about `box-shadow` leaves the theme's raised face on
+// the button, which is the shape the original bug took. So each button is checked as an ELEMENT:
+// the rules that dress it in its resting state, all of them together, must speak for every
+// contested property. Only rules with no pseudo-class count — a `:hover` background says nothing
+// about how the button looks before the pointer arrives.
+const declared = (body) =>
+  body
+    .split(";")
+    .map((decl) => decl.split(":")[0]?.trim().toLowerCase())
+    .map((prop) => (prop === "background-color" ? "background" : prop))
+    .filter((prop) => CONTESTED.includes(prop) || prop === "background");
+
+for (const element of elements) {
+  const own = [...classes].flatMap((c) =>
+    c.endsWith("-")
+      ? element.classes.has(c)
+        ? [...css.matchAll(new RegExp(`\\.(${c}[\\w-]+)`, "g"))].map((m) => m[1])
+        : []
+      : element.classes.has(c)
+        ? [c]
+        : [],
+  );
+  const covered = new Set(element.styled ? ["background"] : []);
+  for (const { selector, body } of parsed) {
+    for (const one of selector.split(",").map((s) => s.trim())) {
+      if (one.includes(":")) continue;
+      const subject = one.split(/[\s>+~]+/).pop() ?? "";
+      const named = [...subject.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+      if (named.length === 0 || !named.every((c) => own.includes(c))) continue;
+      if (compare(specificity(one), THEME_SPECIFICITY) <= 0) continue;
+      for (const prop of declared(body)) covered.add(prop);
+    }
+  }
+  const missing = ["color", "background", "box-shadow"].filter((p) => !covered.has(p));
+  if (missing.length > 0) {
+    const label = [...element.classes].join(" ");
+    const problem = `${CSS_FILE}: the <button> with class "${label}" has no winning rule for ${missing.join(", ")}, so the theme still supplies ${missing.length === 1 ? "it" : "them"} in the real app. Declare ${missing.join(", ")} (\`none\` is a fine answer) on one of its own rules.`;
+    if (!problems.includes(problem)) problems.push(problem);
   }
 }
 
