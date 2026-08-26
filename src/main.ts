@@ -1,4 +1,4 @@
-import type { ViewState } from "obsidian";
+import type { SettingDefinitionItem, ViewState } from "obsidian";
 import {
   FuzzySuggestModal,
   MarkdownView,
@@ -6,6 +6,7 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  requireApiVersion,
   TFile,
   WorkspaceLeaf,
   type App,
@@ -20,6 +21,15 @@ import {
   type KanbanSettings,
   type SettingsPatch,
 } from "./settings";
+import {
+  CARD_NEXT_TODOS_MAX,
+  SETTING_COPY,
+  SETTING_OPTIONS,
+  USER_NAME_PLACEHOLDER,
+  VERSION_SETTING_NAME,
+  settingDefinitions,
+  settingsPatchFor,
+} from "./settingsDefinitions";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
@@ -379,6 +389,44 @@ class KanbanSettingTab extends PluginSettingTab {
    */
   private pendingUserName: string | null = null;
 
+  /**
+   * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
+   * every setting for the settings search. Below 1.13 this method is never called and `display()`
+   * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
+   */
+  override getSettingDefinitions(): SettingDefinitionItem[] {
+    return settingDefinitions(() => this.plugin.settings, this.plugin.manifest.version);
+  }
+
+  /** Where the declarative rendering reads a control's current value from: our own settings, not
+   *  the vault config the base implementation would reach for. */
+  override getControlValue(key: string): unknown {
+    if (key === "userName") return this.pendingUserName ?? this.plugin.settings.userName;
+    const settings: KanbanSettings = this.plugin.settings;
+    return Object.prototype.hasOwnProperty.call(settings, key)
+      ? settings[key as keyof KanbanSettings]
+      : undefined;
+  }
+
+  /** Where the declarative rendering writes one back: through `updateSettings`, so open boards
+   *  re-render, exactly as the imperative rows below do. */
+  override setControlValue(key: string, value: unknown): void {
+    // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
+    if (key === "userName") {
+      this.pendingUserName = typeof value === "string" ? value.trim() : null;
+      return;
+    }
+    const patch = settingsPatchFor(key, value);
+    if (!patch) return;
+    void this.plugin.updateSettings(patch).then(() => {
+      // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
+      // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
+      // later reaches this method at all, but the version is asked anyway: the API is @since 1.13.0
+      // and minAppVersion is 1.7.2, so an unguarded call is a promise the manifest does not make.
+      if (requireApiVersion("1.13.0")) this.refreshDomState();
+    });
+  }
+
   override display(): void {
     this.render();
   }
@@ -395,66 +443,59 @@ class KanbanSettingTab extends PluginSettingTab {
       void this.plugin.updateSettings({ userName: name });
   }
 
+  /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
+   *  renders `getSettingDefinitions()` instead. */
   private render(): void {
     const { containerEl } = this;
     const s = this.plugin.settings;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName("Board notes — open as")
-      .setDesc(
-        "How a note with `folia-board: true` opens from the file explorer, a link, search or the quick switcher. A single note can override this with `folia-view: board` or `folia-view: markdown` in its own frontmatter, and the button in the tab header swaps between the two at any time.",
-      )
-      .addDropdown((d) =>
-        d
-          .addOption("board", "The board")
-          .addOption("markdown", "The markdown editor")
-          .setValue(s.boardNoteDefaultView)
-          .onChange(
-            (v) =>
-              void this.plugin.updateSettings({
-                boardNoteDefaultView: v as KanbanSettings["boardNoteDefaultView"],
-              }),
-          ),
-      );
+    const dropdownRow = (
+      key: keyof typeof SETTING_OPTIONS,
+      value: string,
+      onChange: (v: string) => void,
+      disabled = false,
+    ): void => {
+      new Setting(containerEl)
+        .setName(SETTING_COPY[key].name)
+        .setDesc(SETTING_COPY[key].desc)
+        .setDisabled(disabled)
+        .addDropdown((d) =>
+          d
+            .addOptions(SETTING_OPTIONS[key])
+            .setValue(value)
+            .setDisabled(disabled)
+            .onChange(onChange),
+        );
+    };
+
+    dropdownRow(
+      "boardNoteDefaultView",
+      s.boardNoteDefaultView,
+      (v) =>
+        void this.plugin.updateSettings({
+          boardNoteDefaultView: v as KanbanSettings["boardNoteDefaultView"],
+        }),
+    );
+
+    dropdownRow("detailPresentation", s.detailPresentation, (v) => {
+      // Re-render the tab so the side-panel layout row enables/disables to match.
+      void this.plugin
+        .updateSettings({ detailPresentation: v as KanbanSettings["detailPresentation"] })
+        .then(() => this.render());
+    });
+
+    dropdownRow(
+      "sidePanelMode",
+      s.sidePanelMode,
+      (v) =>
+        void this.plugin.updateSettings({ sidePanelMode: v as KanbanSettings["sidePanelMode"] }),
+      s.detailPresentation === "modal",
+    );
 
     new Setting(containerEl)
-      .setName("Card details — presentation")
-      .setDesc("How the card detail view is shown.")
-      .addDropdown((d) =>
-        d
-          .addOption("side", "Side panel")
-          .addOption("modal", "Modal dialog")
-          .setValue(s.detailPresentation)
-          .onChange((v) => {
-            // Re-render the tab so the side-panel layout row enables/disables to match.
-            void this.plugin
-              .updateSettings({ detailPresentation: v as KanbanSettings["detailPresentation"] })
-              .then(() => this.render());
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Side panel — layout")
-      .setDesc("Split shrinks the board to make room; float overlays the columns.")
-      .setDisabled(s.detailPresentation === "modal")
-      .addDropdown((d) =>
-        d
-          .addOption("split", "Split (shrink the board)")
-          .addOption("float", "Float (overlay the columns)")
-          .setValue(s.sidePanelMode)
-          .setDisabled(s.detailPresentation === "modal")
-          .onChange(
-            (v) =>
-              void this.plugin.updateSettings({
-                sidePanelMode: v as KanbanSettings["sidePanelMode"],
-              }),
-          ),
-      );
-
-    new Setting(containerEl)
-      .setName("Side panel — width (px)")
-      .setDesc("Width of the side detail panel.")
+      .setName(SETTING_COPY.detailWidth.name)
+      .setDesc(SETTING_COPY.detailWidth.desc)
       .addSlider((sl) =>
         sl
           .setLimits(DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX, 10)
@@ -462,80 +503,47 @@ class KanbanSettingTab extends PluginSettingTab {
           .onChange((v) => void this.plugin.updateSettings({ detailWidth: v })),
       );
 
-    new Setting(containerEl)
-      .setName("Add-card button — flow")
-      .setDesc(
-        "Inline adds a card in place; inline-edit then opens the new card's details; detail opens the details to create.",
-      )
-      .addDropdown((d) =>
-        d
-          .addOption("inline", "Inline")
-          .addOption("inline-edit", "Inline, then open details")
-          .addOption("detail", "Open details to create")
-          .setValue(s.addCardFlow)
-          .onChange((v) => {
-            // Re-render so the "open new card's details as" row enables/disables to match.
-            void this.plugin
-              .updateSettings({ addCardFlow: v as KanbanSettings["addCardFlow"] })
-              .then(() => this.render());
-          }),
-      );
+    dropdownRow("addCardFlow", s.addCardFlow, (v) => {
+      // Re-render so the "open new card's details as" row enables/disables to match.
+      void this.plugin
+        .updateSettings({ addCardFlow: v as KanbanSettings["addCardFlow"] })
+        .then(() => this.render());
+    });
+
+    dropdownRow(
+      "addCardOpenMode",
+      s.addCardOpenMode,
+      (v) =>
+        void this.plugin.updateSettings({
+          addCardOpenMode: v as KanbanSettings["addCardOpenMode"],
+        }),
+      s.addCardFlow === "inline",
+    );
 
     new Setting(containerEl)
-      .setName("Add-card — open new card's details as")
-      .setDesc("How the new card's details open (only used when the flow opens details).")
-      .setDisabled(s.addCardFlow === "inline")
-      .addDropdown((d) =>
-        d
-          .addOption("default", "Use the card-details setting")
-          .addOption("modal", "Modal dialog")
-          .addOption("side-float", "Side panel (float)")
-          .addOption("side-split", "Side panel (split)")
-          .setValue(s.addCardOpenMode)
-          .setDisabled(s.addCardFlow === "inline")
-          .onChange(
-            (v) =>
-              void this.plugin.updateSettings({
-                addCardOpenMode: v as KanbanSettings["addCardOpenMode"],
-              }),
-          ),
-      );
-
-    new Setting(containerEl)
-      .setName("Card — next todos shown")
-      .setDesc("How many of the next undone todos to preview on each card (0 = none).")
+      .setName(SETTING_COPY.cardNextTodos.name)
+      .setDesc(SETTING_COPY.cardNextTodos.desc)
       .addSlider((sl) =>
         sl
-          .setLimits(0, 5, 1)
+          .setLimits(0, CARD_NEXT_TODOS_MAX, 1)
           .setValue(s.cardNextTodos)
           .onChange((v) => void this.plugin.updateSettings({ cardNextTodos: v })),
       );
 
-    new Setting(containerEl)
-      .setName("Subitems — default state")
-      .setDesc(
-        "Whether a card's nested subitems (inline todos preview + subcard files) start expanded or collapsed. Toggling a card, or a column's collapse/expand-all, overrides this per card.",
-      )
-      .addDropdown((d) =>
-        d
-          .addOption("expanded", "Expanded")
-          .addOption("collapsed", "Collapsed")
-          .setValue(s.subitemsDefault)
-          .onChange(
-            (v) =>
-              void this.plugin.updateSettings({
-                subitemsDefault: v as KanbanSettings["subitemsDefault"],
-              }),
-          ),
-      );
+    dropdownRow(
+      "subitemsDefault",
+      s.subitemsDefault,
+      (v) =>
+        void this.plugin.updateSettings({
+          subitemsDefault: v as KanbanSettings["subitemsDefault"],
+        }),
+    );
 
     new Setting(containerEl)
-      .setName("Your name")
-      .setDesc(
-        "Signs the comments you write from the board (e.g. \u201calex\u201d \u2192 \u201c- _2026-08-21 11:49 @alex:_ \u2026\u201d), so your own comments never show as unread and a comment landing after one of yours reads as a reply. Leave empty to write comments unsigned.",
-      )
+      .setName(SETTING_COPY.userName.name)
+      .setDesc(SETTING_COPY.userName.desc)
       .addText((t) => {
-        t.setPlaceholder("Alex")
+        t.setPlaceholder(USER_NAME_PLACEHOLDER)
           .setValue(this.plugin.settings.userName)
           .onChange((v) => {
             this.pendingUserName = v.trim();
@@ -543,41 +551,19 @@ class KanbanSettingTab extends PluginSettingTab {
         t.inputEl.addEventListener("blur", () => this.commitUserName());
       });
 
-    new Setting(containerEl)
-      .setName("History — what to record")
-      .setDesc(
-        "Moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",
-      )
-      .addDropdown((d) =>
-        d
-          .addOption("moves", "Moves only")
-          .addOption("structural", "Structural changes")
-          .addOption("all", "Everything")
-          .setValue(s.historyScope)
-          .onChange(
-            (v) =>
-              void this.plugin.updateSettings({
-                historyScope: v as KanbanSettings["historyScope"],
-              }),
-          ),
-      );
+    dropdownRow(
+      "historyScope",
+      s.historyScope,
+      (v) => void this.plugin.updateSettings({ historyScope: v as KanbanSettings["historyScope"] }),
+    );
 
-    new Setting(containerEl)
-      .setName("Board — horizontal drag")
-      .setDesc(
-        "How to pan the board sideways. Shift+drag pans from anywhere (incl. over cards); click and drag pans only from empty board space, leaving cards and columns free. Middle-button drag always pans.",
-      )
-      .addDropdown((d) =>
-        d
-          .addOption("shift", "Shift + click and drag")
-          .addOption("empty", "Click and drag (empty space only)")
-          .setValue(s.boardPan)
-          .onChange(
-            (v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] }),
-          ),
-      );
+    dropdownRow(
+      "boardPan",
+      s.boardPan,
+      (v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] }),
+    );
 
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
-    new Setting(containerEl).setName("Version").setDesc(this.plugin.manifest.version);
+    new Setting(containerEl).setName(VERSION_SETTING_NAME).setDesc(this.plugin.manifest.version);
   }
 }
