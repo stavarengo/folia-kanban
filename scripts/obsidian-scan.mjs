@@ -349,23 +349,60 @@ const runEslint = async () => {
   return { linted, findings };
 };
 
+// --- README placeholder check --------------------------------------------------------------
+// The portal's review also reports "README contains unfilled placeholder text — All placeholder
+// text (such as \"[description]\", \"TODO\", or template comments) must be replaced with real
+// content describing the plugin." That rule is NOT part of obsidian-workflows (checkReadme in
+// src/repo-checks.ts only checks that a README exists and is not tiny), so unlike the two passes
+// above this one is an approximation, not a reproduction: the patterns below are our reading of the
+// message, and the portal may match more, less, or differently.
+//
+// Deliberately case-SENSITIVE for the bare markers: this plugin's own vocabulary has a lowercase
+// "todo" (a column named `todo`, the todo.txt priority convention, the "next todos" setting), and
+// those are real content. A placeholder left behind in a README is written TODO / FIXME / TBD.
+const README_PATTERNS = [
+  { rule: "placeholder/marker", re: /\b(TODO|FIXME|XXX|TBD)\b/g, what: "leftover marker" },
+  {
+    rule: "placeholder/bracket",
+    re: /\[(description|placeholder|plugin name|your plugin name|your name|insert [^\]]*|todo|tbd)\]/gi,
+    what: "bracketed placeholder",
+  },
+  { rule: "placeholder/template", re: /\{\{[^}]*\}\}/g, what: "template expression" },
+  { rule: "placeholder/comment", re: /<!--[\s\S]*?-->/g, what: "HTML comment" },
+  {
+    rule: "placeholder/filler",
+    re: /\b(lorem ipsum|sample plugin|your plugin name)\b/gi,
+    what: "template filler",
+  },
+];
+
+const checkReadme = async () => {
+  const file = resolve(root, "README.md");
+  const text = await readFile(file, "utf8");
+  const findings = [];
+  for (const { rule, re, what } of README_PATTERNS) {
+    for (const m of text.matchAll(re)) {
+      const before = text.slice(0, m.index);
+      const line = before.split("\n").length;
+      findings.push({
+        file,
+        line,
+        column: m.index - before.lastIndexOf("\n"),
+        severity: "warning",
+        rule,
+        text: `README ${what}: ${JSON.stringify(m[0].slice(0, 60))} — replace it with real content describing the plugin.`,
+      });
+    }
+  }
+  return { linted: [file], findings };
+};
+
 // Findings we have decided not to act on yet. An entry matches on tool + rule + file + the exact
 // message text, and on how many times it may occur; a second occurrence, or a changed message, is
 // an unexpected finding like any other. An entry that stops matching is reported too, so a stale
-// baseline cannot quietly outlive the thing it excused.
-const BASELINE = [
-  {
-    tool: "eslint",
-    rule: "obsidianmd/settings-tab/prefer-setting-definitions",
-    file: "src/main.ts",
-    text: "This PluginSettingTab does not implement getSettingDefinitions(); its settings will not appear in Obsidian's settings search for users on 1.13.0 or later. Consider adopting the declarative settings API.",
-    count: 1,
-    // Obsidian's declarative settings API is @since 1.13.0, and obsidian.d.ts states display() is
-    // not called once getSettingDefinitions() returns a non-empty array. With minAppVersion 1.7.2
-    // adopting it means either two parallel settings UIs or broken settings below 1.13.
-    // docs/ai/backlog/20260826.04.settings-tab-is-invisible-to-obsidian-settings-search.md
-  },
-];
+// baseline cannot quietly outlive the thing it excused. Empty: the scan is clean, and every finding
+// is unexpected.
+const BASELINE = [];
 
 // Also normalises separators, so the BASELINE keys match on Windows too.
 const relative = (file) => relativePath(root, resolve(root, String(file))).replaceAll("\\", "/");
@@ -425,15 +462,18 @@ console.log(
 
 const css = await runStylelint(minElectron);
 const js = await runEslint();
+const readme = await checkReadme();
 
 const all = [
   ...css.findings.map((f) => ["stylelint", f]),
   ...js.findings.map((f) => ["eslint", f]),
+  ...readme.findings.map((f) => ["readme", f]),
 ];
 const { unexpected, excused, stale } = applyBaseline(all);
 
 report("stylelint", css, excused);
 report("eslint", js, excused);
+report("readme placeholders (approximation, not a reproduction)", readme, excused);
 
 console.log(
   `\n${all.length} finding(s): ${unexpected.length} unexpected, ${all.length - unexpected.length} baselined.`,

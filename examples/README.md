@@ -36,7 +36,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 
 | Subitem | Kind | Where it renders | Because |
 | --- | --- | --- | --- |
-| `Cut the release branch` | plain todo | **In Progress**, with a `↳ Plan the v1.0 launch` reference | its checklist line carries the inline field `[status:: doing]` |
+| `Cut the release branch` | plain checklist item | **In Progress**, with a `↳ Plan the v1.0 launch` reference | its checklist line carries the inline field `[status:: doing]` |
 | `Write the changelog` | subcard file | **Next Up**, with the same reference | the child note's own `status: next` |
 | `Record the launch demo` | subcard file | nested under its parent in **Todo** | it claims nothing, which is the default for every subitem |
 
