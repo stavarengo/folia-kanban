@@ -89,7 +89,7 @@ function buttons(tsx) {
         if (/^folia-[\w-]+$/.test(cls) || /^folia-[\w-]*-$/.test(cls)) classes.add(cls);
       }
     }
-    if (classes.size > 0) out.push({ classes, styled: /\bstyle=/.test(tag) });
+    out.push({ classes, styled: /\bstyle=/.test(tag), tag: tag.replace(/\s+/g, " ").slice(0, 90) });
     i = end;
   }
   return out;
@@ -107,8 +107,11 @@ const files = (await readdir(UI_DIR, { recursive: true })).filter((f) => f.endsW
 const tsx = (await Promise.all(files.map((f) => readFile(join(UI_DIR, f), "utf8")))).join("\n");
 const elements = buttons(tsx);
 const classes = new Set(elements.flatMap((b) => [...b.classes]));
+const unclassed = elements.filter((b) => b.classes.size === 0);
 const css = await readFile(CSS_FILE, "utf8");
 const parsed = rules(css);
+
+const problemsEarly = [];
 
 const setsContested = (body) =>
   body
@@ -119,29 +122,44 @@ const setsContested = (body) =>
 // convention would otherwise pass silently for as long as it takes someone to notice.
 if (elements.length === 0) {
   console.error(
-    `check-button-styles: FAILED — found no <button> carrying a folia-* class in ${UI_DIR}/**. Either the markup convention changed or this script stopped finding the files.`,
+    `check-button-styles: FAILED — found no <button> at all in ${UI_DIR}/**. Either the markup convention changed or this script stopped finding the files.`,
   );
   process.exit(1);
 }
 
-const problems = [];
+// A button with no `folia-*` class of its own cannot be dressed by any rule this check can find,
+// so it wears whatever the theme gives it. That may even be what someone wants, but it has to be a
+// decision rather than an omission, and this is the only place it can be seen.
+for (const button of unclassed) {
+  problemsEarly.push(
+    `${UI_DIR}/**: \`${button.tag}…\` carries no folia-* class, so nothing in ${CSS_FILE} can dress it and the theme's button face is what shows. Give it a class the stylesheet styles.`,
+  );
+}
+
+const problems = [...problemsEarly];
 let checked = 0;
 for (const { selector, body } of parsed) {
   if (!setsContested(body)) continue;
   for (const one of selector.split(",").map((s) => s.trim())) {
     const subject = one.split(/[\s>+~]+/).pop() ?? "";
+    // A rule can reach these buttons without naming a class at all — `.folia-toolbar button` is
+    // (0,1,1), a TIE with the theme rule that then loses on source order. Treat the bare element
+    // as a subject in its own right so that shape cannot slip through.
+    const bareButton = /(^|[\s>+~])button(?![\w-])/.test(subject);
     const family = [...classes].find(
       (c) => c.endsWith("-") && new RegExp(`\\.${c}[\\w-]+`).test(subject),
     );
     const hit = family
       ? subject.match(new RegExp(`\\.${family}[\\w-]+`))[0].slice(1)
       : [...classes].find((c) => new RegExp(`\\.${c}(?![\\w-])`).test(subject));
-    if (!hit) continue;
+    if (!hit && !bareButton) continue;
     checked += 1;
     const spec = specificity(one);
     if (compare(spec, THEME_SPECIFICITY) <= 0) {
       problems.push(
-        `${CSS_FILE}: \`${one}\` is (${spec.join(",")}) — it colours a <button> (.${hit}${family ? `, one of the runtime-built \`.${family}*\` classes` : ""}) but loses to \`button:not(.clickable-icon)\` (0,1,1), so the theme's face wins in the real app. Write it as \`${one.replace(`.${hit}`, `.${hit}.${hit}`)}\`.`,
+        hit
+          ? `${CSS_FILE}: \`${one}\` is (${spec.join(",")}) — it colours a <button> (.${hit}${family ? `, one of the runtime-built \`.${family}*\` classes` : ""}) but loses to \`button:not(.clickable-icon)\` (0,1,1), so the theme's face wins in the real app. Write it as \`${one.replace(`.${hit}`, `.${hit}.${hit}`)}\`.`
+          : `${CSS_FILE}: \`${one}\` is (${spec.join(",")}) — it colours buttons through the bare element, which does not beat \`button:not(.clickable-icon)\` (0,1,1), so the theme's face wins in the real app. Select the button by a class it carries, named twice.`,
       );
     }
   }
