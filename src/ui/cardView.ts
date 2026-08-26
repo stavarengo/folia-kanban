@@ -1,6 +1,7 @@
 // Pure helpers that turn a card's data into the little chips shown on its board card.
-// Backward-compatible across vaults: priority may be a letter scale (A/B/C/D) or a word
-// scale (urgent/high/medium/low) — both map to the same four severity tones.
+// Backward-compatible across vaults: priority may be a letter scale (A/B/C/D), a word
+// scale (urgent/high/medium/low) — both map to the same four severity tones — or a board's own
+// words, ranked across those same tones by the order its note lists them.
 import type { RelationCounts } from "../model/board";
 import { dedupePriorities, priorityIndex } from "../model/priorities";
 import type { Card, ColumnGroup, ColumnSort } from "../model/types";
