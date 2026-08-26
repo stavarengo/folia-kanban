@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
@@ -3601,5 +3601,69 @@ describe("the previous card's description never seeds the next card's editor", (
     releaseRead();
     await waitFor(() => expect(within(detail).getByLabelText("Edit description")).toHaveValue(""));
     expect(repo.files.get("Tasks/Beta.md")!.body).not.toContain("typed on Alpha");
+describe("file operations done outside the board", () => {
+  /** Rename a card file the way the explorer does: the file moves, then the vault reports it. */
+  function renameOutside(repo: FakeRepo, from: string, to: string) {
+    const entry = repo.files.get(from)!;
+    repo.files.delete(from);
+    repo.files.set(to, entry);
+    act(() => {
+      repo.notifyFileOp({ kind: "rename", from, to });
+      repo.notify();
+    });
+  }
+
+  it("moves a card's collapse override and comments-seen marker to its new path", async () => {
+    const repo = makeRepo();
+    const box = { current: DEFAULT_SETTINGS };
+    renderStateful(
+      repo,
+      {
+        ...DEFAULT_SETTINGS,
+        collapsedCards: { "Tasks/Alpha.md": true },
+        commentsSeen: { "Tasks/Alpha.md": "2026-06-13 09:00#1" },
+      },
+      box,
+    );
+    await screen.findByText("Alpha");
+
+    renameOutside(repo, "Tasks/Alpha.md", "Tasks/Renamed.md");
+
+    await waitFor(() => expect(box.current.collapsedCards["Tasks/Renamed.md"]).toBe(true));
+    expect(box.current.collapsedCards["Tasks/Alpha.md"]).toBeUndefined();
+    expect(box.current.commentsSeen).toEqual({ "Tasks/Renamed.md": "2026-06-13 09:00#1" });
+  });
+
+  it("keeps the detail panel on the card when its file is renamed from the explorer", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("Gamma"));
+    expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
+
+    renameOutside(repo, "Tasks/Gamma.md", "Tasks/Gamma renamed.md");
+
+    // The title lives in the note's heading, so it does not change — what must survive is the
+    // panel: a selection left pointing at the old path resolves to no card and closes it.
+    await waitFor(() => expect(screen.getByTestId("card-detail")).toBeInTheDocument());
+    expect(within(screen.getByTestId("card-detail")).getByText("Gamma")).toBeInTheDocument();
+  });
+
+  it("closes the panel and forgets the card's state when its file is deleted from the explorer", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    const box = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, { ...DEFAULT_SETTINGS, collapsedCards: { "Tasks/Gamma.md": true } }, box);
+    await user.click(await screen.findByText("Gamma"));
+    expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
+
+    repo.files.delete("Tasks/Gamma.md");
+    act(() => {
+      repo.notifyFileOp({ kind: "delete", path: "Tasks/Gamma.md" });
+      repo.notify();
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    expect(box.current.collapsedCards).toEqual({});
   });
 });

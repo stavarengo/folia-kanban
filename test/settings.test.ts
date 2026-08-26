@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, hydrateSettings, seenMarkerFor } from "../src/settings";
+import {
+  DEFAULT_SETTINGS,
+  hydrateSettings,
+  migratePathKeyedSettings,
+  seenMarkerFor,
+} from "../src/settings";
 
 const NOW = "2026-08-25 14:00";
 
@@ -58,5 +63,32 @@ describe("seenMarkerFor", () => {
 
   it("is undefined without either, so every comment counts as unread", () => {
     expect(seenMarkerFor(DEFAULT_SETTINGS, "Tasks/Fresh.md")).toBeUndefined();
+  });
+});
+
+describe("migratePathKeyedSettings", () => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    collapsedCards: { "Tasks/A.md": true, "Notes/N.md": false },
+    commentsSeen: { "Tasks/A.md": "2026-08-25 10:00#1" },
+  };
+
+  it("follows every path-keyed map through a rename in one patch", () => {
+    expect(
+      migratePathKeyedSettings(settings, { kind: "rename", from: "Tasks/A.md", to: "Done/A.md" }),
+    ).toEqual({
+      collapsedCards: { "Done/A.md": true, "Notes/N.md": false },
+      commentsSeen: { "Done/A.md": "2026-08-25 10:00#1" },
+    });
+  });
+
+  it("patches only the maps the operation actually touched", () => {
+    expect(migratePathKeyedSettings(settings, { kind: "delete", path: "Notes/N.md" })).toEqual({
+      collapsedCards: { "Tasks/A.md": true },
+    });
+  });
+
+  it("returns an empty patch when the operation misses everything, so nothing is written", () => {
+    expect(migratePathKeyedSettings(settings, { kind: "delete", path: "Other/X.md" })).toEqual({});
   });
 });

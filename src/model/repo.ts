@@ -11,6 +11,7 @@ import type {
   RelationType,
 } from "./types";
 import type { CardMutation } from "./board";
+import type { FileOp } from "./pathOps";
 
 export interface CardRepository {
   /**
@@ -103,4 +104,17 @@ export interface CardRepository {
 
   /** Subscribe to external changes; returns an unsubscribe function. */
   onChange(cb: () => void): () => void;
+
+  /**
+   * Subscribe to file renames/moves/deletes that happen OUTSIDE the plugin's own actions — the
+   * file explorer, another plugin, an edit straight on disk. Separate from {@link onChange}, which
+   * only says "something changed, reload": path-keyed UI state (the selection, and the per-card
+   * maps in plugin data) has to know WHICH path became which, and a reload cannot tell it.
+   *
+   * A folder operation arrives as one op naming the folder, the way the vault reports it — never
+   * one per file inside it — so consumers must treat a path as covered by its ancestors too.
+   *
+   * Returns an unsubscribe function.
+   */
+  onFileOp(cb: (op: FileOp) => void): () => void;
 }

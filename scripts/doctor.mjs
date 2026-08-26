@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Toolchain preflight (blueprint §3). Refuses to let work start on the wrong
-// runtime or a half-installed tree. Run via `pnpm doctor`; it is the first step
+// runtime or a half-installed tree. Run via `pnpm doctor:check`; it is the first step
 // of `pnpm verify`.
 //
 // Checks: Node baseline, pnpm package manager, lockfile present, dependencies
@@ -39,7 +39,7 @@ const fail = (msg) => {
   if (!pinned.startsWith("pnpm@"))
     fail(`package.json "packageManager" must pin pnpm, got "${pinned}".`);
   else if (ua && !ua.startsWith("pnpm/"))
-    fail(`Use pnpm — this run used "${ua.split(" ")[0]}". Run via "pnpm doctor".`);
+    fail(`Use pnpm — this run used "${ua.split(" ")[0]}". Run via "pnpm doctor:check".`);
   else ok(`pnpm (${pinned || "pinned"})`);
 }
 

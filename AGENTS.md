@@ -11,7 +11,7 @@
 
 ## Way of Working
 
-1. Before changing code: `pnpm doctor`,
+1. Before changing code: `pnpm doctor:check`,
 2. While changing code (TypeScript only): put files in the documented folders; validate vault input with the Zod schemas;
 3. Respect the the linters and guards. Don't just disable or ignore the violations. Fix them for real. Only ignore a violation if it's really technically impossible to fix or if the fix would not be worth.
 4. No task is complete until `pnpm verify` passes (`pnpm verify:ui` for UI changes).

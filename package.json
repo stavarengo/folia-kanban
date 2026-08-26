@@ -15,7 +15,7 @@
     "release:bump-plugin-version": "node scripts/bump-plugin-version.mjs",
     "ci:release": "release-it --ci",
     "dev:helpers:release": "release-it",
-    "doctor": "node scripts/doctor.mjs",
+    "doctor:check": "node scripts/doctor.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src test",
@@ -39,7 +39,7 @@
     "a11y-exceptions:check": "node scripts/check-a11y-exceptions.mjs",
     "test:a11y": "vitest run test/a11y.axe.test.tsx",
     "test:visual": "vitest run test/visual-regression.test.tsx",
-    "verify": "pnpm doctor && pnpm format:check && pnpm filesystem:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check && pnpm architecture:check && pnpm schema:check && pnpm dead-code:check && pnpm docs:check && pnpm tokens:check && pnpm audit:raw-values && pnpm buttons:check && pnpm waivers:check && pnpm a11y-exceptions:check && pnpm obsidian-scan:check",
+    "verify": "pnpm doctor:check && pnpm format:check && pnpm filesystem:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check && pnpm architecture:check && pnpm schema:check && pnpm dead-code:check && pnpm docs:check && pnpm tokens:check && pnpm audit:raw-values && pnpm buttons:check && pnpm waivers:check && pnpm a11y-exceptions:check && pnpm obsidian-scan:check",
     "verify:ui": "pnpm verify",
     "prepare": "lefthook install"
   },

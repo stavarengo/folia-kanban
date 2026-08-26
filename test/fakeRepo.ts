@@ -3,6 +3,7 @@
 // exercise genuine parse/mutate logic without Obsidian.
 
 import type { CardRepository } from "../src/model/repo";
+import type { FileOp } from "../src/model/pathOps";
 import type {
   Board,
   BoardConfig,
@@ -65,6 +66,7 @@ let seq = 0;
 export class FakeRepo implements CardRepository {
   files = new Map<string, Entry>();
   listeners = new Set<() => void>();
+  fileOpListeners = new Set<(op: FileOp) => void>();
   opened: string[] = [];
   ts = "2026-06-13 12:00";
   /** Test hook mirroring VaultRepository's `cardFolderWarning` (missing card-folder, #20260821.07). */
@@ -361,9 +363,19 @@ export class FakeRepo implements CardRepository {
     return () => this.listeners.delete(cb);
   }
 
+  onFileOp(cb: (op: FileOp) => void): () => void {
+    this.fileOpListeners.add(cb);
+    return () => this.fileOpListeners.delete(cb);
+  }
+
   /** test helper: simulate an external change */
   notify() {
     for (const cb of this.listeners) cb();
+  }
+
+  /** test helper: simulate a rename/move/delete done outside the board (explorer, other plugin) */
+  notifyFileOp(op: FileOp) {
+    for (const cb of this.fileOpListeners) cb(op);
   }
 }
 

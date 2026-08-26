@@ -57,6 +57,7 @@ import {
 } from "../model/history";
 import { TITLE_KEY, asTitleMode, resolveTitle, setHeadingTitle } from "../model/cardTitle";
 import type { CardRepository } from "../model/repo";
+import type { FileOp } from "../model/pathOps";
 import {
   BoardFrontmatterSchema,
   ContextFrontmatterSchema,
@@ -612,6 +613,22 @@ export class VaultRepository implements CardRepository {
       cancelled = true;
       c.unload();
       el.innerHTML = "";
+    };
+  }
+
+  onFileOp(cb: (op: FileOp) => void): () => void {
+    // Deliberately NOT filtered by the `recentWrites` echo guard `onChange` uses. Following a path
+    // is idempotent — whichever of the two paths runs first (the in-app action or this listener),
+    // the other finds nothing left to move — so suppressing our own writes would only risk
+    // swallowing a real external operation that landed inside the guard's window.
+    const refs = [
+      this.app.vault.on("rename", (f, oldPath) =>
+        cb({ kind: "rename", from: oldPath, to: f.path }),
+      ),
+      this.app.vault.on("delete", (f) => cb({ kind: "delete", path: f.path })),
+    ];
+    return () => {
+      for (const ref of refs) this.app.vault.offref(ref);
     };
   }
 

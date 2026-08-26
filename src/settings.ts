@@ -1,3 +1,5 @@
+import type { FileOp } from "./model/pathOps";
+import { remapPathKeys } from "./model/pathOps";
 import type { HistoryScope } from "./model/types";
 import type { BoardViewMode } from "./viewMode";
 
@@ -123,6 +125,34 @@ export function hydrateSettings(
  */
 export function seenMarkerFor(settings: KanbanSettings, path: string): string | undefined {
   return settings.commentsSeen[path] ?? (settings.commentsBaseline || undefined);
+}
+
+/**
+ * Every setting keyed by card path. One list, so a file operation that bypasses the plugin's own
+ * actions keeps reaching all of them: adding the next path-keyed map means adding it here, not
+ * finding this code again.
+ */
+type PathKeyedMap = {
+  [K in keyof KanbanSettings]: KanbanSettings[K] extends Record<string, unknown> ? K : never;
+}[keyof KanbanSettings];
+
+const PATH_KEYED_MAPS: readonly PathKeyedMap[] = ["collapsedCards", "commentsSeen"];
+
+/**
+ * The settings patch that follows a card file being renamed, moved, or deleted from outside the
+ * board. Empty when the operation touched nothing this install remembers, so an unrelated vault
+ * edit costs no write.
+ */
+export function migratePathKeyedSettings(
+  settings: KanbanSettings,
+  op: FileOp,
+): Partial<KanbanSettings> {
+  const patch: Partial<KanbanSettings> = {};
+  for (const key of PATH_KEYED_MAPS) {
+    const next = remapPathKeys<unknown>(settings[key], op);
+    if (next) (patch as Record<string, unknown>)[key] = next;
+  }
+  return patch;
 }
 
 export const DETAIL_WIDTH_MIN = 280;
