@@ -14,7 +14,7 @@ import {
   setSubtaskStatus,
   removeSubtask,
   setDescription,
-  ownedHeadingIn,
+  descriptionRefusal,
   cardStats,
   updateTimestampedLine,
   removeTimestampedLine,
@@ -561,13 +561,25 @@ All three landed.
     expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(ownHeadings).fmText);
   });
 
-  it("refuses a heading the plugin owns before it reaches the file", () => {
+  it("refuses a heading the plugin owns, or an open fence, before it reaches the file", () => {
     // The Description box asks before saving; `setDescription` itself stays permissive so a
     // section can still be written by anything that means to.
-    expect(ownedHeadingIn("Intro\n\n## History\n\nof the project")).toBe("## History");
-    expect(ownedHeadingIn("Intro\n\n## comments \n")).toBe("## comments");
-    expect(ownedHeadingIn("Intro\n\n## Notes\n\n### Comments\n")).toBeNull();
-    expect(ownedHeadingIn("```md\n## Comments\n```\n")).toBeNull();
+    expect(descriptionRefusal("Intro\n\n## History\n\nof the project")).toEqual({
+      kind: "heading",
+      line: "## History",
+    });
+    expect(descriptionRefusal("Intro\n\n## comments \n")).toEqual({
+      kind: "heading",
+      line: "## comments",
+    });
+    expect(descriptionRefusal("Intro\n\n## Notes\n\n### Comments\n")).toBeNull();
+    expect(descriptionRefusal("```md\n## Comments\n```\n")).toBeNull();
+    // Left open, a fence would run to the end of the note and take every section with it.
+    expect(descriptionRefusal("Intro\n\n```js\nconst a = 1;")).toEqual({
+      kind: "fence",
+      line: "```",
+    });
+    expect(descriptionRefusal("~~~~\ncode\n~~~\n")).toEqual({ kind: "fence", line: "~~~~" });
   });
 });
 
@@ -622,6 +634,26 @@ describe("code fences hide structure from every lookup at once", () => {
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["c"]);
   });
 
+  it("closes a fence left open inside an existing section before appending to it", () => {
+    const doc = "# T\n\n## Comments\n- _2026-08-22 09:00:_ real\n\n```\ncode\n\n";
+    const out = appendHistory(doc, "Moved", "2026-08-23 10:00");
+    expect(out).toBe(doc + "```\n\n## History\n- _2026-08-23 10:00:_ Moved\n");
+    const out2 = appendComment(doc, "new", "2026-08-23 10:00");
+    expect(out2).toBe(
+      "# T\n\n## Comments\n- _2026-08-22 09:00:_ real\n\n```\ncode\n```\n- _2026-08-23 10:00:_ new\n\n",
+    );
+    expect(parseBody(out2).comments.map((c) => c.text)).toEqual(["real", "new"]);
+  });
+
+  it("sees fences on CRLF notes too", () => {
+    const doc =
+      "# T\r\n\r\n```md\r\n## Comments\r\n- _t:_ quoted\r\n```\r\n\r\n## Comments\r\n- _2026-08-22 09:00:_ real\r\n";
+    const b = parseBody(doc);
+    expect(b.description).toBe("```md\r\n## Comments\r\n- _t:_ quoted\r\n```");
+    expect(b.comments).toEqual([{ timestamp: "2026-08-22 09:00", author: null, text: "real" }]);
+    expect(appendComment(doc, "new", "2026-08-23 10:00")).toBe(doc + "- _2026-08-23 10:00:_ new\n");
+  });
+
   it("a fenced `# heading` is not the title", () => {
     expect(parseBody("```\n# not me\n```\n# Me\n\nbody\n")).toMatchObject({
       title: "Me",
@@ -641,30 +673,53 @@ describe("prose under Comments / History", () => {
         author: null,
         text: "**2026-08-21** — Applied and checked\nagainst the test suite.",
       },
-      { timestamp: "2026-08-22 09:00", author: null, text: "bullet" },
-      { timestamp: "", author: null, text: "a continuation line" },
+      { timestamp: "2026-08-22 09:00", author: null, text: "bullet\na continuation line" },
       { timestamp: "", author: null, text: "A closing remark." },
     ]);
+  });
+
+  it("a bullet wrapped over two lines is one comment, edited and deleted as one", () => {
+    expect(updateTimestampedLine(doc, SECTION.comments, 1, "edited")).toBe(
+      doc.replace(
+        "- _2026-08-22 09:00:_ bullet\n  a continuation line",
+        "- _2026-08-22 09:00:_ edited",
+      ),
+    );
+    expect(removeTimestampedLine(doc, SECTION.comments, 1)).toBe(
+      doc.replace("- _2026-08-22 09:00:_ bullet\n  a continuation line\n\n", ""),
+    );
+  });
+
+  it("a prose edit that would read as structure is written as a bullet instead", () => {
+    for (const text of ["## History", "# Title", "```", "~~~js"]) {
+      const out = updateTimestampedLine(doc, SECTION.comments, 0, text);
+      expect(out).toBe(
+        doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.", `- ${text}`),
+      );
+      expect(parseBody(out).comments.map((c) => c.text)).toEqual([
+        text,
+        "bullet\na continuation line",
+        "A closing remark.",
+      ]);
+      expect(parseBody(out).history).toHaveLength(1);
+    }
   });
 
   it("edits the paragraph the panel showed, as one line, leaving every other byte alone", () => {
     expect(updateTimestampedLine(doc, SECTION.comments, 0, "Applied.")).toBe(
       doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.", "Applied."),
     );
-    expect(updateTimestampedLine(doc, SECTION.comments, 3, "Bye.")).toBe(
+    expect(updateTimestampedLine(doc, SECTION.comments, 2, "Bye.")).toBe(
       doc.replace("A closing remark.", "Bye."),
     );
   });
 
-  it("deletes the whole paragraph the panel showed, and only it", () => {
+  it("deletes the whole paragraph the panel showed, with the blank line that separated it", () => {
     expect(removeTimestampedLine(doc, SECTION.comments, 0)).toBe(
-      doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.\n", ""),
+      doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.\n\n", ""),
     );
-  });
-
-  it("still addresses bullets by the same index the reader gives them", () => {
-    expect(updateTimestampedLine(doc, SECTION.comments, 1, "edited")).toBe(
-      doc.replace("- _2026-08-22 09:00:_ bullet", "- _2026-08-22 09:00:_ edited"),
+    expect(removeTimestampedLine(doc, SECTION.comments, 2)).toBe(
+      doc.replace("A closing remark.\n\n", ""),
     );
   });
 
@@ -675,7 +730,7 @@ describe("prose under Comments / History", () => {
 
   it("counts a prose comment on the card, untracked for unread marking", () => {
     const stats = cardStats(doc);
-    expect(stats.comments).toBe(4);
+    expect(stats.comments).toBe(3);
     expect(stats.commentMarks[0]).toEqual({ timestamp: "", author: null });
   });
 });

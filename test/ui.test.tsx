@@ -305,6 +305,11 @@ describe("card detail", () => {
     await user.type(box, " end");
     expect(within(detail).queryByRole("alert")).toBeNull();
     await user.clear(box);
+    await user.type(box, "Intro{enter}{enter}```js{enter}const a = 1;");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("never closed");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
+    await user.clear(box);
     await user.type(box, "Intro{enter}{enter}## Timeline{enter}{enter}of the project");
     await user.click(within(detail).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("## Timeline"));

@@ -11,7 +11,7 @@ import {
 } from "react";
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
-import { ownedHeadingIn } from "../model/card";
+import { descriptionRefusal } from "../model/card";
 import { RELATION_KEYS } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -420,8 +420,8 @@ export function CardDetail({
   /** Which card `body` was read from — the unread block below must not trust a stale one. */
   const [bodyPath, setBodyPath] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState("");
-  // The owned heading (`## Comments`, …) that stopped the last save, shown until the draft changes.
-  const [descRefusal, setDescRefusal] = useState<string | null>(null);
+  // What stopped the last save (an owned heading, an open fence), shown until the draft changes.
+  const [descRefusal, setDescRefusal] = useState<ReturnType<typeof descriptionRefusal>>(null);
   // Description defaults to a rendered view; clicking it (or the pencil) flips to the raw editor.
   const [editingDesc, setEditingDesc] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -1020,18 +1020,19 @@ export function CardDetail({
               />
               {descRefusal && (
                 <p className="folia-desc-refusal" role="alert">
-                  Not saved: <code>{descRefusal}</code> would start a section the plugin owns
-                  (Subtasks, Comments, History), and everything below it would leave the
-                  description. Rename the heading, or quote it inside a code fence.
+                  Not saved: <code>{descRefusal.line}</code>{" "}
+                  {descRefusal.kind === "heading"
+                    ? "would start a section the plugin owns (Subtasks, Comments, History), and everything below it would leave the description. Rename the heading, or quote it inside a code fence."
+                    : "opens a code block that is never closed, so it would run to the end of the note and swallow the sections after it. Close the fence."}
                 </p>
               )}
               <div className="folia-row-actions">
                 <button
                   className="folia-btn folia-btn-primary"
                   onClick={() => {
-                    const owned = ownedHeadingIn(descDraft);
-                    if (owned !== null) {
-                      setDescRefusal(owned);
+                    const refusal = descriptionRefusal(descDraft);
+                    if (refusal !== null) {
+                      setDescRefusal(refusal);
                       return;
                     }
                     void mutate(() => repo.setDescription(path, descDraft)).then(() =>

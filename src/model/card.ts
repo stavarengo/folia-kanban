@@ -150,15 +150,20 @@ function descriptionRange(lines: string[]): { h1: number; from: number; to: numb
 }
 
 /**
- * The first line of a would-be description that would start a section the plugin owns (`## Comments`
- * typed into the Description box), as typed; `null` when the text is all description. Fenced lines
- * do not count, matching what `descriptionRange` will read back.
+ * Why a would-be description must not be saved as one, or `null` when it is all description: a
+ * line that would start a section the plugin owns (`## Comments` typed into the Description box),
+ * or a code fence left open, which would run to the end of the note and swallow every section
+ * after it. Fenced lines do not count as headings, matching what `descriptionRange` reads back.
  */
-export function ownedHeadingIn(description: string): string | null {
+export function descriptionRefusal(
+  description: string,
+): { kind: "heading" | "fence"; line: string } | null {
   const lines = description.split("\n");
   const fenced = fencedLines(lines);
   const i = lines.findIndex((l, n) => !fenced[n] && OWNED_HEADING_RE.test(l));
-  return i === -1 ? null : (lines[i] ?? "").trim();
+  if (i !== -1) return { kind: "heading", line: (lines[i] ?? "").trim() };
+  const open = unclosedFence(lines);
+  return open === null ? null : { kind: "fence", line: open };
 }
 
 /** Append a single line to a section, creating the section at end if absent. */
@@ -180,7 +185,9 @@ function appendToSection(body: string, name: string, line: string): string {
   const end = sectionEnd(lines, start, fenced);
   let insert = end;
   while (insert - 1 > start && lines[insert - 1]?.trim() === "") insert--;
-  lines.splice(insert, 0, line);
+  // The same open fence, inside the section itself, would swallow the new line.
+  const open = end === lines.length ? unclosedFence(lines) : null;
+  lines.splice(insert, 0, ...(open === null ? [line] : [open, line]));
   return lines.join("\n");
 }
 
@@ -197,10 +204,10 @@ function checklistLine(lines: string[], index: number): number {
 
 /**
  * One entry of a timestamped section (Comments / History), as the half-open line range
- * `[from, to)`. A bullet line is an entry of its own. Prose is an entry per paragraph: consecutive
- * non-blank, non-bullet lines, so a hand-written comment wrapped over several lines reads as one.
- * The reader and both writers walk this same list, which is what keeps "comment N" meaning the
- * same lines to all of them.
+ * `[from, to)`: a bullet, or a paragraph of prose. Either runs until a blank line, a fence or
+ * another bullet, so a comment wrapped over several lines reads as one, bullet or not. The reader
+ * and both writers walk this same list, which is what keeps "comment N" meaning the same lines to
+ * all of them.
  */
 interface Entry {
   from: number;
@@ -215,7 +222,7 @@ function timestampedEntries(lines: string[], name: string): Entry[] {
     if (line.trim() === "") continue;
     const bullet = BULLET_RE.test(line);
     const last = entries[entries.length - 1];
-    if (!bullet && last && !last.bullet && last.to === i) last.to = i + 1;
+    if (!bullet && last && last.to === i) last.to = i + 1;
     else entries.push({ from: i, to: i + 1, bullet });
   }
   return entries;
@@ -286,21 +293,18 @@ type Timestamped = { timestamp: string; text: string; author: string | null };
  * comments", and prose has no timestamp at all.
  */
 function readEntry(lines: string[], entry: Entry): Timestamped {
-  const line = lines[entry.from] ?? "";
-  if (!entry.bullet) {
-    const text = lines
-      .slice(entry.from, entry.to)
-      .map((l) => l.replace(/\r$/, ""))
-      .join("\n")
-      .trim();
-    return { timestamp: "", author: null, text };
-  }
-  const m = TS_LINE_RE.exec(line);
-  if (m) return { timestamp: (m[1] ?? "").trim(), author: m[2] ?? null, text: (m[3] ?? "").trim() };
-  const legacy = TS_LINE_LEGACY_RE.exec(line);
+  const [first = "", ...rest] = lines
+    .slice(entry.from, entry.to)
+    .map((l) => l.replace(/\r$/, "").trim());
+  const withRest = (text: string) => [text, ...rest].join("\n").trim();
+  if (!entry.bullet) return { timestamp: "", author: null, text: withRest(first) };
+  const m = TS_LINE_RE.exec(first);
+  if (m)
+    return { timestamp: (m[1] ?? "").trim(), author: m[2] ?? null, text: withRest(m[3] ?? "") };
+  const legacy = TS_LINE_LEGACY_RE.exec(first);
   if (legacy)
-    return { timestamp: (legacy[1] ?? "").trim(), author: null, text: (legacy[2] ?? "").trim() };
-  return { timestamp: "", author: null, text: line.replace(BULLET_RE, "").trim() };
+    return { timestamp: (legacy[1] ?? "").trim(), author: null, text: withRest(legacy[2] ?? "") };
+  return { timestamp: "", author: null, text: withRest(first.replace(BULLET_RE, "")) };
 }
 
 function parseTimestamped(body: string, name: string): Timestamped[] {
@@ -444,12 +448,17 @@ export function removeSubtask(text: string, index: number): string {
 // The `_..._` branch mirrors TS_LINE_RE's character-class boundary rule.
 const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+?(?:\s+@[^\s:]+)?:_|\[[^\]]+\])\s+)([\s\S]*)$/;
 
+// What a line at column 0 must not start with to stay prose: a heading, or a fence. Either would
+// be structure to the lookups above, and would move or hide every entry after it.
+const STRUCTURAL_LINE_RE = /^ {0,3}(?:#{1,6}[ \t]|`{3,}|~{3,})/;
+
 /**
  * Rewrite the text of the index-th entry of a timestamped section (Comments / History), 0-based in
- * the order `parseTimestamped` reads them. On a bullet, ONLY the text after its timestamp prefix
- * (`_timestamp:_ ` or the legacy `[timestamp] `) changes; the bullet prefix and timestamp stay
- * byte-identical. A prose entry has no prefix to keep: its lines are replaced by the new text as
- * one line. Nothing outside the entry is touched.
+ * the order `parseTimestamped` reads them. The entry is written back as one line. On a bullet, ONLY
+ * the text after its timestamp prefix (`_timestamp:_ ` or the legacy `[timestamp] `) changes; the
+ * bullet prefix and timestamp stay byte-identical. A prose entry has no prefix to keep, so its text
+ * is written bare — unless the new text would read as a heading or a fence at column 0, in which
+ * case it is written as a bullet so it stays a comment. Nothing outside the entry is touched.
  */
 export function updateTimestampedLine(
   text: string,
@@ -470,7 +479,9 @@ export function updateTimestampedLine(
     // A bare bullet (`- text`, no timestamp) keeps its bullet prefix; prose keeps nothing.
     const prefix = entry.bullet
       ? (TS_PREFIX_RE.exec(currentLine)?.[1] ?? BULLET_RE.exec(currentLine)?.[0] ?? "")
-      : "";
+      : STRUCTURAL_LINE_RE.test(safeText)
+        ? "- "
+        : "";
     lines.splice(entry.from, entry.to - entry.from, `${prefix}${safeText}${cr}`);
     return lines.join("\n");
   });
@@ -485,7 +496,10 @@ export function removeTimestampedLine(text: string, section: string, index: numb
     const lines = body.split("\n");
     const entry = timestampedEntries(lines, section)[index];
     if (!entry) return body;
-    lines.splice(entry.from, entry.to - entry.from);
+    // Take the blank line that separated a paragraph from the next entry with it, so repeated
+    // edits do not pile blank lines up.
+    const gap = lines[entry.from - 1]?.trim() === "" && lines[entry.to]?.trim() === "" ? 1 : 0;
+    lines.splice(entry.from, entry.to - entry.from + gap);
     return lines.join("\n");
   });
 }

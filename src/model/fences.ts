@@ -2,7 +2,7 @@
 // backticks or tildes, indented by up to three spaces. Every heading and bullet lookup in the card
 // model goes through here so that quoting the plugin's own format inside a note stays inert.
 
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*?)\r?$/;
 
 /**
  * Fence state after `line`, given the currently open fence marker (null = not in a fence). Returns
