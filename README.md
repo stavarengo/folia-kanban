@@ -258,11 +258,9 @@ Edits are surgical: body changes splice only the section they touch, and frontma
 
 ## Install
 
-**Requirements:** Obsidian **1.7.0+**. Runs on desktop and mobile.
+**Requirements:** Obsidian **1.7.2+**. Runs on desktop and mobile.
 
 ### From Community Plugins
-
-> *Coming soon — Folia Kanban is awaiting review for the Obsidian community store. Until it's listed, use the manual install below.*
 
 1. Open **Settings → Community plugins** and turn off restricted mode.
 2. Click **Browse**, search for **Folia Kanban**, and install it.
@@ -283,6 +281,8 @@ pnpm typecheck   # tsc --noEmit
 ```
 
 The pure model (`src/model`), board graph + drag reducer, and UI logic are unit-tested, including a byte-stability round-trip over the fixtures in `test/fixtures/` that proves edits never corrupt untouched bytes of a card file. The `dist/` build output, `node_modules` and the pnpm store are git-ignored; releases ship the built `dist/main.js`.
+
+Cutting a release, and what the community directory's scanner checks, are written up in [docs/releasing.md](docs/releasing.md).
 
 ## Support
 

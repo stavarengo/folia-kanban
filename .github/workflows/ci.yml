@@ -42,3 +42,46 @@ jobs:
 
       - name: Verify
         run: pnpm verify
+
+  # Obsidian's own action, running the community directory's real scanner rulesets.
+  # `pnpm verify` already runs a local reproduction of them (`obsidian-scan:check`),
+  # which is the only pre-push signal — the action has no local/CLI form. This job is
+  # the second, independently maintained opinion: if the two ever disagree, the
+  # scanner moved and the local copy needs updating. Deliberately floating on `v1`
+  # for that reason.
+  obsidian-scan:
+    name: Obsidian community scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      # The action is npm-only (`npm ci`/`npm install`), and this repo has no
+      # package-lock.json. Installing first makes it skip its own install — it
+      # bails out when node_modules exists — so the scan and the build it runs
+      # see the pnpm-pinned tree, not a freshly resolved one. Its two lint passes
+      # install their own pinned tools in a temp dir either way.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scan
+        uses: obsidianmd/obsidian-workflows@v1
+        with:
+          type: plugin
+          mode: pr
+          # Off by default outside release mode; without it this only reruns our
+          # own `pnpm lint`, not the scanner's rulesets.
+          scanner-lint: true
