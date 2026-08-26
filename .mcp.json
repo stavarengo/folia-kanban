@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "chrome-devtools-obsidian": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--browser-url=http://172.17.0.1:9222"]
+      "command": "sh",
+      "args": [
+        "-c",
+        "url=$OBSIDIAN_DEBUG_URL; if [ -z \"$url\" ]; then host=127.0.0.1; if [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then host=$(ip route 2>/dev/null | awk '/^default/{print $3; exit}'); fi; [ -n \"$host\" ] || host=127.0.0.1; url=http://$host:9222; fi; exec npx -y chrome-devtools-mcp@latest --browser-url=\"$url\""
+      ]
     }
   }
 }

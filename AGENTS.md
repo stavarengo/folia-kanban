@@ -21,14 +21,14 @@
 ### Driving the Obsidian UI via the Chrome DevTools MCP server
 
 1. Use the [`chrome-devtools-obsidian`](./.mcp.json) MCP server against the real Obsidian on the **host** — not the global chrome-devtools plugin (it spawns its own headless Chrome).
-2. Inside a container, testing needs the host bridge. Ask your human to run it (replace CONTAINER_IP); if it's missing, say so — you can't test without it:
+2. Inside a container, testing needs a host bridge on the **container's default gateway** — the host side of the link, never a fixed `172.17.0.1`. `.mcp.json` derives that address itself (override with `OBSIDIAN_DEBUG_URL`); on the host it needs nothing, the default is `http://127.0.0.1:9222`. Derive the same value with `ip route | awk '/^default/{print $3}'`, substitute it for `HOST_GATEWAY` below, and ask your human to run it; if the bridge is missing, say so — you can't test without it. Confirm with `curl -s http://HOST_GATEWAY:9222/json/version`.
 
    ```bash title="Run on the host, not the container - share this snippet with your human when needed"
    pkill -f '[O]bsidian'
    sleep 1
    setsid -f /opt/Obsidian/obsidian --remote-debugging-port=9222 >"$(git rev-parse --show-toplevel)/tmp/obsidian-debug.log" 2>&1 </dev/null
    sleep 3
-   socat TCP-LISTEN:9222,bind=CONTAINER_IP,fork,reuseaddr TCP:127.0.0.1:9222
+   socat TCP-LISTEN:9222,bind=HOST_GATEWAY,fork,reuseaddr TCP:127.0.0.1:9222
    ```
 
 3. Use Obsidian only in the `examples/` vault — never touch others unless asked. Confirm it's open with `app.vault.getName()`.
