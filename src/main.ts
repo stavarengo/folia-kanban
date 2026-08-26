@@ -411,13 +411,13 @@ class KanbanSettingTab extends PluginSettingTab {
   /** Where the declarative rendering writes one back: through `updateSettings`, so open boards
    *  re-render, exactly as the imperative rows below do. */
   override setControlValue(key: string, value: unknown): void {
-    // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
-    if (key === "userName") {
-      this.pendingUserName = typeof value === "string" ? value.trim() : null;
-      return;
-    }
     const patch = settingsPatchFor(key, value);
     if (!patch) return;
+    // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
+    if (patch.userName !== undefined) {
+      this.pendingUserName = patch.userName;
+      return;
+    }
     void this.plugin.updateSettings(patch).then(() => {
       // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
       // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
