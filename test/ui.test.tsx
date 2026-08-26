@@ -3601,6 +3601,9 @@ describe("the previous card's description never seeds the next card's editor", (
     releaseRead();
     await waitFor(() => expect(within(detail).getByLabelText("Edit description")).toHaveValue(""));
     expect(repo.files.get("Tasks/Beta.md")!.body).not.toContain("typed on Alpha");
+  });
+});
+
 describe("file operations done outside the board", () => {
   /**
    * A rename the way Obsidian delivers it: the file moves, the vault reports the operation, and the
