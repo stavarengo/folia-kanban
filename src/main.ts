@@ -133,11 +133,12 @@ export default class FoliaKanbanPlugin extends Plugin {
     // The button follows the flag: a note that gains or loses `folia-board` while it is open
     // gains or loses the button, but the tab is never swapped out from under the user.
     this.registerEvent(this.app.metadataCache.on("changed", () => this.syncMarkdownActions()));
-    // Everything the plugin remembers by path follows a file renamed, moved, or deleted from
-    // outside its own actions. It lives here rather than in the board view because the plugin
-    // remembers these things whether or not a board is open: a rename done with no board tab in
-    // sight would otherwise strand them, and a card later created at the vacated path would
-    // silently inherit them.
+    // Everything the plugin remembers by path follows the file it is about. The vault reports
+    // every rename and delete, the plugin's own included, and the follow-up is idempotent, so
+    // there is nothing to tell apart. It lives here rather than in the board view because the
+    // plugin remembers these things whether or not a board is open: a rename done with no board
+    // tab in sight would otherwise strand them, and a card later created at the vacated path
+    // would silently inherit them.
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         void this.followFileOp({ kind: "rename", from: oldPath, to: file.path });
@@ -242,9 +243,11 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   /**
-   * Follow a file operation the plugin did not make: re-point (or drop) everything it remembers by
-   * path. The vault reports a folder as a single operation covering everything inside it, which is
-   * what `remapPath` and `migratePathKeyedSettings` are built to expect.
+   * Follow a file operation: re-point (or drop) everything the plugin remembers by path. Runs for
+   * the plugin's own renames as much as for one done in the file explorer — both reach it as the
+   * same vault event — which is why every step of it is idempotent. The vault reports a folder as
+   * a single operation covering everything inside it, which is what `remapPath` and
+   * `migratePathKeyedSettings` are built to expect.
    */
   private async followFileOp(op: FileOp): Promise<void> {
     // The "this tab was deliberately put in the Markdown editor" record is keyed by leaf and holds
