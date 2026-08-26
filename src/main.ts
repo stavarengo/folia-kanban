@@ -384,8 +384,12 @@ class KanbanSettingTab extends PluginSettingTab {
    * The name typed but not committed yet. Committing per keystroke would save + re-render every
    * open board nine times for "alexandra", and each intermediate value is a DIFFERENT reader as far
    * as comment read-state is concerned — so a half-typed name reaching an open card's read marker
-   * would leave it recorded under someone who does not exist. It lands on blur, or when the tab
-   * closes, whichever comes first.
+   * would leave it recorded under someone who does not exist.
+   *
+   * It lands when the tab is left — another settings tab, or the settings window closing — and, on
+   * the imperative tab only, as soon as the field loses focus. A name typed and then abandoned by
+   * killing the app outright is therefore lost rather than half-written, which is the safer of the
+   * two ways to be wrong about who wrote a comment.
    */
   private pendingUserName: string | null = null;
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CARD_NEXT_TODOS_MAX,
@@ -26,10 +28,22 @@ describe("settingDefinitions", () => {
     for (const key of controlKeys) expect(DEFAULT_SETTINGS).toHaveProperty(key);
   });
 
-  it("uses the shared copy, so the two renderings of the tab cannot word a setting differently", () => {
+  it("takes its wording from the shared copy", () => {
     for (const [key, copy] of Object.entries(SETTING_COPY)) {
       const def = definitions.find((d) => "control" in d && d.control?.key === key);
       expect(def).toMatchObject({ name: copy.name, desc: copy.desc });
+    }
+  });
+
+  // The other rendering of the tab lives in src/main.ts, which cannot be imported here (it pulls in
+  // the obsidian runtime, which only exists inside the app). Reading it as text is what is left: a
+  // name or description spelled out there again is a second source of truth, and the two would
+  // drift the first time one of them is reworded.
+  it("is the only place the imperative tab can get a setting's wording from", () => {
+    const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+    for (const copy of Object.values(SETTING_COPY)) {
+      expect(main).not.toContain(JSON.stringify(copy.name).slice(1, -1));
+      expect(main).not.toContain(JSON.stringify(copy.desc).slice(1, -1));
     }
   });
 
@@ -42,7 +56,10 @@ describe("settingDefinitions", () => {
       const def = settingDefinitions(() => settings, "1.2.3").find(
         (d) => "control" in d && d.control?.key === key,
       );
-      const disabled = def && "control" in def ? def.control?.disabled : undefined;
+      // Without this, a renamed or dropped setting would make every "not disabled" case below pass
+      // for the wrong reason: no definition found, so nothing to be disabled.
+      if (!def || !("control" in def) || !def.control) throw new Error(`no control for ${key}`);
+      const { disabled } = def.control;
       return typeof disabled === "function" ? disabled() : Boolean(disabled);
     };
 

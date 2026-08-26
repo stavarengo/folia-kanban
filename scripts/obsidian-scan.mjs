@@ -1,7 +1,13 @@
 // Local reproduction of the Stylelint + ESLint passes that Obsidian's community-directory
 // scanner runs against a submitted plugin (obsidianmd/obsidian-workflows, src/lint.ts).
 // The rule sets, ignore lists and the minAppVersion -> Electron mapping below are copied
-// verbatim from that file so a finding here means a finding on the portal.
+// verbatim from that file, so a finding from either of those two passes means a finding on
+// the portal.
+//
+// A third pass, the README placeholder check further down, is NOT a reproduction: the portal's
+// review reports a placeholder rule whose source is not published anywhere, and that pass is our
+// reading of its message. Its own comment says so, and its findings carry that weight, not this
+// paragraph's.
 //
 // Two deliberate differences from the bot:
 //  - it only fails on stylelint exit code 2 (errors), so warning-severity findings are reported
@@ -10,8 +16,8 @@
 //  - it lints a fresh clone, so it only ever sees files git tracks. A working copy also holds
 //    build output, scratch directories and anything else gitignored, and stylelint's `ignoreFiles`
 //    turns out to be inert in 17.6.0 for the way lint.ts invokes it (verified against both the CLI
-//    and the Node API), so nothing upstream would keep those out. Both passes below are therefore
-//    restricted to `git ls-files`, which is exactly what the bot would clone. IGNORES is still
+//    and the Node API), so nothing upstream would keep those out. Both reproduced passes are
+//    therefore restricted to `git ls-files`, which is exactly what the bot would clone. IGNORES is still
 //    passed through unchanged, and ESLint's own ignore handling still applies on top.
 //
 // Known limit of the reproduction: the bot npm-installs its own tool versions at run time

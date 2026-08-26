@@ -45,9 +45,9 @@ blocks:               # cards this one holds up (the inverse is derived, never w
 Description text…
 
 ## Subtasks
-- [ ] Draft the announcement post
+- [ ] Book the demo room
 - [x] Pick the release date
-- [ ] Record the launch demo [status:: doing]   ← a checklist item that claims a column of its own
+- [ ] Rehearse the walkthrough [status:: doing]   ← a checklist item that claims a column of its own
 - [ ] [[A Subcard]]      ← a child card (its own file; its own `status` places it)
 
 ## Comments

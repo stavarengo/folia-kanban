@@ -89,7 +89,7 @@ export const SETTING_COPY = {
   },
   historyScope: {
     name: "History — what to record",
-    desc: "Moves = card moves/reorders only (default); structural = also priority/status/due/order changes; all = also comments + subtasks.",
+    desc: "Moves = card moves/reorders only; structural = also priority/status/due/order changes; all = also comments + subtasks (the default).",
   },
   boardPan: {
     name: "Board — horizontal drag",
@@ -155,8 +155,9 @@ export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSet
 
 /**
  * The settings tab as data, for Obsidian 1.13 and later: it renders the tab from these and indexes
- * them for the settings search. `read` is called on every evaluation of a `disabled` predicate, so
- * the rows that depend on another setting follow it without a re-render.
+ * them for the settings search. A `disabled` predicate reads the settings as they are when it runs,
+ * which is on each render and on each `refreshDomState()` — that is how a row depending on another
+ * setting catches up without the tab being redrawn.
  */
 export function settingDefinitions(
   read: () => KanbanSettings,
