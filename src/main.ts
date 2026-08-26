@@ -262,7 +262,17 @@ export default class FoliaKanbanPlugin extends Plugin {
       if (next === null) this.markdownTabs.delete(leaf);
       else this.markdownTabs.set(leaf, next);
     });
-    await this.updateSettings((s) => migratePathKeyedSettings(s, op));
+    try {
+      await this.updateSettings((s) => migratePathKeyedSettings(s, op));
+    } catch (e) {
+      // Nothing awaits this (it runs off a vault event), so a failed write would otherwise be an
+      // unhandled rejection: invisible to the user and to anything that could react. The in-memory
+      // settings are already correct; what failed is persisting them, which the next write retries.
+      new Notice(
+        `Folia Kanban: could not save after a file was moved or deleted. ${String(e)}`,
+        8000,
+      );
+    }
   }
 
   /** Swap a tab to the board, same leaf, same file. */

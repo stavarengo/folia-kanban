@@ -101,24 +101,34 @@ describe("migratePathKeyedSettings", () => {
 // the board view: the maps are remembered whether or not a board is open.
 describe("the plugin follows external file operations", () => {
   const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+  /** `src/main.ts` from the start of `followFileOp` to the end of its body. */
+  const followFileOp = (() => {
+    const from = main.slice(main.indexOf("private async followFileOp"));
+    return from.slice(0, from.indexOf("\n  }"));
+  })();
 
-  it("listens to the vault's rename and delete events", () => {
-    expect(main).toContain('this.app.vault.on("rename"');
-    expect(main).toContain('this.app.vault.on("delete"');
+  it("listens to the vault's rename and delete events and routes both into the follow-up", () => {
+    for (const event of ["rename", "delete"]) {
+      const at = main.indexOf(`this.app.vault.on("${event}"`);
+      expect(at, `no vault listener for ${event}`).toBeGreaterThan(-1);
+      // The handler, up to the end of its registerEvent call.
+      expect(main.slice(at, main.indexOf("\n    );", at))).toContain("this.followFileOp(");
+    }
   });
 
-  it("routes both events into the same follow-up, and that follow-up runs the migration", () => {
-    // Not just "the name appears somewhere": the handlers must reach it, and it must reach the
-    // migration. A no-op handler or a `followFileOp` that stopped migrating would pass a check
-    // that only looked for the identifier.
-    const handlers = main.match(
-      /this\.app\.vault\.on\("(?:rename|delete)"[\s\S]{0,300}?\n {6}\}\)/g,
-    );
-    expect(handlers).toHaveLength(2);
-    for (const handler of handlers ?? []) expect(handler).toContain("this.followFileOp(");
-    const followFileOp = main.slice(main.indexOf("private async followFileOp"));
-    expect(followFileOp.slice(0, followFileOp.indexOf("\n  }"))).toContain(
-      "migratePathKeyedSettings(s, op)",
-    );
+  it("reports a rename in the direction the migration expects", () => {
+    // The whole feature inverts silently if these two are swapped: state would be re-keyed onto
+    // the path the file just left, which is both stranded and free for an unrelated card to reuse.
+    const at = main.indexOf('this.app.vault.on("rename"');
+    const handler = main.slice(at, main.indexOf("\n    );", at));
+    expect(handler).toContain('kind: "rename", from: oldPath, to: file.path');
+  });
+
+  it("runs the path-keyed settings migration, and re-points the markdown-tab record", () => {
+    expect(followFileOp).toContain("migratePathKeyedSettings(s, op)");
+    // The record is keyed by leaf and holds a path; a WeakMap cannot be walked, so the leaves are.
+    expect(followFileOp).toContain("iterateAllLeaves");
+    expect(followFileOp).toContain("this.markdownTabs");
+    expect(followFileOp).toContain("remapPath(");
   });
 });

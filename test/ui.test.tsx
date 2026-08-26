@@ -3636,25 +3636,28 @@ describe("file operations done outside the board", () => {
 
   it("follows a card whose whole folder was moved, which the vault reports as one operation", async () => {
     const user = userEvent.setup();
-    const repo = makeRepo();
+    const repo = new FakeRepo(config, {
+      "Tasks/team/Delta.md": { fm: { type: "task", status: "todo" }, body: "" },
+    });
     renderStateful(repo, DEFAULT_SETTINGS);
-    await user.click(await screen.findByText("Gamma"));
+    // No heading and no title key: the card is named by its file, so the panel's title says which
+    // path the selection is actually on. A selection left behind would close the panel instead.
+    await user.click(await screen.findByText("Delta"));
     expect(await screen.findByTestId("card-detail")).toBeInTheDocument();
 
-    for (const [path, entry] of [...repo.files]) {
-      if (!path.startsWith("Tasks/")) continue;
-      repo.files.delete(path);
-      repo.files.set("Archive/Tasks" + path.slice("Tasks".length), entry);
-    }
-    act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks", to: "Archive/Tasks" }));
+    const entry = repo.files.get("Tasks/team/Delta.md")!;
+    repo.files.delete("Tasks/team/Delta.md");
+    repo.files.set("Tasks/squad/Delta.md", entry);
+    // One operation for the folder — the vault never reports the files inside it separately.
+    act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks/team", to: "Tasks/squad" }));
     act(() => repo.notify());
 
-    // The board reads its cards from `config.cardFolder`, which still says `Tasks`, so the moved
-    // cards are out of scope for it now — the panel has nothing to hold and closes cleanly rather
-    // than pointing at a path nothing lives at.
-    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() => expect(within(detail).getByText("Delta")).toBeInTheDocument());
   });
 
+  // Not discriminating on its own — a selection left on the deleted path also resolves to no card
+  // — but it pins the panel closing cleanly rather than throwing on a card that is gone.
   it("closes the panel when the open card's file is deleted from the explorer", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

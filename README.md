@@ -295,7 +295,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 
 A card's right-click menu has a **Copy** group with four ways of naming the same file, because what you paste it into decides which one is useful. **Copy path** gives the full path on this device (`/home/you/Vault/Tasks/Ship it.md`) — a terminal, another app, a script. **Copy path relative to vault** gives the path Obsidian itself speaks in (`Tasks/Ship it.md`). **Copy path relative to board folder** gives the path as seen from the folder the board note lives in (`../Tasks/Ship it.md` for a board in a subfolder), which is what a link or a relative reference written next to the board wants. **Copy base name** gives the file name alone (`Ship it.md`).
 
-Only the first one needs the vault to be a folder on disk. On a device where it is not — a vault on mobile — that item says so in a toast rather than copying something else.
+Only the first one needs the vault to be a folder on disk; where it is not — a vault on mobile — that item says so in a toast rather than copying something else. All four need the clipboard, which a browser or device may withhold; when it does, the action says that instead of failing quietly.
 
 ## Your data stays yours
 
