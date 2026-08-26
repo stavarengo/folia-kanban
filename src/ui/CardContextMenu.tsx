@@ -239,6 +239,13 @@ export function CardContextMenu({
           })}
 
           <div className="folia-menu-divider" />
+          <span className="folia-menu-label">Copy</span>
+          {item("Copy path", "copy", () => a.copyPath(path, "absolute"))}
+          {item("Copy path relative to vault", "copy", () => a.copyPath(path, "vault"))}
+          {item("Copy path relative to board folder", "copy", () => a.copyPath(path, "board"))}
+          {item("Copy base name", "copy", () => a.copyPath(path, "name"))}
+
+          <div className="folia-menu-divider" />
           {item("Add subcard", "git-branch", () => a.addSubcard(path))}
           {item("Delete card", "trash", () => a.remove(path), { danger: true })}
         </>

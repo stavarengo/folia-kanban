@@ -51,3 +51,28 @@ export function remapPathKeys<T>(map: Record<string, T>, op: FileOp): Record<str
   for (const [key, value] of moved) kept[key] = value;
   return kept;
 }
+
+/** The folder a vault path lives in — `""` for a note at the vault root. */
+export function parentFolder(path: string): string {
+  const cut = path.lastIndexOf("/");
+  return cut === -1 ? "" : path.slice(0, cut);
+}
+
+/** A vault path's file name, extension included. */
+export function baseName(path: string): string {
+  return path.slice(parentFolder(path).length).replace(/^\//, "");
+}
+
+/**
+ * `path` expressed relative to `folder`, climbing with `../` when it has to. A board note living
+ * below the vault root sees its cards at a different place than the vault does, and `card-folder`
+ * may point outside the board's own folder (`../shared/Cards`), so this is not a prefix strip.
+ */
+export function relativeToFolder(folder: string, path: string): string {
+  const from = folder === "" ? [] : folder.split("/");
+  const to = path.split("/");
+  let common = 0;
+  while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
+  const up = Array<string>(from.length - common).fill("..");
+  return [...up, ...to.slice(common)].join("/");
+}

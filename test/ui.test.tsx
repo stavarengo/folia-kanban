@@ -3667,3 +3667,89 @@ describe("file operations done outside the board", () => {
     expect(box.current.collapsedCards).toEqual({});
   });
 });
+
+describe("copy a card's path", () => {
+  // A board that does NOT sit at the vault root: the only arrangement where the board-folder path
+  // and the vault path differ, which is the whole reason both are offered.
+  const nested: BoardConfig = { ...config, path: "Projects/Acme/Board.md" };
+  const repoWithBoardInFolder = () =>
+    new FakeRepo(nested, {
+      "Tasks/First.md": { fm: { type: "task", status: "todo" }, body: "\n# First\n" },
+    });
+
+  let written: string[] = [];
+  let failNext = false;
+
+  beforeAll(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          if (failNext) return Promise.reject(new Error("denied"));
+          written.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+  afterAll(() => {
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  const openMenu = async (repo: FakeRepo) => {
+    render_(repo, DEFAULT_SETTINGS);
+    const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    return await screen.findByRole("menu");
+  };
+
+  // fireEvent, not userEvent: `userEvent.setup()` installs a clipboard stub of its own, which
+  // would replace the one these tests read back.
+  const copy = async (label: RegExp, repo = repoWithBoardInFolder()) => {
+    written = [];
+    const menu = await openMenu(repo);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: label }));
+    return repo;
+  };
+
+  it("copies the file's path on this device", async () => {
+    await copy(/^Copy path$/);
+    expect(written).toEqual(["/vault/Tasks/First.md"]);
+    expect(await screen.findByText("Copied /vault/Tasks/First.md")).toBeInTheDocument();
+  });
+
+  it("copies the vault path", async () => {
+    await copy(/relative to vault/);
+    expect(written).toEqual(["Tasks/First.md"]);
+  });
+
+  it("copies the path as seen from the board note's folder, climbing out of it", async () => {
+    await copy(/relative to board folder/);
+    expect(written).toEqual(["../../Tasks/First.md"]);
+  });
+
+  it("copies the base name", async () => {
+    await copy(/Copy base name/);
+    expect(written).toEqual(["First.md"]);
+  });
+
+  it("says so instead of copying when the vault has no filesystem path (mobile)", async () => {
+    const repo = repoWithBoardInFolder();
+    repo.vaultBasePath = null;
+    await copy(/^Copy path$/, repo);
+    expect(written).toEqual([]);
+    expect(
+      await screen.findByText("This vault has no filesystem path on this device"),
+    ).toBeInTheDocument();
+  });
+
+  it("reports a clipboard the browser refused", async () => {
+    failNext = true;
+    try {
+      await copy(/relative to vault/);
+    } finally {
+      failNext = false;
+    }
+    expect(await screen.findByText("Could not write to the clipboard")).toBeInTheDocument();
+  });
+});

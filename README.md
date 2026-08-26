@@ -147,7 +147,7 @@ Three limits are worth knowing. Only comments carrying a timestamp can be tracke
 ## Features
 
 - **Drag-and-drop that persists** — by pointer or keyboard. Dropping a card writes its `status` and a fractional `order` (one card rewritten per move, never a mass reindex) and appends a `## History` line.
-- **Quick actions on every card** — mark done, open the note, or delete (with confirm) straight from the board, or right-click for the full context menu (change priority, move up/down, add subcard, and more).
+- **Quick actions on every card** — mark done, open the note, or delete (with confirm) straight from the board, or right-click for the full context menu (change priority, move up/down, copy the card file's path, add subcard, and more).
 - **Next actions on the card** — optionally surface the next *N* unchecked todos inline, so the board shows the next step without opening anything.
 - **Card detail panel** — present it as a docked side panel (split or floating) or a centred modal, your choice. It renders the description and comments with **Obsidian's own Markdown engine**, and lets you edit description, status, priority, due date, your **custom properties** (area, energy, …) and the card's **display title** (its `title:` override, see [Where card titles come from](#where-card-titles-come-from)), manage subtasks/subcards, and add/edit/delete comments. Resizable, closes on click-outside, and never clips behind the status bar. Priority is a free-text combobox that suggests [your board's own scale](#priorities-are-your-scale-not-ours), never one the plugin picked for you. An open panel follows its note: an edit that lands from elsewhere — another pane, an agent, sync — shows up in the panel, and anything you are in the middle of typing stays where it is: a description in the editor (with a notice when the note's version moved on, so Save overwrites it knowingly and Revert takes it), a comment in the box, a property value in its field. A comment you are editing inline stays too, unless that very comment was rewritten or removed from elsewhere: then its editor closes, rather than write your wording over a line that no longer says what you started from. A comment that lands while the panel is open is tagged **new** in the panel and counts as read from then on, exactly as if it had been there when you opened the card.
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
@@ -286,10 +286,16 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 | Filter overdue / due-soon, blocked or unread cards | One-click **Overdue** / **Due soon** / **Blocked** / **Unread** buttons |
 | Move or reorder a card | Drag with the pointer, or pick it up with the keyboard |
 | Scroll horizontally across columns | Hold **Shift** and drag the board background |
-| Card menu (open, mark done, priority, move up/down, add subcard, delete) | Right-click a card |
+| Card menu (open, mark done, priority, move up/down, copy the card's path, add subcard, delete) | Right-click a card |
 | Toggle or remove a surfaced checklist item | Right-click it on the card |
 | Column menu (rename, recolour, WIP limit, reorder, delete) | The column's `⋯` button |
 | Swap the tab between the board and the Markdown editor | The button in the tab header |
+
+### Copying a card's path
+
+A card's right-click menu has a **Copy** group with four ways of naming the same file, because what you paste it into decides which one is useful. **Copy path** gives the full path on this device (`/home/you/Vault/Tasks/Ship it.md`) — a terminal, another app, a script. **Copy path relative to vault** gives the path Obsidian itself speaks in (`Tasks/Ship it.md`). **Copy path relative to board folder** gives the path as seen from the folder the board note lives in (`../Tasks/Ship it.md` for a board in a subfolder), which is what a link or a relative reference written next to the board wants. **Copy base name** gives the file name alone (`Ship it.md`).
+
+Only the first one needs the vault to be a folder on disk. On a device where it is not — a vault on mobile — that item says so in a toast rather than copying something else.
 
 ## Your data stays yours
 

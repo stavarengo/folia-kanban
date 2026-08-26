@@ -347,6 +347,13 @@ export class FakeRepo implements CardRepository {
     return dest;
   }
 
+  /** Stands in for a desktop vault; set to `null` to act like one with no filesystem path. */
+  vaultBasePath: string | null = "/vault";
+
+  absolutePath(path: string): string | null {
+    return this.vaultBasePath === null ? null : `${this.vaultBasePath}/${path}`;
+  }
+
   async openCard(path: string): Promise<void> {
     this.opened.push(path);
   }

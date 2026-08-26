@@ -156,6 +156,9 @@ export function useUnreadComments(
   return useMemo(() => unreadComments(marks ?? [], seen, userName), [marks, seen, userName]);
 }
 
+/** Which representation of a card file's path a copy action puts on the clipboard. */
+export type CopyPathForm = "absolute" | "vault" | "board" | "name";
+
 /** Card-level actions, provided by App so cards/columns don't prop-drill callbacks. */
 export interface BoardActions {
   /** Open the card's detail panel. */
@@ -177,6 +180,15 @@ export interface BoardActions {
   remove(path: string): void;
   /** Open the underlying note in an Obsidian tab. */
   openNote(path: string): void;
+  /**
+   * Put one representation of a card's file path on the clipboard and say so in a toast. Which
+   * representation is useful depends on where it will be pasted, hence the four forms: the
+   * device's filesystem path (`absolute`, unavailable on a vault that is not a folder on disk),
+   * the vault path (`vault`), the path as seen from the board note's own folder (`board`, the one
+   * that differs whenever the board does not sit at the vault root), and the file name alone
+   * (`name`).
+   */
+  copyPath(path: string, form: CopyPathForm): void;
   /**
    * Set a card's priority frontmatter (empty string clears it) and let the board note learn the
    * value. Resolves once the board has reloaded, so a caller with its own view to refresh (the

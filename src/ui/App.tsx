@@ -18,7 +18,7 @@ import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
 import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
 import { migratePathKeyedSettings } from "../settings";
-import { remapPath } from "../model/pathOps";
+import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
 import {
   BoardActionsContext,
   ContextsContext,
@@ -30,6 +30,7 @@ import {
   type BoardActions,
   type ColumnPatch,
   type PinnedSeen,
+  type CopyPathForm,
 } from "./context";
 
 import { Board } from "./Board";
@@ -80,6 +81,25 @@ function applyColumnPatch(c: ColumnDef, patch: ColumnPatch): ColumnDef {
   if (merged.hoverOpacity !== undefined) next.hoverOpacity = merged.hoverOpacity;
   if (merged.parked !== undefined) next.parked = merged.parked;
   return next;
+}
+
+/** The text one copy form puts on the clipboard; `null` only when the vault has no disk path. */
+function pathForm(
+  path: string,
+  form: CopyPathForm,
+  boardPath: string,
+  repo: CardRepository,
+): string | null {
+  switch (form) {
+    case "absolute":
+      return repo.absolutePath(path);
+    case "board":
+      return relativeToFolder(parentFolder(boardPath), path);
+    case "name":
+      return baseName(path);
+    default:
+      return path;
+  }
 }
 
 interface Props {
@@ -362,6 +382,19 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       openNote: (path) => void repo.openCard(path),
+      copyPath: (path, form) => {
+        const text = pathForm(path, form, boardRef.current?.config.path ?? "", repo);
+        if (text === null) {
+          // Only the filesystem form can be missing, and only where the vault has no filesystem
+          // path at all (mobile). Say that instead of copying something the person did not ask for.
+          showToast("This vault has no filesystem path on this device", "error");
+          return;
+        }
+        void navigator.clipboard
+          ?.writeText(text)
+          .then(() => showToast(`Copied ${text}`))
+          .catch(() => showToast("Could not write to the clipboard", "error"));
+      },
       markCommentsSeen: (path, marker) =>
         onUpdateSettings((s) => {
           if ((s.commentsSeen[path] ?? "") === marker) return {};

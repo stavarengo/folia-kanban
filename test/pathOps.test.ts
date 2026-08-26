@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { remapPath, remapPathKeys } from "../src/model/pathOps";
+import {
+  baseName,
+  parentFolder,
+  relativeToFolder,
+  remapPath,
+  remapPathKeys,
+} from "../src/model/pathOps";
 
 describe("remapPath", () => {
   it("follows a renamed file", () => {
@@ -66,5 +72,41 @@ describe("remapPathKeys", () => {
     expect(remapPathKeys(map, { kind: "rename", from: "Tasks/A.md", to: "Tasks/B.md" })).toEqual({
       "Tasks/B.md": "moving",
     });
+  });
+});
+
+describe("relativeToFolder", () => {
+  it("strips the folder a card sits under", () => {
+    expect(relativeToFolder("Projects/Acme", "Projects/Acme/Cards/A.md")).toBe("Cards/A.md");
+  });
+
+  it("climbs out to reach a sibling folder", () => {
+    expect(relativeToFolder("Projects/Acme", "Projects/shared/Cards/A.md")).toBe(
+      "../shared/Cards/A.md",
+    );
+  });
+
+  it("climbs all the way for a card above the board's folder", () => {
+    expect(relativeToFolder("Projects/Acme/boards", "Tasks/A.md")).toBe("../../../Tasks/A.md");
+  });
+
+  it("is the vault path itself for a board note at the vault root", () => {
+    expect(relativeToFolder("", "Tasks/A.md")).toBe("Tasks/A.md");
+  });
+
+  it("does not mistake a same-named file for a folder step", () => {
+    expect(relativeToFolder("Tasks", "Tasks")).toBe("../Tasks");
+  });
+});
+
+describe("parentFolder / baseName", () => {
+  it("splits a nested path", () => {
+    expect(parentFolder("Tasks/deep/A.md")).toBe("Tasks/deep");
+    expect(baseName("Tasks/deep/A.md")).toBe("A.md");
+  });
+
+  it("reads a vault-root note as having no folder", () => {
+    expect(parentFolder("A.md")).toBe("");
+    expect(baseName("A.md")).toBe("A.md");
   });
 });

@@ -1,5 +1,12 @@
 import type { App } from "obsidian";
-import { Component, MarkdownRenderer, TFile, TFolder, normalizePath } from "obsidian";
+import {
+  Component,
+  FileSystemAdapter,
+  MarkdownRenderer,
+  TFile,
+  TFolder,
+  normalizePath,
+} from "obsidian";
 import type {
   Board,
   BoardConfig,
@@ -614,6 +621,13 @@ export class VaultRepository implements CardRepository {
       c.unload();
       el.innerHTML = "";
     };
+  }
+
+  absolutePath(path: string): string | null {
+    const adapter = this.app.vault.adapter;
+    // Desktop vaults are folders on disk; a mobile (Capacitor) vault is not, and has no path a
+    // person could paste anywhere outside Obsidian.
+    return adapter instanceof FileSystemAdapter ? adapter.getFullPath(path) : null;
   }
 
   onFileOp(cb: (op: FileOp) => void): () => void {

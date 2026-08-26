@@ -92,6 +92,13 @@ export interface CardRepository {
    */
   rememberPriorities(values: string[]): Promise<void>;
 
+  /**
+   * The card note's path on the device's filesystem, or `null` where the vault has none — a vault
+   * on mobile, or any other storage that is not a plain folder on disk. Read-only; the plugin never
+   * touches a file through it.
+   */
+  absolutePath(path: string): string | null;
+
   /** Open a card note in the workspace. */
   openCard(path: string): Promise<void>;
 
