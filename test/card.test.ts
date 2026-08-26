@@ -10,6 +10,7 @@ import {
   appendHistory,
   addTodo,
   addSubcard,
+  setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus,
   removeSubtask,
@@ -187,6 +188,48 @@ describe("cardStats — progress counts EVERY checklist line by its checkbox", (
     const toggled = setSubtaskDone(text, 1, true); // the subcard-link line
     expect(cardStats(toggled).checklistDone).toBe(1);
     expect(cardStats(toggled).checklist).toBe(2);
+  });
+});
+
+describe("setSubcardDone — a subcard line is found by its link, never by a position", () => {
+  const doc = [
+    "---",
+    "status: todo",
+    "---",
+    "# P",
+    "",
+    "## Subtasks",
+    "- [x] Freeze",
+    "- [ ] Cut [status:: doing]",
+    "- [ ] [[Child]]",
+    "- [ ] [[Other|alias]]",
+    "",
+    "## Comments",
+    "- [ ] not a subtask",
+    "",
+  ].join("\n");
+
+  it("ticks only the line that links the child, wherever it sits among plain todos", () => {
+    expect(setSubcardDone(doc, ["Child"], true)).toBe(
+      doc.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
+    );
+    expect(setSubcardDone(doc, ["Other"], true)).toBe(
+      doc.replace("- [ ] [[Other|alias]]", "- [x] [[Other|alias]]"),
+    );
+  });
+
+  it("unticks, and returns the text byte-identical when no line links the child", () => {
+    const ticked = doc.replace("- [ ] [[Child]]", "- [x] [[Child]]");
+    expect(setSubcardDone(ticked, ["Child"], false)).toBe(doc);
+    expect(setSubcardDone(doc, ["Nobody"], true)).toBe(doc);
+    expect(setSubcardDone(doc, ["Child"], false)).toBe(doc); // already says so
+  });
+
+  it("never touches a plain todo whose text is the child's name, nor a line outside Subtasks", () => {
+    const tricky = doc.replace("- [x] Freeze", "- [ ] Child");
+    expect(setSubcardDone(tricky, ["Child"], true)).toBe(
+      tricky.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
+    );
   });
 });
 

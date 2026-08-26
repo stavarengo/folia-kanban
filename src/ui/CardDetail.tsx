@@ -11,7 +11,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { Board, Card, CardBody, RelationLink, RelationTypeDef, SubItem } from "../model/types";
-import { boardLinkResolver, syncSubtaskClaim, type LinkResolver } from "../model/board";
+import {
+  boardLinkResolver,
+  syncSubcardLines,
+  syncSubtaskClaim,
+  type LinkResolver,
+} from "../model/board";
 import { descriptionRefusal } from "../model/card";
 import { TITLE_KEY, resolveTitle } from "../model/cardTitle";
 import { relationKeys } from "../model/relationships";
@@ -1169,7 +1174,14 @@ export function CardDetail({
             <select
               value={String(fm.status ?? "")}
               onChange={(e) =>
-                void mutate(() => repo.setFrontmatter(path, { status: e.target.value }))
+                void mutate(async () => {
+                  const status = e.target.value;
+                  await repo.setFrontmatter(path, { status });
+                  // If this card is somebody's subcard, its `- [ ] [[link]]` lines follow the
+                  // column, as a dragged tile's would.
+                  const sync = syncSubcardLines(board, path, status);
+                  if (sync) await repo.applyMove(sync);
+                })
               }
             >
               {board.config.columns.map((c) => (
@@ -1456,11 +1468,15 @@ export function CardDetail({
                         const value = e.target.value;
                         if (s.kind === "card") {
                           if (!child) return;
-                          void mutate(() =>
-                            value === ""
-                              ? repo.unsetFrontmatterKey(child, "status")
-                              : repo.setFrontmatter(child, { status: value }),
-                          );
+                          void mutate(async () => {
+                            // "With this card" places the child without saying whether the work
+                            // is over, so it leaves the checkbox as it is; a named column ticks or
+                            // unticks the line, as it does for an inline todo.
+                            if (value === "") return repo.unsetFrontmatterKey(child, "status");
+                            await repo.setFrontmatter(child, { status: value });
+                            const sync = syncSubcardLines(board, child, value);
+                            if (sync) await repo.applyMove(sync);
+                          });
                           return;
                         }
                         actions.moveTodo(path, s.index, value === "" ? null : value);

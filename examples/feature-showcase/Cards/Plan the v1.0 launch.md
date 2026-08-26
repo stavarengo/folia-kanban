@@ -13,7 +13,7 @@ effort: 3
 
 Pull together everything blocking the **1.0** release. The big picture lives on the [[Showcase Board]]; the two checklist items written as `[[wikilinks]]` below are *subcards* — full cards in their own right.
 
-Every subitem here can claim a column of its own, whichever kind it is. "Cut the release branch" is a plain todo carrying an inline `[status:: doing]` field, so it stands in **In Progress**; [[Write the changelog]] is a file whose own `status` puts it in **Next Up**; [[Record the launch demo]] claims nothing and stays nested here. All three still count towards the progress bar on this card, and any of them can be dragged, right-clicked, or set from this card's detail panel.
+Every subitem here can claim a column of its own, whichever kind it is. "Cut the release branch" is a plain todo carrying an inline `[status:: doing]` field, so it stands in **In Progress**; [[Write the changelog]] is a file whose own `status` puts it in **Next Up**; [[Record the launch demo]] claims nothing and stays nested here. All three still count towards the progress bar on this card, and any of them can be dragged, right-clicked, or set from this card's detail panel. Whichever kind reaches **Done**, its checkbox below is ticked for it: a plain todo on its own line, a subcard through its link.
 
 > [!note] Definition of done
 > Tag cut, release notes published, demo recorded.

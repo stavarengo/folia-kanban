@@ -283,4 +283,44 @@ describe("subitem drag persistence", () => {
     expect(board.parentOf["Tasks/Child.md"]).toBe("Tasks/Root.md");
     expect(repo.files.get("Tasks/Child.md")!.fm.status).toBe("doing");
   });
+
+  it("a subcard reaching Done ticks its parent's line, and leaving Done unticks it", async () => {
+    // The showcase case: the parent counts every line, the subcard is not the first one.
+    const body =
+      "\n# Root\n\n## Subtasks\n- [x] Frozen\n- [ ] Cut [status:: doing]\n- [ ] [[Child]]\n";
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": { fm: { type: "task", status: "todo" }, body },
+      "Tasks/Child.md": { fm: { type: "task", status: "doing" }, body: "\n# Child\n" },
+    });
+    let board = await repo.loadBoard();
+    expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
+
+    const drop = resolveDrop(board, "Tasks/Child.md", "done")!;
+    await repo.applyMove(moveCard(board, "Tasks/Child.md", drop.columnId, drop.index)!);
+    board = await repo.loadBoard();
+    expect(repo.files.get("Tasks/Root.md")!.body).toBe(
+      body.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
+    );
+    expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(2);
+    expect(board.columns["done"]).toEqual(["Tasks/Child.md"]);
+
+    await repo.applyMove(moveCard(board, "Tasks/Child.md", "todo", 0)!);
+    board = await repo.loadBoard();
+    expect(repo.files.get("Tasks/Root.md")!.body).toBe(body);
+    expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
+  });
+
+  it("a child whose status was edited by hand still counts as done on its parent", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Child]]\n",
+      },
+      "Tasks/Child.md": { fm: { type: "task", status: "done" }, body: "\n# Child\n" },
+    });
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
+    // Nothing is written on a load: the note is the person's, and reading it is not a move.
+    expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [ ] [[Child]]");
+  });
 });

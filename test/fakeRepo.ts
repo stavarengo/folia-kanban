@@ -15,6 +15,7 @@ import type {
   HistoryScope,
   RelationType,
 } from "../src/model/types";
+import type { CardMutation } from "../src/model/board";
 import { buildBoard, deriveContext } from "../src/model/board";
 import {
   SECTION,
@@ -28,6 +29,7 @@ import {
   removeSubtask,
   removeTimestampedLine,
   setDescription,
+  setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus,
   updateTimestampedLine,
@@ -181,14 +183,14 @@ export class FakeRepo implements CardRepository {
     delete this.entry(path).fm[key];
   }
 
-  async applyMove(mutation: {
-    path: string;
-    setFrontmatter?: Partial<CardFrontmatter>;
-    setSubtaskStatus?: { index: number; status: string | null; done?: boolean };
-    history?: string;
-  }) {
+  async applyMove(mutation: CardMutation) {
     if (mutation.setFrontmatter)
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
+    for (const key of mutation.unsetFrontmatter ?? []) delete this.entry(mutation.path).fm[key];
+    for (const { path, links, done } of mutation.parentLines ?? []) {
+      const e = this.entry(path);
+      e.body = setSubcardDone(e.body, links, done);
+    }
     if (mutation.setSubtaskStatus) {
       const { index, status, done } = mutation.setSubtaskStatus;
       const e = this.entry(mutation.path);

@@ -441,10 +441,26 @@ export function buildBoard(
   // a second implementation. A line with no `[status:: …]` field claims nothing and keeps rendering
   // inside its parent card, exactly as before; a checked line is done wherever its field points.
   const placedTodos = new Map<string, { indices: Set<number>; doneByColumn: number }>();
+  const placedFor = (path: string) => {
+    let placed = placedTodos.get(path);
+    if (!placed) placedTodos.set(path, (placed = { indices: new Set(), doneByColumn: 0 }));
+    return placed;
+  };
   for (const c of cards) {
     const parentColumn = effectiveColumnOf(c.path);
     for (const item of c.subItems ?? []) {
-      if (item.kind !== "todo") continue;
+      if (item.kind === "card") {
+        // The same one meaning of done, for a line that names a file: the child's own `status`
+        // says where it stands, and standing in the done column is finished whether or not the
+        // parent's box was ever ticked. Every write the board makes ticks that box (`moveCard`),
+        // but a `status` edited by hand in the child note reaches the parent only here — so the
+        // progress bar tells the truth either way, and the note catches up on the next move.
+        const child =
+          item.link === undefined ? null : resolveLink(item.link, byBasename, cardsByPath);
+        const finished = child !== null && cardsByPath[child]?.frontmatter.status === doneCol;
+        if (!item.done && doneCol !== null && finished) placedFor(c.path).doneByColumn++;
+        continue;
+      }
       const claimed =
         item.status !== undefined && colIds.has(item.status) ? item.status : undefined;
       if (claimed === undefined) continue;
@@ -457,8 +473,7 @@ export function buildBoard(
       // The card's own reading of the line comes first, and holds whether or not a tile is minted:
       // a line claiming the done column is finished even when its card is ALREADY in that column
       // and there is nothing to move it to, which is exactly where the tile is skipped below.
-      let placed = placedTodos.get(c.path);
-      if (!placed) placedTodos.set(c.path, (placed = { indices: new Set(), doneByColumn: 0 }));
+      const placed = placedFor(c.path);
       if (finished && !item.done) {
         placed.indices.add(item.index); // finished work is not an outstanding next action
         placed.doneByColumn++;
@@ -718,6 +733,15 @@ export interface CardMutation {
    * `setFrontmatter` — a checklist line has no frontmatter of its own.
    */
   setSubtaskStatus?: { index: number; status: string | null; done?: boolean };
+  /** Frontmatter keys to remove from `path` — how a subcard's own `status` claim is dropped. */
+  unsetFrontmatter?: string[];
+  /**
+   * Checklist lines in OTHER notes to tick or untick along with this move: for each note, the
+   * `[[link]]` targets of the lines that name the moved card (see {@link setSubcardDone}). Lines are
+   * addressed by their link and never by a position, so a note edited in the meantime can at worst
+   * receive no write — never one on somebody else's todo.
+   */
+  parentLines?: { path: string; links: string[]; done: boolean }[];
   /** History event text to append (timestamp added by the adapter). */
   history?: string;
 }
@@ -865,13 +889,90 @@ export function syncSubtaskClaim(
   done: boolean,
 ): CardMutation | null {
   const parent = board.cards[parentPath];
-  const item = parent?.subItems?.find((s) => s.index === index && s.kind === "todo");
-  if (!item || item.status === undefined) return null; // claims nothing — nothing to keep in step
+  const item = parent?.subItems?.find((s) => s.index === index);
+  if (!item) return null;
   const doneCol = findDoneColumn(board.config.columns);
   if (done && doneCol === null) return null; // nowhere to move the claim to; leave the line's own
+  if (item.kind === "card") {
+    // The same rule, for a line that names a file: its claim is the child note's own `status`.
+    // Ticking sends a child that stands somewhere to Done; unticking one in Done drops its
+    // `status` so it rejoins its card; a child claiming nothing is left where it is.
+    const child = item.link === undefined ? null : resolveOnBoard(board, item.link);
+    const status = child === null ? undefined : board.cards[child]?.frontmatter.status;
+    if (child === null || status === undefined) return null;
+    if (!done) return status === doneCol ? { path: child, unsetFrontmatter: ["status"] } : null;
+    if (doneCol === null || status === doneCol) return null;
+    return { path: child, setFrontmatter: { status: doneCol } };
+  }
+  if (item.status === undefined) return null; // claims nothing — nothing to keep in step
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
   if (next === item.status) return null;
   return { path: parentPath, setSubtaskStatus: { index, status: next } };
+}
+
+/**
+ * Resolve a `[[wikilink]]` against a built board, the way `buildBoard` did when it derived
+ * `parentOf` — so a write that finds a line by its link binds it to the same card the graph did.
+ * The synthetic cards minted for placed inline todos are skipped: they borrow their note's file
+ * name and would otherwise answer to a link that names a real card.
+ */
+export function resolveOnBoard(board: Board, link: string): string | null {
+  const byBasename = new Map<string, string[]>();
+  const byPath: Record<string, Card> = {};
+  for (const c of Object.values(board.cards)) {
+    if (c.todoRef) continue;
+    byPath[c.path] = c;
+    const arr = byBasename.get(c.basename);
+    if (arr) arr.push(c.path);
+    else byBasename.set(c.basename, [c.path]);
+  }
+  return resolveLink(link, byBasename, byPath);
+}
+
+/**
+ * The checklist lines, in every note on the board, that name `childPath` and do not already say
+ * `done` — what a subcard reaching or leaving the done column must tick or untick so its parent
+ * tells the same story an inline todo would. Every note that links the child is included, not
+ * only the one `parentOf` picked: the child's progress is a fact about the child, and each of
+ * those notes counts the line in its own progress bar.
+ */
+function parentLinesOf(
+  board: Board,
+  childPath: string,
+  done: boolean,
+): NonNullable<CardMutation["parentLines"]> {
+  const out: NonNullable<CardMutation["parentLines"]> = [];
+  for (const c of Object.values(board.cards)) {
+    if (c.todoRef || c.path === childPath) continue;
+    const links = (c.subItems ?? [])
+      .filter(
+        (s): s is typeof s & { link: string } =>
+          s.kind === "card" &&
+          s.link !== undefined &&
+          s.done !== done &&
+          resolveOnBoard(board, s.link) === childPath,
+      )
+      .map((s) => s.link);
+    if (links.length > 0) out.push({ path: c.path, links, done });
+  }
+  return out;
+}
+
+/**
+ * The write that keeps the `- [ ] [[Child]]` lines naming `childPath` in step with the column it
+ * is being sent to: landing in the done column ticks them, any other column unticks them — the
+ * rule {@link moveSubtask} applies to an inline todo's own checkbox. `null` when nothing needs to
+ * change, or when the board has no done column and so no column means "finished".
+ */
+export function syncSubcardLines(
+  board: Board,
+  childPath: string,
+  toColumnId: string,
+): CardMutation | null {
+  const doneCol = findDoneColumn(board.config.columns);
+  if (doneCol === null) return null;
+  const parentLines = parentLinesOf(board, childPath, toColumnId === doneCol);
+  return parentLines.length === 0 ? null : { path: childPath, parentLines };
 }
 
 /**
@@ -951,9 +1052,17 @@ export function moveCard(
       return c !== undefined ? [c] : [];
     });
   const order = computeDropOrder(colCards, dropIndex);
-  const history =
-    fromStatus === toColumnId
-      ? `Reordered within ${columnTitle(board.config, toColumnId)}`
-      : `Moved from ${columnTitle(board.config, fromStatus || "—")} to ${columnTitle(board.config, toColumnId)}`;
-  return { path: cardPath, setFrontmatter: { status: toColumnId, order }, history };
+  const mutation: CardMutation = {
+    path: cardPath,
+    setFrontmatter: { status: toColumnId, order },
+    history: `Moved from ${columnTitle(board.config, fromStatus || "—")} to ${columnTitle(board.config, toColumnId)}`,
+  };
+  // A reorder says nothing about finishing, so it leaves every parent's checkbox as it is.
+  if (fromStatus === toColumnId) {
+    mutation.history = `Reordered within ${columnTitle(board.config, toColumnId)}`;
+    return mutation;
+  }
+  const parentLines = syncSubcardLines(board, cardPath, toColumnId)?.parentLines;
+  if (parentLines) mutation.parentLines = parentLines;
+  return mutation;
 }

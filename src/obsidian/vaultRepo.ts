@@ -36,6 +36,7 @@ import {
   removeSubtask as removeSubtaskText,
   removeTimestampedLine,
   setDescription as setDescriptionText,
+  setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus as setSubtaskStatusText,
   splitFrontmatter,
@@ -351,6 +352,12 @@ export class VaultRepository implements CardRepository {
   async applyMove(mutation: CardMutation): Promise<void> {
     if (mutation.setFrontmatter)
       await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
+    for (const key of mutation.unsetFrontmatter ?? []) {
+      await this.unsetFrontmatterKey(mutation.path, key);
+    }
+    for (const { path, links, done } of mutation.parentLines ?? []) {
+      await this.editBody(path, (t) => setSubcardDone(t, links, done));
+    }
     if (mutation.setSubtaskStatus) {
       // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
       // where a subitem sits, so writing them separately would leave a moment where the board

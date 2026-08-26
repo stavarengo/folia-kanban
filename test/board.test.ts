@@ -9,6 +9,8 @@ import {
   findDoneColumn,
   makeTodoPath,
   moveSubtask,
+  resolveOnBoard,
+  syncSubcardLines,
   syncSubtaskClaim,
   parseTodoPath,
   reassignColumn,
@@ -252,6 +254,127 @@ describe("ordering", () => {
       "Tasks/A.md",
       "Tasks/B.md",
     ]);
+  });
+});
+
+describe("a subcard reaching Done and its parent's checklist line", () => {
+  function link(target: string, index: number, done = false): SubItem {
+    return { kind: "card", text: `[[${target}]]`, done, link: target, index };
+  }
+  const todoLine: SubItem = { kind: "todo", text: "Plain", done: false, index: 0 };
+  function withItems(basename: string, fm: Partial<Card["frontmatter"]>, items: SubItem[]): Card {
+    return {
+      ...card(
+        basename,
+        fm,
+        items.flatMap((s) => (s.kind === "card" && s.link ? [s.link] : [])),
+      ),
+      subItems: items,
+      stats: {
+        checklist: items.length,
+        checklistDone: items.filter((s) => s.done).length,
+        subcards: items.filter((s) => s.kind === "card").length,
+        comments: 0,
+        commentMarks: [],
+        nextTodos: [],
+      },
+    };
+  }
+
+  it("moving the child into Done ticks the parent line, out of Done unticks it — by link", () => {
+    const parent = withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1)]);
+    const b = buildBoard(config, [parent, card("Child", { status: "next" })]);
+    expect(moveCard(b, "Tasks/Child.md", "done", 0)).toMatchObject({
+      path: "Tasks/Child.md",
+      setFrontmatter: { status: "done" },
+      parentLines: [{ path: "Tasks/Parent.md", links: ["Child"], done: true }],
+    });
+    // Not yet ticked and heading somewhere that is not Done: the line already says so, no write.
+    expect(moveCard(b, "Tasks/Child.md", "doing", 0)?.parentLines).toBeUndefined();
+
+    const ticked = withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1, true)]);
+    const b2 = buildBoard(config, [ticked, card("Child", { status: "done" })]);
+    expect(moveCard(b2, "Tasks/Child.md", "todo", 0)?.parentLines).toEqual([
+      { path: "Tasks/Parent.md", links: ["Child"], done: false },
+    ]);
+    // A reorder says nothing about finishing.
+    expect(moveCard(b2, "Tasks/Child.md", "done", 0)?.parentLines).toBeUndefined();
+  });
+
+  it("writes every note that links the child, and nothing when no note does", () => {
+    const b = buildBoard(config, [
+      withItems("A", { status: "todo" }, [link("Child", 0)]),
+      withItems("B", { status: "doing" }, [link("Tasks/Child", 0), link("Child", 1)]),
+      card("Child", { status: "todo" }),
+      card("Loner", { status: "todo" }),
+    ]);
+    expect(syncSubcardLines(b, "Tasks/Child.md", "done")?.parentLines).toEqual([
+      { path: "Tasks/A.md", links: ["Child"], done: true },
+      { path: "Tasks/B.md", links: ["Tasks/Child", "Child"], done: true },
+    ]);
+    expect(syncSubcardLines(b, "Tasks/Loner.md", "done")).toBeNull();
+  });
+
+  it("leaves the line alone on a board with no done column", () => {
+    const cols = [
+      { id: "open", title: "Open" },
+      { id: "later", title: "Later" },
+    ];
+    const b = buildBoard({ ...config, columns: cols }, [
+      withItems("Parent", { status: "open" }, [link("Child", 0)]),
+      card("Child", { status: "open" }),
+    ]);
+    expect(moveCard(b, "Tasks/Child.md", "later", 0)?.parentLines).toBeUndefined();
+  });
+
+  it("does not bind an ambiguous link to either card", () => {
+    const b = buildBoard(config, [
+      withItems("Parent", { status: "todo" }, [link("Child", 0)]),
+      { ...card("Child", { status: "todo" }), path: "Tasks/x/Child.md" },
+      { ...card("Child", { status: "todo" }), path: "Tasks/y/Child.md" },
+    ]);
+    expect(resolveOnBoard(b, "Child")).toBeNull();
+    expect(syncSubcardLines(b, "Tasks/x/Child.md", "done")).toBeNull();
+  });
+
+  it("counts an unticked line as done while its child sits in Done (a status edited by hand)", () => {
+    // `buildBoard` writes the counted stats onto the card, so each reading gets fresh cards.
+    const parent = () => withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1)]);
+    const doneOf = (child: Card, p = parent()) =>
+      buildBoard(config, [p, child]).cards["Tasks/Parent.md"]?.stats?.checklistDone;
+    expect(doneOf(card("Child", { status: "done" }))).toBe(1);
+    // A ticked line is not counted twice, and a child anywhere else is not counted at all.
+    const ticked = withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1, true)]);
+    expect(doneOf(card("Child", { status: "done" }), ticked)).toBe(1);
+    expect(doneOf(card("Child", { status: "doing" }))).toBe(0);
+    expect(doneOf(card("Child"))).toBe(0);
+  });
+
+  it("ticking the parent line by hand gives the answer an inline todo gives", () => {
+    const b = buildBoard(config, [
+      withItems("Parent", { status: "todo" }, [
+        link("Placed", 0),
+        link("Home", 1),
+        link("Finished", 2, true),
+      ]),
+      card("Placed", { status: "doing" }),
+      card("Home"),
+      card("Finished", { status: "done" }),
+    ]);
+    // Ticking a child that stands somewhere sends it to Done.
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 0, true)).toEqual({
+      path: "Tasks/Placed.md",
+      setFrontmatter: { status: "done" },
+    });
+    // Un-ticking one in Done drops its claim: it rejoins its card.
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 2, false)).toEqual({
+      path: "Tasks/Finished.md",
+      unsetFrontmatter: ["status"],
+    });
+    // A child claiming nothing is left where it is, ticked or not.
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 1, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 1, false)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 0, false)).toBeNull(); // still in Doing
   });
 });
 

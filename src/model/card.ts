@@ -387,14 +387,38 @@ export function addSubcard(text: string, link: string): string {
   return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] [[${link}]]`));
 }
 
+/** Rewrite only the checkbox of line `i`; every other byte of the line passes through. */
+function tickLine(lines: string[], i: number, done: boolean): void {
+  const m = CHECKBOX_RE.exec(lines[i] ?? "");
+  if (m) lines[i] = `${m[1] ?? ""}[${done ? "x" : " "}] ${m[3] ?? ""}`;
+}
+
 /** Toggle/set the done state of the index-th subtask (0-based among checklist items). */
 export function setSubtaskDone(text: string, index: number, done: boolean): string {
   return withBody(text, (body) => {
     const lines = body.split("\n");
     const i = checklistLine(lines, index);
-    const m = i === -1 ? null : CHECKBOX_RE.exec(lines[i] ?? "");
-    if (!m) return body;
-    lines[i] = `${m[1] ?? ""}[${done ? "x" : " "}] ${m[3] ?? ""}`;
+    if (i === -1) return body;
+    tickLine(lines, i, done);
+    return lines.join("\n");
+  });
+}
+
+/**
+ * Tick or untick every `## Subtasks` line that links one of `links` (the exact targets
+ * `parseSubtasks` reads back as `SubItem.link`). The line is found by its link, never by a
+ * position: a subcard's done-ness is decided in the child's note, and by the time it is written
+ * here the parent may have been edited in between — a line that no longer links the child is not
+ * touched, and a note that never linked it is returned unchanged.
+ */
+export function setSubcardDone(text: string, links: readonly string[], done: boolean): string {
+  return withBody(text, (body) => {
+    const lines = body.split("\n");
+    for (const item of parseSubtasks(text)) {
+      if (item.kind !== "card" || item.link === undefined || !links.includes(item.link)) continue;
+      const i = checklistLine(lines, item.index);
+      if (i !== -1) tickLine(lines, i, done);
+    }
     return lines.join("\n");
   });
 }
