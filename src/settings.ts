@@ -20,8 +20,9 @@ export interface KanbanSettings {
   /** Whether the board-setup actions (create a board, convert a note into one) are offered in the
    *  command palette. */
   boardSetupCommands: boolean;
-  /** Whether they are offered in the file explorer's right-click menu — on a folder to create a
-   *  board inside it, on a note to convert that note. */
+  /** Whether they are offered wherever Obsidian gives a file or folder a menu (the file explorer, a
+   *  tab header, "More options") — on a folder to create a board inside it, on a note to convert
+   *  that note. */
   boardSetupFileMenu: boolean;
   /** Whether converting is offered in the right-click menu inside a note's editor. */
   boardSetupEditorMenu: boolean;
