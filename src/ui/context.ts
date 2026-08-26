@@ -184,7 +184,7 @@ export interface BoardActions {
    * above, decides the colour a priority badge is drawn in: a value that only appears on a card
    * sits in the vocabulary at an alphabetical position nobody chose.
    */
-  priorityScale: string[];
+  priorityScale: readonly string[];
 
   /** Column management (persists to the board note frontmatter). */
   renameColumn(id: string, title: string): void;

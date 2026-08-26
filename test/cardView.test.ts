@@ -77,6 +77,23 @@ describe("priorityTone", () => {
     expect(priorityTone("blocker", [])).toBe("muted");
     expect(priorityTone("blocker", ["someday", "whenever"])).toBe("muted");
   });
+  it("re-spreads the ramp when the scale grows, and shares tones past four values", () => {
+    const three = ["s1", "s2", "s3"];
+    expect(priorityTone("s3", three)).toBe("prio-4");
+    // A fourth word moves the third one: the ramp is a function of the whole list's length.
+    expect(priorityTone("s3", [...three, "s4"])).toBe("prio-3");
+    // Seven values into four tones: neighbours share, ends stay pinned, the sort still separates.
+    const seven = ["a1", "a2", "a3", "a4", "a5", "a6", "a7"];
+    expect(seven.map((v) => priorityTone(v, seven))).toEqual([
+      "prio-1",
+      "prio-1",
+      "prio-2",
+      "prio-2",
+      "prio-3",
+      "prio-3",
+      "prio-4",
+    ]);
+  });
   it("lets the fixed scales win over the board's order, so a known scale never repaints", () => {
     // `C` keeps its yellow even though this board lists it last, and `normal` keeps its orange
     // between two invented neighbours.
@@ -376,8 +393,9 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
   });
 
   it("sort: priority breaks a severity tie by the board's own vocabulary order", () => {
-    // All three are unknown words, so they share the `muted` tone and used to collapse into one
-    // tie that fell back to board order. The board's vocabulary now decides.
+    // No `scale`, so all three words are unknown and share the `muted` tone — what a board whose
+    // note has not learned them looks like. They used to collapse into one tie that fell back to
+    // board order; the vocabulary now decides between them.
     const cards = [
       card({ priority: "whenever" }, "W"),
       card({ priority: "blocker" }, "B"),
@@ -392,6 +410,49 @@ describe("groupAndSortCards (#6 in-column grouping + sort)", () => {
     });
     if (!out[0]) throw new Error("expected group at index 0");
     expect(names(out[0])).toEqual(["B", "N", "W"]);
+  });
+
+  it("sort: priority follows the scale the board note holds, not the tone words start with", () => {
+    // The wiring the board actually uses: `scale` is the note's list, so these words carry real
+    // tones and lead the sort. Without it `blocker` and `whenever` would be `muted` and the known
+    // `normal` would sort ABOVE both — which is exactly what this asserts is not happening.
+    const cards = [
+      card({ priority: "normal" }, "N"),
+      card({ priority: "whenever" }, "W"),
+      card({ priority: "blocker" }, "B"),
+    ];
+    const scale = ["blocker", "normal", "whenever"];
+    const out = groupAndSortCards(cards, {
+      group: "none",
+      sort: "priority",
+      today,
+      doneColumnId: done,
+      priorities: scale,
+      scale,
+    });
+    if (!out[0]) throw new Error("expected group at index 0");
+    expect(names(out[0])).toEqual(["B", "N", "W"]);
+  });
+
+  it("sort: priority leaves a card-only value below everything the note ranks", () => {
+    // `invented` is not on the note's list, so it has no tone — it sorts under the ranked words,
+    // and still above a card with no priority at all.
+    const cards = [
+      card({ priority: "invented" }, "I"),
+      card({}, "None"),
+      card({ priority: "whenever" }, "W"),
+    ];
+    const scale = ["blocker", "normal", "whenever"];
+    const out = groupAndSortCards(cards, {
+      group: "none",
+      sort: "priority",
+      today,
+      doneColumnId: done,
+      priorities: [...scale, "invented"],
+      scale,
+    });
+    if (!out[0]) throw new Error("expected group at index 0");
+    expect(names(out[0])).toEqual(["W", "I", "None"]);
   });
 
   it("sort: priority keeps severity above the vocabulary order", () => {

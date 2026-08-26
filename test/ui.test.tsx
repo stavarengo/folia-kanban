@@ -1715,6 +1715,41 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     expect(headings).toEqual(["Overdue", "Today"]);
   });
 
+  it("a `sort: priority` column ranks a board's own words by the note's list", async () => {
+    // End to end through the real Column: the note's scale has to reach the sort, not just the
+    // badge. Without it `normal` (a word the plugin knows) would outrank both invented words.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        priorities: ["blocker", "normal", "whenever"],
+        columns: [{ id: "todo", title: "Todo", sort: "priority" }],
+      },
+      {
+        "Tasks/Whenever.md": {
+          fm: { type: "task", status: "todo", order: 1, priority: "whenever" },
+          body: "\n# Whenever\n",
+        },
+        "Tasks/Normal.md": {
+          fm: { type: "task", status: "todo", order: 2, priority: "normal" },
+          body: "\n# Normal\n",
+        },
+        "Tasks/Blocker.md": {
+          fm: { type: "task", status: "todo", order: 3, priority: "blocker" },
+          body: "\n# Blocker\n",
+        },
+      },
+    );
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    await waitFor(() =>
+      expect([...todoCol.querySelectorAll(".folia-card-title")].map((t) => t.textContent)).toEqual([
+        "Blocker",
+        "Normal",
+        "Whenever",
+      ]),
+    );
+  });
+
   it("#10 a faded + parked column gets the de-emphasis classes and CSS vars", async () => {
     const repo = new FakeRepo(
       {

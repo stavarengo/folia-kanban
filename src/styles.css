@@ -529,6 +529,8 @@
 }
 .folia-swatch.folia-swatch {
   width: 24px;
+  /* The swatch shows a colour, not text, but the "no colour" one draws an icon on `currentColor`;
+     inheriting keeps that icon the panel's colour instead of the theme's button text colour. */
   color: inherit;
   height: 24px;
   border-radius: var(--folia-r-pill);
@@ -1194,7 +1196,10 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.folia-mini {
+/* Doubled to stay above `.folia-icon-btn.folia-icon-btn`, which is doubled for the theme's sake:
+   a rule that only refines another button rule has to carry the same weight, or the refinement is
+   quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
+.folia-mini.folia-mini {
   width: 24px;
   height: 24px;
   margin-left: auto;
@@ -1458,7 +1463,9 @@
   background: var(--background-modifier-hover);
   border-color: var(--folia-border);
 }
-.folia-desc-edit {
+/* Doubled for the same reason as `.folia-mini`: it refines `.folia-icon-btn`, which carries the
+   doubled weight the theme forces, so its own transition would otherwise never apply. */
+.folia-desc-edit.folia-desc-edit {
   position: absolute;
   top: 4px;
   right: 4px;

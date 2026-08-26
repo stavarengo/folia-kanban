@@ -40,7 +40,7 @@ const EMPTY_RELATION_COUNTS = {} as const;
 
 /** Stable empty column list, so the actions object keeps its identity before the board loads. */
 const EMPTY_COLUMNS: readonly ColumnDef[] = [];
-const EMPTY_PRIORITIES: string[] = [];
+const EMPTY_PRIORITIES: readonly string[] = [];
 
 /** Translate `addCardOpenMode` into a presentation override; 'default' means "use the global". */
 function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | null {

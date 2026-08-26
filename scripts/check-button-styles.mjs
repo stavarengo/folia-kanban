@@ -19,14 +19,18 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
 
+// Only the React UI is scanned. Buttons built through Obsidian's own Setting API (`src/settings.ts`)
+// are deliberately out of scope: those are Obsidian's controls in Obsidian's settings pane, and
+// they are SUPPOSED to wear the theme's button face.
 const UI_DIR = "src/ui";
 const CSS_FILE = "src/styles.css";
 
 /**
  * What `button:not(.clickable-icon)` sets in Obsidian's own app.css, and therefore what a plugin
- * rule has to win to keep: `color`, `background-color` and `box-shadow`. `border` is not on the
- * list because nothing at that specificity sets it — the border a button starts with comes from
- * the user agent, which any single class already beats. `padding` is set, but only under
+ * rule has to win to keep. Read out of the installed Obsidian's own `obsidian.asar`, where the
+ * desktop rule sets exactly `color`, `background-color` and `box-shadow`. `border` is not on the
+ * list because nothing at that specificity sets it — the border a button starts with comes from the
+ * user agent, which any single class already beats. `padding` is set, but only under
  * `.is-tablet`, so on desktop it costs nothing and policing it here would flag every button rule
  * in the stylesheet for a case none of them is designed for.
  */
@@ -89,7 +93,13 @@ function buttons(tsx) {
         if (/^folia-[\w-]+$/.test(cls) || /^folia-[\w-]*-$/.test(cls)) classes.add(cls);
       }
     }
-    out.push({ classes, styled: /\bstyle=/.test(tag), tag: tag.replace(/\s+/g, " ").slice(0, 90) });
+    out.push({
+      classes,
+      // An inline `style` naming a background is dressing the stylesheet cannot see but the button
+      // really has: a colour swatch paints itself. Any other inline style is ignored.
+      styled: /style=\{[^}]*background/.test(tag),
+      tag: tag.replace(/\s+/g, " ").slice(0, 90),
+    });
     i = end;
   }
   return out;
@@ -178,7 +188,36 @@ const declared = (body) =>
     .map((prop) => (prop === "background-color" ? "background" : prop))
     .filter((prop) => CONTESTED.includes(prop) || prop === "background");
 
+/**
+ * The rules that dress one button in its resting state, in source order, each with its specificity.
+ * Descendant rules count on the assumption their ancestor matches — conservative in the direction
+ * of "this button is dressed", which is the only direction that can hide a problem here.
+ */
+function dressing(own) {
+  const out = [];
+  for (const [order, { selector, body }] of parsed.entries()) {
+    for (const one of selector.split(",").map((sel) => sel.trim())) {
+      if (one.includes(":")) continue;
+      const subject = one.split(/[\s>+~]+/).pop() ?? "";
+      const named = [...subject.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+      if (named.length === 0 || !named.every((c) => own.includes(c))) continue;
+      out.push({ selector: one, body, order, spec: specificity(one) });
+    }
+  }
+  return out;
+}
+
+/** Every property a rule body sets, normalised enough to compare two rules for a clash. */
+const properties = (body) =>
+  body
+    .split(";")
+    .map((decl) => decl.split(":")[0]?.trim().toLowerCase())
+    .filter((prop) => prop && !prop.startsWith("--"));
+
 for (const element of elements) {
+  // A runtime-built family (`"folia-chip-" + tone`) is credited as a whole: which member a button
+  // ends up carrying is a render-time decision, so the check asks that the family dresses it rather
+  // than pretending to know which one shows.
   const own = [...classes].flatMap((c) =>
     c.endsWith("-")
       ? element.classes.has(c)
@@ -188,15 +227,27 @@ for (const element of elements) {
         ? [c]
         : [],
   );
+  const dress = dressing(own);
   const covered = new Set(element.styled ? ["background"] : []);
-  for (const { selector, body } of parsed) {
-    for (const one of selector.split(",").map((s) => s.trim())) {
-      if (one.includes(":")) continue;
-      const subject = one.split(/[\s>+~]+/).pop() ?? "";
-      const named = [...subject.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
-      if (named.length === 0 || !named.every((c) => own.includes(c))) continue;
-      if (compare(specificity(one), THEME_SPECIFICITY) <= 0) continue;
-      for (const prop of declared(body)) covered.add(prop);
+  for (const rule of dress) {
+    if (compare(rule.spec, THEME_SPECIFICITY) <= 0) continue;
+    for (const prop of declared(rule.body)) covered.add(prop);
+  }
+
+  // Doubling a class to beat the theme also raises it against the plugin's OWN later rules, and
+  // that is the one way this convention can break something. Two rules on the same button setting
+  // the same property should still resolve by source order — the later one refines the earlier —
+  // so a case where weight overrules order means a refinement has gone silently dead.
+  for (const [i, earlier] of dress.entries()) {
+    for (const later of dress.slice(i + 1)) {
+      if (compare(earlier.spec, later.spec) <= 0) continue;
+      const clash = properties(earlier.body).filter((prop) =>
+        properties(later.body).includes(prop),
+      );
+      if (clash.length === 0) continue;
+      problems.push(
+        `${CSS_FILE}: \`${later.selector}\` sets ${clash.join(", ")} for the <button> with class "${[...element.classes].join(" ")}", but the earlier \`${earlier.selector}\` now out-weighs it, so that declaration is dead. Give \`${later.selector}\` the same doubled weight.`,
+      );
     }
   }
   const missing = ["color", "background", "box-shadow"].filter((p) => !covered.has(p));

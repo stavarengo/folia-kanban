@@ -53,9 +53,15 @@ const PRIORITY_RAMP: readonly ChipTone[] = ["prio-1", "prio-2", "prio-3", "prio-
 
 /**
  * Spread the position `index` of a scale of `length` values over the four `prio-*` tones. The ends
- * are pinned — first value strongest, last weakest — and the middle is distributed evenly, with a
- * tie broken toward the stronger tone so a three-word scale comes out hot, warm, calm rather than
- * skipping the warm step. With fewer than two values there is no ranking to express, and so no ramp.
+ * are pinned — first value strongest, last weakest — and the rest are spread evenly between them,
+ * with a tie broken toward the stronger tone so a three-word scale comes out hot, warm, calm
+ * rather than skipping the warm step. With fewer than two values there is no ranking to express,
+ * and so no ramp.
+ *
+ * Two consequences worth knowing. A scale longer than four has neighbours sharing a tone — four
+ * steps is what the palette holds, and the sort still separates them. And the tone of a value
+ * depends on how long the list is, so adding a word re-spreads the ramp: the board repaints at the
+ * moment the user changes their own scale, which is the moment they are looking at it.
  */
 function rampTone(index: number, length: number): ChipTone | null {
   if (index < 0 || length < 2) return null;
