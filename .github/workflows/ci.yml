@@ -50,11 +50,13 @@ jobs:
   # scanner rather than a snapshot of it.
   #
   # NOT a gate on lint findings, and cannot be made into one: the action reports
-  # every scanner finding as a warning and only calls setFailed on `error` severity
-  # (manifest/README/license schema, or a failed build), and stylelint exits 0 on its
-  # own warnings so those reach the log but not even an annotation. There is no
-  # strictness input. So this job failing means the manifest or the build broke; the
-  # gate on lint findings is `obsidian-scan:check`, which fails on any of them.
+  # every scanner finding as a warning and only calls setFailed on `error` severity,
+  # and stylelint exits 0 on its own warnings so those reach the log but not even an
+  # annotation. There is no strictness input. What is left at `error` severity here,
+  # with the build switched off below: manifest/versions.json schema, a missing
+  # README or LICENSE, and a failed install of the scanner's own temp deps (a network
+  # flake — rerun it). The gate on lint findings is `obsidian-scan:check`, which
+  # fails on any of them.
   # Read this job's log when the two should agree and you want to know if the
   # scanner has moved — findings here that the local pass missed mean it has.
   obsidian-scan:
