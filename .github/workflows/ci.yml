@@ -43,12 +43,20 @@ jobs:
       - name: Verify
         run: pnpm verify
 
-  # Obsidian's own action, running the community directory's real scanner rulesets.
-  # `pnpm verify` already runs a local reproduction of them (`obsidian-scan:check`),
-  # which is the only pre-push signal — the action has no local/CLI form. This job is
-  # the second, independently maintained opinion: if the two ever disagree, the
-  # scanner moved and the local copy needs updating. Deliberately floating on `v1`
-  # for that reason.
+  # Obsidian's own action, running the community directory's real scanner rulesets
+  # with the tool versions the directory pins — which the local reproduction in
+  # `pnpm verify` (`obsidian-scan:check`) cannot, since it shares this repo's ESLint
+  # major and its own caniuse data. Floating on `v1` on purpose, so it tracks the
+  # scanner rather than a snapshot of it.
+  #
+  # NOT a gate on lint findings, and cannot be made into one: the action reports
+  # every scanner finding as a warning and only calls setFailed on `error` severity
+  # (manifest/README/license schema, or a failed build), and stylelint exits 0 on its
+  # own warnings so those reach the log but not even an annotation. There is no
+  # strictness input. So this job failing means the manifest or the build broke; the
+  # gate on lint findings is `obsidian-scan:check`, which fails on any of them.
+  # Read this job's log when the two should agree and you want to know if the
+  # scanner has moved — findings here that the local pass missed mean it has.
   obsidian-scan:
     name: Obsidian community scan
     runs-on: ubuntu-latest
@@ -71,8 +79,8 @@ jobs:
 
       # The action is npm-only (`npm ci`/`npm install`), and this repo has no
       # package-lock.json. Installing first makes it skip its own install — it
-      # bails out when node_modules exists — so the scan and the build it runs
-      # see the pnpm-pinned tree, not a freshly resolved one. Its two lint passes
+      # bails out when node_modules exists — so its type-aware ESLint pass sees
+      # the pnpm-pinned tree, not a freshly resolved one. The two lint passes
       # install their own pinned tools in a temp dir either way.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -85,3 +93,7 @@ jobs:
           # Off by default outside release mode; without it this only reruns our
           # own `pnpm lint`, not the scanner's rulesets.
           scanner-lint: true
+          # The verify job already builds. Building here would only add a second
+          # copy of styles.css under dist/ for stylelint to report twice — its
+          # ignoreFiles is inert the way the action invokes it.
+          build: "false"

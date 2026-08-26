@@ -13,12 +13,14 @@ Both steps are ours end to end: nothing is drafted for a human to publish by han
 
 The community directory reviews every release with a scanner: Stylelint with its own ruleset, plus ESLint with `eslint-plugin-obsidianmd`. This repo checks itself against that scanner twice, on purpose.
 
-- **`pnpm obsidian-scan:check`** (`scripts/obsidian-scan.mjs`, part of `pnpm verify`) reproduces both passes locally, copied from the action's `src/lint.ts`. It is the only signal available before pushing — the official tooling exists solely as a GitHub Action, with no CLI or npm form.
+- **`pnpm obsidian-scan:check`** (`scripts/obsidian-scan.mjs`, part of `pnpm verify`) reproduces both passes locally, copied from the action's `src/lint.ts`. It is **the gate**: it fails the build on any finding, warning or error, and it is the only signal available before pushing — the official tooling exists solely as a GitHub Action, with no CLI or npm form.
 - **The `Obsidian community scan` job** in `ci.yml` runs Obsidian's own [`obsidianmd/obsidian-workflows`](https://github.com/obsidianmd/obsidian-workflows) action in PR mode with `scanner-lint: true`, deliberately floating on the `v1` tag.
 
-Keeping both is the point: the local copy gives pre-push feedback, the action tracks whatever the scanner does next. **When the two disagree, the scanner moved and `scripts/obsidian-scan.mjs` needs updating** — that divergence is the job's real value, not the duplicated pass.
+Be precise about what that second one is, because it is easy to over-read: **it does not fail on lint findings, and cannot be configured to.** The action records every scanner finding as a `warning` and only fails the job on `error` severity — a broken manifest, a missing README or licence, a failed build — and stylelint exits 0 on its own warnings, so those land in the job log without even an annotation. There is no strictness input to turn on.
 
-The action is npm-only (`npm ci` / `npm install` / `npm run <script>`) and this repo has no `package-lock.json`, so the job installs with pnpm first; the action skips its own install when `node_modules` already exists. Its lint passes install their own pinned tool versions in a temp directory regardless.
+What it is for, then: the directory pins its own tool versions (stylelint 17.6.0, ESLint 9.37.0, `eslint-plugin-obsidianmd` 0.4.1, fresh browser-feature data), and the local reproduction cannot match them — it runs on this repo's ESLint major and its own pinned `caniuse-lite`. This job runs the real ones. So when you want to know whether the scanner has moved, read its log: a finding there that `obsidian-scan:check` did not produce means `scripts/obsidian-scan.mjs` has drifted and needs updating.
+
+The action is npm-only (`npm ci` / `npm install` / `npm run <script>`) and this repo has no `package-lock.json`, so the job installs with pnpm first; the action skips its own install when `node_modules` already exists, which is what the type-aware ESLint pass needs. Its lint passes install their own pinned tool versions in a temp directory regardless. Its build step is switched off, since the verify job already builds and a `dist/styles.css` would only get linted a second time.
 
 The action's release mode, and its reusable `release.yml`, were considered and **not** adopted (decided 2026-08-26): it creates a *draft* release and knows nothing about this repo's tag-reachability gate, semver-only tag rule, or changelog-derived notes. Adopting it would trade real control for a duplicate of checks CI already runs on the same commit.
 

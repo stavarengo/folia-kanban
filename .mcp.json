@@ -4,7 +4,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "url=$OBSIDIAN_DEBUG_URL; if [ -z \"$url\" ]; then host=127.0.0.1; if [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then host=$(ip route 2>/dev/null | awk '/^default/{print $3; exit}'); fi; [ -n \"$host\" ] || host=127.0.0.1; url=http://$host:9222; fi; exec npx -y chrome-devtools-mcp@latest --browser-url=\"$url\""
+        "url=$OBSIDIAN_DEBUG_URL; if [ -z \"$url\" ]; then host=; if [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then host=$(PATH=$PATH:/sbin:/usr/sbin ip route 2>/dev/null | awk '/^default/{print $3; exit}'); [ -n \"$host\" ] || echo 'chrome-devtools-obsidian: could not derive the container gateway; falling back to 127.0.0.1, which will not reach the host. Set OBSIDIAN_DEBUG_URL.' >&2; fi; [ -n \"$host\" ] || host=127.0.0.1; url=http://$host:9222; fi; exec npx -y chrome-devtools-mcp@latest --browser-url=\"$url\""
       ]
     }
   }
