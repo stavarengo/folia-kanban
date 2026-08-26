@@ -11,6 +11,7 @@ import {
   ContextFrontmatterSchema,
   DataCorruptionError,
   FrontmatterSchema,
+  RelationTypeEntrySchema,
   decode,
 } from "../src/model/schemas";
 
@@ -74,6 +75,23 @@ describe("BoardFrontmatterSchema (board config note)", () => {
     // A defaultable config field must not crash a real board; the adapter falls back to "Tasks".
     const fm = decode(BoardFrontmatterSchema, { "card-folder": 123 }, "board");
     expect(fm["card-folder"]).toBeUndefined();
+  });
+});
+
+describe("RelationTypeEntrySchema (one board-note `relations` entry)", () => {
+  it("accepts a bare key, a { key } object, and an inverse left empty in YAML (null)", () => {
+    expect(RelationTypeEntrySchema.safeParse("a-result-of").success).toBe(true);
+    expect(RelationTypeEntrySchema.safeParse({ key: "a-result-of" }).success).toBe(true);
+    const nulled = RelationTypeEntrySchema.safeParse({ key: "a-result-of", inverse: null });
+    expect(
+      nulled.success && typeof nulled.data === "object" && nulled.data.inverse,
+    ).toBeUndefined();
+  });
+
+  it("rejects an entry with no key, or a non-string key", () => {
+    expect(RelationTypeEntrySchema.safeParse({ inverse: "x" }).success).toBe(false);
+    expect(RelationTypeEntrySchema.safeParse({ key: 3 }).success).toBe(false);
+    expect(RelationTypeEntrySchema.safeParse(42).success).toBe(false);
   });
 });
 

@@ -5,6 +5,8 @@ priority: C
 area: docs
 blocks:
   - "[[Draft the announcement post]]"
+a-result-of:
+  - "[[Design the on-disk format]]"
 ---
 
 # Decide the export format
@@ -12,6 +14,8 @@ blocks:
 Context: [[Design the on-disk format]]
 
 This card's `blocks` property says the announcement can't be drafted until the format is settled. It is written on **this** end only: the other card shows a read-only **Blocked by** entry the plugin derives at load time, and both tiles get a marker — "Blocks 1" here, "Blocked" there. Nothing is enforced: you can still drag either card anywhere.
+
+`a-result-of` is a second relationship type, one the board note declares itself under `relations` (`key: a-result-of`, `inverse: results-in`). Same mechanics, different words: this tile shows *A result of 1*, the design card shows *Results in 1*, and the panel gives each type its own pair of lists. It carries no meaning beyond the link, so it stays visible even though the design card is done — only blocking fades when either end is finished.
 
 ## Question
 

@@ -108,12 +108,28 @@ export interface CardStats {
 export type HistoryScope = "moves" | "structural" | "all";
 
 /**
- * The relationship vocabulary: a typed, NON-hierarchical link between two cards (parentage stays
- * the `## Subtasks` checklist and is not a relationship type). Only `blocks` exists today; every
- * link carries its type so a second one is additive rather than a reshape of what this version
- * writes into people's notes.
+ * A relationship type's identity: the frontmatter key its outgoing links are stored under. A typed,
+ * NON-hierarchical link between two cards (parentage stays the `## Subtasks` checklist and is not
+ * a relationship type). `blocks` is built in; the board note's `relations` property adds more, and
+ * `BoardConfig.relations` holds what each key means (see `RelationTypeDef`).
  */
-export type RelationType = "blocks";
+export type RelationType = string;
+
+/**
+ * One relationship type, as the board knows it. Its `key` is both its identity and the frontmatter
+ * key the declaring card writes its outgoing links to; `inverse` is the key read as the same edge
+ * stated from the other end, never written by the plugin — `null` for a type whose inverse can only
+ * be derived. The labels are what the panel headings, tile markers and history lines say.
+ */
+export interface RelationTypeDef {
+  key: RelationType;
+  inverse: string | null;
+  label: string;
+  inverseLabel: string;
+}
+
+/** Which end of a relationship a card is on: `out` = it declares the link, `in` = it is the target. */
+export type RelationDirection = "out" | "in";
 
 /**
  * Where a link was declared, which decides whether the card showing it may also remove it.
@@ -129,6 +145,7 @@ type RelationSource = "own" | "inverse" | "both";
 /** One end of a relationship, as one card sees it. */
 export interface RelationLink {
   type: RelationType;
+  direction: RelationDirection;
   /** The link text as the declaring note first writes it — what a row shows. */
   target: string;
   /**
@@ -140,15 +157,6 @@ export interface RelationLink {
   /** Vault path of the card the target resolves to, or `null` when no card on the board matches. */
   path: string | null;
   source: RelationSource;
-}
-
-// Only referenced by Card below (not imported elsewhere), so kept module-private.
-/** Both directions of a card's relationships, already resolved against the board. */
-interface CardRelations {
-  /** Cards this one blocks (outgoing) — the direction that is written to frontmatter. */
-  blocks: RelationLink[];
-  /** Cards blocking this one (incoming) — derived at load time, never written. */
-  blockedBy: RelationLink[];
 }
 
 /** A card as the board needs it: identity + frontmatter + the child links it declares. */
@@ -191,10 +199,11 @@ export interface Card {
   context?: string;
   /**
    * Typed relationships to other cards, both directions, resolved against the board. Filled by
-   * `buildBoard` from the `blocks` / `blocked-by` frontmatter keys — derived, never written back
-   * as a whole (only the outgoing `blocks` list is ever written, by the card that declares it).
+   * `buildBoard` from the vocabulary's frontmatter keys — derived, never written back as a whole
+   * (only an outgoing list is ever written, by the card that declares it). Outgoing links first,
+   * then incoming, each in the order the notes list them.
    */
-  relations?: CardRelations;
+  relations?: RelationLink[];
 }
 
 /**
@@ -270,6 +279,12 @@ export interface BoardConfig {
    * the values its cards currently carry are still offered, they are just not remembered yet.
    */
   priorities: string[];
+  /**
+   * The relationship types this board understands (`relations` in the board note), `blocks`
+   * always first. Like `priorities`, the board's own vocabulary: what the detail panel offers a
+   * field for, and which frontmatter keys `buildBoard` reads as links.
+   */
+  relations: RelationTypeDef[];
 }
 
 export interface Board {

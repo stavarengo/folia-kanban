@@ -7,6 +7,9 @@ priorities:
   - C
   - D
   - someday
+relations:
+  - key: a-result-of
+    inverse: results-in
 columns:
   - todo
   - id: next

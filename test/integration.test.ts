@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import { FakeRepo } from "./fakeRepo";
 import { makeTodoPath, resolveDrop, moveCard } from "../src/model/board";
 import type { BoardConfig } from "../src/model/types";
+import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
   titleMode: "auto",
   priorities: [],
+  relations: [BLOCKS],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },

@@ -1,10 +1,11 @@
 import { createContext, useContext, useMemo } from "react";
-import type { RelationCounts } from "../model/board";
+import type { RelationCount } from "../model/board";
 import type { CardRepository } from "../model/repo";
-import type { ColumnDef, ContextConfig } from "../model/types";
+import type { Card, ColumnDef, ContextConfig } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
 import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
+import type { MatchContext } from "./cardView";
 
 /**
  * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
@@ -27,13 +28,13 @@ export function useContexts(): Record<string, ContextConfig> {
 }
 
 /**
- * Active blocking-link counts per card path, provided by App. Lives in its own React context, not
+ * Active relationship counts per card path, provided by App. Lives in its own React context, not
  * a CardItem prop, for the same reason the contexts map does: the count on card A changes when
  * card B is edited, and A's own memoized props are untouched by that edit.
  */
-export const RelationCountsContext = createContext<Record<string, RelationCounts>>({});
+export const RelationCountsContext = createContext<Record<string, RelationCount[]>>({});
 
-export function useRelationCounts(): Record<string, RelationCounts> {
+export function useRelationCounts(): Record<string, RelationCount[]> {
   return useContext(RelationCountsContext);
 }
 
@@ -100,6 +101,44 @@ export function useSubitemsCollapse(): SubitemsCollapse {
     }),
     [settings.collapsedCards, settings.subitemsDefault, update],
   );
+}
+
+/** A card's seen-marker frozen at one moment, for the card whose panel is open (see `unreadStateOf`). */
+export interface PinnedSeen {
+  path: string;
+  seen: string | undefined;
+}
+
+/**
+ * The reader's unread verdict on any card, from these settings — what the tile badge shows, except
+ * for the pinned card: that one is judged by the marker it had when its panel opened, the same
+ * snapshot the panel itself marks "new" against. Opening a card records its comments as seen, and
+ * an `unread:` filter reading the live marker would drop the card from the board — and from an
+ * inbox lane — in the middle of the visit.
+ */
+export function unreadStateOf(
+  settings: KanbanSettings,
+  pinned: PinnedSeen | null = null,
+): (card: Card) => UnreadState {
+  return (card) =>
+    unreadComments(
+      card.stats?.commentMarks ?? [],
+      card.path === pinned?.path ? pinned.seen : seenMarkerFor(settings, card.path),
+      settings.userName,
+    );
+}
+
+/**
+ * Everything `matchCard` needs beyond the card, built once by App so a column's lane rule and the
+ * global search judge `is:` and `unread:` by the same counts and the same reader as the tile
+ * markers.
+ */
+export const MatchContextContext = createContext<MatchContext | null>(null);
+
+export function useMatchContext(): MatchContext {
+  const c = useContext(MatchContextContext);
+  if (!c) throw new Error("MatchContextContext is missing a provider");
+  return c;
 }
 
 /**

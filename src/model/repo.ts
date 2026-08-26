@@ -50,8 +50,9 @@ export interface CardRepository {
   removeSubtask(path: string, index: number): Promise<void>;
 
   /**
-   * Declare a relationship FROM this card TO `target` (a wikilink target, e.g. another card's
-   * file name). Only the declaring end is written — the inverse is derived when the board loads,
+   * Declare a relationship of `type` (a key of the board's vocabulary, `BoardConfig.relations`)
+   * FROM this card TO `target` (a wikilink target, e.g. another card's file name). Only the
+   * declaring end is written — the inverse is derived when the board loads,
    * so a link written here has no second copy anywhere to fall out of step with. A relationship
    * the card already declares is a no-op, and so is one naming the card itself.
    */

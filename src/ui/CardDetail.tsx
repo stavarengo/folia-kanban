@@ -9,10 +9,10 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
+import type { Board, Card, CardBody, RelationLink, RelationTypeDef, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
 import { descriptionRefusal } from "../model/card";
-import { RELATION_KEYS } from "../model/relationships";
+import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
 import { priorityOptions } from "./cardView";
@@ -253,17 +253,10 @@ function subtaskColumn(board: Board, item: SubItem): { value: string; known: boo
 }
 
 // The frontmatter keys the panel edits through a dedicated control, so the generic property rows
-// never offer a second, conflicting way to write them. The relationship keys are in here for the
-// add-property form: an array value is already excluded from the rows themselves.
-const EDITED_KEYS = new Set([
-  "status",
-  "priority",
-  "due",
-  "order",
-  "type",
-  "created",
-  ...RELATION_KEYS,
-]);
+// never offer a second, conflicting way to write them. The board's relationship keys join these
+// per board (see `editedKeys`) for the add-property form: an array value is already excluded from
+// the rows themselves.
+const EDITED_KEYS = ["status", "priority", "due", "order", "type", "created"];
 
 /**
  * One relationship row: the linked card's displayed title (clicking it opens that card), or the
@@ -275,12 +268,15 @@ const EDITED_KEYS = new Set([
  */
 function RelationRow({
   link,
+  heading,
   board,
   onNavigate,
   onRemove,
   note,
 }: {
   link: RelationLink;
+  /** The list this row sits in, so its remove button names the link — not only the card. */
+  heading: string;
   board: Board;
   onNavigate: ((path: string) => void) | undefined;
   onRemove?: (() => void) | undefined;
@@ -303,7 +299,7 @@ function RelationRow({
       {onRemove ? (
         <button
           className="folia-icon-btn folia-mini"
-          aria-label={`Remove relationship to ${label}`}
+          aria-label={`Remove ${heading} link to ${label}`}
           title="Remove"
           onClick={onRemove}
         >
@@ -318,31 +314,131 @@ function RelationRow({
   );
 }
 
-/** What an un-removable row says instead of a button, per where the link actually lives. */
-const RELATION_NOTES: Record<"inverse" | "both", { text: string; title: string }> = {
-  inverse: {
-    text: "via blocked-by",
-    title: "Declared by that card's blocked-by property — remove it there",
-  },
-  both: {
-    text: "also via blocked-by",
-    title:
-      "Both notes state this link, so clearing it here would leave the other to bring it back — remove that card's blocked-by property too",
-  },
-};
+/** What an un-removable outgoing row says instead of a button, per where the link actually lives. */
+function outgoingNote(
+  type: RelationTypeDef,
+  source: "inverse" | "both",
+): { text: string; title: string } {
+  const inverse = type.inverse ?? "";
+  return source === "inverse"
+    ? {
+        text: `via ${inverse}`,
+        title: `Declared by that card's ${inverse} property — remove it there`,
+      }
+    : {
+        text: `also via ${inverse}`,
+        title: `Both notes state this link, so clearing it here would leave the other to bring it back — remove that card's ${inverse} property too`,
+      };
+}
 
-/** The Blocked by list is derived, so its only affordance is saying where each link is written. */
-const BLOCKED_BY_NOTES: Record<"own" | "inverse" | "both", { text: string; title: string }> = {
-  own: {
+/** The incoming list is derived, so its only affordance is saying where each link is written. */
+function incomingNote(
+  type: RelationTypeDef,
+  source: "own" | "inverse" | "both",
+): { text: string; title: string } | undefined {
+  if (source === "inverse") return undefined;
+  const inverse = type.inverse ?? "";
+  return {
     text: "from this note",
-    title: "Written in this note's own blocked-by property — edit the note to change it",
-  },
-  inverse: { text: "", title: "" },
-  both: {
-    text: "from this note",
-    title: "Written in this note's own blocked-by property, and stated by that card as well",
-  },
-};
+    title:
+      source === "own"
+        ? `Written in this note's own ${inverse} property — edit the note to change it`
+        : `Written in this note's own ${inverse} property, and stated by that card as well`,
+  };
+}
+
+/**
+ * Both directions of one relationship type: the list this card declares (editable, with the field
+ * that adds to it) and the derived list of cards that declare it about this one. One instance per
+ * type in the board's vocabulary, each with its own draft text.
+ */
+function RelationTypeSections({
+  type,
+  links,
+  board,
+  path,
+  choices,
+  listId,
+  onNavigate,
+  mutate,
+}: {
+  type: RelationTypeDef;
+  links: readonly RelationLink[];
+  board: Board;
+  path: string;
+  choices: Map<string, string>;
+  listId: string;
+  onNavigate: ((path: string) => void) | undefined;
+  mutate: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const repo = useRepo();
+  const [draft, setDraft] = useState("");
+  const outgoing = links.filter((l) => l.direction === "out");
+  const incoming = links.filter((l) => l.direction === "in");
+  return (
+    <>
+      <section className="folia-section">
+        <h3>{type.label}</h3>
+        <ul className="folia-relations">
+          {outgoing.map((l) => (
+            <RelationRow
+              key={`${l.target}\u0000${l.path ?? ""}`}
+              link={l}
+              heading={type.label}
+              board={board}
+              onNavigate={onNavigate}
+              {...(l.source === "own"
+                ? {
+                    // Every spelling the note uses for this one link, so the row it showed does
+                    // not come straight back on the next load.
+                    onRemove: () => void mutate(() => repo.removeRelation(path, l.type, l.targets)),
+                  }
+                : { note: outgoingNote(type, l.source) })}
+            />
+          ))}
+          {outgoing.length === 0 && <li className="folia-muted">Nothing linked yet.</li>}
+        </ul>
+        <div className="folia-add-inline">
+          <input
+            list={listId}
+            value={draft}
+            placeholder="Link a card…"
+            aria-label={`Link a card under ${type.label}`}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              const typed = draft.trim();
+              if (e.key !== "Enter" || !typed) return;
+              e.preventDefault();
+              // Text naming no card is kept as typed: it becomes a link to a card that is not
+              // there, which the list shows as missing rather than swallow.
+              void mutate(() => repo.addRelation(path, type.key, choices.get(typed) ?? typed));
+              setDraft("");
+            }}
+          />
+        </div>
+      </section>
+
+      <section className="folia-section">
+        {/* Derived, never written: this list is the inverse of other cards' declarations (plus this
+            card's own hand-written inverse key), so there is nothing here to edit from here. */}
+        <h3>{type.inverseLabel}</h3>
+        <ul className="folia-relations">
+          {incoming.map((l) => (
+            <RelationRow
+              key={`${l.target}\u0000${l.path ?? ""}`}
+              link={l}
+              heading={type.inverseLabel}
+              board={board}
+              onNavigate={onNavigate}
+              note={incomingNote(type, l.source)}
+            />
+          ))}
+          {incoming.length === 0 && <li className="folia-muted">Nothing links here.</li>}
+        </ul>
+      </section>
+    </>
+  );
+}
 
 /**
  * What the relationship field offers, as `typed text → the file name to link`, since a wikilink
@@ -428,7 +524,6 @@ export function CardDetail({
   const [newTodo, setNewTodo] = useState("");
   const [newSubcard, setNewSubcard] = useState("");
   const [newComment, setNewComment] = useState("");
-  const [newBlocks, setNewBlocks] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newPropKey, setNewPropKey] = useState("");
   const [newPropVal, setNewPropVal] = useState("");
@@ -441,9 +536,14 @@ export function CardDetail({
   // instead of pushing the panel past the screen. Re-measured on mount and window resize.
   const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
-  const blocksListId = useId();
+  // One datalist for every relationship field: they all offer the same cards.
+  const relationListId = useId();
   // Rebuilt only when the board or the open card changes — not on every keystroke in any field.
-  const blockChoices = useMemo(() => relationChoices(board, path), [board, path]);
+  const relationChoicesValue = useMemo(() => relationChoices(board, path), [board, path]);
+  const editedKeys = useMemo(
+    () => new Set([...EDITED_KEYS, ...relationKeys(board.config.relations)]),
+    [board.config.relations],
+  );
 
   // Unread comments (§ unread). Read-state is plugin data keyed by card path, so it is read from
   // settings rather than from the note. Two things happen here and their order is the whole point:
@@ -819,11 +919,11 @@ export function CardDetail({
 
   const fm = card.frontmatter;
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
-  const relations = card.relations ?? { blocks: [], blockedBy: [] };
+  const relations = card.relations ?? [];
   const curPriority = String(fm.priority ?? "");
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
-      !EDITED_KEYS.has(k) &&
+      !editedKeys.has(k) &&
       (typeof v === "string" || typeof v === "number" || typeof v === "boolean") &&
       v !== "",
   );
@@ -976,10 +1076,10 @@ export function CardDetail({
             <button
               className="folia-btn"
               aria-label="Add property"
-              disabled={!newPropKey.trim() || EDITED_KEYS.has(newPropKey.trim())}
+              disabled={!newPropKey.trim() || editedKeys.has(newPropKey.trim())}
               onClick={() => {
                 const key = newPropKey.trim();
-                if (!key || EDITED_KEYS.has(key)) return;
+                if (!key || editedKeys.has(key)) return;
                 void mutate(() => repo.setFrontmatter(path, { [key]: newPropVal }));
                 setNewPropKey("");
                 setNewPropVal("");
@@ -1227,75 +1327,24 @@ export function CardDetail({
           </div>
         </section>
 
-        <section className="folia-section">
-          <h3>Blocks</h3>
-          <ul className="folia-relations">
-            {relations.blocks.map((l) => (
-              <RelationRow
-                key={`${l.target}\u0000${l.path ?? ""}`}
-                link={l}
-                board={board}
-                onNavigate={onNavigate}
-                {...(l.source === "own"
-                  ? {
-                      // Every spelling the note uses for this one link, so the row it showed does
-                      // not come straight back on the next load.
-                      onRemove: () =>
-                        void mutate(() => repo.removeRelation(path, l.type, l.targets)),
-                    }
-                  : { note: RELATION_NOTES[l.source] })}
-              />
-            ))}
-            {relations.blocks.length === 0 && (
-              <li className="folia-muted">This card blocks nothing.</li>
-            )}
-          </ul>
-          <div className="folia-add-inline">
-            <input
-              list={blocksListId}
-              value={newBlocks}
-              placeholder="Blocks another card…"
-              aria-label="Add a card this one blocks"
-              onChange={(e) => setNewBlocks(e.target.value)}
-              onKeyDown={(e) => {
-                const typed = newBlocks.trim();
-                if (e.key !== "Enter" || !typed) return;
-                e.preventDefault();
-                // Text naming no card is kept as typed: it becomes a link to a card that is not
-                // there, which the list shows as missing rather than swallow.
-                void mutate(() =>
-                  repo.addRelation(path, "blocks", blockChoices.get(typed) ?? typed),
-                );
-                setNewBlocks("");
-              }}
-            />
-            <datalist id={blocksListId}>
-              {[...blockChoices.keys()].map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
-          </div>
-        </section>
-
-        <section className="folia-section">
-          {/* Derived, never written: this list is the inverse of other cards' `blocks` (plus this
-              card's own hand-written `blocked-by`), so there is nothing here to edit from here. */}
-          <h3>Blocked by</h3>
-          <ul className="folia-relations">
-            {relations.blockedBy.map((l) => (
-              <RelationRow
-                key={`${l.target}\u0000${l.path ?? ""}`}
-                link={l}
-                board={board}
-                onNavigate={onNavigate}
-                {...(BLOCKED_BY_NOTES[l.source].text ? { note: BLOCKED_BY_NOTES[l.source] } : {})}
-              />
-            ))}
-            {relations.blockedBy.length === 0 && (
-              <li className="folia-muted">Nothing is blocking this card.</li>
-            )}
-          </ul>
-        </section>
+        {board.config.relations.map((type) => (
+          <RelationTypeSections
+            key={type.key}
+            type={type}
+            links={relations.filter((l) => l.type === type.key)}
+            board={board}
+            path={path}
+            choices={relationChoicesValue}
+            listId={relationListId}
+            onNavigate={onNavigate}
+            mutate={mutate}
+          />
+        ))}
+        <datalist id={relationListId}>
+          {[...relationChoicesValue.keys()].map((label) => (
+            <option key={label} value={label} />
+          ))}
+        </datalist>
 
         <section className="folia-section">
           <h3>Comments</h3>

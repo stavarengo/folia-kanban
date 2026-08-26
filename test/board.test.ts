@@ -23,12 +23,14 @@ import {
   subtreePaths,
 } from "../src/model/board";
 import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
+import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
   titleMode: "auto",
   priorities: [],
+  relations: [BLOCKS],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },

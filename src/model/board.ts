@@ -11,9 +11,12 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
+  RelationDirection,
   RelationLink,
+  RelationType,
+  RelationTypeDef,
 } from "./types";
-import { readBlockedBy, readRelations } from "./relationships";
+import { BLOCKS, readInverse, readRelations } from "./relationships";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
 
@@ -221,22 +224,24 @@ function isGenuinelyNested(path: string, parentOf: Record<string, string>): bool
 }
 
 /**
- * Resolve every `blocks` / `blocked-by` declaration into the two directions each card sees, and
- * hang the result on the cards themselves (the `context` precedent).
+ * Resolve every relationship declaration into the two directions each card sees, and hang the
+ * result on the cards themselves (the `context` precedent). One pass per type in the board's
+ * vocabulary; `blocks` / `blocked-by` is one such type.
  *
- * The two keys describe the SAME kind of edge from opposite ends, so both are read into one graph
- * and an edge declared from both ends is kept once — as `both` rather than as either end's own,
- * because neither note can end it alone. `source` is what tells the detail panel whether the card
- * in front of you may remove the link or only report where it lives. A card cannot block itself:
- * a self-link is dropped rather than shown as both a blocker and a blocked card.
+ * A type's key and its inverse key describe the SAME kind of edge from opposite ends, so both are
+ * read into one graph and an edge declared from both ends is kept once — as `both` rather than as
+ * either end's own, because neither note can end it alone. `source` is what tells the detail panel
+ * whether the card in front of you may remove the link or only report where it lives. A card
+ * cannot relate to itself: a self-link is dropped rather than shown as both ends.
  */
 function buildRelations(
   cards: Card[],
   byBasename: Map<string, string[]>,
   cardsByPath: Record<string, Card>,
+  types: readonly RelationTypeDef[],
 ): void {
-  const blocks: Record<string, RelationLink[]> = {};
-  const blockedBy: Record<string, RelationLink[]> = {};
+  const outgoing: Record<string, RelationLink[]> = {};
+  const incoming: Record<string, RelationLink[]> = {};
   // Every edge already registered, so a second statement of the same one is folded into it rather
   // than added twice — and so the fact that it WAS stated twice is not lost, which is what decides
   // whether one note can end the relationship on its own.
@@ -246,20 +251,21 @@ function buildRelations(
   >();
   // One end of an edge, for that key: its card path, or the raw target when nothing resolved (so
   // two notes pointing at the same missing card still count as one edge).
-  const endKey = (path: string | null, target: string) => path ?? "?" + target;
+  const endKey = (end: { path: string | null; target: string }) => end.path ?? "?" + end.target;
 
   const addEdge = (
-    blocker: { path: string | null; target: string },
-    blocked: { path: string | null; target: string },
-    declaredBy: "blocker" | "blocked",
+    type: RelationType,
+    from: { path: string | null; target: string },
+    to: { path: string | null; target: string },
+    declaredBy: "from" | "to",
   ) => {
-    if (blocker.path !== null && blocker.path === blocked.path) return; // no card blocks itself
-    const key = endKey(blocker.path, blocker.target) + ">" + endKey(blocked.path, blocked.target);
-    const declarer = declaredBy === "blocker" ? blocker.path : blocked.path;
+    if (from.path !== null && from.path === to.path) return; // no card relates to itself
+    const key = type + ":" + endKey(from) + ">" + endKey(to);
+    const declarer = declaredBy === "from" ? from.path : to.path;
     const existing = seen.get(key);
     if (existing) {
-      // Stated a second time by the OTHER note: both ends declare it, so deleting the blocker's
-      // own list would not end it — the inverse would simply be derived again on the next load.
+      // Stated a second time by the OTHER note: both ends declare it, so deleting the declaring
+      // list alone would not end it — the inverse would simply be derived again on the next load.
       // Say so on both rows instead of offering a remove button that quietly does nothing.
       if (existing.declarer !== declarer) {
         if (existing.out) existing.out.source = "both";
@@ -268,59 +274,65 @@ function buildRelations(
       }
       // Stated twice by the SAME note, spelled differently (`[[B]]` and `[[Tasks/B]]`). One row,
       // but every spelling has to go when it is removed — remember them all on that row.
-      const link = declaredBy === "blocker" ? existing.out : existing.in;
-      const extra = declaredBy === "blocker" ? blocked.target : blocker.target;
+      const link = declaredBy === "from" ? existing.out : existing.in;
+      const extra = declaredBy === "from" ? to.target : from.target;
       if (link && !link.targets.includes(extra)) link.targets.push(extra);
       return;
     }
     const record: { declarer: string | null; out?: RelationLink; in?: RelationLink } = { declarer };
-    if (blocker.path !== null) {
+    if (from.path !== null) {
       record.out = {
-        type: "blocks",
-        target: blocked.target,
-        targets: [blocked.target],
-        path: blocked.path,
-        source: declaredBy === "blocker" ? "own" : "inverse",
+        type,
+        direction: "out",
+        target: to.target,
+        targets: [to.target],
+        path: to.path,
+        source: declaredBy === "from" ? "own" : "inverse",
       };
-      (blocks[blocker.path] ??= []).push(record.out);
+      (outgoing[from.path] ??= []).push(record.out);
     }
-    if (blocked.path !== null) {
+    if (to.path !== null) {
       record.in = {
-        type: "blocks",
-        target: blocker.target,
-        targets: [blocker.target],
-        path: blocker.path,
-        source: declaredBy === "blocked" ? "own" : "inverse",
+        type,
+        direction: "in",
+        target: from.target,
+        targets: [from.target],
+        path: from.path,
+        source: declaredBy === "to" ? "own" : "inverse",
       };
-      (blockedBy[blocked.path] ??= []).push(record.in);
+      (incoming[to.path] ??= []).push(record.in);
     }
     seen.set(key, record);
   };
 
-  // Two passes, `blocks` first, so an edge stated at BOTH ends always keeps the declaration the
-  // plugin itself writes. Reading them card by card would hand that to whichever note the vault
-  // happened to list first, and with it whether the panel offers a remove button.
-  for (const c of cards) {
-    for (const target of readRelations(c.frontmatter, "blocks")) {
-      addEdge(
-        { path: c.path, target: c.basename },
-        { path: resolveLink(target, byBasename, cardsByPath), target },
-        "blocker",
-      );
+  for (const type of types) {
+    // Two passes, the declaring key first, so an edge stated at BOTH ends always keeps the
+    // declaration the plugin itself writes. Reading them card by card would hand that to whichever
+    // note the vault happened to list first, and with it whether the panel offers a remove button.
+    for (const c of cards) {
+      for (const target of readRelations(c.frontmatter, type.key)) {
+        addEdge(
+          type.key,
+          { path: c.path, target: c.basename },
+          { path: resolveLink(target, byBasename, cardsByPath), target },
+          "from",
+        );
+      }
     }
-  }
-  for (const c of cards) {
-    for (const target of readBlockedBy(c.frontmatter)) {
-      addEdge(
-        { path: resolveLink(target, byBasename, cardsByPath), target },
-        { path: c.path, target: c.basename },
-        "blocked",
-      );
+    for (const c of cards) {
+      for (const target of readInverse(c.frontmatter, type)) {
+        addEdge(
+          type.key,
+          { path: resolveLink(target, byBasename, cardsByPath), target },
+          { path: c.path, target: c.basename },
+          "to",
+        );
+      }
     }
   }
 
   for (const c of cards) {
-    c.relations = { blocks: blocks[c.path] ?? [], blockedBy: blockedBy[c.path] ?? [] };
+    c.relations = [...(outgoing[c.path] ?? []), ...(incoming[c.path] ?? [])];
   }
 }
 
@@ -346,7 +358,7 @@ export function buildBoard(
   const cardsByPath: Record<string, Card> = {};
   for (const c of cards) cardsByPath[c.path] = c;
 
-  buildRelations(cards, byBasename, cardsByPath);
+  buildRelations(cards, byBasename, cardsByPath, config.relations);
 
   const parentOf: Record<string, string> = {};
   for (const c of cards) {
@@ -495,38 +507,50 @@ export function buildBoard(
   return { config, columns, cards: cardsByPath, parentOf, placedOf, childrenOf, contexts };
 }
 
-/** How many ACTIVE blocking links a card has in each direction (see {@link relationCounts}). */
-export interface RelationCounts {
-  /** Cards it is holding up. */
-  blocks: number;
-  /** Cards holding it up. */
-  blockedBy: number;
+/** How many links of one type a card shows in each direction (see {@link relationCounts}). */
+export interface RelationCount {
+  type: RelationTypeDef;
+  out: number;
+  in: number;
 }
 
 /**
- * The blocking links worth showing a marker for, per card path. Only paths with at least one are
- * present, so a lookup that misses means "nothing to show".
+ * The relationship markers a card shows, per card path: one entry per type it has links of, in
+ * the vocabulary's order. Only paths with at least one are present, so a lookup that misses means
+ * "nothing to show". Unresolved targets never count — there is no card on the other end.
  *
- * A link counts while NEITHER end sits in the board's done column: a card is not held up by
- * something already finished, and a finished card is not holding anything up. Unresolved targets
- * never count — there is no card to be waiting on. This is presentation only; nothing about it
- * restricts what a card may do, which stays true to the board's nudge-never-block posture.
+ * A blocking link counts while NEITHER end sits in the board's done column: a card is not held up
+ * by something already finished, and a finished card is not holding anything up. Every other type
+ * is a plain link with no such meaning, so it counts whatever column either end is in. This is
+ * presentation only; nothing about it restricts what a card may do, which stays true to the
+ * board's nudge-never-block posture.
  */
 export function relationCounts(
   board: Board,
   doneColumnId: string | null,
-): Record<string, RelationCounts> {
+): Record<string, RelationCount[]> {
   const isDone = (path: string) =>
     doneColumnId !== null && board.cards[path]?.frontmatter.status === doneColumnId;
-  const out: Record<string, RelationCounts> = {};
+  const out: Record<string, RelationCount[]> = {};
   for (const [path, card] of Object.entries(board.cards)) {
-    if (isDone(path)) continue;
-    const relations = card.relations;
-    if (!relations) continue;
-    const live = (links: RelationLink[]) =>
-      links.filter((l) => l.path !== null && !isDone(l.path)).length;
-    const counts = { blocks: live(relations.blocks), blockedBy: live(relations.blockedBy) };
-    if (counts.blocks > 0 || counts.blockedBy > 0) out[path] = counts;
+    const links = card.relations;
+    if (!links) continue;
+    const counts: RelationCount[] = [];
+    for (const type of board.config.relations) {
+      const holdsUp = type.key !== BLOCKS.key || !isDone(path);
+      const live = (direction: RelationDirection) =>
+        links.filter(
+          (l) =>
+            l.type === type.key &&
+            l.direction === direction &&
+            l.path !== null &&
+            holdsUp &&
+            (type.key !== BLOCKS.key || !isDone(l.path)),
+        ).length;
+      const count = { type, out: live("out"), in: live("in") };
+      if (count.out > 0 || count.in > 0) counts.push(count);
+    }
+    if (counts.length > 0) out[path] = counts;
   }
   return out;
 }

@@ -1,13 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { buildBoard, relationCounts } from "../src/model/board";
 import {
-  RELATION_KEYS,
-  relationKey,
+  BLOCKS,
   isSelfRelation,
+  normalizeRelationTypes,
+  readInverse,
+  readRelations,
+  relationKeys,
+  relationLabel,
   relationLinkText,
   relationTarget,
-  readBlockedBy,
-  readRelations,
   withRelation,
   withoutRelation,
 } from "../src/model/relationships";
@@ -19,11 +21,18 @@ const config: BoardConfig = {
   cardFolder: "Tasks",
   titleMode: "auto",
   priorities: [],
+  relations: [BLOCKS],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },
     { id: "done", title: "Done" },
   ],
+};
+
+/** The same board, with `a-result-of` / `results-in` declared in its note. */
+const withResultOf: BoardConfig = {
+  ...config,
+  relations: normalizeRelationTypes([{ key: "a-result-of", inverse: "results-in" }]),
 };
 
 function card(basename: string, fm: Partial<Card["frontmatter"]> = {}, folder = "Tasks"): Card {
@@ -55,13 +64,13 @@ describe("relationship frontmatter", () => {
     // `blocks:\n  - [[A]]` (no quotes) is what a person typing into a note produces, and YAML
     // reads it as a sequence inside a sequence rather than as a string.
     expect(readRelations({ blocks: [["A"]] }, "blocks")).toEqual(["A"]);
-    expect(readBlockedBy({ "blocked-by": [["A"], "[[B]]"] })).toEqual(["A", "B"]);
+    expect(readInverse({ "blocked-by": [["A"], "[[B]]"] }, BLOCKS)).toEqual(["A", "B"]);
   });
 
   it("reads an absent or empty list as no relationships", () => {
     expect(readRelations({}, "blocks")).toEqual([]);
     expect(readRelations({ blocks: [] }, "blocks")).toEqual([]);
-    expect(readBlockedBy({ "blocked-by": [] })).toEqual([]);
+    expect(readInverse({ "blocked-by": [] }, BLOCKS)).toEqual([]);
   });
 
   it("strips an alias/anchor only when the board resolves it — the raw target is kept verbatim", () => {
@@ -113,8 +122,10 @@ describe("relationship frontmatter", () => {
   });
 
   it("names the keys it owns, so generic property editing can stay out of them", () => {
-    expect(relationKey("blocks")).toBe("blocks");
-    expect([...RELATION_KEYS]).toEqual(["blocks", "blocked-by"]);
+    expect(relationKeys([BLOCKS])).toEqual(["blocks", "blocked-by"]);
+    expect(
+      relationKeys([BLOCKS, { key: "x", inverse: null, label: "X", inverseLabel: "" }]),
+    ).toEqual(["blocks", "blocked-by", "x"]);
     expect(relationLinkText("A")).toBe("[[A]]");
   });
 
@@ -141,10 +152,99 @@ describe("relationship frontmatter", () => {
   });
 });
 
+describe("the relationship vocabulary (board note `relations`)", () => {
+  it("always holds `blocks` first, whatever the note says", () => {
+    expect(normalizeRelationTypes(undefined)).toEqual([BLOCKS]);
+    expect(normalizeRelationTypes("nonsense")).toEqual([BLOCKS]);
+    expect(normalizeRelationTypes([])).toEqual([BLOCKS]);
+  });
+
+  it("reads `{ key, inverse }` entries, labelling both ends from their keys", () => {
+    expect(normalizeRelationTypes([{ key: "a-result-of", inverse: "results-in" }])).toEqual([
+      BLOCKS,
+      {
+        key: "a-result-of",
+        inverse: "results-in",
+        label: "A result of",
+        inverseLabel: "Results in",
+      },
+    ]);
+  });
+
+  it("accepts a bare key, whose other end then has no words of its own", () => {
+    expect(normalizeRelationTypes(["relates_to"])).toEqual([
+      BLOCKS,
+      {
+        key: "relates_to",
+        inverse: null,
+        label: "Relates to",
+        inverseLabel: "Relates to (reverse)",
+      },
+    ]);
+  });
+
+  it("drops what it cannot use instead of refusing the board", () => {
+    expect(
+      normalizeRelationTypes([
+        42,
+        { inverse: "x" },
+        { key: "   " },
+        { key: "same", inverse: "same" },
+        // A key the plugin already gives a meaning to, as the key or as the inverse.
+        "status",
+        { key: "fine", inverse: "created" },
+        // No letters, so no heading to show.
+        "---",
+        "kept",
+      ]),
+    ).toEqual([
+      BLOCKS,
+      { key: "kept", inverse: null, label: "Kept", inverseLabel: "Kept (reverse)" },
+    ]);
+  });
+
+  it("reads an `inverse:` left without a value as no inverse, not as a broken entry", () => {
+    // YAML hands `null` for a key with nothing after the colon.
+    expect(normalizeRelationTypes([{ key: "depends-on", inverse: null }])).toEqual([
+      BLOCKS,
+      {
+        key: "depends-on",
+        inverse: null,
+        label: "Depends on",
+        inverseLabel: "Depends on (reverse)",
+      },
+    ]);
+    expect(normalizeRelationTypes([{ key: "depends-on", inverse: "  " }])).toHaveLength(2);
+  });
+
+  it("gives one frontmatter key one meaning: a repeat of a key or an inverse is dropped", () => {
+    expect(
+      normalizeRelationTypes([
+        "blocks",
+        "Blocks",
+        { key: "Held-By", inverse: "BLOCKED-BY" },
+        { key: "held-by", inverse: "blocked-by" },
+        { key: "a", inverse: "b" },
+        { key: "b", inverse: "c" },
+        { key: "c", inverse: "a" },
+        "a",
+      ]),
+    ).toEqual([BLOCKS, { key: "a", inverse: "b", label: "A", inverseLabel: "B" }]);
+  });
+
+  it("reads a key as a heading", () => {
+    expect(relationLabel("blocks")).toBe("Blocks");
+    expect(relationLabel("blocked-by")).toBe("Blocked by");
+    expect(relationLabel("a-result-of")).toBe("A result of");
+    expect(relationLabel("depends_on")).toBe("Depends on");
+  });
+});
+
 describe("history lines for relationships", () => {
   it("names the type and the target as a link", () => {
     expect(relationAddedLine("blocks", "A")).toBe("Blocks added: [[A]]");
     expect(relationRemovedLine("blocks", "A")).toBe("Blocks removed: [[A]]");
+    expect(relationAddedLine("a-result-of", "A")).toBe("A result of added: [[A]]");
   });
 
   it("is logged under the same scope as a subtask link, not the stricter structural one", () => {
@@ -160,11 +260,25 @@ describe("buildBoard relationships", () => {
       card("A", { status: "todo", blocks: ["[[B]]"] }),
       card("B", { status: "todo" }),
     ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "own" },
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "out",
+        target: "B",
+        targets: ["B"],
+        path: "Tasks/B.md",
+        source: "own",
+      },
     ]);
-    expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-      { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "inverse" },
+    expect(b.cards["Tasks/B.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "in",
+        target: "A",
+        targets: ["A"],
+        path: "Tasks/A.md",
+        source: "inverse",
+      },
     ]);
     // The inverse is derived only — nothing is written back to B.
     expect(b.cards["Tasks/B.md"]?.frontmatter["blocked-by"]).toBeUndefined();
@@ -175,11 +289,25 @@ describe("buildBoard relationships", () => {
       card("A", { status: "todo" }),
       card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
     ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "inverse" },
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "out",
+        target: "B",
+        targets: ["B"],
+        path: "Tasks/B.md",
+        source: "inverse",
+      },
     ]);
-    expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-      { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "own" },
+    expect(b.cards["Tasks/B.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "in",
+        target: "A",
+        targets: ["A"],
+        path: "Tasks/A.md",
+        source: "own",
+      },
     ]);
   });
 
@@ -192,11 +320,25 @@ describe("buildBoard relationships", () => {
         card("B", { status: "todo", "blocked-by": ["[[A]]"] }),
       ];
       const b = buildBoard(config, order === 0 ? pair : pair.reverse());
-      expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-        { type: "blocks", target: "B", targets: ["B"], path: "Tasks/B.md", source: "both" },
+      expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+        {
+          type: "blocks",
+          direction: "out",
+          target: "B",
+          targets: ["B"],
+          path: "Tasks/B.md",
+          source: "both",
+        },
       ]);
-      expect(b.cards["Tasks/B.md"]?.relations?.blockedBy).toEqual([
-        { type: "blocks", target: "A", targets: ["A"], path: "Tasks/A.md", source: "both" },
+      expect(b.cards["Tasks/B.md"]?.relations).toEqual([
+        {
+          type: "blocks",
+          direction: "in",
+          target: "A",
+          targets: ["A"],
+          path: "Tasks/A.md",
+          source: "both",
+        },
       ]);
     }
   });
@@ -206,7 +348,7 @@ describe("buildBoard relationships", () => {
       card("A", { status: "todo", blocks: ["[[B]]", "[[B|see this]]"] }),
       card("B", { status: "todo" }),
     ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.source).toBe("own");
+    expect(b.cards["Tasks/A.md"]?.relations?.[0]?.source).toBe("own");
   });
 
   it("remembers every spelling one note gives a single link, so removing it clears them all", () => {
@@ -216,21 +358,28 @@ describe("buildBoard relationships", () => {
       card("A", { status: "todo", blocks: ["[[B]]", "[[Tasks/B]]"] }),
       card("B", { status: "todo" }),
     ]);
-    const link = b.cards["Tasks/A.md"]?.relations?.blocks;
+    const link = b.cards["Tasks/A.md"]?.relations;
     expect(link).toHaveLength(1);
     expect(link?.[0]?.targets).toEqual(["B", "Tasks/B"]);
   });
 
   it("keeps a target that matches no card, marked unresolved", () => {
     const b = buildBoard(config, [card("A", { status: "todo", blocks: ["[[Ghost]]"] })]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks).toEqual([
-      { type: "blocks", target: "Ghost", targets: ["Ghost"], path: null, source: "own" },
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "out",
+        target: "Ghost",
+        targets: ["Ghost"],
+        path: null,
+        source: "own",
+      },
     ]);
   });
 
   it("drops a self-link rather than show one card as both blocker and blocked", () => {
     const b = buildBoard(config, [card("A", { status: "todo", blocks: ["[[A]]"] })]);
-    expect(b.cards["Tasks/A.md"]?.relations).toEqual({ blocks: [], blockedBy: [] });
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([]);
   });
 
   it("resolves a folder-qualified target the same way subcard links resolve", () => {
@@ -238,7 +387,7 @@ describe("buildBoard relationships", () => {
       card("A", { status: "todo", blocks: ["[[Tasks/Sub/B]]"] }),
       card("B", { status: "todo" }, "Tasks/Sub"),
     ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.path).toBe("Tasks/Sub/B.md");
+    expect(b.cards["Tasks/A.md"]?.relations?.[0]?.path).toBe("Tasks/Sub/B.md");
   });
 
   it("refuses to bind an ambiguous basename, exactly as parentage does", () => {
@@ -247,12 +396,84 @@ describe("buildBoard relationships", () => {
       card("B", { status: "todo" }, "Tasks/One"),
       card("B", { status: "todo" }, "Tasks/Two"),
     ]);
-    expect(b.cards["Tasks/A.md"]?.relations?.blocks[0]?.path).toBeNull();
+    expect(b.cards["Tasks/A.md"]?.relations?.[0]?.path).toBeNull();
   });
 
-  it("leaves a card with no relationships an empty pair, never undefined", () => {
+  it("leaves a card with no relationships an empty list, never undefined", () => {
     const b = buildBoard(config, [card("A", { status: "todo" })]);
-    expect(b.cards["Tasks/A.md"]?.relations).toEqual({ blocks: [], blockedBy: [] });
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([]);
+  });
+
+  it("reads a second type from the vocabulary, with its own inverse key", () => {
+    const b = buildBoard(withResultOf, [
+      card("A", { status: "todo", "a-result-of": ["[[B]]"] }),
+      card("B", { status: "done" }),
+      card("C", { status: "todo", "results-in": ["[[A]]"] }),
+    ]);
+    // `results-in: [[A]]` on C says "C results in A", i.e. A is a result of C — the same edge
+    // `a-result-of: [[C]]` on A would state, so A shows it outgoing and C incoming.
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+      {
+        type: "a-result-of",
+        direction: "out",
+        target: "B",
+        targets: ["B"],
+        path: "Tasks/B.md",
+        source: "own",
+      },
+      {
+        type: "a-result-of",
+        direction: "out",
+        target: "C",
+        targets: ["C"],
+        path: "Tasks/C.md",
+        source: "inverse",
+      },
+    ]);
+    expect(b.cards["Tasks/B.md"]?.relations).toEqual([
+      {
+        type: "a-result-of",
+        direction: "in",
+        target: "A",
+        targets: ["A"],
+        path: "Tasks/A.md",
+        source: "inverse",
+      },
+    ]);
+    expect(b.cards["Tasks/C.md"]?.relations).toEqual([
+      {
+        type: "a-result-of",
+        direction: "in",
+        target: "A",
+        targets: ["A"],
+        path: "Tasks/A.md",
+        source: "own",
+      },
+    ]);
+  });
+
+  it("keeps the same pair of cards apart per type — one edge of each, never merged", () => {
+    const b = buildBoard(withResultOf, [
+      card("A", { status: "todo", blocks: ["[[B]]"], "a-result-of": ["[[B]]"] }),
+      card("B", { status: "todo" }),
+    ]);
+    expect(b.cards["Tasks/A.md"]?.relations?.map((l) => [l.type, l.direction])).toEqual([
+      ["blocks", "out"],
+      ["a-result-of", "out"],
+    ]);
+    expect(b.cards["Tasks/B.md"]?.relations?.map((l) => [l.type, l.direction])).toEqual([
+      ["blocks", "in"],
+      ["a-result-of", "in"],
+    ]);
+  });
+
+  it("ignores a key the vocabulary does not name, so it stays a plain property", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo", "a-result-of": ["[[B]]"] }),
+      card("B", { status: "todo" }),
+    ]);
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([]);
+    expect(b.cards["Tasks/B.md"]?.relations).toEqual([]);
   });
 
   it("does not turn a blocking link into parentage (relationships stay non-hierarchical)", () => {
@@ -272,8 +493,20 @@ describe("relationCounts", () => {
       card("B", { status: "todo" }),
     ]);
     expect(relationCounts(b, "done")).toEqual({
-      "Tasks/A.md": { blocks: 1, blockedBy: 0 },
-      "Tasks/B.md": { blocks: 0, blockedBy: 1 },
+      "Tasks/A.md": [{ type: BLOCKS, out: 1, in: 0 }],
+      "Tasks/B.md": [{ type: BLOCKS, out: 0, in: 1 }],
+    });
+  });
+
+  it("counts every other type whatever column either end is in — only blocking fades when done", () => {
+    const b = buildBoard(withResultOf, [
+      card("A", { status: "done", blocks: ["[[B]]"], "a-result-of": ["[[B]]"] }),
+      card("B", { status: "todo" }),
+    ]);
+    const resultOf = withResultOf.relations[1];
+    expect(relationCounts(b, "done")).toEqual({
+      "Tasks/A.md": [{ type: resultOf, out: 1, in: 0 }],
+      "Tasks/B.md": [{ type: resultOf, out: 0, in: 1 }],
     });
   });
 
@@ -301,8 +534,8 @@ describe("relationCounts", () => {
       card("B", { status: "todo" }),
     ]);
     expect(relationCounts(b, null)).toEqual({
-      "Tasks/A.md": { blocks: 1, blockedBy: 0 },
-      "Tasks/B.md": { blocks: 0, blockedBy: 1 },
+      "Tasks/A.md": [{ type: BLOCKS, out: 1, in: 0 }],
+      "Tasks/B.md": [{ type: BLOCKS, out: 0, in: 1 }],
     });
   });
 });

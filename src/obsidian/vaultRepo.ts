@@ -34,7 +34,12 @@ import {
   splitFrontmatter,
   updateTimestampedLine,
 } from "../model/card";
-import { isSelfRelation, relationKey, withRelation, withoutRelation } from "../model/relationships";
+import {
+  isSelfRelation,
+  normalizeRelationTypes,
+  withRelation,
+  withoutRelation,
+} from "../model/relationships";
 import {
   commentAddedLine,
   commentEditedLine,
@@ -172,6 +177,7 @@ export class VaultRepository implements CardRepository {
       path: this.boardPath,
       columns: normalizeColumns(fm["columns"]),
       priorities: normalizePriorities(fm["priorities"]),
+      relations: normalizeRelationTypes(fm["relations"]),
       cardFolder,
       cardFolderRaw,
       titleMode,
@@ -408,7 +414,6 @@ export class VaultRepository implements CardRepository {
     type: RelationType,
     rewrite: (fm: Record<string, unknown>) => string[] | null,
   ): Promise<boolean> {
-    const key = relationKey(type);
     let changed = false;
     this.markWrite(path);
     await this.app.fileManager.processFrontMatter(
@@ -418,18 +423,27 @@ export class VaultRepository implements CardRepository {
         if (next === null) return;
         // An empty list means the card declares no such relationship any more, so the key goes
         // with it — the note is left as if it had never had one, not carrying a `blocks: []`.
-        if (next.length === 0) delete fm[key];
-        else fm[key] = next;
+        if (next.length === 0) delete fm[type];
+        else fm[type] = next;
         changed = true;
       },
     );
     return changed;
   }
 
+  /**
+   * Only a type the board note's vocabulary names may be written: `type` is used as a frontmatter
+   * key, and a caller passing anything else would overwrite a property nothing reads as a link.
+   */
+  private async knownRelation(type: RelationType): Promise<boolean> {
+    return (await this.readConfig()).relations.some((t) => t.key === type);
+  }
+
   async addRelation(path: string, type: RelationType, target: string): Promise<void> {
     // Refused at the write, not just hidden at the read: a self-link is dropped when the board is
     // built, so storing one would put a line in the note that no panel can show or take back.
     if (isSelfRelation(path, this.file(path).basename, target)) return;
+    if (!(await this.knownRelation(type))) return;
     const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, target));
     if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }
@@ -439,6 +453,7 @@ export class VaultRepository implements CardRepository {
     type: RelationType,
     targets: readonly string[],
   ): Promise<void> {
+    if (!(await this.knownRelation(type))) return;
     const changed = await this.editRelations(path, type, (fm) =>
       withoutRelation(fm, type, targets),
     );

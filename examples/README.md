@@ -16,7 +16,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with three example bo
 
 - **Basic** — folder [`basic/`](./basic/), board note [`Example Board.md`](<basic/Example Board.md>). A minimal 3-column board (Todo / Doing / Done) with a couple of sample cards. **Start here**: it shows the bare essentials — a board note, a `card-folder`, and cards as Markdown files.
 - **Custom Scale** — folder [`custom-scale/`](./custom-scale/), board note [`Custom Scale Board.md`](<custom-scale/Custom Scale Board.md>). A small board whose priorities are `blocker` / `steady` / `whenever` instead of `A`/`B`/`C` — it shows how the board note's `priorities` order becomes both the colour ramp and the sort order.
-- **Feature Showcase** — folder [`feature-showcase/`](./feature-showcase/), board note [`Showcase Board.md`](<feature-showcase/Showcase Board.md>). A "kitchen-sink" board that exercises **every feature** in one place — columns, lanes, contexts, priorities, due-date buckets, subcards, comments, history, and custom properties. **Explore here** once the basics click.
+- **Feature Showcase** — folder [`feature-showcase/`](./feature-showcase/), board note [`Showcase Board.md`](<feature-showcase/Showcase Board.md>). A "kitchen-sink" board that exercises **every feature** in one place — columns, lanes, contexts, priorities, due-date buckets, subcards, relationships, comments, history, and custom properties. **Explore here** once the basics click.
 
 ## Feature tour — what the Feature Showcase board demonstrates
 
@@ -51,14 +51,24 @@ All three still count towards the parent's progress bar — moving the work some
 | `04-tune-the-search-index.md` | Tune the search index | the filename is a numbered slug, so the first heading that looks like a real title wins |
 | `Ship the release notes.md` | Cut the 1.0 release notes | a `title:` key in the card's own frontmatter beats every other source |
 
-**Blocking relationships** — two cards show the two ways a blocking link can be written, and the plugin treats them as the same thing:
+**Relationships** — the board note declares one relationship type of its own next to the built-in `blocks`:
+
+```yaml
+relations:
+  - key: a-result-of
+    inverse: results-in
+```
+
+Three cards then declare four links, covering both types written from either end, and the plugin treats both spellings of an edge as the same thing:
 
 | Card file | Property | What you see |
 | --- | --- | --- |
 | `Decide the export format.md` | `blocks: ["[[Draft the announcement post]]"]` | this tile shows *Blocks 1*; `Draft the announcement post` shows *Blocked* and lists this card under a read-only **Blocked by** |
 | `Record the launch demo.md` | `blocked-by: ["[[Fix keyboard-drag focus bug]]"]` | the same edge stated from the other end — the bug card shows *Blocks 1*, with nothing written to it |
+| `Decide the export format.md` | `a-result-of: ["[[Design the on-disk format]]"]` | the board's own type: *A result of 1* here, *Results in 1* on the design card — still shown although that card is done, because only blocking fades on done |
+| `Triage community feedback.md` | `results-in: ["[[Someday - board swimlanes]]"]` | the inverse key, hand-written: the swimlanes card shows *A result of 1* with nothing written to it |
 
-Open either card's detail panel: the **Blocks** field adds and removes links (type to get suggestions from the board's own cards), while **Blocked by** is derived and read-only. The plugin only ever writes the `blocks` end, so a link it created lives in one note and has no second copy to fall out of step with; a `blocked-by` you wrote by hand stays exactly as you wrote it. State the same link from both ends and the row says so rather than offering a remove button that would only clear half of it. A marker fades once either end reaches **Done** — finished work neither waits nor holds anything up. Nothing is enforced: drag a *Blocked* card wherever you like.
+Open any of them: the panel has one editable list per type (**Blocks**, **A result of** — type to get suggestions from the board's own cards) and one derived, read-only list for the other end (**Blocked by**, **Results in**). The plugin only ever writes the declaring end, so a link it created lives in one note and has no second copy to fall out of step with; an inverse you wrote by hand stays exactly as you wrote it. State the same link from both ends and the row says so rather than offering a remove button that would only clear half of it. A blocking marker fades once either end reaches **Done** — finished work neither waits nor holds anything up. Nothing is enforced: drag a *Blocked* card wherever you like, and press `/` and type `is:blocked` (or click the **Blocked** chip) to list what is waiting on something, `is:unblocked` for what is free to pick up.
 
 **A note written under its own headings** — `Decide the export format.md` keeps its whole body under `## Question` and `## Answer`, the shape an issue-style note (or an agent) tends to produce. Open it: the Description box shows all of it, headings and all, because a card's description is everything between the title and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Edit the description and save, and that structure comes back unchanged.
 
@@ -67,8 +77,8 @@ Open either card's detail panel: the **Blocks** field adds and removes links (ty
 - **Open a card** (click it) to see the **detail panel** — edit status, priority, due date, custom properties, subtasks, comments. The priority field is free text with the board's own values as suggestions: type `blocker`, and it joins the board note's `priorities` list and shows up as a suggestion from then on, even after you delete the card again. Try both presentations: Settings → *Card details — presentation* → `side` vs `modal`.
 - **Next actions on cards:** Settings → *Card — next todos shown* → `3`. Cards now surface their next unchecked todos inline.
 - **Collapse/expand subitems:** `Plan the v1.0 launch` has a nested subcard (`Record the launch demo`), so it carries a **Subitems** toggle under its title — click it to fold the subcard group away into a `4 subitems, 1 done` summary (that count is every `## Subtasks` line on the card, including the two placed elsewhere), click again to bring it back. Try Settings → *Card — next todos shown* → `3` first, and it collapses the next-todos preview the same way. A column's `⋯` menu adds **Collapse all subitems** / **Expand all subitems** for everything shown in that column.
-- **Unread comments:** open Settings → **Your name** and type `alex` — that is who the showcase vault pretends you are. Read-state lives in the plugin's own data, not in the notes, and tracking starts the moment the plugin first loads, so the comments shipped in this vault already count as read and nothing lights up by itself. Make something arrive: open `Cards/Decide the export format.md` as a note and add a line under `## Comments` stamped with the current date and time (or any later one), say `- _2030-01-01 09:00 @agent:_ any thoughts?` — and its tile's comment badge turns **blue** with a dot (*1 unread comment*). Do the same on `Cards/Plan the v1.0 launch.md`, which already holds two comments signed `@alex` (yours), and the badge turns **purple** with an arrow instead: *a reply to yours*. Open either card and the new comment is tinted and tagged, under a **New** rule; the tile goes quiet once you have visited it.
-- **Search:** press `/` and try `priority:a`, `due:overdue`, `due:soon`, `area:work`, `tag:bug`, `context:Engineering`. Tokens **AND** together; quotes allow spaces (`area:"release plan"`); there's no negation. The **Overdue** / **Due soon** chips are shortcuts for `due:overdue` / `due:soon`.
+- **Unread comments:** open Settings → **Your name** and type `alex` — that is who the showcase vault pretends you are. Read-state lives in the plugin's own data, not in the notes, and tracking starts the moment the plugin first loads, so the comments shipped in this vault already count as read and nothing lights up by itself. Make something arrive: open `Cards/Decide the export format.md` as a note and add a line under `## Comments` stamped with the current date and time (or any later one), say `- _2030-01-01 09:00 @agent:_ any thoughts?` — and its tile's comment badge turns **blue** with a dot (*1 unread comment*). Do the same on `Cards/Plan the v1.0 launch.md`, which already holds two comments signed `@alex` (yours), and the badge turns **purple** with an arrow instead: *a reply to yours*. Open either card and the new comment is tinted and tagged, under a **New** rule; the tile goes quiet once you have visited it. Before that, click the **Unread** chip (or type `unread:comments`) to see only the cards with something new, `unread:replies` for only the answers to you.
+- **Search:** press `/` and try `priority:a`, `due:overdue`, `due:soon`, `area:work`, `tag:bug`, `context:Engineering`, `is:blocked`, `is:unblocked`, `unread:comments`. Tokens **AND** together; quotes allow spaces (`area:"release plan"`); there's no negation beyond `is:unblocked` and `unread:none`. The **Overdue** / **Due soon** / **Blocked** / **Unread** chips are shortcuts for `due:overdue` / `due:soon` / `is:blocked` / `unread:comments`.
 - **Drag** a card between columns (pointer or keyboard — pick up with Space, drop with Space). The card's `status`, a fractional `order`, and a `## History` line are written to its file.
 - **Right-click** a card for the context menu (mark done, change priority, move, add subcard, delete). Right-click a surfaced next-todo to toggle it, remove it, or send it to a column of its own.
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
@@ -82,7 +92,7 @@ Open either card's detail panel: the **Blocks** field adds and removes links (ty
 - A card joins a column by `status` matching a column **`id`** exactly (case-sensitive); an unknown/missing status lands in the first column.
 - The tile usually shows the **filename**, but a card whose filename is a slug (or that carries its own `title:` key) shows a different title — see the two title-source cards above. The board note's `card-title` property (`auto` / `filename` / `heading`) sets the policy; `[[wikilinks]]` always match the **filename**, never the displayed title.
 - A subcard (`- [ ] [[Child]]`) is pulled out of its own column and shown nested under its parent.
-- A column `filter:` **replaces** its status bucket (it's a lane). The `context:` search token matches the **folder name**.
+- A column `filter:` **replaces** its status bucket (it's a lane). The `context:` search token matches the **folder name**. A lane filtering on `unread:` shows each reader their own set, since read-state is per install, not in the notes.
 
 ## Learn more
 

@@ -1,5 +1,6 @@
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from "react";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
+
 import { hasToken, toggleToken, type FilterKey } from "./cardView";
 
 interface Props {
@@ -18,10 +19,16 @@ const KEY_HINTS: ReadonlyArray<{ key: FilterKey; hint: string }> = [
   { key: "tag", hint: "area or any tag" },
   { key: "due", hint: "overdue · soon · today · none · YYYY-MM-DD" },
   { key: "context", hint: "context value" },
+  { key: "is", hint: "blocked · unblocked · blocking" },
+  { key: "unread", hint: "comments · replies · none" },
 ];
 
-/** Known `due:` values offered once the user is typing a `due:` token. */
-const DUE_VALUES = ["overdue", "soon", "today", "none"] as const;
+/** The closed value sets, offered once the user is typing that key's token. */
+const KEY_VALUES: Partial<Record<FilterKey, readonly string[]>> = {
+  due: ["overdue", "soon", "today", "none"],
+  is: ["blocked", "unblocked", "blocking"],
+  unread: ["comments", "replies", "none"],
+};
 
 interface Suggestion {
   /** The full token text inserted when chosen (e.g. "area:" or "due:overdue"). */
@@ -50,14 +57,10 @@ function suggestionsFor(fragment: string): Suggestion[] {
   }
   const key = frag.slice(0, colon);
   const partial = frag.slice(colon + 1);
-  if (key === "due") {
-    return DUE_VALUES.filter((v) => v.startsWith(partial)).map((v) => ({
-      insert: `due:${v}`,
-      label: `due:${v}`,
-      hint: "",
-    }));
-  }
-  return [];
+  const values = KEY_HINTS.some((k) => k.key === key) ? KEY_VALUES[key as FilterKey] : undefined;
+  return (values ?? [])
+    .filter((v) => v.startsWith(partial))
+    .map((v) => ({ insert: `${key}:${v}`, label: `${key}:${v}`, hint: "" }));
 }
 
 /** Replace the caret's fragment (last run since the previous space) with `insert`. */
@@ -114,10 +117,20 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
     });
   };
 
-  const toggleDue = (value: "overdue" | "soon") => {
-    onChange(toggleToken(query, "due", value));
+  const toggle = (key: FilterKey, value: string) => {
+    onChange(toggleToken(query, key, value));
     setOpen(false);
   };
+  const chip = (key: FilterKey, value: string, icon: IconName, label: string) => (
+    <button
+      className={"folia-filter-chip" + (hasToken(query, key, value) ? " is-on" : "")}
+      aria-pressed={hasToken(query, key, value)}
+      onClick={() => toggle(key, value)}
+    >
+      <Icon name={icon} size={13} />
+      {label}
+    </button>
+  );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showList) {
@@ -226,22 +239,10 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
       </div>
 
       <div className="folia-toolbar-filters" role="group" aria-label="Quick filters">
-        <button
-          className={"folia-filter-chip" + (hasToken(query, "due", "overdue") ? " is-on" : "")}
-          aria-pressed={hasToken(query, "due", "overdue")}
-          onClick={() => toggleDue("overdue")}
-        >
-          <Icon name="alert" size={13} />
-          Overdue
-        </button>
-        <button
-          className={"folia-filter-chip" + (hasToken(query, "due", "soon") ? " is-on" : "")}
-          aria-pressed={hasToken(query, "due", "soon")}
-          onClick={() => toggleDue("soon")}
-        >
-          <Icon name="calendar" size={13} />
-          Due soon
-        </button>
+        {chip("due", "overdue", "alert", "Overdue")}
+        {chip("due", "soon", "calendar", "Due soon")}
+        {chip("is", "blocked", "ban", "Blocked")}
+        {chip("unread", "comments", "message", "Unread")}
       </div>
 
       {active && (

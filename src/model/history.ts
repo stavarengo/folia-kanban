@@ -6,7 +6,7 @@
 // thing that emits history — none of the field/comment/subtask kinds below do.
 
 import type { HistoryScope, RelationType } from "./types";
-import { relationLinkText } from "./relationships";
+import { relationLabel, relationLinkText } from "./relationships";
 
 /** Mutation kinds consulted by the gating policy (move/reorder is handled directly in applyMove). */
 export type HistoryEventKind = "priority" | "due" | "status" | "comment" | "subtask" | "relation";
@@ -63,12 +63,11 @@ export function subtaskRemovedLine(text: string): string {
   return `Subtask removed: ${text}`;
 }
 
-/** How a relationship type reads at the start of a history line. */
-const RELATION_LABEL: Record<RelationType, string> = { blocks: "Blocks" };
-
+// A relationship line starts with the type's label, read off its key the way the panel heading is
+// (`blocks` → `Blocks`), so the adapter needs no vocabulary in hand to write it.
 export function relationAddedLine(type: RelationType, target: string): string {
-  return `${RELATION_LABEL[type]} added: ${relationLinkText(target)}`;
+  return `${relationLabel(type)} added: ${relationLinkText(target)}`;
 }
 export function relationRemovedLine(type: RelationType, target: string): string {
-  return `${RELATION_LABEL[type]} removed: ${relationLinkText(target)}`;
+  return `${relationLabel(type)} removed: ${relationLinkText(target)}`;
 }

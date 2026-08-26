@@ -33,12 +33,7 @@ import {
 } from "../src/model/card";
 
 import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
-import {
-  isSelfRelation,
-  relationKey,
-  withRelation,
-  withoutRelation,
-} from "../src/model/relationships";
+import { isSelfRelation, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {
   commentAddedLine,
@@ -254,15 +249,19 @@ export class FakeRepo implements CardRepository {
     const fm = this.entry(path).fm;
     const next = rewrite(fm);
     if (next === null) return false;
-    const key = relationKey(type);
-    if (next.length === 0) delete fm[key];
-    else fm[key] = next;
+    if (next.length === 0) delete fm[type];
+    else fm[type] = next;
     return true;
   }
 
+  private knownRelation(type: RelationType): boolean {
+    return this.config.relations.some((t) => t.key === type);
+  }
+
   async addRelation(path: string, type: RelationType, target: string): Promise<void> {
-    // Mirrors the vault adapter: a card never stores a link to itself.
+    // Mirrors the vault adapter: a card never stores a link to itself, nor under an unknown key.
     if (isSelfRelation(path, this.entry(path).basename, target)) return;
+    if (!this.knownRelation(type)) return;
     if (this.editRelations(path, type, (fm) => withRelation(fm, type, target)))
       this.maybeHistory(path, "relation", relationAddedLine(type, target));
   }
@@ -272,7 +271,9 @@ export class FakeRepo implements CardRepository {
     type: RelationType,
     targets: readonly string[],
   ): Promise<void> {
+    if (!this.knownRelation(type)) return;
     const shown = targets[0];
+
     if (this.editRelations(path, type, (fm) => withoutRelation(fm, type, targets)) && shown)
       this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }

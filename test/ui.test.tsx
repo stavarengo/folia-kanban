@@ -7,12 +7,14 @@ import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
 import { DEFAULT_SETTINGS, applySettingsPatch, type KanbanSettings } from "../src/settings";
 import { SettingsContext, useSettings } from "../src/ui/context";
+import { BLOCKS, normalizeRelationTypes } from "../src/model/relationships";
 
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
   titleMode: "auto",
   priorities: [],
+  relations: [BLOCKS],
   columns: [
     { id: "todo", title: "Todo" },
     { id: "doing", title: "Doing" },
@@ -2180,7 +2182,7 @@ describe("blocking relationships", () => {
 
   // The panel has more than one datalist (priority has one too), so read the one this field points at.
   const blockSuggestions = (detail: HTMLElement) => {
-    const input = within(detail).getByLabelText("Add a card this one blocks") as HTMLInputElement;
+    const input = within(detail).getByLabelText("Link a card under Blocks") as HTMLInputElement;
     return [...(input.list?.options ?? [])].map((o) => o.value);
   };
 
@@ -2221,7 +2223,7 @@ describe("blocking relationships", () => {
     expect(within(detail).getByRole("heading", { name: "Blocked by" })).toBeInTheDocument();
     // "Blocked by" is derived, so its rows carry no remove control.
     const row = within(detail).getByRole("button", { name: "Blocker" });
-    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+    expect(within(detail).queryByLabelText(/^Remove .* link to/)).toBeNull();
     await user.click(row);
     expect(await screen.findByRole("heading", { name: "Blocker" })).toBeInTheDocument();
   });
@@ -2232,7 +2234,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Loose"));
     const detail = await screen.findByTestId("card-detail");
-    const input = within(detail).getByLabelText("Add a card this one blocks");
+    const input = within(detail).getByLabelText("Link a card under Blocks");
     await user.type(input, "Waiting{Enter}");
     await waitFor(() =>
       expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toEqual(["[[Waiting]]"]),
@@ -2255,7 +2257,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Loose", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
-    const input = within(detail).getByLabelText("Add a card this one blocks") as HTMLInputElement;
+    const input = within(detail).getByLabelText("Link a card under Blocks") as HTMLInputElement;
     const options = Array.from(input.list?.querySelectorAll("option") ?? []).map((o) => o.value);
     // The subtask's own title is not a link target, and the note that owns it is still offered
     // under its own name — the synthetic card borrows that name and must not make it ambiguous.
@@ -2275,7 +2277,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Blocker"));
     const detail = await screen.findByTestId("card-detail");
-    await user.click(within(detail).getByLabelText("Remove relationship to Waiting"));
+    await user.click(within(detail).getByLabelText("Remove Blocks link to Waiting"));
     await waitFor(() =>
       expect(repo.files.get("Tasks/Blocker.md")!.fm).not.toHaveProperty("blocks"),
     );
@@ -2299,7 +2301,7 @@ describe("blocking relationships", () => {
     await user.click(screen.getByText("Blocker"));
     const detail = await screen.findByTestId("card-detail");
     expect(within(detail).getByText("via blocked-by")).toBeInTheDocument();
-    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+    expect(within(detail).queryByLabelText(/^Remove .* link to/)).toBeNull();
   });
 
   it("shows a target that matches no card as missing rather than dropping it", async () => {
@@ -2336,7 +2338,7 @@ describe("blocking relationships", () => {
     // Clearing only this note's `blocks` would leave Waiting's `blocked-by` to re-derive the edge,
     // so the row explains where else it lives instead of offering a button that cannot deliver.
     expect(within(detail).getByText("also via blocked-by")).toBeInTheDocument();
-    expect(within(detail).queryByLabelText(/^Remove relationship/)).toBeNull();
+    expect(within(detail).queryByLabelText(/^Remove .* link to/)).toBeNull();
   });
 
   it("says where a hand-written blocked-by lives, since the derived list cannot edit it", async () => {
@@ -2367,7 +2369,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Here"));
     const detail = await screen.findByTestId("card-detail");
-    const input = within(detail).getByLabelText("Add a card this one blocks");
+    const input = within(detail).getByLabelText("Link a card under Blocks");
     await user.type(input, "Tune the search index{Enter}");
     // A wikilink binds to the file name, so that is what must land in the property.
     await waitFor(() =>
@@ -2390,7 +2392,7 @@ describe("blocking relationships", () => {
     await user.click(await screen.findByText("Here"));
     const detail = await screen.findByTestId("card-detail");
     await user.type(
-      within(detail).getByLabelText("Add a card this one blocks"),
+      within(detail).getByLabelText("Link a card under Blocks"),
       "Keyboard bug{Enter}",
     );
     // `[[B]]` would be refused by the board as ambiguous and land dead, so the path is written.
@@ -2417,7 +2419,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Blocker"));
     const detail = await screen.findByTestId("card-detail");
-    await user.click(within(detail).getByLabelText("Remove relationship to Waiting"));
+    await user.click(within(detail).getByLabelText("Remove Blocks link to Waiting"));
     await waitFor(() =>
       expect(repo.files.get("Tasks/Blocker.md")!.fm).not.toHaveProperty("blocks"),
     );
@@ -2444,7 +2446,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Loose"));
     const detail = await screen.findByTestId("card-detail");
-    await user.type(within(detail).getByLabelText("Add a card this one blocks"), "Loose{Enter}");
+    await user.type(within(detail).getByLabelText("Link a card under Blocks"), "Loose{Enter}");
     await waitFor(() => expect(repo.files.get("Tasks/Loose.md")!.fm).not.toHaveProperty("blocks"));
   });
 
@@ -2455,7 +2457,7 @@ describe("blocking relationships", () => {
     await user.click(await screen.findByText("Loose"));
     const detail = await screen.findByTestId("card-detail");
     // fireEvent, not user.type: `[` opens a key descriptor in userEvent's typing syntax.
-    const input = within(detail).getByLabelText("Add a card this one blocks");
+    const input = within(detail).getByLabelText("Link a card under Blocks");
     fireEvent.change(input, { target: { value: "[[Waiting]]" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
@@ -2896,5 +2898,208 @@ describe("unread comments", () => {
     await user.click(screen.getByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     expect(within(detail).queryByText("New")).toBeNull();
+  });
+});
+
+describe("relationship types beyond blocks", () => {
+  const resultOf = normalizeRelationTypes([{ key: "a-result-of", inverse: "results-in" }]);
+  const typedRepo = () =>
+    new FakeRepo(
+      { ...config, relations: resultOf },
+      {
+        "Tasks/Outcome.md": {
+          // The scalar form on purpose: an array never reaches the generic property rows anyway,
+          // so only a scalar proves the rows stay out of a declared key.
+          fm: { type: "task", status: "done", "a-result-of": "[[Cause]]" },
+          body: "\n# Outcome\n",
+        },
+        "Tasks/Cause.md": { fm: { type: "task", status: "todo" }, body: "\n# Cause\n" },
+        "Tasks/Loose.md": { fm: { type: "task", status: "todo" }, body: "\n# Loose\n" },
+      },
+      () => "all",
+    );
+  const cardOf = (title: string) =>
+    screen
+      .getAllByText(title)
+      .map((el) => el.closest(".folia-card"))
+      .find((el): el is HTMLElement => el !== null) as HTMLElement;
+
+  it("marks both ends with the type's own words, and a done end does not fade a plain link", async () => {
+    render_(typedRepo());
+    await screen.findByText("Outcome");
+    expect(within(cardOf("Outcome")).getByText("A result of 1")).toHaveClass("folia-chip-muted");
+    expect(within(cardOf("Cause")).getByText("Results in 1")).toHaveClass("folia-chip-muted");
+    expect(within(cardOf("Loose")).queryByText(/result/)).toBeNull();
+  });
+
+  it("gives every type its own pair of sections in the panel, blocks first", async () => {
+    const user = userEvent.setup();
+    render_(typedRepo());
+    await user.click(await screen.findByText("Cause"));
+    const detail = await screen.findByTestId("card-detail");
+    const headings = within(detail)
+      .getAllByRole("heading", { level: 3 })
+      .map((h) => h.textContent);
+    expect(headings.indexOf("Blocks")).toBeLessThan(headings.indexOf("A result of"));
+    expect(headings).toEqual(
+      expect.arrayContaining(["Blocks", "Blocked by", "A result of", "Results in"]),
+    );
+    // The derived side names the card that declared it.
+    const incoming = within(detail).getByRole("heading", { name: "Results in" })
+      .parentElement as HTMLElement;
+    expect(within(incoming).getByRole("button", { name: "Outcome" })).toBeInTheDocument();
+  });
+
+  it("writes a typed link under its own key and logs it under the type's label", async () => {
+    const user = userEvent.setup();
+    const repo = typedRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Link a card under A result of"), "Cause{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Loose.md")!.fm["a-result-of"]).toEqual(["[[Cause]]"]),
+    );
+    expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toBeUndefined();
+    expect(repo.files.get("Tasks/Loose.md")!.body).toContain("A result of added: [[Cause]]");
+    expect(within(cardOf("Loose")).getByText("A result of 1")).toBeInTheDocument();
+  });
+
+  it("keeps a type's keys out of the generic property rows and the add form", async () => {
+    const user = userEvent.setup();
+    render_(typedRepo());
+    await user.click(await screen.findByText("Outcome"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).queryByText("a-result-of")).toBeNull();
+    await user.type(within(detail).getByPlaceholderText("property"), "results-in");
+    expect(within(detail).getByRole("button", { name: "Add property" })).toBeDisabled();
+  });
+
+  it("refuses to write a type the board note does not name", async () => {
+    const repo = typedRepo();
+    await repo.addRelation("Tasks/Loose.md", "depends-on", "Cause");
+    expect(repo.files.get("Tasks/Loose.md")!.fm["depends-on"]).toBeUndefined();
+    expect(repo.files.get("Tasks/Loose.md")!.body).not.toContain("added");
+  });
+});
+
+describe("is: and unread: in the search box and chips", () => {
+  const asRafa: KanbanSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
+  const mixedRepo = () =>
+    new FakeRepo(config, {
+      "Tasks/Blocker.md": {
+        fm: { type: "task", status: "todo", blocks: ["[[Waiting]]"] },
+        body: "\n# Blocker\n",
+      },
+      "Tasks/Waiting.md": { fm: { type: "task", status: "doing" }, body: "\n# Waiting\n" },
+      "Tasks/Chatty.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Chatty\n\n## Comments\n- _2026-06-13 09:00 @rafa:_ mine\n- _2026-06-13 10:00 @agent:_ reply\n",
+      },
+      "Tasks/Quiet.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Quiet\n\n## Comments\n- _2026-06-13 10:00 @agent:_ news\n",
+      },
+    });
+  const visible = (title: string) => screen.queryByText(title) !== null;
+
+  it("the Blocked chip narrows the board to cards wearing the marker", async () => {
+    const user = userEvent.setup();
+    render_(mixedRepo(), asRafa);
+    await screen.findByText("Blocker");
+    await user.click(screen.getByRole("button", { name: "Blocked" }));
+    expect(screen.getByLabelText("Search cards")).toHaveValue("is:blocked");
+    expect(visible("Waiting")).toBe(true);
+    expect(visible("Blocker")).toBe(false);
+    expect(visible("Chatty")).toBe(false);
+    expect(screen.getByText("1 of 4")).toBeInTheDocument();
+  });
+
+  it("is:unblocked and is:blocking answer from the same counts", async () => {
+    const user = userEvent.setup();
+    render_(mixedRepo(), asRafa);
+    await screen.findByText("Blocker");
+    const search = screen.getByLabelText("Search cards");
+    await user.type(search, "is:unblocked");
+    expect(visible("Waiting")).toBe(false);
+    expect(visible("Blocker")).toBe(true);
+    expect(visible("Quiet")).toBe(true);
+    await user.clear(search);
+    await user.type(search, "is:blocking");
+    expect(visible("Blocker")).toBe(true);
+    expect(visible("Waiting")).toBe(false);
+  });
+
+  it("the Unread chip narrows to what the reader has not read; unread:replies to answers", async () => {
+    const user = userEvent.setup();
+    render_(mixedRepo(), asRafa);
+    await screen.findByText("Chatty");
+    await user.click(screen.getByRole("button", { name: "Unread" }));
+    expect(screen.getByLabelText("Search cards")).toHaveValue("unread:comments");
+    expect(visible("Chatty")).toBe(true);
+    expect(visible("Quiet")).toBe(true);
+    expect(visible("Blocker")).toBe(false);
+    const search = screen.getByLabelText("Search cards");
+    await user.clear(search);
+    await user.type(search, "unread:replies");
+    expect(visible("Chatty")).toBe(true);
+    expect(visible("Quiet")).toBe(false);
+  });
+
+  it("keeps the card you open on the filtered board until you close it", async () => {
+    const user = userEvent.setup();
+    const box = { current: asRafa };
+    renderStateful(mixedRepo(), asRafa, box);
+    await screen.findByText("Chatty");
+    await user.click(screen.getByRole("button", { name: "Unread" }));
+    expect(screen.getByText("2 of 4")).toBeInTheDocument();
+    await user.click(screen.getByText("Chatty"));
+    const detail = await screen.findByTestId("card-detail");
+    // Opening really marks the comments seen…
+    await waitFor(() => expect(box.current.commentsSeen["Tasks/Chatty.md"]).toBeDefined());
+    // …yet the tile stays put and the count does not drop while the panel is open.
+    expect(screen.getByText("2 of 4")).toBeInTheDocument();
+    expect(screen.getAllByText("Chatty").some((el) => el.closest(".folia-card"))).toBe(true);
+    await user.click(within(detail).getAllByLabelText("Close")[0] as HTMLElement);
+    await waitFor(() => expect(screen.getByText("1 of 4")).toBeInTheDocument());
+    expect(screen.queryByText("Chatty")).toBeNull();
+  });
+
+  it("a column lane can filter on unread — it then shows each reader their own set", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [...config.columns, { id: "inbox", title: "Inbox", filter: "unread:comments" }],
+      },
+      {
+        "Tasks/Quiet.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Quiet\n\n## Comments\n- _2026-06-13 10:00 @agent:_ news\n",
+        },
+        "Tasks/Silent.md": { fm: { type: "task", status: "todo" }, body: "\n# Silent\n" },
+      },
+    );
+    render_(repo, asRafa);
+    const inbox = (await screen.findByText("Inbox")).closest("section") as HTMLElement;
+    expect(within(inbox).getByText("Quiet")).toBeInTheDocument();
+    expect(within(inbox).queryByText("Silent")).toBeNull();
+  });
+
+  it("suggests is: and unread: values once the key is typed", async () => {
+    const user = userEvent.setup();
+    render_(mixedRepo(), asRafa);
+    await screen.findByText("Blocker");
+    const search = screen.getByLabelText("Search cards");
+    await user.type(search, "is:");
+    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
+    expect(within(list).getByRole("option", { name: /is:unblocked/ })).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, "unread:r");
+    expect(
+      within(await screen.findByRole("listbox", { name: "Filter suggestions" })).getByRole(
+        "option",
+        { name: /unread:replies/ },
+      ),
+    ).toBeInTheDocument();
   });
 });

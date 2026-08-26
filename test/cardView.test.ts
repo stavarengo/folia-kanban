@@ -16,6 +16,7 @@ import {
   priorityOptions,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
+import { BLOCKS } from "../src/model/relationships";
 import type { Card } from "../src/model/types";
 
 function card(fm: Card["frontmatter"], basename = "Card"): Card {
@@ -605,5 +606,79 @@ describe("dates", () => {
     const d = new Date(2026, 5, 16, 9, 5); // local June 16 2026 09:05
     expect(dateOnly(d)).toBe("2026-06-16");
     expect(stamp(d)).toBe("2026-06-16 09:05");
+  });
+});
+
+describe("is: and unread: tokens (state beyond the card's own note)", () => {
+  const today = "2026-06-16";
+  const blocked = card({}, "Waiting");
+  const blocker = card({}, "Blocker");
+  const loose = card({}, "Loose");
+  const relations = {
+    "Tasks/Waiting.md": [{ type: BLOCKS, out: 0, in: 1 }],
+    "Tasks/Blocker.md": [{ type: BLOCKS, out: 1, in: 0 }],
+  };
+  const ctx = { today, doneColumnId: "done", relations };
+
+  it("is:blocked / is:blocking read the same active counts the tile markers show", () => {
+    expect(matchQuery(blocked, "is:blocked", ctx)).toBe(true);
+    expect(matchQuery(blocker, "is:blocked", ctx)).toBe(false);
+    expect(matchQuery(blocker, "is:blocking", ctx)).toBe(true);
+    expect(matchQuery(loose, "is:blocking", ctx)).toBe(false);
+  });
+
+  it("is:unblocked is the question the marker makes people ask, since the grammar has no negation", () => {
+    expect(matchQuery(loose, "is:unblocked", ctx)).toBe(true);
+    expect(matchQuery(blocker, "is:unblocked", ctx)).toBe(true);
+    expect(matchQuery(blocked, "is:unblocked", ctx)).toBe(false);
+  });
+
+  it("only blocking answers is:, whatever other types the counts hold", () => {
+    const resultOf = { key: "a-result-of", inverse: null, label: "A result of", inverseLabel: "" };
+    const linked = { "Tasks/Loose.md": [{ type: resultOf, out: 1, in: 1 }] };
+    expect(matchQuery(loose, "is:blocked", { today, doneColumnId: null, relations: linked })).toBe(
+      false,
+    );
+    expect(matchQuery(loose, "is:blocking", { today, doneColumnId: null, relations: linked })).toBe(
+      false,
+    );
+  });
+
+  it("with no counts in the context nothing is blocked, and an unknown value matches nothing", () => {
+    const bare = { today, doneColumnId: null };
+    expect(matchQuery(blocked, "is:blocked", bare)).toBe(false);
+    expect(matchQuery(blocked, "is:unblocked", bare)).toBe(true);
+    expect(matchQuery(blocked, "is:whatever", ctx)).toBe(false);
+  });
+
+  it("unread: reads the reader's verdict handed in through the context", () => {
+    const verdict = (kind: "none" | "unread" | "reply") => ({
+      today,
+      doneColumnId: null,
+      unread: () => ({ kind, indices: kind === "none" ? [] : [0], replyIndex: null }),
+    });
+    expect(matchQuery(loose, "unread:comments", verdict("unread"))).toBe(true);
+    expect(matchQuery(loose, "unread:comments", verdict("reply"))).toBe(true);
+    expect(matchQuery(loose, "unread:comments", verdict("none"))).toBe(false);
+    expect(matchQuery(loose, "unread:replies", verdict("reply"))).toBe(true);
+    expect(matchQuery(loose, "unread:replies", verdict("unread"))).toBe(false);
+    expect(matchQuery(loose, "unread:none", verdict("none"))).toBe(true);
+    expect(matchQuery(loose, "unread:none", verdict("unread"))).toBe(false);
+    expect(matchQuery(loose, "unread:whatever", verdict("unread"))).toBe(false);
+  });
+
+  it("with no reader in the context nothing is unread", () => {
+    const bare = { today, doneColumnId: null };
+    expect(matchQuery(loose, "unread:comments", bare)).toBe(false);
+    expect(matchQuery(loose, "unread:none", bare)).toBe(true);
+  });
+
+  it("parses both as tokens, and the chips toggle them like any other", () => {
+    expect(parseFilter("is:blocked unread:replies").tokens).toEqual([
+      { key: "is", value: "blocked" },
+      { key: "unread", value: "replies" },
+    ]);
+    expect(toggleToken("", "unread", "comments")).toBe("unread:comments");
+    expect(hasToken("is:Blocked", "is", "blocked")).toBe(true);
   });
 });

@@ -2,9 +2,11 @@
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D), a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones — or a board's own
 // words, ranked across those same tones by the order its note lists them.
-import type { RelationCounts } from "../model/board";
+import type { RelationCount } from "../model/board";
 import { dedupePriorities, priorityIndex } from "../model/priorities";
+import { BLOCKS } from "../model/relationships";
 import type { Card, ColumnGroup, ColumnSort } from "../model/types";
+import type { UnreadState } from "../model/unread";
 import type { IconName } from "./icons";
 
 export type ChipTone =
@@ -206,7 +208,7 @@ export interface BoardFilters {
 // (#9) and area-scoped / auto-populated columns (#1).
 //
 // A query is a space-separated list of terms. A term is either a `key:value` token
-// (area:, status:, priority:, tag:, due:, context:) or free text. Free text is matched
+// (area:, status:, priority:, tag:, due:, context:, is:, unread:) or free text. Free text is matched
 // case-insensitively against a card's title + basename + priority + tags (a Card has no body
 // text at board level, so "free text" means title/priority/tags). Use "double quotes"
 // to allow spaces in a value or a free-text phrase. All terms AND together; an empty
@@ -214,9 +216,26 @@ export interface BoardFilters {
 // ---------------------------------------------------------------------------
 
 /** Token keys the grammar understands. Free text is held separately. */
-export type FilterKey = "area" | "status" | "priority" | "tag" | "due" | "context";
+export type FilterKey =
+  | "area"
+  | "status"
+  | "priority"
+  | "tag"
+  | "due"
+  | "context"
+  | "is"
+  | "unread";
 
-const FILTER_KEYS: readonly FilterKey[] = ["area", "status", "priority", "tag", "due", "context"];
+const FILTER_KEYS: readonly FilterKey[] = [
+  "area",
+  "status",
+  "priority",
+  "tag",
+  "due",
+  "context",
+  "is",
+  "unread",
+];
 
 /** Recognized `due:` values. A bare YYYY-MM-DD date is also accepted (exact match). */
 interface FilterToken {
@@ -232,12 +251,21 @@ export interface Filter {
   tokens: FilterToken[];
 }
 
-/** Extra context the matcher needs that isn't on the card (for `due:` urgency). */
+/**
+ * Extra context the matcher needs that isn't on the card. `today` and `doneColumnId` serve `due:`;
+ * the two optional parts serve the tokens that read state beyond the card's own note, and a
+ * caller that has neither in hand (a one-off rule, a legacy filter) simply leaves them out — the
+ * tokens then read as "no card is blocked, nothing is unread".
+ */
 export interface MatchContext {
   /** Today as YYYY-MM-DD. */
   today: string;
   /** Resolved id of the board's "done" column, or null. */
   doneColumnId: string | null;
+  /** Active relationship counts per card path (`relationCounts`), for `is:blocked` / `is:blocking`. */
+  relations?: Record<string, RelationCount[]>;
+  /** The reader's unread verdict on a card, for `unread:`. Reader-specific: see `unread.ts`. */
+  unread?: (card: Card) => UnreadState;
 }
 
 export const EMPTY_FILTER: Filter = { text: [], tokens: [] };
@@ -331,6 +359,44 @@ function matchDue(card: Card, value: string, ctx: MatchContext): boolean {
   }
 }
 
+/**
+ * `is:` matching, on the same active blocking counts the tile markers show — so `is:blocked` lists
+ * exactly the cards wearing the *Blocked* marker, done ends excluded. `unblocked` is the question
+ * the marker makes people ask ("what can I work on?"), and the grammar has no negation to ask it
+ * with otherwise. An unknown value matches nothing rather than everything.
+ */
+function matchIs(card: Card, value: string, ctx: MatchContext): boolean {
+  const blocking = ctx.relations?.[card.path]?.find((c) => c.type.key === BLOCKS.key);
+  switch (value) {
+    case "blocked":
+      return (blocking?.in ?? 0) > 0;
+    case "unblocked":
+      return (blocking?.in ?? 0) === 0;
+    case "blocking":
+      return (blocking?.out ?? 0) > 0;
+    default:
+      return false;
+  }
+}
+
+/**
+ * `unread:` matching, on the same verdict the tile badge shows. `comments` = anything unread on
+ * the card, `replies` = only the louder "someone answered you" state, `none` = nothing unread.
+ */
+function matchUnread(card: Card, value: string, ctx: MatchContext): boolean {
+  const kind = ctx.unread?.(card).kind ?? "none";
+  switch (value) {
+    case "comments":
+      return kind !== "none";
+    case "replies":
+      return kind === "reply";
+    case "none":
+      return kind === "none";
+    default:
+      return false;
+  }
+}
+
 function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean {
   const fm = card.frontmatter;
   switch (token.key) {
@@ -352,6 +418,10 @@ function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean 
       );
     case "due":
       return matchDue(card, token.value, ctx);
+    case "is":
+      return matchIs(card, token.value, ctx);
+    case "unread":
+      return matchUnread(card, token.value, ctx);
   }
 }
 
@@ -600,35 +670,62 @@ export function groupAndSortCards(
   return out;
 }
 
+const cards = (n: number) => (n === 1 ? "card" : "cards");
+
 /**
- * The blocking markers a card shows, from its ACTIVE link counts (see `relationCounts`). Two
- * distinct chips, because the two directions mean opposite things: "Blocked" is a reason this card
- * cannot move yet, "Blocks n" is a reason other cards cannot. Neither enforces anything — the
- * board still lets any card go anywhere; these only make the dependency visible.
+ * The relationship markers a card shows, from its ACTIVE link counts (see `relationCounts`).
+ *
+ * Blocking gets two distinct chips, because its two directions mean opposite things: "Blocked" is
+ * a reason this card cannot move yet, "Blocks n" is a reason other cards cannot. Every other type
+ * is a plain link, so each direction it has gets a quiet chip carrying the type's own label and
+ * a count. Nothing here enforces anything — the board still lets any card go anywhere; these only
+ * make the link visible.
  *
  * Separate from {@link cardChips} because the counts come from the board graph rather than the
  * card's own frontmatter, and the two reach the card tile by different routes.
  */
-export function relationChips(counts: RelationCounts | undefined): CardChip[] {
-  if (!counts) return [];
+export function relationChips(counts: readonly RelationCount[] | undefined): CardChip[] {
   const chips: CardChip[] = [];
-  if (counts.blockedBy > 0) {
-    chips.push({
-      key: "blocked-by",
-      label: "Blocked",
-      tone: "danger",
-      icon: "ban",
-      title: `Blocked by ${counts.blockedBy} unfinished card${counts.blockedBy === 1 ? "" : "s"}`,
-    });
-  }
-  if (counts.blocks > 0) {
-    chips.push({
-      key: "blocks",
-      label: `Blocks ${counts.blocks}`,
-      tone: "accent",
-      icon: "octagon-alert",
-      title: `Blocking ${counts.blocks} unfinished card${counts.blocks === 1 ? "" : "s"}`,
-    });
+  for (const { type, out, in: incoming } of counts ?? []) {
+    if (type.key === BLOCKS.key) {
+      if (incoming > 0) {
+        chips.push({
+          key: "blocked-by",
+          label: "Blocked",
+          tone: "danger",
+          icon: "ban",
+          title: `Blocked by ${incoming} unfinished ${cards(incoming)}`,
+        });
+      }
+      if (out > 0) {
+        chips.push({
+          key: "blocks",
+          label: `Blocks ${out}`,
+          tone: "accent",
+          icon: "octagon-alert",
+          title: `Blocking ${out} unfinished ${cards(out)}`,
+        });
+      }
+      continue;
+    }
+    if (out > 0) {
+      chips.push({
+        key: `${type.key}-out`,
+        label: `${type.label} ${out}`,
+        tone: "muted",
+        icon: "link",
+        title: `${type.label}: ${out} ${cards(out)}`,
+      });
+    }
+    if (incoming > 0) {
+      chips.push({
+        key: `${type.key}-in`,
+        label: `${type.inverseLabel} ${incoming}`,
+        tone: "muted",
+        icon: "link",
+        title: `${type.inverseLabel}: ${incoming} ${cards(incoming)}`,
+      });
+    }
   }
   return chips;
 }

@@ -7,7 +7,7 @@ import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
 import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
-import { useBoardActions, useSettings, useSubitemsCollapse } from "./context";
+import { useBoardActions, useMatchContext, useSettings, useSubitemsCollapse } from "./context";
 import { groupAndSortCards, isEmptyFilter, matchCard, parseFilter, type Filter } from "./cardView";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -207,7 +207,7 @@ export function Column({
   // #9: the global search is the single source of truth — a parsed §1 Filter (empty = no filtering).
   const globalFiltering = !isEmptyFilter(filter);
   const columnFilter = column.filter ? parseFilter(column.filter) : null;
-  const matchCtx = { today, doneColumnId };
+  const matchCtx = useMatchContext();
 
   // #1 — an area-filtered column is an AUTO-POPULATED LANE, not a within-status filter. When a
   // column carries a non-empty `filter` rule it pulls EVERY top-level card on the board matching

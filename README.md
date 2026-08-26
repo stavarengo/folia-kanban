@@ -38,6 +38,8 @@ priority: A
 due: 2026-06-15
 blocks:               # cards this one holds up (the inverse is derived, never written)
   - "[[Another Card]]"
+a-result-of:          # any other relationship type the board note declares (see below)
+  - "[[A Spike]]"
 ---
 
 # Card title
@@ -64,7 +66,20 @@ Quoting the plugin's own format is fine anywhere: a `## Comments` or a `- [ ] to
 
 Comments and history do not have to be bullets. A paragraph written by hand under `## Comments` — `**2026-08-21** — applied and checked`, say — shows in the panel as a comment with no timestamp or author; each paragraph is one comment, and a bullet wrapped over several lines is one comment too. Both can be edited and deleted from the panel like any other. Editing writes the comment back as a single line (a paragraph edited into something that would read as a heading or a fence is written as a bullet, so it stays a comment), and deleting removes the whole paragraph. What stays invisible is a fenced code block inside the section, and anything after the next `#` or `##` heading.
 
-Blocking works the same way — one end declares it. `blocks` lists the cards this one holds up; the card on the other end shows a read-only **Blocked by** entry the board derives when it loads. Every link the plugin writes therefore lives in exactly one note, so there is no second copy to fall out of step with. A `blocked-by` list written by hand is read as the same relationship stated from the other side and is left exactly as you wrote it — and where both notes happen to state the same link, the panel says so instead of offering a remove button that one note could not honour. All of it is marking, not ruling: a blocked card can still be dragged anywhere, in keeping with the board nudging rather than refusing.
+Relationships work the same way — one end declares it. `blocks` lists the cards this one holds up; the card on the other end shows a read-only **Blocked by** entry the board derives when it loads. Every link the plugin writes therefore lives in exactly one note, so there is no second copy to fall out of step with. A `blocked-by` list written by hand is read as the same relationship stated from the other side and is left exactly as you wrote it — and where both notes happen to state the same link, the panel says so instead of offering a remove button that one note could not honour.
+
+`blocks` is the one type every board has. The board note adds its own under `relations` — each entry a frontmatter key and, optionally, the key that states the same link from the other end:
+
+```yaml
+relations:
+  - key: a-result-of
+    inverse: results-in
+  - depends-on           # no inverse key: the other end is only ever derived, headed "Depends on (reverse)"
+```
+
+Every type gets the same treatment as blocking: an editable list in the panel headed by its key (`a-result-of` → **A result of**), a derived read-only list for the other end (**Results in**), a quiet marker on both tiles, and a history line under the type's own words. The key is the only thing the plugin gives a meaning to: a `results-in` written by hand is read exactly as a `blocked-by` is, and a key the board note does not declare stays an ordinary property. The reverse holds too — declare a key your cards already use for something else and its values are read as links from then on, so pick a fresh one. The keys the plugin itself owns (`status`, `priority`, `due`, `tags`, `type`, `created`, …) are refused outright.
+
+Blocking is the one type that means something beyond "linked": its marker fades once either end is done, and the search grammar reads it (`is:blocked`, `is:unblocked`, `is:blocking`, and the **Blocked** chip). That is the whole of what it does. A blocked card can still be dragged anywhere — into **Done** included — with no refusal, no confirmation, no warning. This is a decision, not an omission: the board's rule is to nudge and never block (soft WIP limits work the same way), and which columns a card may enter is a workflow question that stays yours. The marker and the filter are there so you can see the dependency and ask the board about it; what you do with it is up to you.
 
 Parentage has a single source of truth: a card is a subcard of P **iff** P's `## Subtasks` links to it. Body edits splice only the touched section; frontmatter is written via Obsidian's `processFrontMatter`, so unrelated bytes in your notes are never rewritten.
 
@@ -123,8 +138,9 @@ From there the board tracks what you have already read:
 - It turns **purple with an arrow** — *"a reply to yours"* — when one of those unread comments landed after a comment of your own (or inside the same minute — timestamps carry no seconds, and an agent answering straight away shares yours). There is no threading in a flat list of comments, so that ordering is all there is to go on: once you have commented on a card, anything new on it reads as a reply. Dot versus arrow, not only blue versus purple, so the two states stay apart without relying on colour, and the tile's own accessible name carries the words for a screen reader.
 - Inside the detail panel, the unread ones are tinted and tagged **new** — and the one that actually followed a comment of yours is tagged **reply** — under a **New** rule marking where what you had already read ends.
 - Opening a card marks its comments as read. The markers stay put for that visit, so you can actually read what was new before it goes quiet.
+- The **Unread** chip in the toolbar (or `unread:comments` in the search box) narrows the board to the cards with something you have not read; `unread:replies` keeps only the ones that read as answers to you, `unread:none` the rest. Opening a card marks it read, but it stays on the filtered board (and in a lane built on `unread:`) until you close its panel, so it does not vanish from under you mid-visit.
 
-Read-state is **per install**, stored in the plugin's own data — never in your notes. "Alex has read this" is not a fact the vault should carry to everyone who has the file, so it does not travel with the note and says nothing about what a collaborator has read. (Whether it follows you between your own machines depends on whether your sync carries plugin data; the plugin itself does not spread it.) Tracking starts the first time this version of the plugin loads: everything commented before that moment counts as already read, so an upgrade does not light up every card you ever discussed. A card you have never opened since then is judged against that starting point; one visit gives it a mark of its own.
+Read-state is **per install**, stored in the plugin's own data — never in your notes. "Alex has read this" is not a fact the vault should carry to everyone who has the file, so it does not travel with the note and says nothing about what a collaborator has read. (Whether it follows you between your own machines depends on whether your sync carries plugin data; the plugin itself does not spread it.) The `unread:` token is therefore the one part of the filter grammar that answers differently for each reader. It is still allowed in a column's `filter:` — an **Inbox** lane with `filter: "unread:comments"` is a useful thing to build — but a board note that uses it is describing *your* install: someone else opening the same note sees that lane filled with what *they* have not read, and a fresh install sees it empty until something new arrives. Tracking starts the first time this version of the plugin loads: everything commented before that moment counts as already read, so an upgrade does not light up every card you ever discussed. A card you have never opened since then is judged against that starting point; one visit gives it a mark of its own.
 
 Three limits are worth knowing. Only comments carrying a timestamp can be tracked — a `## Comments` bullet or paragraph typed by hand without one is still shown, but nothing can order it against "what I had already read", so it never lights up. What the board remembers is a high-water mark, one per card, so a comment that reaches you *out of order* — written earlier by a collaborator, delivered later by sync or by git — arrives already below the mark and stays quiet; your own signed comments are kept out of that mark so they can never cause it (with no name set, yours are unsigned and cannot be told apart, so they count like anyone else's). And an author is one word: `@alex_smith` is fine, `@Ana Maria` is not, so a name you set with spaces in it is written with those spaces turned into dashes.
 
@@ -137,9 +153,9 @@ Three limits are worth knowing. Only comments carrying a timestamp can be tracke
 - **Subcards grouped Jira-style** — `- [ ] [[Child]]` is a full child card; children render nested in a bordered group under their parent, in the parent's column.
 - **Subitems can hold a column of their own** — drag a subtask into any column and it stands there like a card, carrying a `↳ parent` reference. Works the same for a plain checklist item and for a subcard file (see [Subitems in their own column](#subitems-in-their-own-column)).
 - **Collapse/expand subitems** — one toggle per card tile hides or shows everything nested under it, todos preview and subcard group alike, with a count summary while collapsed. A board-wide default plus a per-column collapse-all/expand-all (see [Collapse/expand subitems](#collapseexpand-subitems)).
-- **Blocking relationships** — say that one card blocks another with a `blocks: ["[[Other card]]"]` list. The detail panel adds and removes them with suggestions from the board's own cards, and shows the derived **Blocked by** side; the tiles get a *Blocked* / *Blocks n* marker while both ends are unfinished. Typed from the start, so other kinds of link can follow. It marks, it never refuses a move.
+- **Relationships** — say that one card blocks another with a `blocks: ["[[Other card]]"]` list, or declare your own types in the board note (`a-result-of` / `results-in`, say). The detail panel adds and removes them with suggestions from the board's own cards and shows the derived other end; the tiles get a marker — *Blocked* / *Blocks n* while both ends are unfinished, the type's own words for everything else. It marks, it never refuses a move.
 - **Configurable** — a real settings tab: detail presentation, add-card flow, how many next-todos to show, and what History records (see [Settings](#settings)).
-- **Search & quick filters** — press `/` to search by title, file name, tag or priority; one-click **Overdue** / **Due soon** filters.
+- **Search & quick filters** — press `/` to search by title, file name, tag or priority, or by token (`due:`, `priority:`, `is:blocked`, `unread:comments`, …); one-click **Overdue** / **Due soon** / **Blocked** / **Unread** filters.
 - **Soft WIP limits** — set a per-column limit; the board nudges (never refuses) when you go over.
 - **In-app column management** — add, rename, recolour, set limits, reorder and delete columns; changes are written back to the board note's `columns` frontmatter.
 - **Relative due dates** — *Today*, *Tomorrow*, *in 3d*, *Yesterday*, with overdue cards flagged.
@@ -169,6 +185,9 @@ Doing it by hand still works, and it is worth knowing what the guided path write
    card-title: auto        # where card titles come from: auto (default) | filename | heading
    folia-view: board       # optional — this note's own view: board | markdown
    priorities: [A, B, C]   # optional — the board's own priority vocabulary; it learns as you go
+   relations:              # optional — relationship types beyond the built-in blocks / blocked-by
+     - key: a-result-of
+       inverse: results-in
    columns:
      - todo
      - doing
@@ -264,7 +283,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 | Action | How |
 | --- | --- |
 | Search by title, file name, tag or priority | Press `/` |
-| Filter overdue / due-soon cards | One-click **Overdue** / **Due soon** buttons |
+| Filter overdue / due-soon, blocked or unread cards | One-click **Overdue** / **Due soon** / **Blocked** / **Unread** buttons |
 | Move or reorder a card | Drag with the pointer, or pick it up with the keyboard |
 | Scroll horizontally across columns | Hold **Shift** and drag the board background |
 | Card menu (open, mark done, priority, move up/down, add subcard, delete) | Right-click a card |

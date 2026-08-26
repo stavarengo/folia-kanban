@@ -39,7 +39,8 @@ const optionalConfigString = z.preprocess(
 /**
  * The board definition note's config frontmatter. `card-folder` + `columns` drive the board;
  * `card-title` picks where card titles come from (validated by `asTitleMode`, unknown = `auto`);
- * `priorities` remembers the board's own priority vocabulary (validated by `normalizePriorities`).
+ * `priorities` remembers the board's own priority vocabulary (validated by `normalizePriorities`);
+ * `relations` names the relationship types beyond `blocks` (validated by `normalizeRelationTypes`).
  */
 export const BoardFrontmatterSchema = z.looseObject({
   "card-folder": optionalConfigString,
@@ -48,7 +49,19 @@ export const BoardFrontmatterSchema = z.looseObject({
   card_title: optionalConfigString,
   columns: z.unknown().optional(),
   priorities: z.unknown().optional(),
+  relations: z.unknown().optional(),
 });
+
+/**
+ * One entry of the board note's `relations` list: a relationship type beyond the built-in
+ * `blocks`, either a bare key or `{ key, inverse }` (validated by `normalizeRelationTypes`, which
+ * drops an entry that fails this rather than refuse the board).
+ */
+export const RelationTypeEntrySchema = z.union([
+  z.string(),
+  // `inverse:` left without a value is YAML `null`, and must read as absent, not as corruption.
+  z.looseObject({ key: z.string(), inverse: optionalConfigString }),
+]);
 
 /** A context's `_context.md` frontmatter (#14). All display-only and optional. */
 export const ContextFrontmatterSchema = z.looseObject({

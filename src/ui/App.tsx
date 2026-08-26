@@ -16,21 +16,25 @@ import {
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
-import type { KanbanSettings, SettingsPatch } from "../settings";
+import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
 import {
   BoardActionsContext,
   ContextsContext,
   RelationCountsContext,
   RepoContext,
+  MatchContextContext,
   SettingsContext,
+  unreadStateOf,
   type BoardActions,
   type ColumnPatch,
+  type PinnedSeen,
 } from "./context";
+
 import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
-import { boardPriorities, matchCard, parseFilter } from "./cardView";
+import { boardPriorities, matchCard, parseFilter, type MatchContext } from "./cardView";
 
 /** Stable empty contexts map (#14) so the provider value identity doesn't churn pre-load. */
 const EMPTY_CONTEXTS = {} as const;
@@ -610,22 +614,39 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // Parse the query once per change; Board/Column filter with this same parsed §1 Filter.
   const filter = useMemo(() => parseFilter(query), [query]);
 
+  // The open card's seen-marker as it was when it was selected, so an `unread:` filter keeps the
+  // card on the board for the whole visit (see `unreadStateOf`). Re-read only when the selection
+  // changes: derived during render so it is captured before the panel's own effect marks the
+  // comments seen.
+  const [pinnedSeen, setPinnedSeen] = useState<PinnedSeen | null>(null);
+  if ((pinnedSeen?.path ?? null) !== selected) {
+    setPinnedSeen(selected ? { path: selected, seen: seenMarkerFor(settings, selected) } : null);
+  }
+  const matchCtx = useMemo<MatchContext>(
+    () => ({
+      today: todayValue,
+      doneColumnId,
+      relations: relationCountsValue,
+      unread: unreadStateOf(settings, pinnedSeen),
+    }),
+    [todayValue, doneColumnId, relationCountsValue, settings, pinnedSeen],
+  );
+
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
     if (board) {
-      const ctx = { today: todayValue, doneColumnId };
       for (const col of board.config.columns) {
         for (const p of board.columns[col.id] ?? []) {
           const c = board.cards[p];
           if (!c) continue;
           total++;
-          if (matchCard(c, filter, ctx)) match++;
+          if (matchCard(c, filter, matchCtx)) match++;
         }
       }
     }
     return { total, match };
-  }, [board, filter, todayValue, doneColumnId]);
+  }, [board, filter, matchCtx]);
 
   // "/" focuses the search box (the placeholder advertises it), but only when this board view is
   // the active, visible one and the user isn't already typing in a field. A document-level listener
@@ -709,59 +730,61 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         <BoardActionsContext.Provider value={actions}>
           <ContextsContext.Provider value={stableContexts}>
             <RelationCountsContext.Provider value={relationCountsValue}>
-              <div className="folia-root" ref={rootRef}>
-                <Toolbar
-                  ref={searchRef}
-                  query={query}
-                  onChange={setQuery}
-                  matchCount={counts.match}
-                  totalCount={counts.total}
-                />
-                {board.cardFolderWarning && (
-                  <div className="folia-card-folder-notice" role="status">
-                    {board.cardFolderWarning}
-                  </div>
-                )}
-                <div className="folia-main" role="region" aria-label="Board">
-                  <Board
-                    board={board}
-                    today={todayValue}
-                    selectedPath={selected}
-                    wipLimits={wipLimits}
-                    filter={filter}
-                    doneColumnId={doneColumnId}
-                    onMove={(activeId, overId) => void onMove(activeId, overId)}
-                    onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+              <MatchContextContext.Provider value={matchCtx}>
+                <div className="folia-root" ref={rootRef}>
+                  <Toolbar
+                    ref={searchRef}
+                    query={query}
+                    onChange={setQuery}
+                    matchCount={counts.match}
+                    totalCount={counts.total}
                   />
-                  {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
-                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
-                  {detailMode !== "modal" && detail}
-                </div>
-                {detailMode === "modal" &&
-                  panelShown &&
-                  rootRef.current &&
-                  createPortal(
-                    <div
-                      className="folia-detail-modal-backdrop"
-                      onPointerDown={(e) => {
-                        if (e.target === e.currentTarget) closeDetail();
-                      }}
-                    >
-                      {detail}
-                    </div>,
-                    rootRef.current,
+                  {board.cardFolderWarning && (
+                    <div className="folia-card-folder-notice" role="status">
+                      {board.cardFolderWarning}
+                    </div>
                   )}
-                {toast && (
-                  <div
-                    className={"folia-toast folia-toast-" + toast.tone}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
-                    {toast.text}
+                  <div className="folia-main" role="region" aria-label="Board">
+                    <Board
+                      board={board}
+                      today={todayValue}
+                      selectedPath={selected}
+                      wipLimits={wipLimits}
+                      filter={filter}
+                      doneColumnId={doneColumnId}
+                      onMove={(activeId, overId) => void onMove(activeId, overId)}
+                      onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+                    />
+                    {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
+                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
+                    {detailMode !== "modal" && detail}
                   </div>
-                )}
-              </div>
+                  {detailMode === "modal" &&
+                    panelShown &&
+                    rootRef.current &&
+                    createPortal(
+                      <div
+                        className="folia-detail-modal-backdrop"
+                        onPointerDown={(e) => {
+                          if (e.target === e.currentTarget) closeDetail();
+                        }}
+                      >
+                        {detail}
+                      </div>,
+                      rootRef.current,
+                    )}
+                  {toast && (
+                    <div
+                      className={"folia-toast folia-toast-" + toast.tone}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
+                      {toast.text}
+                    </div>
+                  )}
+                </div>
+              </MatchContextContext.Provider>
             </RelationCountsContext.Provider>
           </ContextsContext.Provider>
         </BoardActionsContext.Provider>
