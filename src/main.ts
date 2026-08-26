@@ -94,6 +94,9 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   private unloaded = false;
 
+  /** Tail of the settings-write chain; see {@link saveSettings}. */
+  private pendingWrite: Promise<void> = Promise.resolve();
+
   override async onload(): Promise<void> {
     await this.loadSettings();
 
@@ -499,8 +502,16 @@ export default class FoliaKanbanPlugin extends Plugin {
     if (stampedBaseline) await this.saveSettings();
   }
 
+  /** Serializes the writes: two `saveData` calls in flight at once can land on disk in either
+   *  order, and what survives is whatever the slower one carried — an older snapshot than the one
+   *  already applied in memory. A rename chain done quickly in the file explorer is exactly that
+   *  case. Chained, each write also reads `this.settings` at the moment it runs, so the last one
+   *  writes the newest state rather than the state as of when it was queued. */
   async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    const write = this.pendingWrite.then(() => this.saveData(this.settings));
+    // A failed write must not break the chain for every write after it.
+    this.pendingWrite = write.catch(() => {});
+    await write;
   }
 
   /** Apply a settings patch and push it live into every open board immediately, then persist in

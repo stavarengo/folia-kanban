@@ -107,7 +107,18 @@ describe("the plugin follows external file operations", () => {
     expect(main).toContain('this.app.vault.on("delete"');
   });
 
-  it("runs the path-keyed settings migration on them", () => {
-    expect(main).toContain("migratePathKeyedSettings");
+  it("routes both events into the same follow-up, and that follow-up runs the migration", () => {
+    // Not just "the name appears somewhere": the handlers must reach it, and it must reach the
+    // migration. A no-op handler or a `followFileOp` that stopped migrating would pass a check
+    // that only looked for the identifier.
+    const handlers = main.match(
+      /this\.app\.vault\.on\("(?:rename|delete)"[\s\S]{0,300}?\n {6}\}\)/g,
+    );
+    expect(handlers).toHaveLength(2);
+    for (const handler of handlers ?? []) expect(handler).toContain("this.followFileOp(");
+    const followFileOp = main.slice(main.indexOf("private async followFileOp"));
+    expect(followFileOp.slice(0, followFileOp.indexOf("\n  }"))).toContain(
+      "migratePathKeyedSettings(s, op)",
+    );
   });
 });

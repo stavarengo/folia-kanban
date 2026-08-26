@@ -113,10 +113,14 @@ export interface CardRepository {
   onChange(cb: () => void): () => void;
 
   /**
-   * Subscribe to file renames/moves/deletes that happen OUTSIDE the plugin's own actions — the
-   * file explorer, another plugin, an edit straight on disk. Separate from {@link onChange}, which
+   * Subscribe to file renames/moves/deletes, whoever made them — the file explorer, another
+   * plugin, an edit straight on disk, or one of this repository's own actions (an in-app rename is
+   * a vault rename like any other, and is reported as one). Separate from {@link onChange}, which
    * only says "something changed, reload": path-keyed UI state (the selection, and the per-card
    * maps in plugin data) has to know WHICH path became which, and a reload cannot tell it.
+   *
+   * Consumers must therefore be idempotent: an in-app rename reaches them here AND through the
+   * action's own follow-up, in either order.
    *
    * A folder operation arrives as one op naming the folder, the way the vault reports it — never
    * one per file inside it — so consumers must treat a path as covered by its ancestors too.

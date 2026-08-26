@@ -3730,6 +3730,9 @@ describe("copy a card's path", () => {
     written = [];
     const menu = await openMenu(repo);
     fireEvent.click(within(menu).getByRole("menuitem", { name: label }));
+    // The toast lands when the clipboard promise settles, a microtask after the click; flush it
+    // inside `act` so the state update it causes is not left dangling outside one.
+    await act(async () => {});
     return repo;
   };
 
