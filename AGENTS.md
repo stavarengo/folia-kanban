@@ -8,6 +8,7 @@
 1. Keep this file thin: only what a fresh LLM session **can't** rediscover from the other files. A few words per entry.
 2. Update [`examples/`](./examples/) whenever a change affects the user experience.
 3. Do not invent architecture. Follow the project's guards.
+4. Before building something that looks obviously missing, read [`docs/decisions.md`](./docs/decisions.md) — it records what was deliberately left out, why, and what would have to change.
 
 ## Way of Working
 
