@@ -577,9 +577,21 @@ All three landed.
     // Left open, a fence would run to the end of the note and take every section with it.
     expect(descriptionRefusal("Intro\n\n```js\nconst a = 1;")).toEqual({
       kind: "fence",
-      line: "```",
+      line: "```js",
     });
     expect(descriptionRefusal("~~~~\ncode\n~~~\n")).toEqual({ kind: "fence", line: "~~~~" });
+    // The fence reported is the line that opened it, not just its marker.
+    expect(descriptionRefusal("```js\nok\n```\n\n```sh\nopen")).toEqual({
+      kind: "fence",
+      line: "```sh",
+    });
+    // `setDescription` trims, so an indent that would keep the first line inert is judged gone.
+    expect(descriptionRefusal("    ## History\n\nof the project")).toEqual({
+      kind: "heading",
+      line: "## History",
+    });
+    expect(descriptionRefusal("     ```\noops")).toEqual({ kind: "fence", line: "```" });
+    expect(descriptionRefusal("Intro\n    ## History\n")).toBeNull();
   });
 });
 
@@ -697,7 +709,7 @@ describe("prose under Comments / History", () => {
   });
 
   it("a prose edit that would read as structure is written as a bullet instead", () => {
-    for (const text of ["## History", "# Title", "```", "~~~js"]) {
+    for (const text of ["## History", "# Title", "#\u00a0Title", "```", "~~~js"]) {
       const out = updateTimestampedLine(doc, SECTION.comments, 0, text);
       expect(out).toBe(
         doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.", `- ${text}`),

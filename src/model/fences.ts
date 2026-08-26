@@ -43,12 +43,18 @@ export function fencedLines(lines: readonly string[]): boolean[] {
   });
 }
 
-/** The marker of a fence still open at the end of the text, or null when every fence is closed. */
-export function unclosedFence(lines: readonly string[]): string | null {
-  let open: string | null = null;
-  for (const line of lines) {
-    const next = fenceAfter(line, open);
-    if (next !== false) open = next;
-  }
+/**
+ * The fence still open at the end of the text — its marker and the index of the line that opened
+ * it — or null when every fence is closed.
+ */
+export function unclosedFence(lines: readonly string[]): { marker: string; at: number } | null {
+  let open: { marker: string; at: number } | null = null;
+  lines.forEach((line, at) => {
+    const next = fenceAfter(line, open?.marker ?? null);
+    if (next === false) return;
+    // A delimiter that neither opens nor closes (`~~~` inside a `~~~~` block) leaves it as is.
+    if (next === null) open = null;
+    else if (open === null) open = { marker: next, at };
+  });
   return open;
 }

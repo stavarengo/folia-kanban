@@ -579,6 +579,7 @@ export function CardDetail({
     setBodyPath(null);
     setConfirmDelete(false);
     setEditingDesc(false); // navigating cards starts the new card in view mode
+    setDescRefusal(null);
     void reload();
   }, [path, isCreate]);
 

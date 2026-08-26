@@ -158,12 +158,14 @@ function descriptionRange(lines: string[]): { h1: number; from: number; to: numb
 export function descriptionRefusal(
   description: string,
 ): { kind: "heading" | "fence"; line: string } | null {
-  const lines = description.split("\n");
+  // Judge the bytes `setDescription` will write: it trims, so an indent on the first line that
+  // would keep a heading or a fence inert here is gone by the time the note is read back.
+  const lines = description.trim().split("\n");
   const fenced = fencedLines(lines);
   const i = lines.findIndex((l, n) => !fenced[n] && OWNED_HEADING_RE.test(l));
   if (i !== -1) return { kind: "heading", line: (lines[i] ?? "").trim() };
   const open = unclosedFence(lines);
-  return open === null ? null : { kind: "fence", line: open };
+  return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
 
 /** Append a single line to a section, creating the section at end if absent. */
@@ -176,7 +178,7 @@ function appendToSection(body: string, name: string, line: string): string {
     if (out.length > 0 && !out.endsWith("\n")) out += "\n";
     // A fence left open runs to the end of the note, and would swallow the new section with it.
     const open = unclosedFence(lines);
-    if (open !== null) out += `${open}\n`;
+    if (open !== null) out += `${open.marker}\n`;
     // ensure a blank line before the new heading when there's preceding content
     if (out.trim() !== "" && !out.endsWith("\n\n")) out += "\n";
     out += `## ${name}\n${line}\n`;
@@ -187,7 +189,7 @@ function appendToSection(body: string, name: string, line: string): string {
   while (insert - 1 > start && lines[insert - 1]?.trim() === "") insert--;
   // The same open fence, inside the section itself, would swallow the new line.
   const open = end === lines.length ? unclosedFence(lines) : null;
-  lines.splice(insert, 0, ...(open === null ? [line] : [open, line]));
+  lines.splice(insert, 0, ...(open === null ? [line] : [open.marker, line]));
   return lines.join("\n");
 }
 
@@ -449,8 +451,9 @@ export function removeSubtask(text: string, index: number): string {
 const TS_PREFIX_RE = /^(\s*[-*]\s+(?:_[0-9: -]+?(?:\s+@[^\s:]+)?:_|\[[^\]]+\])\s+)([\s\S]*)$/;
 
 // What a line at column 0 must not start with to stay prose: a heading, or a fence. Either would
-// be structure to the lookups above, and would move or hide every entry after it.
-const STRUCTURAL_LINE_RE = /^ {0,3}(?:#{1,6}[ \t]|`{3,}|~{3,})/;
+// be structure to the lookups above, and would move or hide every entry after it. `\s`, not a
+// narrower class, because that is what the heading lookups above accept.
+const STRUCTURAL_LINE_RE = /^ {0,3}(?:#{1,6}\s|`{3,}|~{3,})/;
 
 /**
  * Rewrite the text of the index-th entry of a timestamped section (Comments / History), 0-based in
