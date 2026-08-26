@@ -502,3 +502,63 @@ describe("following files as they move (onFileOp)", () => {
     off();
   });
 });
+
+describe("applying a move", () => {
+  it("writes the card's placement without inventing a history line of its own", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+
+    await repo.applyMove({ path: "basic/Cards/One.md", setFrontmatter: { status: "done" } });
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")["status"]).toBe("done");
+    expect(app.vault.text("basic/Cards/One.md")).not.toContain("## History");
+  });
+
+  it("appends the history line the move itself carries", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+
+    await repo.applyMove({
+      path: "basic/Cards/One.md",
+      setFrontmatter: { status: "done" },
+      history: "Moved from Todo to Done",
+    });
+
+    expect(app.vault.text("basic/Cards/One.md")).toContain("Moved from Todo to Done");
+  });
+
+  it("moves an inline todo's checkbox and status field in a single write", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile(
+      "basic/Cards/One.md",
+      card("status: todo", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n"),
+    );
+    let writes = 0;
+    app.vault.on("modify", () => writes++);
+
+    await repo.applyMove({
+      path: "basic/Cards/One.md",
+      setSubtaskStatus: { index: 0, status: "doing", done: true },
+    });
+
+    expect(app.vault.text("basic/Cards/One.md")).toContain("- [x] Write the docs [status:: doing]");
+    expect(writes).toBe(1);
+  });
+
+  it("clears the status field when the todo lands back on its card's own column", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile(
+      "basic/Cards/One.md",
+      card("status: todo", "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n"),
+    );
+
+    await repo.applyMove({
+      path: "basic/Cards/One.md",
+      setSubtaskStatus: { index: 0, status: null },
+    });
+
+    expect(app.vault.text("basic/Cards/One.md")).toContain("- [ ] Write the docs\n");
+  });
+});
