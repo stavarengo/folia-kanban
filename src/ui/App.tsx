@@ -390,8 +390,15 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           showToast("This vault has no filesystem path on this device", "error");
           return;
         }
-        void navigator.clipboard
-          ?.writeText(text)
+        // Not `navigator.clipboard?.writeText(…)`: where the API is missing, optional chaining
+        // short-circuits the whole chain and the click would do nothing at all, silently.
+        const clipboard = navigator.clipboard;
+        if (!clipboard) {
+          showToast("This device gives the plugin no clipboard access", "error");
+          return;
+        }
+        void clipboard
+          .writeText(text)
           .then(() => showToast(`Copied ${text}`))
           .catch(() => showToast("Could not write to the clipboard", "error"));
       },

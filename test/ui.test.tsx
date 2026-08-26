@@ -3743,6 +3743,19 @@ describe("copy a card's path", () => {
     ).toBeInTheDocument();
   });
 
+  it("says so when the device gives the plugin no clipboard at all", async () => {
+    const saved = Object.getOwnPropertyDescriptor(navigator, "clipboard")!;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    try {
+      await copy(/relative to vault/);
+      expect(
+        await screen.findByText("This device gives the plugin no clipboard access"),
+      ).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, "clipboard", saved);
+    }
+  });
+
   it("reports a clipboard the browser refused", async () => {
     failNext = true;
     try {

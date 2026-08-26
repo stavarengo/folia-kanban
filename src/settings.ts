@@ -136,7 +136,13 @@ type PathKeyedMap = {
   [K in keyof KanbanSettings]: KanbanSettings[K] extends Record<string, unknown> ? K : never;
 }[keyof KanbanSettings];
 
-const PATH_KEYED_MAPS: readonly PathKeyedMap[] = ["collapsedCards", "commentsSeen"];
+// `satisfies` is what makes this a constraint rather than a convention: add a path-keyed map to
+// `KanbanSettings` and typecheck fails here until it is listed, so the migration below cannot
+// quietly fall behind the settings it is supposed to cover.
+const PATH_KEYED_MAPS = {
+  collapsedCards: true,
+  commentsSeen: true,
+} satisfies Record<PathKeyedMap, true>;
 
 /**
  * The settings patch that follows a card file being renamed, moved, or deleted from outside the
@@ -148,7 +154,7 @@ export function migratePathKeyedSettings(
   op: FileOp,
 ): Partial<KanbanSettings> {
   const patch: Partial<KanbanSettings> = {};
-  for (const key of PATH_KEYED_MAPS) {
+  for (const key of Object.keys(PATH_KEYED_MAPS) as PathKeyedMap[]) {
     const next = remapPathKeys<unknown>(settings[key], op);
     if (next) (patch as Record<string, unknown>)[key] = next;
   }
