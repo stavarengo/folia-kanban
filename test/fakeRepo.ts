@@ -187,10 +187,6 @@ export class FakeRepo implements CardRepository {
     if (mutation.setFrontmatter)
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
     for (const key of mutation.unsetFrontmatter ?? []) delete this.entry(mutation.path).fm[key];
-    for (const { path, links, done } of mutation.parentLines ?? []) {
-      const e = this.entry(path);
-      e.body = setSubcardDone(e.body, links, done);
-    }
     if (mutation.setSubtaskStatus) {
       const { index, status, done } = mutation.setSubtaskStatus;
       const e = this.entry(mutation.path);
@@ -203,6 +199,14 @@ export class FakeRepo implements CardRepository {
     if (mutation.history) {
       const e = this.entry(mutation.path);
       e.body = appendHistory(e.body, mutation.history, this.ts);
+    }
+    for (const { path, links, done } of mutation.parentLines ?? []) {
+      const e = this.entry(path);
+      e.body = setSubcardDone(e.body, links, done);
+      for (const link of links) {
+        const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
+        this.maybeHistory(path, "subtask", line);
+      }
     }
   }
 

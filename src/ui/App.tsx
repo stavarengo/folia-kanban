@@ -483,7 +483,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
             // claims a column: keep the claim and the checkbox from telling two stories. A second
             // write rather than one, so the toggle keeps writing its own history line unchanged.
             const b = boardRef.current;
-            const sync = b ? syncSubtaskClaim(b, path, index, done) : null;
+            const sync = b ? syncSubtaskClaim(b, path, { index }, done) : null;
             if (sync) await repo.applyMove(sync);
           } catch (e) {
             reportError(e);

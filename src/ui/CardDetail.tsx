@@ -1422,7 +1422,7 @@ export function CardDetail({
                       await repo.toggleSubtask(path, s.index, !s.done);
                       // Same rule the board's own toggle follows: a line that claims a column has
                       // its claim moved with its checkbox, so the two never tell different stories.
-                      const sync = syncSubtaskClaim(board, path, s.index, !s.done);
+                      const sync = syncSubtaskClaim(board, path, s, !s.done);
                       if (sync) await repo.applyMove(sync);
                     })
                   }

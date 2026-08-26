@@ -310,6 +310,20 @@ describe("subitem drag persistence", () => {
     expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
   });
 
+  it("the parent's tick leaves the trace a click on it would, under the same history scope", async () => {
+    const body = "\n# Root\n\n## Subtasks\n- [ ] [[Child]]\n";
+    const files = {
+      "Tasks/Root.md": { fm: { type: "task", status: "todo" }, body },
+      "Tasks/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
+    };
+    const quiet = new FakeRepo(config, files);
+    await quiet.applyMove(moveCard(await quiet.loadBoard(), "Tasks/Child.md", "done", 0)!);
+    expect(quiet.files.get("Tasks/Root.md")!.body).toBe(body.replace("[ ]", "[x]")); // no history
+    const loud = new FakeRepo(config, files, () => "all");
+    await loud.applyMove(moveCard(await loud.loadBoard(), "Tasks/Child.md", "done", 0)!);
+    expect(loud.files.get("Tasks/Root.md")!.body).toContain("Subtask done: [[Child]]");
+  });
+
   it("a child whose status was edited by hand still counts as done on its parent", async () => {
     const repo = new FakeRepo(config, {
       "Tasks/Root.md": {

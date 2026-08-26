@@ -9,7 +9,7 @@ import {
   findDoneColumn,
   makeTodoPath,
   moveSubtask,
-  resolveOnBoard,
+  boardLinkResolver,
   syncSubcardLines,
   syncSubtaskClaim,
   parseTodoPath,
@@ -308,6 +308,9 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       withItems("B", {}, [link("A", 0)]),
     ]);
     expect(b.columns["todo"]).toEqual(["Tasks/A.md", "Tasks/B.md"]);
+    expect(moveCard(b, "Tasks/B.md", "todo", 0)).toMatchObject({
+      history: "Reordered within Todo",
+    });
     expect(moveCard(b, "Tasks/B.md", "todo", 0)?.parentLines).toBeUndefined();
     expect(moveCard(b, "Tasks/B.md", "doing", 0)?.parentLines).toEqual([
       { path: "Tasks/A.md", links: ["B"], done: false },
@@ -346,7 +349,7 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       { ...card("Child", { status: "todo" }), path: "Tasks/x/Child.md" },
       { ...card("Child", { status: "todo" }), path: "Tasks/y/Child.md" },
     ]);
-    expect(resolveOnBoard(b, "Child")).toBeNull();
+    expect(boardLinkResolver(b)("Child")).toBeNull();
     expect(syncSubcardLines(b, "Tasks/x/Child.md", "done")).toBeNull();
   });
 
@@ -375,30 +378,34 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       card("Finished", { status: "done" }),
     ]);
     // Ticking a child that stands somewhere sends it to Done.
-    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 0, true)).toEqual({
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 0, link: "Placed" }, true)).toEqual({
       path: "Tasks/Placed.md",
       setFrontmatter: { status: "done" },
     });
     // Un-ticking one in Done drops its claim: it rejoins its card.
-    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 2, false)).toEqual({
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 2, link: "Finished" }, false)).toEqual({
       path: "Tasks/Finished.md",
       unsetFrontmatter: ["status"],
     });
+    // The write lands in another note, so the position alone never names it: the link the person
+    // was shown must still be on that line, or nothing is written.
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 0, link: "Home" }, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 0 }, true)).toBeNull();
     // Another card listing the same child follows; the clicked note itself is not written twice.
     const b2 = buildBoard(config, [
       withItems("Parent", { status: "todo" }, [link("Placed", 0)]),
       withItems("Other", { status: "doing" }, [link("Placed", 0)]),
       card("Placed", { status: "doing" }),
     ]);
-    expect(syncSubtaskClaim(b2, "Tasks/Parent.md", 0, true)).toEqual({
+    expect(syncSubtaskClaim(b2, "Tasks/Parent.md", { index: 0, link: "Placed" }, true)).toEqual({
       path: "Tasks/Placed.md",
       setFrontmatter: { status: "done" },
       parentLines: [{ path: "Tasks/Other.md", links: ["Placed"], done: true }],
     });
     // A child claiming nothing is left where it is, ticked or not.
-    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 1, true)).toBeNull();
-    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 1, false)).toBeNull();
-    expect(syncSubtaskClaim(b, "Tasks/Parent.md", 0, false)).toBeNull(); // still in Doing
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 1, link: "Home" }, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 1, link: "Home" }, false)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 0, link: "Placed" }, false)).toBeNull(); // still in Doing
   });
 });
 
@@ -1062,7 +1069,7 @@ describe("subitems in a column of their own", () => {
       withTodos("Root", { status: "todo" }, [todo("Placed", 0, "doing")]),
     ]);
     // Ticking the box must not erase the placement the user made — there is nowhere to move it to.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0 }, true)).toBeNull();
   });
 
   it("sends a todo home without touching its checkbox — that is a move, not a claim", () => {
@@ -1146,18 +1153,18 @@ describe("subitems in a column of their own", () => {
       ]),
     ]);
     // Ticking a placed line moves its claim to done, so the tile does not teleport past its words.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, true)).toEqual({
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0 }, true)).toEqual({
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 0, status: "done" },
     });
     // Un-ticking one that claims done drops the claim: it goes back to living with its card.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", 2, false)).toEqual({
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 2 }, false)).toEqual({
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 2, status: null },
     });
     // A line claiming nothing is left alone — ticking a plain todo has never placed it anywhere.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", 1, true)).toBeNull();
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", 0, false)).toBeNull(); // still claims doing
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 1 }, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0 }, false)).toBeNull(); // still claims doing
   });
 
   it("can clear a claim that names no column of this board", () => {

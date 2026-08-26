@@ -355,9 +355,6 @@ export class VaultRepository implements CardRepository {
     for (const key of mutation.unsetFrontmatter ?? []) {
       await this.unsetFrontmatterKey(mutation.path, key);
     }
-    for (const { path, links, done } of mutation.parentLines ?? []) {
-      await this.editBody(path, (t) => setSubcardDone(t, links, done));
-    }
     if (mutation.setSubtaskStatus) {
       // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
       // where a subitem sits, so writing them separately would leave a moment where the board
@@ -374,6 +371,16 @@ export class VaultRepository implements CardRepository {
     if (mutation.history) {
       const historyLine = mutation.history;
       await this.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));
+    }
+    // Last, and after the moved note's own record: the parent's box is the same edit a click on
+    // it would make, so it leaves the same (scope-gated) trace, and a parent that has gone missing
+    // since the board loaded cannot stop the move itself from being recorded.
+    for (const { path, links, done } of mutation.parentLines ?? []) {
+      await this.editBody(path, (t) => setSubcardDone(t, links, done));
+      for (const link of links) {
+        const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
+        await this.maybeHistory(path, "subtask", line);
+      }
     }
   }
 
