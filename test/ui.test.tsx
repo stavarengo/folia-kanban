@@ -1311,6 +1311,38 @@ describe("card context menu", () => {
     );
   });
 
+  it("draws a board's own priority scale as a ranked ramp, not as grey badges", async () => {
+    const repo = new FakeRepo(
+      { ...config, priorities: ["blocker", "normal", "whenever"] },
+      {
+        "Tasks/First.md": {
+          fm: { type: "task", status: "todo", order: 1, priority: "blocker" },
+          body: "\n# First\n",
+        },
+        "Tasks/Second.md": {
+          fm: { type: "task", status: "todo", order: 2, priority: "whenever" },
+          body: "\n# Second\n",
+        },
+      },
+    );
+    render_(repo);
+    const tone = async (name: string) => {
+      const card = (await screen.findByText(name)).closest(".folia-card") as HTMLElement;
+      return {
+        strip: card.getAttribute("data-prio"),
+        chip: within(card).getByTitle("Priority").className,
+      };
+    };
+    expect(await tone("First")).toEqual({
+      strip: "prio-1",
+      chip: "folia-chip folia-chip-prio-1",
+    });
+    expect(await tone("Second")).toEqual({
+      strip: "prio-4",
+      chip: "folia-chip folia-chip-prio-4",
+    });
+  });
+
   it("treats a whitespace-only priority as no priority at all", async () => {
     const repo = new FakeRepo(config, {
       "Tasks/First.md": {

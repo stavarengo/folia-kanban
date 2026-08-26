@@ -82,10 +82,16 @@ function CardItemInner({
   // from settings rather than arriving on the memoized card. `reply` = an unread comment that
   // landed after one of your own.
   const unread = useUnreadComments(card.path, card.stats?.commentMarks);
-  const chips = [...relationChips(relations), ...cardChips(card, today, actions.doneColumnId)];
+  const chips = [
+    ...relationChips(relations),
+    ...cardChips(card, today, actions.doneColumnId, actions.priorities),
+  ];
   const stats = card.stats;
   const fm = card.frontmatter;
-  const prio = typeof fm.priority === "string" && fm.priority ? priorityTone(fm.priority) : null;
+  const prio =
+    typeof fm.priority === "string" && fm.priority
+      ? priorityTone(fm.priority, actions.priorities)
+      : null;
   // Context grouping (#14): the card's folder-derived context + its (optional) config. The marker
   // is a left accent strip (inset clear of the priority bar) + a label badge, so cards sharing a
   // context read as a group within a column. Subfolders without a `_context.md` just have a name.

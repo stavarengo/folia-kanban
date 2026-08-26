@@ -218,7 +218,9 @@ priorities:
 
 That list is why a value **outlives the last card that used it**: delete every `blocker` card and `blocker` is still offered tomorrow. It is a plain property — reorder it, prune it, or write it yourself.
 
-Its order matters in one place. A column with `sort: priority` orders cards by severity first (the built-in colour ramp, where `A`/`urgent`/`p1` are strongest and `D`/`trivial` weakest) and falls back to this list to break ties — so a scale the ramp knows nothing about (`blocker`, `someday`, `whenever`) sorts the way you listed it instead of collapsing into one undifferentiated heap.
+Its order is the ranking, strongest first, and it is what makes your own words read as a scale. Priority badges are drawn on a four-step colour ramp, and a value the plugin has no opinion about takes its colour from where you put it in this list: `blocker` / `normal` / `whenever` comes out hot-to-calm rather than as three identical grey chips. The words the plugin does know keep their own colour wherever you list them — `A` stays red and `D` stays blue — so adopting a custom scale never repaints an existing board. A column with `sort: priority` follows the same ranking, then falls back to the list order to break ties within a colour.
+
+`examples/custom-scale/` is a small board built entirely on its own words, if you want to see it before committing to one.
 
 ### Where card titles come from
 

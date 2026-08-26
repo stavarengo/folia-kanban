@@ -1,20 +1,21 @@
 # Folia Kanban — Example Vault
 
-Welcome! This folder is a ready-to-open **Obsidian vault** with two example boards for learning the **Folia Kanban** plugin. Every card is a plain Markdown file — drag-and-drop, nested subcards, comments, and history, with no database.
+Welcome! This folder is a ready-to-open **Obsidian vault** with three example boards for learning the **Folia Kanban** plugin. Every card is a plain Markdown file — drag-and-drop, nested subcards, comments, and history, with no database.
 
 ## How to open it
 
 1. **Open this `examples/` folder as a vault** in Obsidian (`Open folder as vault` → pick this `examples/` folder). The Feature Showcase board points `card-folder` at `feature-showcase/Cards`, read **from the vault root**, so this folder needs to be the vault root for it to resolve.
 2. Enable **Folia Kanban** under Settings → Community plugins (install it manually first if needed — see the repo's main README). Trust the author if Obsidian prompts you.
-3. Click either board note (below) in the file explorer — it opens as the board. The command **"Open Folia Kanban board"** and the layout-grid ribbon icon do the same thing without hunting for the note first. To see the note's raw Markdown, use the **Edit as markdown** button in the tab header; the button in the editor takes you back.
+3. Click any board note (below) in the file explorer — it opens as the board. The command **"Open Folia Kanban board"** and the layout-grid ribbon icon do the same thing without hunting for the note first. To see the note's raw Markdown, use the **Edit as markdown** button in the tab header; the button in the editor takes you back.
 4. Want a board of your own to play with? Run **Create board** from the command palette, or right-click a folder here and pick **Create Folia board here** — the note comes out with its properties already in place and opens as an empty board. **Convert this note into a board** does the same to a note you already have.
 
 > [!note]
-> Want these in your own vault instead? Copy a board's folder anywhere. `basic/` just works — its `card-folder: ./Cards` travels with the note. For `feature-showcase/` you also edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`), or to `./Cards` to make it portable too.
+> Want these in your own vault instead? Copy a board's folder anywhere. `basic/` and `custom-scale/` just work — their `card-folder: ./Cards` travels with the note. For `feature-showcase/` you also edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`), or to `./Cards` to make it portable too.
 
 ## The boards
 
 - **Basic** — folder [`basic/`](./basic/), board note [`Example Board.md`](<basic/Example Board.md>). A minimal 3-column board (Todo / Doing / Done) with a couple of sample cards. **Start here**: it shows the bare essentials — a board note, a `card-folder`, and cards as Markdown files.
+- **Custom Scale** — folder [`custom-scale/`](./custom-scale/), board note [`Custom Scale Board.md`](<custom-scale/Custom Scale Board.md>). A small board whose priorities are `blocker` / `normal` / `whenever` instead of `A`/`B`/`C` — it shows how the board note's `priorities` order becomes both the colour ramp and the sort order.
 - **Feature Showcase** — folder [`feature-showcase/`](./feature-showcase/), board note [`Showcase Board.md`](<feature-showcase/Showcase Board.md>). A "kitchen-sink" board that exercises **every feature** in one place — columns, lanes, contexts, priorities, due-date buckets, subcards, comments, history, and custom properties. **Explore here** once the basics click.
 
 ## Feature tour — what the Feature Showcase board demonstrates
@@ -31,7 +32,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 | **Parked** | `parked: true` + `opacity: 0.45` + `hoverOpacity: 0.95` — a faded "someday" lane that brightens on hover |
 | **Done** | done column; past-due cards here stay neutral (done is never "overdue") |
 
-**Cards** — across the board you'll find every priority (`A`/`B`/`C`/`D`, plus an unknown `someday` that renders muted; the board note's `priorities` property lists exactly that vocabulary, which is what the priority field and the right-click chips suggest — type a new value there and the board learns it), every due-date state (overdue, today, soon, later, none), tags (list and string form), an `area:`, custom properties (`energy`, `effort`), subtask checklists with progress, **subcards** (`- [ ] [[Child]]` rendered nested), comments (some signed `@alex` / `@agent`, which is what drives the unread markers; `Design the on-disk format` has one written as a plain paragraph, and quotes the whole card format inside a code fence without it being read as structure), and auto-history. The cards live in context subfolders (`Cards/Engineering/`, `Cards/Design/`); each folder's `_context.md` gives its cards a coloured accent strip + badge.
+**Cards** — across the board you'll find every priority (`A`/`B`/`C`/`D`, plus a `someday` the plugin has no opinion about, which takes the calmest ramp colour because the board note lists it last; that `priorities` property is the board's whole vocabulary, which is what the priority field and the right-click chips suggest — type a new value there and the board learns it), every due-date state (overdue, today, soon, later, none), tags (list and string form), an `area:`, custom properties (`energy`, `effort`), subtask checklists with progress, **subcards** (`- [ ] [[Child]]` rendered nested), comments (some signed `@alex` / `@agent`, which is what drives the unread markers; `Design the on-disk format` has one written as a plain paragraph, and quotes the whole card format inside a code fence without it being read as structure), and auto-history. The cards live in context subfolders (`Cards/Engineering/`, `Cards/Design/`); each folder's `_context.md` gives its cards a coloured accent strip + badge.
 
 **Subitems in a column of their own** — `Plan the v1.0 launch` (in Todo) carries all three cases of one rule at once, so you can compare them side by side:
 

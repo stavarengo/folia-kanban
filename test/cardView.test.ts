@@ -42,9 +42,55 @@ describe("priorityTone", () => {
     expect(priorityTone("medium")).toBe("prio-2");
     expect(priorityTone("low")).toBe("prio-3");
   });
-  it("falls back to muted for unknown values (keeps arbitrary scales rendering)", () => {
+  it("falls back to muted for unknown values with no vocabulary to rank them by", () => {
     expect(priorityTone("someday")).toBe("muted");
     expect(priorityTone("")).toBe("muted");
+    // One value is a scale of one: nothing to rank it against, so no ramp.
+    expect(priorityTone("someday", ["someday"])).toBe("muted");
+    // Still muted when the board's scale does not hold the value at all.
+    expect(priorityTone("someday", ["blocker", "whenever"])).toBe("muted");
+  });
+  it("ranks a board's own scale across the four tones, ends pinned", () => {
+    const ramp = (scale: string[]) => scale.map((v) => priorityTone(v, scale));
+    expect(ramp(["blocker", "whenever"])).toEqual(["prio-1", "prio-4"]);
+    expect(ramp(["blocker", "meh", "whenever"])).toEqual(["prio-1", "prio-3", "prio-4"]);
+    expect(ramp(["s1", "s2", "s3", "s4"])).toEqual(["prio-1", "prio-2", "prio-3", "prio-4"]);
+    expect(ramp(["s1", "s2", "s3", "s4", "s5"])).toEqual([
+      "prio-1",
+      "prio-2",
+      "prio-3",
+      "prio-3",
+      "prio-4",
+    ]);
+    expect(ramp(["s1", "s2", "s3", "s4", "s5", "s6"])).toEqual([
+      "prio-1",
+      "prio-2",
+      "prio-2",
+      "prio-3",
+      "prio-3",
+      "prio-4",
+    ]);
+  });
+  it("takes the ramp from the whole vocabulary, so a value it has not learned yet shifts it", () => {
+    const scale = ["blocker", "normal", "whenever"];
+    expect(priorityTone("whenever", scale)).toBe("prio-4");
+    // A card carrying a value the board note never listed widens the vocabulary, and the ramp
+    // spreads over the wider scale. Transient in practice: setting a priority folds it into the
+    // note, and the note's list is the user's to reorder.
+    expect(priorityTone("whenever", [...scale, "someday"])).toBe("prio-3");
+  });
+  it("lets the fixed scales win over the board's order, so a known scale never repaints", () => {
+    // `C` keeps its yellow even though this board lists it last, and `normal` keeps its orange
+    // between two invented neighbours.
+    expect(priorityTone("C", ["blocker", "C"])).toBe("prio-3");
+    expect(priorityTone("normal", ["blocker", "normal", "whenever"])).toBe("prio-2");
+    expect(priorityTone("blocker", ["blocker", "normal", "whenever"])).toBe("prio-1");
+  });
+  it("matches the vocabulary case-insensitively, like everything else about priorities", () => {
+    expect(priorityTone("BLOCKER", ["blocker", "whenever"])).toBe("prio-1");
+  });
+  it("ranks the showcase's `someday` under the A-D ramp it sits beside", () => {
+    expect(priorityTone("someday", ["A", "B", "C", "D", "someday"])).toBe("prio-4");
   });
 });
 

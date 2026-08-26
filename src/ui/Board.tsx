@@ -422,14 +422,14 @@ export function Board({
                 data-prio={
                   typeof activeCard.frontmatter.priority === "string" &&
                   activeCard.frontmatter.priority
-                    ? priorityTone(activeCard.frontmatter.priority)
+                    ? priorityTone(activeCard.frontmatter.priority, actions.priorities)
                     : undefined
                 }
               >
                 <div className="folia-card-main">
                   <div className="folia-card-title">{activeCard.title}</div>
                   {(() => {
-                    const chips = cardChips(activeCard, today, doneColumnId);
+                    const chips = cardChips(activeCard, today, doneColumnId, actions.priorities);
                     return chips.length > 0 ? (
                       <div className="folia-chips">
                         {chips.map((c) => (
