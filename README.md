@@ -216,7 +216,7 @@ priorities:
   - blocker
 ```
 
-That list is why a value **outlives the last card that used it**: delete every `blocker` card and `blocker` is still offered tomorrow. It is a plain property — reorder it, prune it, or write it yourself.
+That list is why a value **outlives the last card that used it**: delete every `blocker` card and `blocker` is still offered tomorrow. It is a plain property — reorder it, prune it, or write it yourself. Worth doing once, too: the first time a board writes this list it puts in every word its cards already used, in the order it found them, which is not a ranking anyone chose. What the order means is below.
 
 Its order is the ranking, strongest first, and it is what makes your own words read as a scale. Priority badges are drawn on a four-step colour ramp, and a value the plugin has no opinion about takes its colour from where you put it in this list: `blocker` / `steady` / `whenever` comes out hot-to-calm rather than as three identical grey chips. Two things stay deliberately conservative. The words the plugin does know keep their own colour wherever you list them — `A` stays red and `D` stays blue — and a value that only exists on a card, which the note has not learned yet, stays neutral rather than being ranked by a position you never chose. A column with `sort: priority` reads the same colours: strongest tone first, and the list order only decides between cards that share a tone. So reordering the list moves your own words, both in colour and in sort, while a word the plugin knows keeps its built-in severity wherever you put it — list `D` above `A` and `A` still leads.
 
