@@ -7,11 +7,13 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { Board, Card, CardBody, RelationLink, RelationTypeDef, SubItem } from "../model/types";
-import { syncSubtaskClaim } from "../model/board";
+import { boardLinkResolver, syncSubtaskClaim, type LinkResolver } from "../model/board";
 import { descriptionRefusal } from "../model/card";
+import { TITLE_KEY, resolveTitle } from "../model/cardTitle";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -39,9 +41,35 @@ interface Props {
   focusNew?: boolean;
   /** When set, focus the "Add a subcard" input (the context-menu "Add subcard" action). */
   focusAddSubcard?: boolean;
+  /** When set, focus the "Display title" field (the context-menu "Display title" action). */
+  focusDisplayTitle?: boolean;
 }
 
 const clampWidth = (n: number) => Math.min(DETAIL_WIDTH_MAX, Math.max(DETAIL_WIDTH_MIN, n));
+
+/**
+ * A one-line field's local draft, committed on blur/Enter. The persisted value follows the note
+ * (a reload after an external edit), and the draft follows it too — but only a draft that still
+ * reads what the field showed before: anything typed, committed or not, is never taken away. So a
+ * write that fails keeps its text in the field, and an edit landing from elsewhere waits for the
+ * field to be left. `trim` also strips the draft on commit.
+ */
+function useFieldDraft(value: string, onCommit: (v: string) => void, trim = false) {
+  const [draft, setDraft] = useState(value);
+  const shown = useRef(value);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = value;
+    setDraft((d) => (d === before ? value : d));
+  }, [value]);
+  const commit = () => {
+    const next = trim ? draft.trim() : draft;
+    if (next !== draft) setDraft(next);
+    // Against the value as the field would show it: a blur with nothing typed writes nothing.
+    if (next !== (trim ? value.trim() : value)) onCommit(next);
+  };
+  return { draft, setDraft, commit };
+}
 
 /** One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. */
 function PropRow({
@@ -55,12 +83,7 @@ function PropRow({
   onCommit: (v: string) => void;
   onRemove: () => void;
 }) {
-  const [draft, setDraft] = useState(value);
-  // Resync when the persisted value changes (e.g. after a reload picked up an external edit).
-  useEffect(() => setDraft(value), [value]);
-  const commit = () => {
-    if (draft !== value) onCommit(draft);
-  };
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit);
   return (
     <div className="folia-prop-row">
       <span className="folia-prop-key">{name}</span>
@@ -108,14 +131,7 @@ function PriorityField({
   onCommit: (v: string) => void;
 }) {
   const listId = useId();
-  const [draft, setDraft] = useState(value);
-  // Resync when the persisted value changes (e.g. after a reload picked up an external edit).
-  useEffect(() => setDraft(value), [value]);
-  const commit = () => {
-    const next = draft.trim();
-    if (next !== draft) setDraft(next);
-    if (next !== value) onCommit(next);
-  };
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
   return (
     <label>
       Priority
@@ -219,16 +235,6 @@ function CommentItem({
   );
 }
 
-function resolveBasename(board: Board, link: string): string | null {
-  for (const p in board.cards) {
-    const c = board.cards[p];
-    // Skip the synthetic cards minted for placed inline todos: they borrow their note's file name,
-    // so one would answer to a `[[wikilink]]` that names a real card.
-    if (c && !c.todoRef && c.basename === link) return p;
-  }
-  return null;
-}
-
 /**
  * What the per-subitem column picker is looking at: the column this line claims for itself, `""`
  * for "with this card", and whether that claim names a column this board actually has.
@@ -240,11 +246,15 @@ function resolveBasename(board: Board, link: string): string | null {
  * sitting in the note, and a picker that pretends it is absent is the one place it can never be
  * removed from.
  */
-function subtaskColumn(board: Board, item: SubItem): { value: string; known: boolean } {
+function subtaskColumn(
+  board: Board,
+  item: SubItem,
+  resolve: LinkResolver,
+): { value: string; known: boolean } {
   const raw =
     item.kind === "card"
       ? (() => {
-          const child = item.link ? resolveBasename(board, item.link) : null;
+          const child = item.link ? resolve(item.link) : null;
           return child ? String(board.cards[child]?.frontmatter.status ?? "") : "";
         })()
       : (item.status ?? "");
@@ -256,7 +266,52 @@ function subtaskColumn(board: Board, item: SubItem): { value: string; known: boo
 // never offer a second, conflicting way to write them. The board's relationship keys join these
 // per board (see `editedKeys`) for the add-property form: an array value is already excluded from
 // the rows themselves.
-const EDITED_KEYS = ["status", "priority", "due", "order", "type", "created"];
+const EDITED_KEYS = ["status", "priority", "due", "order", "type", "created", TITLE_KEY];
+
+/**
+ * The card's `title:` override as one always-present row: what the card is called when neither
+ * its file name nor its heading should be. Empty means "no override", and the placeholder shows
+ * what the card falls back to, so clearing the field is a visible choice rather than a guess.
+ * Commits on blur/Enter like the other property rows.
+ */
+function DisplayTitleRow({
+  value,
+  fallback,
+  inputRef,
+  onCommit,
+}: {
+  value: string;
+  fallback: string;
+  inputRef: RefObject<HTMLInputElement>;
+  onCommit: (v: string) => void;
+}) {
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
+  return (
+    <div className="folia-prop-row">
+      <span
+        className="folia-prop-key"
+        title="Overrides the file name and the heading; clear it to fall back"
+      >
+        Display title
+      </span>
+      <input
+        ref={inputRef}
+        className="folia-prop-input"
+        value={draft}
+        placeholder={fallback}
+        aria-label="Display title"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+      />
+    </div>
+  );
+}
 
 /**
  * One relationship row: the linked card's displayed title (clicking it opens that card), or the
@@ -369,7 +424,7 @@ function RelationTypeSections({
   choices: Map<string, string>;
   listId: string;
   onNavigate: ((path: string) => void) | undefined;
-  mutate: (fn: () => Promise<unknown>) => Promise<void>;
+  mutate: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
   const repo = useRepo();
   const [draft, setDraft] = useState("");
@@ -411,8 +466,13 @@ function RelationTypeSections({
               e.preventDefault();
               // Text naming no card is kept as typed: it becomes a link to a card that is not
               // there, which the list shows as missing rather than swallow.
-              void mutate(() => repo.addRelation(path, type.key, choices.get(typed) ?? typed));
               setDraft("");
+              void mutate(() => repo.addRelation(path, type.key, choices.get(typed) ?? typed)).then(
+                (ok) => {
+                  // A failed write hands the text back, into an empty box only.
+                  if (!ok) setDraft((cur) => cur || typed);
+                },
+              );
             }}
           />
         </div>
@@ -497,6 +557,7 @@ export function CardDetail({
   onCreated,
   focusNew,
   focusAddSubcard,
+  focusDisplayTitle,
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
@@ -509,6 +570,7 @@ export function CardDetail({
   const descRef = useRef<HTMLTextAreaElement | null>(null);
   const descViewRef = useRef<HTMLDivElement | null>(null);
   const subcardRef = useRef<HTMLInputElement | null>(null);
+  const displayTitleRef = useRef<HTMLInputElement | null>(null);
   // Synchronous in-flight guard for the create form: blocks a second submit (rapid Enter, or
   // Enter-then-click) during the async createCard window before onCreated unmounts this branch.
   const creatingRef = useRef(false);
@@ -518,6 +580,14 @@ export function CardDetail({
   const [descDraft, setDescDraft] = useState("");
   // What stopped the last save (an owned heading, an open fence), shown until the draft changes.
   const [descRefusal, setDescRefusal] = useState<ReturnType<typeof descriptionRefusal>>(null);
+  // The panel follows its note (see the `[path, isCreate, board]` effect), and a reload must never
+  // take words out of the editor. A draft is dirty from the first keystroke until it is saved or
+  // reverted; while dirty, reloads leave it alone. `descBase` is the description the draft grew
+  // from, so the editor can tell when the note moved on underneath it and say so.
+  const descDirty = useRef(false);
+  const descBase = useRef("");
+  // The draft as of the last keystroke, for a save that lands after more was typed.
+  const descLatest = useRef("");
   // Description defaults to a rendered view; clicking it (or the pencil) flips to the raw editor.
   const [editingDesc, setEditingDesc] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -525,8 +595,7 @@ export function CardDetail({
   const [newSubcard, setNewSubcard] = useState("");
   const [newComment, setNewComment] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [newPropKey, setNewPropKey] = useState("");
-  const [newPropVal, setNewPropVal] = useState("");
+  const [newProp, setNewProp] = useState({ key: "", val: "" });
   // Width override only while a resize drag is in flight; otherwise the panel reads settings.detailWidth.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   // Height the rendered preview occupied right before flipping to the raw editor, so the textarea
@@ -544,6 +613,9 @@ export function CardDetail({
     () => new Set([...EDITED_KEYS, ...relationKeys(board.config.relations)]),
     [board.config.relations],
   );
+  // The same reading of a `[[wikilink]]` the board used to nest subcards, so a link the board bound
+  // is never shown here as missing, and one the board refused (an ambiguous name) is never bound.
+  const resolve = useMemo(() => boardLinkResolver(board), [board]);
 
   // Unread comments (§ unread). Read-state is plugin data keyed by card path, so it is read from
   // settings rather than from the note. Two things happen here and their order is the whole point:
@@ -636,6 +708,15 @@ export function CardDetail({
     () => unreadComments(commentMarks, seenAtOpen, me),
     [commentMarks, seenAtOpen, me],
   );
+  const commentKeys = useMemo(() => {
+    const seen = new Map<string, number>();
+    return (body?.comments ?? []).map((c) => {
+      const id = `${c.timestamp}\u0000${c.author ?? ""}\u0000${c.text}`;
+      const n = seen.get(id) ?? 0;
+      seen.set(id, n + 1);
+      return `${id}\u0000${n}`;
+    });
+  }, [body]);
   // Opening a card marks everything on it as seen. Keyed on the newest timestamp (a string), not on
   // the comments array, which is a fresh reference after every board reload; the equality guard
   // stops the settings write it triggers from coming straight back round.
@@ -662,26 +743,57 @@ export function CardDetail({
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
+  // Reads can overlap (a write's own reload and the board's); only the latest may land.
+  const readSeq = useRef(0);
   const reload = async () => {
+    const seq = ++readSeq.current;
     try {
       const b = await repo.readBody(path);
+      // Neither an older read nor one started for a card since navigated away from may land.
+      if (seq !== readSeq.current || !stillHere()) return;
       setBody(b);
       setBodyPath(path);
-      setDescDraft(b.description);
+      if (!descDirty.current) {
+        setDescDraft(b.description);
+        descBase.current = b.description;
+      }
     } catch {
-      onClose(); // card was deleted out from under us
+      // A read that failed (the note mid-rewrite, or already gone) keeps what the panel has:
+      // closing here would take the drafts with it, and a card that is really gone leaves the
+      // board on its next reload, which unmounts the panel anyway.
     }
   };
 
+  // The card on screen right now, as of this render — what a write or read started on an
+  // earlier card checks before touching state, since the panel is one instance across cards and
+  // the async work of the previous one keeps resolving after navigation.
+  const livePath = useRef(path);
+  livePath.current = path;
+  const stillHere = () => livePath.current === path;
+  // Which card the panel state below belongs to; the effect resets it only when that changes.
+  const shownPath = useRef<string | null>(null);
+  // The body is re-read whenever the board reloads — its own writes and edits landing from
+  // elsewhere (another pane, an agent, sync) come through the same signal — so what the panel
+  // shows is what the note says, not what it said when the panel opened. Each field with a draft
+  // decides for itself what a reload may touch: see `descDirty`, and the comment list's keys.
   useEffect(() => {
     if (isCreate) return; // no card to read while the create form is up
-    setBody(null);
-    setBodyPath(null);
-    setConfirmDelete(false);
-    setEditingDesc(false); // navigating cards starts the new card in view mode
-    setDescRefusal(null);
+    if (shownPath.current !== path) {
+      shownPath.current = path;
+      setBody(null);
+      setBodyPath(null);
+      setConfirmDelete(false);
+      setEditingDesc(false); // navigating cards starts the new card in view mode
+      setDescRefusal(null);
+      // The previous card's draft goes with it: until this card's read lands, an editor opened
+      // from the empty state would otherwise start from the other card's text.
+      descDirty.current = false;
+      descBase.current = "";
+      descLatest.current = "";
+      setDescDraft("");
+    }
     void reload();
-  }, [path, isCreate]);
+  }, [path, isCreate, board]);
 
   // Dialog focus management: focus in on open, return focus to the opener on close. The create form
   // autofocuses its title input (a synchronous commit-phase focus), so don't steal it back here.
@@ -694,8 +806,8 @@ export function CardDetail({
   // A freshly-created card (inline-edit / detail flows) lands the user in the description editor.
   // Description defaults to view mode, so a fresh card has no textarea to focus — flip to edit mode
   // here; the editing-flag effect below focuses the textarea once it mounts. Keyed on `path`, not
-  // `body`, so each field edit's reload doesn't re-trigger. The detail create flow unmounts the
-  // create branch and remounts a fresh card panel; inline-edit re-keys the same instance on the new path.
+  // `body`, so each field edit's reload doesn't re-trigger. Both add-card flows keep this one panel
+  // instance and change its path — the create form and the card are the same mounted component.
   useEffect(() => {
     if (focusNew && !isCreate) setEditingDesc(true);
   }, [focusNew, path]);
@@ -738,11 +850,25 @@ export function CardDetail({
     setEditingDesc(true);
   };
 
+  // Drop the draft for what the note says now (a reload while the draft was dirty kept both).
+  const revertDesc = () => {
+    descDirty.current = false;
+    if (body) {
+      setDescDraft(body.description);
+      descBase.current = body.description;
+    }
+  };
+
   // The "Add subcard" context-menu action opens this card and lands focus on its subcard input,
   // letting the user type the title there (the input's Enter handler calls repo.addSubcard).
   useEffect(() => {
     if (focusAddSubcard && !isCreate) subcardRef.current?.focus();
   }, [focusAddSubcard, path]);
+
+  // Same shape for the context-menu "Display title" action.
+  useEffect(() => {
+    if (focusDisplayTitle && !isCreate) displayTitleRef.current?.focus();
+  }, [focusDisplayTitle, path]);
 
   // Side modes: a pointerdown outside the panel closes it — but not when it lands on another
   // card (that card's own open handler switches the detail), nor on a menu/context surface.
@@ -788,10 +914,20 @@ export function CardDetail({
     activeDocument.addEventListener("pointerup", onUp);
   };
 
-  const mutate = async (fn: () => Promise<unknown>) => {
-    await fn();
-    await reload();
-    onChanged();
+  // Every write the panel makes goes through here, and a failure is reported the way every other
+  // board mutation's is (the toast), instead of leaving the panel looking as if nothing happened.
+  // The body is re-read and the board reloaded either way, since a write can fail halfway.
+  const mutate = async (fn: () => Promise<unknown>): Promise<boolean> => {
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      actions.reportError(e);
+      return false;
+    } finally {
+      await reload();
+      onChanged();
+    }
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -817,8 +953,9 @@ export function CardDetail({
           const newPath = await repo.createCard(t, createColumn);
           onCreated?.(newPath);
           // On success this branch unmounts (createColumn→null), so no need to reset the guard.
-        } catch {
+        } catch (e) {
           creatingRef.current = false; // let the user retry after a failed create
+          actions.reportError(e);
         }
       })();
     };
@@ -921,11 +1058,30 @@ export function CardDetail({
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? [];
   const curPriority = String(fm.priority ?? "");
+  // What the card would be called with no `title:` key, under this board's mode: the placeholder
+  // the Display title field shows, so clearing it is a visible choice. Judged on the headings the
+  // body holds (its H1 and whatever the description carries), the same way the board judges them.
+  const titleWithoutOverride =
+    body === null
+      ? card.titleSource === "frontmatter"
+        ? ""
+        : card.title
+      : resolveTitle(
+          card.basename,
+          {},
+          `${body.title ? `# ${body.title}\n` : ""}${body.description}`,
+          board.config.titleMode,
+        ).title;
+  // The Display title field only ever shows a non-blank string `title:`; any other shape (a
+  // number, a blank written by hand) is a generic row instead, or it would have no way out of
+  // the note.
+  const titleRowIsGeneric =
+    TITLE_KEY in fm && (typeof fm[TITLE_KEY] !== "string" || fm[TITLE_KEY] === "");
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
-      !editedKeys.has(k) &&
+      (!editedKeys.has(k) || (k === TITLE_KEY && titleRowIsGeneric)) &&
       (typeof v === "string" || typeof v === "number" || typeof v === "boolean") &&
-      v !== "",
+      (v !== "" || k === TITLE_KEY),
   );
 
   return (
@@ -1026,7 +1182,10 @@ export function CardDetail({
           {/* The one field that does not go through `mutate`: setting a priority also teaches the
               board note its vocabulary, which lives in the shared action, and that action already
               reloads the board. Going through `mutate` would reload it a second time. */}
+          {/* Keyed by card, as every field with a draft is: what was typed on one card must not
+              be sitting in the field when the panel moves to the next one. */}
           <PriorityField
+            key={path}
             value={curPriority}
             options={priorityOptions(actions.priorities, curPriority)}
             onCommit={(value) =>
@@ -1049,9 +1208,24 @@ export function CardDetail({
         </div>
 
         <div className="folia-props">
+          {!titleRowIsGeneric && (
+            <DisplayTitleRow
+              key={path}
+              value={typeof fm[TITLE_KEY] === "string" ? fm[TITLE_KEY] : ""}
+              fallback={titleWithoutOverride}
+              inputRef={displayTitleRef}
+              onCommit={(val) =>
+                void mutate(() =>
+                  val === ""
+                    ? repo.unsetFrontmatterKey(path, TITLE_KEY)
+                    : repo.setFrontmatter(path, { [TITLE_KEY]: val }),
+                )
+              }
+            />
+          )}
           {extraProps.map(([k, v]) => (
             <PropRow
-              key={k}
+              key={`${path}\u0000${k}`}
               name={k}
               value={String(v)}
               onCommit={(val) => void mutate(() => repo.setFrontmatter(path, { [k]: val }))}
@@ -1061,28 +1235,32 @@ export function CardDetail({
           <div className="folia-prop-add">
             <input
               className="folia-prop-input"
-              value={newPropKey}
+              value={newProp.key}
               placeholder="property"
               aria-label="New property name"
-              onChange={(e) => setNewPropKey(e.target.value)}
+              onChange={(e) => setNewProp({ ...newProp, key: e.target.value })}
             />
             <input
               className="folia-prop-input"
-              value={newPropVal}
+              value={newProp.val}
               placeholder="value"
               aria-label="New property value"
-              onChange={(e) => setNewPropVal(e.target.value)}
+              onChange={(e) => setNewProp({ ...newProp, val: e.target.value })}
             />
             <button
               className="folia-btn"
               aria-label="Add property"
-              disabled={!newPropKey.trim() || editedKeys.has(newPropKey.trim())}
+              disabled={!newProp.key.trim() || editedKeys.has(newProp.key.trim())}
               onClick={() => {
-                const key = newPropKey.trim();
+                const key = newProp.key.trim();
                 if (!key || editedKeys.has(key)) return;
-                void mutate(() => repo.setFrontmatter(path, { [key]: newPropVal }));
-                setNewPropKey("");
-                setNewPropVal("");
+                const val = newProp.val;
+                setNewProp({ key: "", val: "" });
+                void mutate(() => repo.setFrontmatter(path, { [key]: val })).then((ok) => {
+                  // Handed back as a pair, and only into an empty form: an entry typed meanwhile stays.
+                  if (!ok && stillHere())
+                    setNewProp((cur) => (cur.key || cur.val ? cur : { key, val }));
+                });
               }}
             >
               Add
@@ -1105,6 +1283,8 @@ export function CardDetail({
                     : undefined
                 }
                 onChange={(e) => {
+                  descDirty.current = true;
+                  descLatest.current = e.target.value;
                   setDescDraft(e.target.value);
                   setDescRefusal(null);
                 }}
@@ -1113,7 +1293,7 @@ export function CardDetail({
                   if (e.key === "Escape") {
                     // Stay inside the editor: don't let Escape bubble to the panel and close it.
                     e.stopPropagation();
-                    if (body) setDescDraft(body.description);
+                    revertDesc();
                     setDescRefusal(null);
                     setEditingDesc(false);
                   }
@@ -1127,6 +1307,14 @@ export function CardDetail({
                     : "opens a code block that is never closed, so it would run to the end of the note and swallow the sections after it. Close the fence."}
                 </p>
               )}
+              {body && body.description !== descBase.current && (
+                // The note moved on while this draft was being written. Neither side is thrown
+                // away on its own: Save writes the draft over it, Revert takes the note's version.
+                <p className="folia-desc-behind" role="status">
+                  The description changed in the note while you were editing. Save keeps your
+                  version; Revert loads the note's.
+                </p>
+              )}
               <div className="folia-row-actions">
                 <button
                   className="folia-btn folia-btn-primary"
@@ -1136,9 +1324,19 @@ export function CardDetail({
                       setDescRefusal(refusal);
                       return;
                     }
-                    void mutate(() => repo.setDescription(path, descDraft)).then(() =>
-                      setEditingDesc(false),
-                    );
+                    // The draft stays dirty through the write and the reload it triggers, so a
+                    // failed save leaves it in place; only a success makes the saved text the base.
+                    // Words typed while the write was in flight keep the editor open, unsaved.
+                    const saved = descDraft;
+                    descLatest.current = saved;
+                    void mutate(() => repo.setDescription(path, saved)).then((ok) => {
+                      if (!ok || !stillHere()) return;
+                      // The note holds the description trimmed, and is read back that way.
+                      descBase.current = saved.trim();
+                      if (descLatest.current !== saved) return;
+                      descDirty.current = false;
+                      setEditingDesc(false);
+                    });
                   }}
                 >
                   Save
@@ -1146,7 +1344,7 @@ export function CardDetail({
                 <button
                   className="folia-btn"
                   onClick={() => {
-                    if (body) setDescDraft(body.description);
+                    revertDesc();
                     setDescRefusal(null);
                     setEditingDesc(false);
                   }}
@@ -1219,7 +1417,7 @@ export function CardDetail({
                 />
                 {s.kind === "card" && s.link ? (
                   (() => {
-                    const child = resolveBasename(board, s.link);
+                    const child = resolve(s.link);
                     return child ? (
                       // The link text is the child's basename (that is what wikilinks bind to);
                       // show the child's displayed title, same as its tile on the board.
@@ -1244,9 +1442,9 @@ export function CardDetail({
                     link names no card on the board has nothing to write to, so the control says so
                     rather than accepting a choice it would drop. */}
                 {(() => {
-                  const child = s.kind === "card" && s.link ? resolveBasename(board, s.link) : null;
+                  const child = s.kind === "card" && s.link ? resolve(s.link) : null;
                   const orphanLink = s.kind === "card" && child === null;
-                  const claim = subtaskColumn(board, s);
+                  const claim = subtaskColumn(board, s, resolve);
                   return (
                     <select
                       className="folia-subtask-column"
@@ -1304,8 +1502,11 @@ export function CardDetail({
               onChange={(e) => setNewTodo(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newTodo.trim()) {
-                  void mutate(() => repo.addTodo(path, newTodo.trim()));
+                  const text = newTodo;
                   setNewTodo("");
+                  void mutate(() => repo.addTodo(path, text.trim())).then((ok) => {
+                    if (!ok && stillHere()) setNewTodo((cur) => cur || text);
+                  });
                 }
               }}
             />
@@ -1319,8 +1520,11 @@ export function CardDetail({
               onChange={(e) => setNewSubcard(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newSubcard.trim()) {
-                  void mutate(() => repo.addSubcard(path, newSubcard.trim()));
+                  const text = newSubcard;
                   setNewSubcard("");
+                  void mutate(() => repo.addSubcard(path, text.trim())).then((ok) => {
+                    if (!ok && stillHere()) setNewSubcard((cur) => cur || text);
+                  });
                 }
               }}
             />
@@ -1329,7 +1533,8 @@ export function CardDetail({
 
         {board.config.relations.map((type) => (
           <RelationTypeSections
-            key={type.key}
+            // Keyed by card as well: the link input's draft belongs to the card it was typed on.
+            key={`${path}\u0000${type.key}`}
             type={type}
             links={relations.filter((l) => l.type === type.key)}
             board={board}
@@ -1353,6 +1558,12 @@ export function CardDetail({
               // The divider is an extra <li> spliced in at the boundary, NOT a second list: `i`
               // stays the comment's own position, which is the edit/delete handle the model walks.
               const isFirstUnread = unread.indices[0] === i;
+              // Keyed by the line itself, not its position: a reload after a comment is removed
+              // above this one must keep an inline edit on the comment it was opened on. The text
+              // is part of the key on purpose — a comment rewritten from elsewhere while its editor
+              // is open is a different line, and the editor closes rather than write the old
+              // wording back over it. Identical lines are told apart by which of them this one is.
+              const key = commentKeys[i] ?? String(i);
               // "reply" marks the comment that actually landed after one of yours, which need not be
               // the first unread one — an older unread comment can sit before it.
               const mark: false | "unread" | "reply" = !unread.indices.includes(i)
@@ -1362,7 +1573,7 @@ export function CardDetail({
                   : "unread";
               const item = (
                 <CommentItem
-                  key={i}
+                  key={key}
                   timestamp={c.timestamp}
                   author={c.author}
                   unread={mark}
@@ -1388,7 +1599,7 @@ export function CardDetail({
                     // break the <ul>'s list semantics (axe `list`). Hidden from assistive tech:
                     // it would only add an item that says "New" and shift every count after it,
                     // while each unread line already carries its own tag.
-                    <li key={`new-${i}`} className="folia-comments-divider" aria-hidden="true">
+                    <li key={`new-${key}`} className="folia-comments-divider" aria-hidden="true">
                       <span>New</span>
                     </li>,
                     item,
@@ -1410,11 +1621,13 @@ export function CardDetail({
                   e.preventDefault();
                   const text = newComment.trim();
                   const floor = body?.comments.length ?? 0;
+                  setNewComment("");
                   void mutate(async () => {
                     await repo.addComment(path, text);
-                    postedHere.current.posts.push({ floor, text });
+                    if (stillHere()) postedHere.current.posts.push({ floor, text });
+                  }).then((ok) => {
+                    if (!ok && stillHere()) setNewComment((cur) => cur || text);
                   });
-                  setNewComment("");
                 }
               }}
             />

@@ -1,6 +1,6 @@
 # Folia Kanban — Example Vault
 
-Welcome! This folder is a ready-to-open **Obsidian vault** with three example boards for learning the **Folia Kanban** plugin. Every card is a plain Markdown file — drag-and-drop, nested subcards, comments, and history, with no database.
+Welcome! This folder is a ready-to-open **Obsidian vault** with a few example boards for learning the **Folia Kanban** plugin. Every card is a plain Markdown file — drag-and-drop, nested subcards, comments, and history, with no database.
 
 ## How to open it
 
@@ -17,6 +17,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with three example bo
 - **Basic** — folder [`basic/`](./basic/), board note [`Example Board.md`](<basic/Example Board.md>). A minimal 3-column board (Todo / Doing / Done) with a couple of sample cards. **Start here**: it shows the bare essentials — a board note, a `card-folder`, and cards as Markdown files.
 - **Custom Scale** — folder [`custom-scale/`](./custom-scale/), board note [`Custom Scale Board.md`](<custom-scale/Custom Scale Board.md>). A small board whose priorities are `blocker` / `steady` / `whenever` instead of `A`/`B`/`C` — it shows how the board note's `priorities` order becomes both the colour ramp and the sort order.
 - **Feature Showcase** — folder [`feature-showcase/`](./feature-showcase/), board note [`Showcase Board.md`](<feature-showcase/Showcase Board.md>). A "kitchen-sink" board that exercises **every feature** in one place — columns, lanes, contexts, priorities, due-date buckets, subcards, relationships, comments, history, and custom properties. **Explore here** once the basics click.
+- **Title modes** — folder [`title-modes/`](./title-modes/), three board notes over one card folder: [`Auto Board.md`](<title-modes/Auto Board.md>), [`Heading Board.md`](<title-modes/Heading Board.md>) and [`Filename Board.md`](<title-modes/Filename Board.md>). Each sets a different `card-title` policy, so the same three cards show under all three rules side by side (see [Title modes](#title-modes-side-by-side) below).
 
 ## Feature tour — what the Feature Showcase board demonstrates
 
@@ -72,6 +73,18 @@ Open any of them: the panel has one editable list per type (**Blocks**, **A resu
 
 **A note written under its own headings** — `Decide the export format.md` keeps its whole body under `## Question` and `## Answer`, the shape an issue-style note (or an agent) tends to produce. Open it: the Description box shows all of it, headings and all, because a card's description is everything between the title and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Edit the description and save, and that structure comes back unchanged.
 
+## Title modes, side by side
+
+The three boards in `title-modes/` share one `Cards/` folder and differ in one line: `card-title: auto`, `heading` or `filename`. What each card shows on each board:
+
+| Card file | Heading in the note | `auto` | `heading` | `filename` |
+| --- | --- | --- | --- | --- |
+| `Notes.md` | `# Notes from the kickoff meeting` | Notes | Notes from the kickoff meeting | Notes |
+| `02-write-docs.md` | `# Docs` | 02-write-docs | Docs | 02-write-docs |
+| `Override.md` (has `title: Set from the frontmatter`) | `# The heading of this note` | Set from the frontmatter | Set from the frontmatter | Set from the frontmatter |
+
+`auto` only reads a heading for a slug-shaped file name, and only when the heading reads as a real title, so `Notes.md` keeps its name and `02-write-docs.md` skips its one-word heading. A `title:` key wins everywhere; open `Override` and clear the **Display title** field in its detail panel to watch each board fall back to its own rule.
+
 ## Things to try (features you can't see in a static file)
 
 - **Open a card** (click it) to see the **detail panel** — edit status, priority, due date, custom properties, subtasks, comments. The priority field is free text with the board's own values as suggestions: type `blocker`, and it joins the board note's `priorities` list and shows up as a suggestion from then on, even after you delete the card again. Try both presentations: Settings → *Card details — presentation* → `side` vs `modal`.
@@ -84,6 +97,7 @@ Open any of them: the panel has one editable list per type (**Blocks**, **A resu
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
 - **Live reload:** edit a card `.md` in another pane and watch the board update.
 - **Swap the tab's view:** the tab header button flips between the board and the note's Markdown. Settings → *Board notes — open as* picks which one a board note starts in, and adding `folia-view: markdown` to one board note's frontmatter overrides that for that note alone.
+- **Set a display title:** open any card and type into the **Display title** field near the top of its detail panel (or right-click the tile and pick **Display title**). The tile reads that from then on, whatever the board's `card-title` says; clear the field to go back.
 - **Rename a title-sourced card:** rename `04-tune-the-search-index` from the board and its `# ` heading is rewritten — the file keeps its slug name. Rename `Ship the release notes` and its `title:` frontmatter value changes instead.
 
 ## Authoring gotchas (worth knowing)

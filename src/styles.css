@@ -1476,6 +1476,14 @@
 .folia-desc-view:focus-within .folia-desc-edit {
   opacity: 1;
 }
+.folia-desc-behind {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  font-size: var(--folia-font-size-xs);
+  color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
+  background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
+  border-radius: var(--folia-r-sm);
+}
 .folia-desc-empty.folia-desc-empty {
   display: block;
   width: 100%;

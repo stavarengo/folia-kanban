@@ -101,6 +101,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const [focusNew, setFocusNew] = useState(false);
   // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
   const [focusAddSubcard, setFocusAddSubcard] = useState(false);
+  // One-shot: focus the open card's "Display title" field (the context-menu "Display title" action).
+  const [focusDisplayTitle, setFocusDisplayTitle] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
@@ -281,6 +283,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setOpenOverride(null);
     setFocusNew(false);
     setFocusAddSubcard(false);
+    setFocusDisplayTitle(false);
     setCreateColumn(null);
     // An inline todo placed in its own column has no note of its own, so opening its tile opens the
     // note that owns the checklist line — where the todo is edited, exactly as it always was. One
@@ -302,6 +305,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         openCard(path);
         setFocusAddSubcard(true);
       },
+      editDisplayTitle: (path) => {
+        openCard(path);
+        setFocusDisplayTitle(true);
+      },
+      reportError,
       complete: (path) => {
         if (!doneColumnId) return;
         const title = boardRef.current?.cards[path]?.title ?? "Card";
@@ -692,6 +700,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setOpenOverride(null);
     setFocusNew(false);
     setFocusAddSubcard(false);
+    setFocusDisplayTitle(false);
   };
 
   const detail = detailOpen ? (
@@ -701,6 +710,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       mode={detailMode}
       focusNew={focusNew}
       focusAddSubcard={focusAddSubcard}
+      focusDisplayTitle={focusDisplayTitle}
       onClose={closeDetail}
       onNavigate={openCard}
       onChanged={() => void load()}

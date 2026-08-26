@@ -3103,3 +3103,503 @@ describe("is: and unread: in the search box and chips", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("the detail panel reads links the way the board does", () => {
+  it("binds a folder-qualified subcard link, as the board nests it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Parent.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Tasks/Sub/Child]]\n",
+      },
+      "Tasks/Sub/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Parent"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByRole("button", { name: "Child" })).toHaveClass("folia-link");
+    expect(within(detail).getByRole("combobox", { name: /^Column for/ })).toBeEnabled();
+  });
+
+  it("refuses a basename two cards share, as the board does", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Parent.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Child]]\n",
+      },
+      "Tasks/A/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
+      "Tasks/B/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Parent"));
+    const detail = await screen.findByTestId("card-detail");
+    expect(within(detail).getByText("Child")).toHaveClass("folia-link-missing");
+    expect(within(detail).getByRole("combobox", { name: /^Column for/ })).toBeDisabled();
+  });
+});
+
+describe("the detail panel reports a failed write", () => {
+  it("shows the error toast when adding a subcard fails", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.addSubcard = async () => {
+      throw new Error("disk is full");
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Add a subcard"), "Child{Enter}");
+    expect(await screen.findByText("disk is full")).toHaveClass("folia-toast-error");
+  });
+
+  it("shows the error toast when the detail create flow fails, and keeps the form for a retry", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.createCard = async () => {
+      throw new Error("folder is read-only");
+    };
+    render_(repo, { ...DEFAULT_SETTINGS, addCardFlow: "detail" });
+    await screen.findByText("Alpha");
+    await user.click(screen.getByLabelText("Add card to Done"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("New card title"), "Doomed");
+    await user.click(within(detail).getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("folder is read-only")).toHaveClass("folia-toast-error");
+    expect(within(detail).getByLabelText("New card title")).toHaveValue("Doomed");
+    expect(within(detail).getByRole("button", { name: "Create" })).toBeEnabled();
+  });
+});
+
+describe("an open detail panel follows its note", () => {
+  it("shows a comment that arrived from elsewhere", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByText("hi there");
+    const file = repo.files.get("Tasks/Alpha.md")!;
+    file.body += "- _2026-06-13 10:00 @agent:_ from outside\n";
+    repo.notify();
+    expect(await within(detail).findByText("from outside")).toBeInTheDocument();
+  });
+
+  it("keeps a description draft and a half-written comment, and says the note moved on", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    const editor = within(detail).getByLabelText("Edit description") as HTMLTextAreaElement;
+    await user.type(editor, " and more");
+    await user.type(within(detail).getByLabelText("Write a comment"), "half a thought");
+    const file = repo.files.get("Tasks/Alpha.md")!;
+    file.body = file.body.replace("Desc A", "Desc B");
+    repo.notify();
+    expect(await within(detail).findByRole("status")).toHaveTextContent(/changed in the note/);
+    expect(editor).toHaveValue("Desc A and more");
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("half a thought");
+    await user.click(within(detail).getByRole("button", { name: "Revert" }));
+    expect(await within(detail).findByText("Desc B")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("half a thought");
+  });
+
+  it("keeps an inline comment edit on its comment when the one above it is removed elsewhere", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Two.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Two\n\n## Comments\n- _2026-06-13 09:00:_ first\n- _2026-06-13 09:05:_ second\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Two"));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByText("second");
+    await user.click(within(detail).getAllByRole("button", { name: "Edit comment" })[1]!);
+    await user.type(within(detail).getByRole("textbox", { name: "Edit comment" }), " edited");
+    const file = repo.files.get("Tasks/Two.md")!;
+    file.body = file.body.replace("- _2026-06-13 09:00:_ first\n", "");
+    repo.notify();
+    await waitFor(() => expect(within(detail).queryByText("first")).not.toBeInTheDocument());
+    expect(within(detail).getByRole("textbox", { name: "Edit comment" })).toHaveValue(
+      "second edited",
+    );
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(file.body).toContain("- _2026-06-13 09:05:_ second edited"));
+    expect(file.body).not.toContain("first");
+  });
+});
+
+describe("display title override", () => {
+  it("sets and clears the card's title key from the panel's Display title field", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Display title") as HTMLInputElement;
+    expect(field).toHaveValue("");
+    expect(field.placeholder).toBe("Alpha");
+    await user.type(field, "Alpha, shown{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha, shown"));
+    expect(await screen.findByRole("heading", { name: "Alpha, shown" })).toBeInTheDocument();
+    // The key has its own control, so the generic property rows must not offer it a second time.
+    expect(within(detail).queryByLabelText("Value of title")).not.toBeInTheDocument();
+    await user.clear(within(detail).getByLabelText("Display title"));
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBeUndefined());
+    expect(await screen.findByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+  });
+
+  it("the card menu's Display title opens the panel on that field", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    await user.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Display title/ }),
+    );
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() => expect(within(detail).getByLabelText("Display title")).toHaveFocus());
+  });
+});
+
+describe("the detail panel keeps its drafts when a write fails or the note moves on", () => {
+  it("a failed description save keeps the editor open with the draft in place", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.setDescription = async () => {
+      throw new Error("note is locked");
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    await user.type(within(detail).getByLabelText("Edit description"), " kept");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("note is locked")).toHaveClass("folia-toast-error");
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("Desc A kept");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("Desc A");
+  });
+
+  it("an untouched inline comment edit does not write over a change that arrived from elsewhere", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByText("hi there");
+    await user.click(within(detail).getByRole("button", { name: "Edit comment" }));
+    const file = repo.files.get("Tasks/Alpha.md")!;
+    file.body = file.body.replace("hi there", "hi there, rewritten outside");
+    repo.notify();
+    await waitFor(() => expect(file.body).toContain("rewritten outside"));
+    await user.click(within(detail).getByRole("heading", { name: "Alpha" }));
+    await waitFor(() =>
+      expect(within(detail).queryByRole("textbox", { name: "Edit comment" })).toBeNull(),
+    );
+    expect(file.body).toContain("hi there, rewritten outside");
+  });
+});
+
+describe("the Display title placeholder names the card's fallback under the board's mode", () => {
+  it("shows the heading a `card-title: heading` board would fall back to", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      { ...config, titleMode: "heading" },
+      {
+        "Tasks/Notes.md": {
+          fm: { type: "task", status: "todo", title: "Overridden" },
+          body: "\n# Notes from the kickoff\n\nBody.\n",
+        },
+      },
+    );
+    render_(repo);
+    await user.click(await screen.findByText("Overridden"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Display title") as HTMLInputElement;
+    await waitFor(() => expect(field.placeholder).toBe("Notes from the kickoff"));
+    await user.clear(field);
+    await user.keyboard("{Enter}");
+    expect(
+      await screen.findByRole("heading", { name: "Notes from the kickoff" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the detail panel hands text back when a small write fails", () => {
+  it("a failed comment post puts the comment back in the box", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.addComment = async () => {
+      throw new Error("cannot write");
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "long thought{Enter}");
+    expect(await screen.findByText("cannot write")).toHaveClass("folia-toast-error");
+    await waitFor(() =>
+      expect(within(detail).getByLabelText("Write a comment")).toHaveValue("long thought"),
+    );
+  });
+
+  it("a description save that lands after more typing leaves the editor open with the new words", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    let release: () => void = () => {};
+    const origSet = repo.setDescription.bind(repo);
+    repo.setDescription = async (path: string, text: string) => {
+      await new Promise<void>((r) => {
+        release = r;
+      });
+      return origSet(path, text);
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    const editor = within(detail).getByLabelText("Edit description");
+    // A trailing newline: the note stores the description trimmed, and the editor must not read
+    // that difference as the note having moved on.
+    await user.type(editor, " one{Enter}");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    await user.type(editor, "two");
+    release();
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("Desc A one"));
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("Desc A one\ntwo");
+    expect(within(detail).queryByRole("status")).toBeNull();
+  });
+
+  it("keeps an inline edit on its own comment among same-minute comments when one is removed elsewhere", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Two.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Two\n\n## Comments\n- _2026-06-13 09:00 @alex:_ first\n- _2026-06-13 09:00 @alex:_ second\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Two"));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByText("second");
+    await user.click(within(detail).getAllByRole("button", { name: "Edit comment" })[0]!);
+    await user.type(within(detail).getByRole("textbox", { name: "Edit comment" }), " edited");
+    const file = repo.files.get("Tasks/Two.md")!;
+    file.body = file.body.replace("- _2026-06-13 09:00 @alex:_ first\n", "");
+    repo.notify();
+    await waitFor(() => expect(within(detail).queryByText("first")).not.toBeInTheDocument());
+    // The comment under edit is gone, so its editor goes with it rather than land on "second".
+    expect(within(detail).queryByRole("textbox", { name: "Edit comment" })).toBeNull();
+    expect(file.body).toContain("- _2026-06-13 09:00 @alex:_ second\n");
+  });
+});
+
+describe("an open detail panel survives a read it could not complete", () => {
+  it("keeps the panel and its drafts when a body read fails", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "still here");
+    let failed = 0;
+    repo.readBody = async () => {
+      failed++;
+      throw new Error("mid-rewrite");
+    };
+    repo.notify();
+    await waitFor(() => expect(failed).toBeGreaterThan(0));
+    expect(screen.getByTestId("card-detail")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("still here");
+    expect(within(detail).getByText("Desc A")).toBeInTheDocument();
+  });
+
+  it("keeps a property value being typed when that key changes in the note", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Value of area");
+    await user.clear(field);
+    await user.type(field, "garden");
+    repo.files.get("Tasks/Alpha.md")!.fm["area"] = "office";
+    repo.notify();
+    await waitFor(() => expect(within(detail).getByLabelText("Priority")).toBeInTheDocument());
+    expect(within(detail).getByLabelText("Value of area")).toHaveValue("garden");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["area"]).toBe("garden"));
+  });
+});
+
+describe("the detail panel's reads and field writes stay with their card", () => {
+  it("a slow write on one card does not put that card's body on the card opened next", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    let release: () => void = () => {};
+    const origAdd = repo.addTodo.bind(repo);
+    repo.addTodo = async (path: string, text: string) => {
+      await new Promise<void>((r) => {
+        release = r;
+      });
+      return origAdd(path, text);
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Add a todo"), "slow todo{Enter}");
+    await user.click(within(detail).getByRole("button", { name: "Beta" }));
+    await screen.findByRole("heading", { name: "Beta" });
+    // Hold the board reload that follows the write, so the window in which Alpha's own re-read
+    // lands on the panel now showing Beta stays open long enough to look at.
+    let releaseLoad: () => void = () => {};
+    const origLoad = repo.loadBoard.bind(repo);
+    let reads = 0;
+    const origRead = repo.readBody.bind(repo);
+    repo.readBody = async (path: string) => {
+      reads++;
+      return origRead(path);
+    };
+    repo.loadBoard = async () => {
+      await new Promise<void>((r) => {
+        releaseLoad = r;
+      });
+      return origLoad();
+    };
+    release();
+    await waitFor(() => expect(reads).toBeGreaterThan(0));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("slow todo"));
+    expect(within(detail).queryByText("first todo")).toBeNull();
+    expect(within(detail).queryByText("slow todo")).toBeNull();
+    releaseLoad();
+    await screen.findByRole("heading", { name: "Beta" });
+  });
+
+  it("a failed property write keeps the typed value in its field", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.setFrontmatter = async () => {
+      throw new Error("frontmatter locked");
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Value of area");
+    await user.clear(field);
+    await user.type(field, "garden{Enter}");
+    expect(await screen.findByText("frontmatter locked")).toHaveClass("folia-toast-error");
+    expect(within(detail).getByLabelText("Value of area")).toHaveValue("garden");
+  });
+});
+
+describe("a field draft belongs to the card it was typed on", () => {
+  it("does not carry a Display title draft over to the next card opened", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Display title"), "Alpha shown");
+    await user.click(screen.getByText("Gamma"));
+    await screen.findByRole("heading", { name: "Gamma" });
+    expect(within(detail).getByLabelText("Display title")).toHaveValue("");
+    await user.click(within(detail).getByLabelText("Display title"));
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha shown"));
+    expect(repo.files.get("Tasks/Gamma.md")!.fm["title"]).toBeUndefined();
+  });
+
+  it("a blank title key written by hand still has a row it can be removed from", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Blank.md": { fm: { type: "task", status: "todo", title: "" }, body: "\n# Blank\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Blank"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(within(detail).getByLabelText("Remove title"));
+    await waitFor(() => expect("title" in repo.files.get("Tasks/Blank.md")!.fm).toBe(false));
+  });
+});
+
+describe("work started on one card does not reach the card opened next", () => {
+  it("a failed todo write on the previous card does not hand its text to the next card's input", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    let fail: () => void = () => {};
+    repo.addTodo = async () =>
+      new Promise<void>((_, reject) => {
+        fail = () => reject(new Error("too late"));
+      });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Add a todo"), "alpha todo{Enter}");
+    await user.click(within(detail).getByRole("button", { name: "Beta" }));
+    await screen.findByRole("heading", { name: "Beta" });
+    fail();
+    expect(await screen.findByText("too late")).toHaveClass("folia-toast-error");
+    expect(within(detail).getByLabelText("Add a todo")).toHaveValue("");
+  });
+
+  it("a description save finishing on the previous card leaves the next card's editor alone", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    let release: () => void = () => {};
+    const origSet = repo.setDescription.bind(repo);
+    repo.setDescription = async (path: string, text: string) => {
+      await new Promise<void>((r) => {
+        release = r;
+      });
+      return origSet(path, text);
+    };
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    await user.type(within(detail).getByLabelText("Edit description"), " saved late");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    await user.click(within(detail).getByRole("button", { name: "Beta" }));
+    await screen.findByRole("heading", { name: "Beta" });
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    await user.type(within(detail).getByLabelText("Edit description"), "Beta words");
+    release();
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("Desc A saved late"),
+    );
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("Beta words");
+    expect(within(detail).queryByRole("status")).toBeNull();
+  });
+});
+
+describe("the previous card's description never seeds the next card's editor", () => {
+  it("opens an empty editor on the next card when its read has not landed", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    await user.type(within(detail).getByLabelText("Edit description"), " typed on Alpha");
+    let releaseRead: () => void = () => {};
+    const origRead = repo.readBody.bind(repo);
+    repo.readBody = async (path: string) => {
+      if (path === "Tasks/Beta.md")
+        await new Promise<void>((r) => {
+          releaseRead = r;
+        });
+      return origRead(path);
+    };
+    await user.click(within(detail).getByRole("button", { name: "Beta" }));
+    await screen.findByRole("heading", { name: "Beta" });
+    await user.click(within(detail).getByLabelText("Edit description"));
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("");
+    releaseRead();
+    await waitFor(() => expect(within(detail).getByLabelText("Edit description")).toHaveValue(""));
+    expect(repo.files.get("Tasks/Beta.md")!.body).not.toContain("typed on Alpha");
+  });
+});

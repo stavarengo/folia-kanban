@@ -147,28 +147,48 @@ export function deriveContext(cardFolder: string, path: string): string | undefi
   return rest.slice(0, slash);
 }
 
+/** What a `[[wikilink]]` binds to on a given set of cards: a card path, or null. */
+export type LinkResolver = (link: string) => string | null;
+
 /**
- * Resolve a wikilink target to a card path. Prefers an exact path when the link carries a
- * folder segment; otherwise matches by basename, but only when that basename is unambiguous
- * (duplicate basenames across folders resolve to nothing rather than silently binding the wrong one).
+ * Build the one resolver every reading of a `[[wikilink]]` goes through — subcard parentage,
+ * blocking relationships, and the detail panel's rows alike — so they can never disagree about
+ * which card a link names. A link carrying a folder segment binds to that exact path; otherwise
+ * it matches by basename, but only when that basename is unambiguous (duplicate basenames across
+ * folders resolve to nothing rather than silently binding the wrong one). A `.md` suffix, an
+ * `#anchor` and a `|alias` are all tolerated.
+ *
+ * Feed it real notes only: the synthetic cards minted for placed inline todos borrow their note's
+ * file name, and would make every card holding one look like two cards sharing a name.
  */
-function resolveLink(
-  link: string,
-  byBasename: Map<string, string[]>,
-  byPath: Record<string, Card>,
-): string | null {
-  const noAnchor = link.split("#");
-  const noAlias = (noAnchor[0] ?? link).split("|");
-  const raw = (noAlias[0] ?? "").trim();
-  if (raw.includes("/")) {
-    const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
-    if (byPath[withMd]) return withMd;
+function linkResolver(cards: Iterable<Card>): LinkResolver {
+  const byBasename = new Map<string, string[]>();
+  const byPath = new Set<string>();
+  for (const c of cards) {
+    byPath.add(c.path);
+    const arr = byBasename.get(c.basename);
+    if (arr) arr.push(c.path);
+    else byBasename.set(c.basename, [c.path]);
   }
-  const segments = raw.split("/");
-  const last = segments[segments.length - 1];
-  const base = (last ?? raw).replace(/\.md$/i, "").trim();
-  const paths = byBasename.get(base);
-  return paths !== undefined && paths.length === 1 ? (paths[0] ?? null) : null;
+  return (link) => {
+    const noAnchor = link.split("#");
+    const noAlias = (noAnchor[0] ?? link).split("|");
+    const raw = (noAlias[0] ?? "").trim();
+    if (raw.includes("/")) {
+      const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
+      if (byPath.has(withMd)) return withMd;
+    }
+    const segments = raw.split("/");
+    const last = segments[segments.length - 1];
+    const base = (last ?? raw).replace(/\.md$/i, "").trim();
+    const paths = byBasename.get(base);
+    return paths !== undefined && paths.length === 1 ? (paths[0] ?? null) : null;
+  };
+}
+
+/** The resolver for a built board: its real notes, never the tiles minted for placed todos. */
+export function boardLinkResolver(board: Board): LinkResolver {
+  return linkResolver(Object.values(board.cards).filter((c) => !c.todoRef));
 }
 
 /** Alphabetical by displayed title; the basename breaks ties so the order stays deterministic. */
@@ -236,8 +256,7 @@ function isGenuinelyNested(path: string, parentOf: Record<string, string>): bool
  */
 function buildRelations(
   cards: Card[],
-  byBasename: Map<string, string[]>,
-  cardsByPath: Record<string, Card>,
+  resolve: LinkResolver,
   types: readonly RelationTypeDef[],
 ): void {
   const outgoing: Record<string, RelationLink[]> = {};
@@ -314,7 +333,7 @@ function buildRelations(
         addEdge(
           type.key,
           { path: c.path, target: c.basename },
-          { path: resolveLink(target, byBasename, cardsByPath), target },
+          { path: resolve(target), target },
           "from",
         );
       }
@@ -323,7 +342,7 @@ function buildRelations(
       for (const target of readInverse(c.frontmatter, type)) {
         addEdge(
           type.key,
-          { path: resolveLink(target, byBasename, cardsByPath), target },
+          { path: resolve(target), target },
           { path: c.path, target: c.basename },
           "to",
         );
@@ -348,22 +367,16 @@ export function buildBoard(
     if (ctx !== undefined) c.context = ctx;
   }
 
-  const byBasename = new Map<string, string[]>();
-  for (const c of cards) {
-    const arr = byBasename.get(c.basename);
-    if (arr) arr.push(c.path);
-    else byBasename.set(c.basename, [c.path]);
-  }
-
+  const resolve = linkResolver(cards);
   const cardsByPath: Record<string, Card> = {};
   for (const c of cards) cardsByPath[c.path] = c;
 
-  buildRelations(cards, byBasename, cardsByPath, config.relations);
+  buildRelations(cards, resolve, config.relations);
 
   const parentOf: Record<string, string> = {};
   for (const c of cards) {
     for (const link of c.childLinks) {
-      const childPath = resolveLink(link, byBasename, cardsByPath);
+      const childPath = resolve(link);
       if (childPath && childPath !== c.path && !parentOf[childPath]) {
         parentOf[childPath] = c.path;
       }

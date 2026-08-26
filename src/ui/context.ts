@@ -164,6 +164,13 @@ export interface BoardActions {
   startCreate(columnId: string): void;
   /** Open the card's detail panel with its "Add a subcard" input focused, so the user types the title there. */
   addSubcard(path: string): void;
+  /** Open the card's detail panel with its "Display title" field focused (the `title:` override). */
+  editDisplayTitle(path: string): void;
+  /**
+   * Show a failed write the way every board mutation's failure is shown (the error toast). For the
+   * writes the detail panel makes itself, which otherwise have no path to that toast.
+   */
+  reportError(e: unknown): void;
   /** Move a card to the board's "done" column, if one exists. */
   complete(path: string): void;
   /** Trash the card's note (after confirmation in the UI). */
