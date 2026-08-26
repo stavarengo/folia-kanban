@@ -7,6 +7,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with two example boar
 1. **Open this `examples/` folder as a vault** in Obsidian (`Open folder as vault` → pick this `examples/` folder). The Feature Showcase board points `card-folder` at `feature-showcase/Cards`, read **from the vault root**, so this folder needs to be the vault root for it to resolve.
 2. Enable **Folia Kanban** under Settings → Community plugins (install it manually first if needed — see the repo's main README). Trust the author if Obsidian prompts you.
 3. Click either board note (below) in the file explorer — it opens as the board. The command **"Open Folia Kanban board"** and the layout-grid ribbon icon do the same thing without hunting for the note first. To see the note's raw Markdown, use the **Edit as markdown** button in the tab header; the button in the editor takes you back.
+4. Want a board of your own to play with? Run **Create board** from the command palette, or right-click a folder here and pick **Create Folia board here** — the note comes out with its properties already in place and opens as an empty board. **Convert this note into a board** does the same to a note you already have.
 
 > [!note]
 > Want these in your own vault instead? Copy a board's folder anywhere. `basic/` just works — its `card-folder: ./Cards` travels with the note. For `feature-showcase/` you also edit one line in its board note: set `card-folder:` to the new folder's vault-relative path (e.g. `My Stuff/feature-showcase/Cards`), or to `./Cards` to make it portable too.

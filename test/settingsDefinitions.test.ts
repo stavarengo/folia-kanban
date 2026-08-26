@@ -5,6 +5,7 @@ import {
   CARD_NEXT_TODOS_MAX,
   SETTING_COPY,
   SETTING_OPTIONS,
+  TOGGLE_SETTING_KEYS,
   settingDefinitions,
   settingsPatchFor,
 } from "../src/settingsDefinitions";
@@ -112,6 +113,18 @@ describe("settingsPatchFor", () => {
     expect(settingsPatchFor("detailWidth", "420")).toEqual({ detailWidth: 420 });
     expect(settingsPatchFor("cardNextTodos", -3)).toEqual({ cardNextTodos: 0 });
     expect(settingsPatchFor("cardNextTodos", 99)).toEqual({ cardNextTodos: CARD_NEXT_TODOS_MAX });
+  });
+
+  it("accepts a boolean for an on/off setting and refuses anything else", () => {
+    for (const key of TOGGLE_SETTING_KEYS) {
+      expect(settingsPatchFor(key, true)).toEqual({ [key]: true });
+      expect(settingsPatchFor(key, false)).toEqual({ [key]: false });
+      // A toggle falling through to the dropdown branch would be refused, and the setting would
+      // render, click, and silently never persist.
+      expect(settingsPatchFor(key, "true")).toBeNull();
+      expect(settingsPatchFor(key, 1)).toBeNull();
+      expect(DEFAULT_SETTINGS[key]).toBe(true);
+    }
   });
 
   it("trims the name comments are signed with", () => {

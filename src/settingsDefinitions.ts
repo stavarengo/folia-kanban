@@ -16,9 +16,28 @@ export type EditableSettingKey =
   | "subitemsDefault"
   | "userName"
   | "historyScope"
-  | "boardPan";
+  | "boardPan"
+  | "boardSetupCommands"
+  | "boardSetupFileMenu"
+  | "boardSetupEditorMenu";
 
-type DropdownKey = Exclude<EditableSettingKey, "detailWidth" | "cardNextTodos" | "userName">;
+/** The settings that are a plain on/off. Kept as a value, not only a type, so `settingsPatchFor`
+ *  can recognise one at runtime — a boolean reaching the dropdown branch would be refused. */
+export const TOGGLE_SETTING_KEYS = [
+  "boardSetupCommands",
+  "boardSetupFileMenu",
+  "boardSetupEditorMenu",
+] as const satisfies readonly EditableSettingKey[];
+
+type ToggleKey = (typeof TOGGLE_SETTING_KEYS)[number];
+
+const isToggleKey = (key: string): key is ToggleKey =>
+  (TOGGLE_SETTING_KEYS as readonly string[]).includes(key);
+
+type DropdownKey = Exclude<
+  EditableSettingKey,
+  "detailWidth" | "cardNextTodos" | "userName" | ToggleKey
+>;
 
 /**
  * The choices of every dropdown setting, value -> label, in the order they are offered. Typed
@@ -95,6 +114,18 @@ export const SETTING_COPY = {
     name: "Board — horizontal drag",
     desc: "How to pan the board sideways. Shift+drag pans from anywhere (incl. over cards); click and drag pans only from empty board space, leaving cards and columns free. Middle-button drag always pans.",
   },
+  boardSetupCommands: {
+    name: "Board setup — command palette",
+    desc: "Offer the two board-setup actions in the command palette: one makes a new note that is already a board, the other adds the board properties to the note you have open.",
+  },
+  boardSetupFileMenu: {
+    name: "Board setup — file explorer menu",
+    desc: "Offer them when you right-click in the file explorer: on a folder, to make a board inside it; on a note, to turn that note into one.",
+  },
+  boardSetupEditorMenu: {
+    name: "Board setup — editor menu",
+    desc: "Offer turning the note into a board from the right-click menu inside its editor.",
+  },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
 
 /** Placeholder shown in the "Your name" field. */
@@ -129,6 +160,7 @@ const toNumber = (value: unknown): number | null => {
  * before it reaches the stored settings.
  */
 export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
+  if (isToggleKey(key)) return typeof value === "boolean" ? { [key]: value } : null;
   switch (key) {
     case "detailWidth": {
       const n = toNumber(value);
@@ -142,15 +174,19 @@ export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSet
     }
     case "userName":
       return typeof value === "string" ? { userName: value.trim() } : null;
-    default: {
-      if (!hasOwn(SETTING_OPTIONS, key)) return null;
-      const options: Record<string, string> = SETTING_OPTIONS[key as DropdownKey];
-      if (typeof value !== "string" || !hasOwn(options, value)) return null;
-      // `key` is a DropdownKey and `value` one of the option keys `SETTING_OPTIONS` types against
-      // that setting's own union, which is what makes this a valid patch for it.
-      return { [key]: value };
-    }
+    default:
+      return dropdownPatchFor(key, value);
   }
+}
+
+/** The patch a dropdown's new value means, or `null` when the setting does not offer that value. */
+function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
+  if (!hasOwn(SETTING_OPTIONS, key)) return null;
+  const options: Record<string, string> = SETTING_OPTIONS[key as DropdownKey];
+  if (typeof value !== "string" || !hasOwn(options, value)) return null;
+  // `key` is a DropdownKey and `value` one of the option keys `SETTING_OPTIONS` types against that
+  // setting's own union, which is what makes this a valid patch for it.
+  return { [key]: value };
 }
 
 /**
@@ -171,6 +207,11 @@ export function settingDefinitions(
       options: SETTING_OPTIONS[key],
       ...(disabled ? { disabled } : {}),
     },
+  });
+
+  const toggle = (key: ToggleKey): SettingDefinitionItem => ({
+    ...SETTING_COPY[key],
+    control: { type: "toggle", key },
   });
 
   return [
@@ -200,6 +241,7 @@ export function settingDefinitions(
     },
     dropdown("historyScope"),
     dropdown("boardPan"),
+    ...TOGGLE_SETTING_KEYS.map(toggle),
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     { name: VERSION_SETTING_NAME, desc: version },
   ];

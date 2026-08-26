@@ -17,6 +17,14 @@ export interface KanbanSettings {
   /** Which view a board note opens in when it is opened as a file (explorer, link, search,
    *  quick switcher, restored tab). A note's own `folia-view` property overrides it. */
   boardNoteDefaultView: BoardViewMode;
+  /** Whether the board-setup actions (create a board, convert a note into one) are offered in the
+   *  command palette. */
+  boardSetupCommands: boolean;
+  /** Whether they are offered in the file explorer's right-click menu — on a folder to create a
+   *  board inside it, on a note to convert that note. */
+  boardSetupFileMenu: boolean;
+  /** Whether converting is offered in the right-click menu inside a note's editor. */
+  boardSetupEditorMenu: boolean;
   /** Whether a card's nested subitems (inline todos preview + subcard files) start expanded or
    *  collapsed when a card has never been toggled explicitly. `collapsedCards` overrides this
    *  per card. */
@@ -81,6 +89,9 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   historyScope: "all",
   boardPan: "shift",
   boardNoteDefaultView: "board",
+  boardSetupCommands: true,
+  boardSetupFileMenu: true,
+  boardSetupEditorMenu: true,
   subitemsDefault: "expanded",
   collapsedCards: {},
   userName: "",

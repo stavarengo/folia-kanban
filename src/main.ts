@@ -1,4 +1,10 @@
-import type { SettingDefinitionItem, ViewState } from "obsidian";
+import type {
+  MarkdownFileInfo,
+  Menu,
+  SettingDefinitionItem,
+  TAbstractFile,
+  ViewState,
+} from "obsidian";
 import {
   FuzzySuggestModal,
   MarkdownView,
@@ -8,6 +14,7 @@ import {
   Setting,
   requireApiVersion,
   TFile,
+  TFolder,
   WorkspaceLeaf,
   type App,
 } from "obsidian";
@@ -25,11 +32,19 @@ import {
   CARD_NEXT_TODOS_MAX,
   SETTING_COPY,
   SETTING_OPTIONS,
+  TOGGLE_SETTING_KEYS,
   USER_NAME_PLACEHOLDER,
   VERSION_SETTING_NAME,
   settingDefinitions,
   settingsPatchFor,
 } from "./settingsDefinitions";
+import {
+  NEW_BOARD_BASENAME,
+  applyBoardFrontmatter,
+  boardNoteContent,
+  cardFolderPathFor,
+  uniqueNotePath,
+} from "./boardNote";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
@@ -99,6 +114,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       name: "Open board",
       callback: () => void this.activateView(),
     });
+    this.registerBoardSetupActions();
 
     this.addSettingTab(new KanbanSettingTab(this.app, this));
 
@@ -266,6 +282,133 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
     // Several boards — let the user pick which to open.
     new BoardChooserModal(this.app, boards, (f) => void this.openBoard(f.path)).open();
+  }
+
+  /**
+   * The two guided ways to get a board: make one, or turn the note you are on into one. Every
+   * entry point is registered once and reads its toggle when it runs — a command through its
+   * `checkCallback`, a menu through the handler Obsidian calls fresh on every open — so turning one
+   * off in the settings takes effect immediately, with nothing to unregister.
+   */
+  private registerBoardSetupActions(): void {
+    this.addCommand({
+      id: "folia-create-board",
+      name: "Create board",
+      checkCallback: (checking) => {
+        if (!this.settings.boardSetupCommands) return false;
+        if (!checking) void this.createBoard(null);
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "folia-convert-note-to-board",
+      name: "Convert this note into a board",
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!this.settings.boardSetupCommands || !this.canConvert(file)) return false;
+        if (!checking) void this.convertToBoard(file);
+        return true;
+      },
+    });
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) =>
+        this.addBoardSetupMenuItems(menu, file, this.settings.boardSetupFileMenu),
+      ),
+    );
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, _editor, info: MarkdownFileInfo) =>
+        this.addBoardSetupMenuItems(menu, info.file, this.settings.boardSetupEditorMenu),
+      ),
+    );
+  }
+
+  /** A note can be converted when it is Markdown and is not a board already. */
+  private canConvert(file: TAbstractFile | null): file is TFile {
+    return file instanceof TFile && file.extension === "md" && !this.isBoard(file);
+  }
+
+  private addBoardSetupMenuItems(menu: Menu, target: TAbstractFile | null, enabled: boolean): void {
+    if (!enabled) return;
+    if (target instanceof TFolder) {
+      menu.addItem((item) =>
+        item
+          .setTitle("Create Folia board here")
+          .setIcon("layout-grid")
+          .onClick(() => void this.createBoard(target)),
+      );
+      return;
+    }
+    if (this.canConvert(target)) {
+      const file = target;
+      menu.addItem((item) =>
+        item
+          .setTitle("Convert to Folia board")
+          .setIcon("layout-grid")
+          .onClick(() => void this.convertToBoard(file)),
+      );
+    }
+  }
+
+  /** Make a note that is already a board. `parent` is the folder the user right-clicked; without
+   *  one, the note lands wherever Obsidian's own "new note location" setting puts new notes. */
+  private async createBoard(parent: TFolder | null): Promise<void> {
+    const folder = parent ?? this.app.fileManager.getNewFileParent("");
+    const path = uniqueNotePath(
+      folder.path,
+      NEW_BOARD_BASENAME,
+      (p) => this.app.vault.getAbstractFileByPath(p) !== null,
+    );
+    try {
+      const title = path.slice(path.lastIndexOf("/") + 1, -".md".length);
+      const file = await this.app.vault.create(path, boardNoteContent(title));
+      await this.ensureCardFolder(file);
+      await this.openNewBoard(file);
+    } catch (e) {
+      new Notice(`Folia Kanban: could not create the board note. ${String(e)}`, 8000);
+    }
+  }
+
+  /** Add the board properties to a note that already exists. `processFrontMatter` is what puts
+   *  them at the very top even when the note has no frontmatter yet, and leaves the rest of the
+   *  note's bytes alone. */
+  private async convertToBoard(file: TFile): Promise<void> {
+    try {
+      let ownFolder = false;
+      await this.app.fileManager.processFrontMatter(
+        file,
+        (frontmatter: Record<string, unknown>) => {
+          ownFolder = applyBoardFrontmatter(frontmatter);
+        },
+      );
+      if (ownFolder) await this.ensureCardFolder(file);
+      await this.openNewBoard(file);
+    } catch (e) {
+      new Notice(`Folia Kanban: could not convert this note into a board. ${String(e)}`, 8000);
+    }
+  }
+
+  /** Create the folder a fresh board's `card-folder` names, so its first open is an empty board
+   *  rather than the notice about a folder that is not there. */
+  private async ensureCardFolder(boardNote: TFile): Promise<void> {
+    const path = cardFolderPathFor(boardNote.parent?.path ?? "");
+    if (this.app.vault.getAbstractFileByPath(path)) return;
+    await this.app.vault.createFolder(path).catch(() => {
+      // A board opens fine without it — the first card creates it — so this is a nicety, not a step.
+    });
+  }
+
+  /** Show a just-created or just-converted board. It goes straight to the board view rather than
+   *  through the file-open redirect: that one asks the metadata cache what the note is, and the
+   *  cache has not read the frontmatter we wrote a moment ago, so it would answer "ordinary note"
+   *  and leave the user in the editor. */
+  private async openNewBoard(file: TFile): Promise<void> {
+    const { workspace } = this.app;
+    const leaf =
+      this.leafShowing(VIEW_TYPE_KANBAN, file.path) ??
+      this.leafShowing("markdown", file.path) ??
+      workspace.getLeaf(true);
+    await this.showBoardIn(leaf, file.path, true);
+    await workspace.revealLeaf(leaf);
   }
 
   /** Every note flagged `folia-board: true` in its frontmatter. */
@@ -566,6 +709,15 @@ class KanbanSettingTab extends PluginSettingTab {
       s.boardPan,
       (v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] }),
     );
+
+    for (const key of TOGGLE_SETTING_KEYS) {
+      new Setting(containerEl)
+        .setName(SETTING_COPY[key].name)
+        .setDesc(SETTING_COPY[key].desc)
+        .addToggle((t) =>
+          t.setValue(s[key]).onChange((v) => void this.plugin.updateSettings({ [key]: v })),
+        );
+    }
 
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     new Setting(containerEl).setName(VERSION_SETTING_NAME).setDesc(this.plugin.manifest.version);

@@ -147,6 +147,14 @@ Three limits are worth knowing. Only comments carrying a timestamp can be tracke
 
 ## Set up a board
 
+The quickest way is to let the plugin write the note for you. **Create board** in the command palette makes a new note that is already a board — properties in place, at the top of the file, with a `Cards` folder beside it ready for the first card. Right-clicking a folder in the file explorer offers **Create Folia board here**, which does the same thing inside that folder.
+
+Already have a note you want to run as a board? **Convert this note into a board** in the command palette adds the properties to the note you are on, and **Convert to Folia board** does it from the file explorer's right-click menu or from the right-click menu inside the editor. Your existing text and your existing properties are left exactly as they are; only the missing board properties are added, so converting a note twice changes nothing the second time. Either way the board opens as soon as it is made.
+
+Each of those three places has its own switch in Settings, so you can keep the commands and drop the menu entries (or the other way round) if a context menu is somewhere you would rather not see them.
+
+Doing it by hand still works, and it is worth knowing what the guided path writes.
+
 1. Make a **board note** — any note with this frontmatter (see `examples/basic/` for a minimal board, or `examples/feature-showcase/` for one that exercises every feature):
 
    ```yaml
@@ -163,6 +171,8 @@ Three limits are worth knowing. Only comments carrying a timestamp can be tracke
 
 2. Put card notes (each with a `status` matching a column) in that folder.
 3. Open the board note the way you open any note — click it in the file explorer, follow a link, find it in search. It comes up as the board. (The command **“Open Folia Kanban board”** and the layout-grid ribbon icon still work, and are how you reach a board without going looking for its note.)
+
+The properties must be the **first** thing in the file — that is Obsidian's rule for a properties block, not ours, and a block that starts a few lines down is read as ordinary text, which is why a hand-written board can end up reporting “no board note found”. The commands above use Obsidian's own properties API and cannot get that wrong, which is the main reason to prefer them.
 
 ### The board and the Markdown editor are the same tab
 
@@ -236,6 +246,10 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **Your name** — signs the comments you write from the board, and tells the board which comments are yours for [unread marking](#unread-comments). Empty (the default) writes them unsigned.
 - **Subitems — default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).
 - **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
+- **Board — horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
+- **Board setup — command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
+- **Board setup — file explorer menu** — whether right-clicking a folder offers **Create Folia board here**, and right-clicking a note offers **Convert to Folia board**.
+- **Board setup — editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
 
 ## Keyboard & mouse
 
