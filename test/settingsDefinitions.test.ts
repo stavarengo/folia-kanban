@@ -83,6 +83,16 @@ describe("settingsPatchFor", () => {
     expect(settingsPatchFor("detailWidth", 10)).toEqual({ detailWidth: DETAIL_WIDTH_MIN });
     expect(settingsPatchFor("detailWidth", 9999)).toEqual({ detailWidth: DETAIL_WIDTH_MAX });
     expect(settingsPatchFor("detailWidth", "nope")).toBeNull();
+    // Number("") / Number(null) / Number(true) are 0, 0 and 1: read as numbers they would move a
+    // setting to the bottom of its range instead of being refused.
+    expect(settingsPatchFor("detailWidth", null)).toBeNull();
+    expect(settingsPatchFor("detailWidth", "")).toBeNull();
+    expect(settingsPatchFor("detailWidth", "   ")).toBeNull();
+    expect(settingsPatchFor("cardNextTodos", true)).toBeNull();
+    expect(settingsPatchFor("cardNextTodos", null)).toBeNull();
+    expect(settingsPatchFor("cardNextTodos", Number.NaN)).toBeNull();
+    // A control that reports its value as a numeric string is still a number.
+    expect(settingsPatchFor("detailWidth", "420")).toEqual({ detailWidth: 420 });
     expect(settingsPatchFor("cardNextTodos", -3)).toEqual({ cardNextTodos: 0 });
     expect(settingsPatchFor("cardNextTodos", 99)).toEqual({ cardNextTodos: CARD_NEXT_TODOS_MAX });
   });

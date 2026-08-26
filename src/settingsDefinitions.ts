@@ -112,6 +112,16 @@ const hasOwn = (o: object, key: string): boolean => Object.prototype.hasOwnPrope
 
 const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n));
 
+/** A control's value as a number, or `null` when it is not one. Deliberately not `Number(value)`:
+ *  that reads `null`, `true` and `""` as 0 or 1, so a malformed change event would quietly move a
+ *  setting to the bottom of its range instead of being refused. */
+const toNumber = (value: unknown): number | null => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
 /**
  * The settings patch a control's new value means, or `null` when the value is not one this setting
  * accepts. Obsidian hands `setControlValue` an `unknown`, and a hand-edited `data.json` or a future
@@ -121,14 +131,14 @@ const clamp = (n: number, min: number, max: number): number => Math.min(max, Mat
 export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
   switch (key) {
     case "detailWidth": {
-      const n = Math.round(Number(value));
-      return Number.isFinite(n)
-        ? { detailWidth: clamp(n, DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX) }
-        : null;
+      const n = toNumber(value);
+      return n === null
+        ? null
+        : { detailWidth: clamp(Math.round(n), DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX) };
     }
     case "cardNextTodos": {
-      const n = Math.round(Number(value));
-      return Number.isFinite(n) ? { cardNextTodos: clamp(n, 0, CARD_NEXT_TODOS_MAX) } : null;
+      const n = toNumber(value);
+      return n === null ? null : { cardNextTodos: clamp(Math.round(n), 0, CARD_NEXT_TODOS_MAX) };
     }
     case "userName":
       return typeof value === "string" ? { userName: value.trim() } : null;

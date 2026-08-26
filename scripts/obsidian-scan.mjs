@@ -364,10 +364,15 @@ const README_PATTERNS = [
   { rule: "placeholder/marker", re: /\b(TODO|FIXME|XXX|TBD)\b/g, what: "leftover marker" },
   {
     rule: "placeholder/bracket",
-    re: /\[(description|placeholder|plugin name|your plugin name|your name|insert [^\]]*|todo|tbd)\]/gi,
+    // Literal template tokens only. A bracket pattern any wider matches this README's own Markdown
+    // links, wikilinks, task boxes and inline fields, none of which are placeholders.
+    re: /\[(description|placeholder|plugin name|your plugin name|your name|insert [^\]]*)\]/gi,
     what: "bracketed placeholder",
   },
   { rule: "placeholder/template", re: /\{\{[^}]*\}\}/g, what: "template expression" },
+  // The portal's message names "template comments", and a README that carries none cannot regress
+  // into one. A deliberate tooling comment (a markdownlint directive, say) trips this: that is a
+  // conversation to have, not a false alarm to suppress in advance.
   { rule: "placeholder/comment", re: /<!--[\s\S]*?-->/g, what: "HTML comment" },
   {
     rule: "placeholder/filler",
