@@ -11,7 +11,7 @@ examples/
 **/*.md
 
 # Hand-maintained design-system stylesheet is owned by ds:check
-# (tokens:check + audit:raw-values), not Prettier
+# (tokens:check + audit:raw-values + buttons:check), not Prettier
 src/styles.css
 
 # Lockfile

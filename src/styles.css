@@ -1,7 +1,15 @@
 /* Folia Kanban — board styling.
    A small design-token layer mapped onto Obsidian's theme variables, so the board adopts the
    user's light/dark theme automatically while keeping a consistent, shadcn-grade visual system.
-   Raw values live only in the token block; everything below consumes the tokens. */
+   Raw values live only in the token block; everything below consumes the tokens.
+
+   Doubled class names — `.folia-btn.folia-btn { … }` — are deliberate, not a typo. Obsidian gives
+   every plain button a face through `button:not(.clickable-icon)`, which is an element plus a
+   pseudo-class and therefore out-specifies a lone class: a single-class rule setting `color`,
+   `background` or `box-shadow` on a <button> silently loses in the real app while looking correct
+   in jsdom, where no theme is loaded. Naming the class twice matches exactly the same elements one
+   specificity step higher, which is enough. `pnpm buttons:check` (scripts/check-button-styles.mjs)
+   holds the line so nobody has to remember the trap. */
 
 .folia-root {
   /* radii */
@@ -179,7 +187,7 @@
   display: flex;
   gap: 6px;
 }
-.folia-filter-chip {
+.folia-filter-chip.folia-filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -233,7 +241,7 @@
 .folia-filter-suggest li {
   margin: 0;
 }
-.folia-filter-suggest-item {
+.folia-filter-suggest-item.folia-filter-suggest-item {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -425,7 +433,7 @@
   font-style: italic;
 }
 
-.folia-column-add {
+.folia-column-add.folia-column-add {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -514,7 +522,7 @@
   /* two-tone ring readable over any swatch fill, in either theme */
   box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
 }
-.folia-swatch-none {
+.folia-swatch-none.folia-swatch-none {
   display: grid;
   place-items: center;
   background: var(--background-modifier-hover);
@@ -525,7 +533,7 @@
   background: var(--folia-border);
   margin: 1px 0;
 }
-.folia-menu-item {
+.folia-menu-item.folia-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -547,7 +555,7 @@
   opacity: var(--folia-opacity-disabled);
   cursor: default;
 }
-.folia-menu-danger {
+.folia-menu-danger.folia-menu-danger {
   color: var(--folia-danger);
 }
 .folia-menu-danger:hover:not(:disabled) {
@@ -591,7 +599,7 @@
 .folia-menu-prio.is-active {
   box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
 }
-.folia-menu-prio-none {
+.folia-menu-prio-none.folia-menu-prio-none {
   display: grid;
   place-items: center;
   background: var(--background-modifier-hover);
@@ -605,7 +613,7 @@
   gap: 5px;
   padding: 2px 4px;
 }
-.folia-menu-column {
+.folia-menu-column.folia-menu-column {
   font: inherit;
   font-size: var(--folia-font-size-sm);
   padding: 3px 9px;
@@ -621,7 +629,7 @@
 }
 
 /* ------------------------------------------------------------------ add column */
-.folia-add-column {
+.folia-add-column.folia-add-column {
   flex: 0 0 220px;
   align-self: flex-start;
   display: flex;
@@ -929,14 +937,14 @@
 }
 /* Chip text is mixed toward --text-normal so it keeps the hue but stays legible (WCAG AA) in
    BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. */
-.folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-1) 32%, transparent); }
-.folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
-.folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in srgb, var(--folia-prio-3) 34%, transparent); }
-.folia-chip-prio-4 { color: color-mix(in srgb, var(--folia-prio-4) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-4) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-4) 32%, transparent); }
-.folia-chip-danger { color: color-mix(in srgb, var(--folia-danger) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-danger) 22%, transparent); border-color: color-mix(in srgb, var(--folia-danger) 36%, transparent); }
-.folia-chip-warn { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
-.folia-chip-accent { color: color-mix(in srgb, var(--folia-accent) 55%, var(--text-normal)); background: color-mix(in srgb, var(--folia-accent) 18%, transparent); border-color: color-mix(in srgb, var(--folia-accent) 32%, transparent); }
-.folia-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }
+.folia-chip-prio-1.folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-1) 32%, transparent); }
+.folia-chip-prio-2.folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
+.folia-chip-prio-3.folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in srgb, var(--folia-prio-3) 34%, transparent); }
+.folia-chip-prio-4.folia-chip-prio-4 { color: color-mix(in srgb, var(--folia-prio-4) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-4) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-4) 32%, transparent); }
+.folia-chip-danger.folia-chip-danger { color: color-mix(in srgb, var(--folia-danger) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-danger) 22%, transparent); border-color: color-mix(in srgb, var(--folia-danger) 36%, transparent); }
+.folia-chip-warn.folia-chip-warn { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
+.folia-chip-accent.folia-chip-accent { color: color-mix(in srgb, var(--folia-accent) 55%, var(--text-normal)); background: color-mix(in srgb, var(--folia-accent) 18%, transparent); border-color: color-mix(in srgb, var(--folia-accent) 32%, transparent); }
+.folia-chip-muted.folia-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }
 
 /* ------------------------------------------------------------------ progress + meta */
 .folia-progress {
@@ -1037,7 +1045,7 @@
 }
 
 /* ------------------------------------------------------------------ subitems collapse toggle */
-.folia-card-subitems-toggle {
+.folia-card-subitems-toggle.folia-card-subitems-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1107,7 +1115,7 @@
 }
 
 /* ------------------------------------------------------------------ buttons */
-.folia-btn {
+.folia-btn.folia-btn {
   font: inherit;
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);
@@ -1123,7 +1131,7 @@
   background: var(--background-modifier-hover);
   border-color: var(--folia-border-strong);
 }
-.folia-btn-primary {
+.folia-btn-primary.folia-btn-primary {
   background: var(--folia-accent);
   border-color: transparent;
   color: var(--folia-on-accent);
@@ -1132,7 +1140,7 @@
   background: var(--interactive-accent-hover, var(--folia-accent));
   filter: brightness(1.06);
 }
-.folia-btn-danger {
+.folia-btn-danger.folia-btn-danger {
   color: var(--folia-on-accent);
   background: var(--folia-danger);
   border-color: transparent;
@@ -1141,7 +1149,7 @@
   filter: brightness(1.06);
 }
 
-.folia-icon-btn {
+.folia-icon-btn.folia-icon-btn {
   display: inline-grid;
   place-items: center;
   width: 26px;
@@ -1432,7 +1440,7 @@
 .folia-desc-view:focus-within .folia-desc-edit {
   opacity: 1;
 }
-.folia-desc-empty {
+.folia-desc-empty.folia-desc-empty {
   display: block;
   width: 100%;
   text-align: left;
@@ -1552,7 +1560,7 @@
   margin-left: auto;
   cursor: help;
 }
-.folia-link {
+.folia-link.folia-link {
   background: transparent;
   border: none;
   color: var(--link-color, var(--folia-accent));
@@ -1706,7 +1714,7 @@
   color: var(--text-faint, var(--text-muted));
   font-variant-numeric: tabular-nums;
 }
-.folia-muted {
+.folia-muted.folia-muted {
   color: var(--text-faint, var(--text-muted));
   font-size: var(--folia-font-size-sm);
   font-style: italic;
@@ -1921,7 +1929,7 @@
 }
 /* The strip occupies left 5–7px; `.folia-card-main`'s existing 12px left padding already clears it,
    so no extra body inset is needed (and a folder-only card with no color must stay visually inert). */
-.folia-chip-context {
+.folia-chip-context.folia-chip-context {
   color: var(--folia-ctx-color, var(--text-muted));
   background: color-mix(in srgb, var(--folia-ctx-color, var(--text-muted)) 16%, transparent);
   border-color: color-mix(in srgb, var(--folia-ctx-color, var(--text-muted)) 30%, transparent);
