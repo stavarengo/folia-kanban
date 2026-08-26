@@ -769,6 +769,100 @@ describe("applying a move", () => {
     expect(writes).toBe(1);
   });
 
+  it("takes away the keys the move says the card no longer claims", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo\norder: 3\npriority: B"));
+
+    await repo.applyMove({
+      path: "basic/Cards/One.md",
+      setFrontmatter: { status: "done" },
+      unsetFrontmatter: ["order"],
+    });
+
+    const fm = app.vault.frontmatter("basic/Cards/One.md");
+    expect(fm).not.toHaveProperty("order");
+    expect(fm["status"]).toBe("done");
+    expect(fm["priority"]).toBe("B");
+  });
+
+  it("ticks the checklist line every parent keeps for a subcard that reached Done", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/Child.md", card("status: todo"));
+    const parent = "\n# P\n\n## Subtasks\n- [ ] [[Child]]\n- [ ] Something else\n";
+    app.vault.addFile("basic/Cards/One.md", card("status: todo", parent));
+    app.vault.addFile("basic/Cards/Two.md", card("status: todo", parent));
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+
+    await repo.applyMove({
+      path: "basic/Cards/Child.md",
+      setFrontmatter: { status: "done" },
+      parentLines: [
+        { path: "basic/Cards/One.md", links: ["Child"], done: true },
+        { path: "basic/Cards/Two.md", links: ["Child"], done: true },
+      ],
+    });
+
+    for (const path of ["basic/Cards/One.md", "basic/Cards/Two.md"]) {
+      const text = app.vault.text(path) ?? "";
+      expect(text).toContain("- [x] [[Child]]");
+      expect(text).toContain("- [ ] Something else");
+      // The tick leaves the same trace a click on the box would.
+      expect(text).toContain("Subtask done: [[Child]]");
+    }
+  });
+
+  it("leaves a parent whose line already says so completely untouched", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile(
+      "basic/Cards/One.md",
+      card("status: todo", "\n# P\n\n## Subtasks\n- [x] [[Child]]\n"),
+    );
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+    const before = app.vault.text("basic/Cards/One.md");
+    let writes = 0;
+    app.vault.on("modify", () => writes++);
+
+    await repo.applyMove({
+      path: "basic/Cards/Child.md",
+      parentLines: [{ path: "basic/Cards/One.md", links: ["Child"], done: true }],
+    });
+
+    expect(app.vault.text("basic/Cards/One.md")).toBe(before);
+    // Not rewritten at all: a note whose text would come out the same is still a write, and a
+    // write is a modify event the board reacts to.
+    expect(writes).toBe(0);
+  });
+
+  it("writes every other parent even when one has gone missing, and still reports the failure", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/Child.md", card("status: todo"));
+    app.vault.addFile(
+      "basic/Cards/Two.md",
+      card("status: todo", "\n# P\n\n## Subtasks\n- [ ] [[Child]]\n"),
+    );
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md");
+
+    await expect(
+      repo.applyMove({
+        path: "basic/Cards/Child.md",
+        setFrontmatter: { status: "done" },
+        history: "Moved from Todo to Done",
+        parentLines: [
+          { path: "basic/Cards/Gone.md", links: ["Child"], done: true },
+          { path: "basic/Cards/Two.md", links: ["Child"], done: true },
+        ],
+      }),
+    ).rejects.toThrow("Not a file: basic/Cards/Gone.md");
+
+    // The move itself, and the parent that is still there, went through regardless.
+    expect(app.vault.frontmatter("basic/Cards/Child.md")["status"]).toBe("done");
+    expect(app.vault.text("basic/Cards/Child.md")).toContain("Moved from Todo to Done");
+    expect(app.vault.text("basic/Cards/Two.md")).toContain("- [x] [[Child]]");
+  });
+
   it("clears the status field when the todo lands back on its card's own column", async () => {
     const { app, repo } = setup();
     app.vault.addFile(
