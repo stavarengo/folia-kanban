@@ -195,7 +195,7 @@ export function CardContextMenu({
                 key={p}
                 className={
                   "folia-menu-prio folia-chip-" +
-                  priorityTone(p, a.priorities) +
+                  priorityTone(p, a.priorityScale) +
                   (samePriority(p, priority) ? " is-active" : "")
                 }
                 role="menuitemradio"

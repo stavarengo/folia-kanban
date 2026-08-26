@@ -40,6 +40,7 @@ const EMPTY_RELATION_COUNTS = {} as const;
 
 /** Stable empty column list, so the actions object keeps its identity before the board loads. */
 const EMPTY_COLUMNS: readonly ColumnDef[] = [];
+const EMPTY_PRIORITIES: string[] = [];
 
 /** Translate `addCardOpenMode` into a presentation override; 'default' means "use the global". */
 function mapOpenMode(openMode: KanbanSettings["addCardOpenMode"]): DetailMode | null {
@@ -457,6 +458,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       doneColumnId,
       columns: board?.config.columns ?? EMPTY_COLUMNS,
       priorities,
+      priorityScale: board?.config.priorities ?? EMPTY_PRIORITIES,
       renameColumn: (id, title) => {
         const b = boardRef.current;
         const t = title.trim();
@@ -570,6 +572,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       moveTo,
       doneColumnId,
       priorities,
+      board?.config.priorities,
       repo,
       load,
       setColumnsAndReload,

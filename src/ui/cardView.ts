@@ -52,33 +52,35 @@ const PRIORITY_TONE: Record<string, ChipTone> = {
 const PRIORITY_RAMP: readonly ChipTone[] = ["prio-1", "prio-2", "prio-3", "prio-4"];
 
 /**
- * Spread the position `index` of a scale of `length` values over the four `prio-*` tones, so a
- * board's own vocabulary reads as a ranked ramp instead of a row of identical grey badges. The
- * ends are pinned (first value strongest, last weakest) and the middle is distributed evenly;
- * with fewer than two values there is no ranking to express, so there is no ramp either.
+ * Spread the position `index` of a scale of `length` values over the four `prio-*` tones. The ends
+ * are pinned — first value strongest, last weakest — and the middle is distributed evenly, with a
+ * tie broken toward the stronger tone so a three-word scale comes out hot, warm, calm rather than
+ * skipping the warm step. With fewer than two values there is no ranking to express, and so no ramp.
  */
 function rampTone(index: number, length: number): ChipTone | null {
   if (index < 0 || length < 2) return null;
-  const step = Math.round((index * (PRIORITY_RAMP.length - 1)) / (length - 1));
-  return PRIORITY_RAMP[step] ?? null;
+  const exact = (index * (PRIORITY_RAMP.length - 1)) / (length - 1);
+  return PRIORITY_RAMP[Math.ceil(exact - 0.5)] ?? null;
 }
 
 /**
  * The severity tone a priority value is drawn in.
  *
- * The fixed scales win: `a`–`d`, the word scale and `p0`–`p4` keep the tone they have always had,
- * whatever else the board holds. That matters because `vocabulary` is not only what the board note
- * remembers — it also picks up the values the cards happen to use — so letting it drive known
- * values would repaint a plain `A`/`C` board the moment one of its letters went unused.
+ * `scale` is the board note's own `priorities` list and nothing else — the ranking the user wrote
+ * down. A word that only appears on a card stays `muted` until the board remembers it, because
+ * the position it would occupy in the derived vocabulary is alphabetical, not chosen: colouring by
+ * that would invent a ranking nobody authored and repaint every board written before the note
+ * learned to hold a list.
  *
- * Everything the fixed scales do not know is ranked by where it sits in `vocabulary`, which is the
- * board note's `priorities` order: the user's own scale, in the order they put it in. Without a
- * vocabulary (or with a single-value one) an unknown value stays `muted`, exactly as before.
+ * The fixed scales win over the list: `a`–`d`, the word scale and `p0`–`p4` keep the tone they
+ * have always had, wherever a board happens to list them, so no existing board repaints. That also
+ * means a scale mixing invented words with known ones takes its colours from both, which is the
+ * price of never surprising a board that was reading correctly yesterday.
  */
-export function priorityTone(value: string, vocabulary: readonly string[] = []): ChipTone {
+export function priorityTone(value: string, scale: readonly string[] = []): ChipTone {
   const known = PRIORITY_TONE[value.trim().toLowerCase()];
   if (known) return known;
-  return rampTone(priorityIndex(vocabulary, value), vocabulary.length) ?? "muted";
+  return rampTone(priorityIndex(scale, value), scale.length) ?? "muted";
 }
 
 /**
@@ -492,13 +494,17 @@ const DUE_GROUP_LABEL: Record<DueUrgency | "none", string> = {
  * a card above having none. (Before the vocabulary existed those two tied and fell back to board
  * order, which read as arbitrary.)
  */
-function priorityKey(card: Card, vocabulary: readonly string[]): { tone: number; index: number } {
+function priorityKey(
+  card: Card,
+  vocabulary: readonly string[],
+  scale: readonly string[],
+): { tone: number; index: number } {
   const p = card.frontmatter.priority;
   const value = typeof p === "string" ? p.trim() : "";
   if (!value) return { tone: PRIORITY_RANK.muted, index: vocabulary.length };
   const index = priorityIndex(vocabulary, value);
   return {
-    tone: PRIORITY_RANK[priorityTone(value, vocabulary)],
+    tone: PRIORITY_RANK[priorityTone(value, scale)],
     index: index === -1 ? vocabulary.length : index,
   };
 }
@@ -518,18 +524,19 @@ interface SortContext {
   today: string;
   doneColumnId: string | null;
   priorities: readonly string[];
+  scale: readonly string[];
 }
 
 function sortCards(cards: Card[], ctx: SortContext): Card[] {
-  const { sort, today, doneColumnId, priorities } = ctx;
+  const { sort, today, doneColumnId, priorities, scale } = ctx;
   if (sort === "manual") return cards;
   const ranked = cards.map((card, i) => ({ card, i }));
   ranked.sort((a, b) => {
     // priority: low rank first (prio-1 strongest). due: high rank first (overdue most pressing).
     let d: number;
     if (sort === "priority") {
-      const ka = priorityKey(a.card, priorities);
-      const kb = priorityKey(b.card, priorities);
+      const ka = priorityKey(a.card, priorities, scale);
+      const kb = priorityKey(b.card, priorities, scale);
       d = ka.tone - kb.tone || ka.index - kb.index;
     } else {
       d = dueRank(b.card, today, doneColumnId) - dueRank(a.card, today, doneColumnId);
@@ -555,10 +562,11 @@ export function groupAndSortCards(
     doneColumnId: string | null;
     /** The board's priority vocabulary; only breaks ties under `sort: "priority"`. */
     priorities?: readonly string[];
+    scale?: readonly string[];
   },
 ): CardGroup[] {
-  const { group, sort, today, doneColumnId, priorities = [] } = opts;
-  const ctx: SortContext = { sort, today, doneColumnId, priorities };
+  const { group, sort, today, doneColumnId, priorities = [], scale = [] } = opts;
+  const ctx: SortContext = { sort, today, doneColumnId, priorities, scale };
   if (group !== "due") {
     return [{ key: "", label: "", cards: sortCards(cards, ctx) }];
   }
@@ -623,7 +631,7 @@ export function cardChips(
   card: Card,
   today: string,
   doneColumnId: string | null,
-  priorities: readonly string[] = [],
+  scale: readonly string[] = [],
 ): CardChip[] {
   const fm = card.frontmatter;
   const chips: CardChip[] = [];
@@ -632,7 +640,7 @@ export function cardChips(
     chips.push({
       key: "prio",
       label: fm.priority,
-      tone: priorityTone(fm.priority, priorities),
+      tone: priorityTone(fm.priority, scale),
       title: "Priority",
     });
   }

@@ -218,7 +218,7 @@ priorities:
 
 That list is why a value **outlives the last card that used it**: delete every `blocker` card and `blocker` is still offered tomorrow. It is a plain property — reorder it, prune it, or write it yourself.
 
-Its order is the ranking, strongest first, and it is what makes your own words read as a scale. Priority badges are drawn on a four-step colour ramp, and a value the plugin has no opinion about takes its colour from where you put it in this list: `blocker` / `normal` / `whenever` comes out hot-to-calm rather than as three identical grey chips. The words the plugin does know keep their own colour wherever you list them — `A` stays red and `D` stays blue — so adopting a custom scale never repaints an existing board. A column with `sort: priority` follows the same ranking, then falls back to the list order to break ties within a colour.
+Its order is the ranking, strongest first, and it is what makes your own words read as a scale. Priority badges are drawn on a four-step colour ramp, and a value the plugin has no opinion about takes its colour from where you put it in this list: `blocker` / `steady` / `whenever` comes out hot-to-calm rather than as three identical grey chips. Two things stay deliberately conservative. The words the plugin does know keep their own colour wherever you list them — `A` stays red and `D` stays blue — and a value that only exists on a card, which the note has not learned yet, stays neutral rather than being ranked by a position you never chose. A column with `sort: priority` follows the same ranking, then falls back to the list order to break ties within a colour.
 
 `examples/custom-scale/` is a small board built entirely on its own words, if you want to see it before committing to one.
 

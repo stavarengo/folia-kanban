@@ -1159,8 +1159,12 @@
   border-color: transparent;
   color: var(--folia-on-accent);
 }
+/* The accent/danger faces state their hover colours in full rather than inheriting half of them:
+   `.folia-btn:hover` sits right above and carries the same weight, so leaving a gap here would let
+   the neutral hover face reach a button that is meant to stay accented. */
 .folia-btn-primary:hover {
   background: var(--interactive-accent-hover, var(--folia-accent));
+  border-color: transparent;
   filter: brightness(1.06);
 }
 .folia-btn-danger.folia-btn-danger {
@@ -1169,6 +1173,8 @@
   border-color: transparent;
 }
 .folia-btn-danger:hover {
+  background: var(--folia-danger);
+  border-color: transparent;
   filter: brightness(1.06);
 }
 

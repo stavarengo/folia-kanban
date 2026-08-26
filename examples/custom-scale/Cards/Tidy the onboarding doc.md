@@ -1,10 +1,10 @@
 ---
 type: task
 status: doing
-priority: normal
+priority: steady
 created: 2026-02-02
 ---
 
 # Tidy the onboarding doc
 
-The middle of the scale. `normal` also happens to be a word the plugin knows, so it keeps that meaning wherever it appears.
+The middle of the scale, so it takes the middle of the ramp. None of these three words means anything to the plugin on its own — the order in the board note is the whole ranking.

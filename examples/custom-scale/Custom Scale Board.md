@@ -3,7 +3,7 @@ folia-board: true
 card-folder: ./Cards
 priorities:
   - blocker
-  - normal
+  - steady
   - whenever
 columns:
   - todo

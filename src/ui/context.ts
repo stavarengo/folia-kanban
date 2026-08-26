@@ -178,6 +178,13 @@ export interface BoardActions {
    * equal severities, which is why it is the note's order and not one the plugin decides.
    */
   priorities: string[];
+  /**
+   * The board note's OWN `priorities` list, in its order and nothing more — empty when the note
+   * holds none. This is the ranking the user wrote, which is why it, and not the wider vocabulary
+   * above, decides the colour a priority badge is drawn in: a value that only appears on a card
+   * sits in the vocabulary at an alphabetical position nobody chose.
+   */
+  priorityScale: string[];
 
   /** Column management (persists to the board note frontmatter). */
   renameColumn(id: string, title: string): void;

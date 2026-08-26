@@ -257,6 +257,7 @@ export function Column({
       today,
       doneColumnId,
       priorities: actions.priorities,
+      scale: actions.priorityScale,
     },
   );
 

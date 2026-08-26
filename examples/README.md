@@ -15,7 +15,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with three example bo
 ## The boards
 
 - **Basic** — folder [`basic/`](./basic/), board note [`Example Board.md`](<basic/Example Board.md>). A minimal 3-column board (Todo / Doing / Done) with a couple of sample cards. **Start here**: it shows the bare essentials — a board note, a `card-folder`, and cards as Markdown files.
-- **Custom Scale** — folder [`custom-scale/`](./custom-scale/), board note [`Custom Scale Board.md`](<custom-scale/Custom Scale Board.md>). A small board whose priorities are `blocker` / `normal` / `whenever` instead of `A`/`B`/`C` — it shows how the board note's `priorities` order becomes both the colour ramp and the sort order.
+- **Custom Scale** — folder [`custom-scale/`](./custom-scale/), board note [`Custom Scale Board.md`](<custom-scale/Custom Scale Board.md>). A small board whose priorities are `blocker` / `steady` / `whenever` instead of `A`/`B`/`C` — it shows how the board note's `priorities` order becomes both the colour ramp and the sort order.
 - **Feature Showcase** — folder [`feature-showcase/`](./feature-showcase/), board note [`Showcase Board.md`](<feature-showcase/Showcase Board.md>). A "kitchen-sink" board that exercises **every feature** in one place — columns, lanes, contexts, priorities, due-date buckets, subcards, comments, history, and custom properties. **Explore here** once the basics click.
 
 ## Feature tour — what the Feature Showcase board demonstrates

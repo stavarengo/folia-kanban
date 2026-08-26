@@ -1313,15 +1313,24 @@ describe("card context menu", () => {
 
   it("draws a board's own priority scale as a ranked ramp, not as grey badges", async () => {
     const repo = new FakeRepo(
-      { ...config, priorities: ["blocker", "normal", "whenever"] },
+      { ...config, priorities: ["blocker", "middling", "whenever"] },
       {
         "Tasks/First.md": {
           fm: { type: "task", status: "todo", order: 1, priority: "blocker" },
           body: "\n# First\n",
         },
         "Tasks/Second.md": {
-          fm: { type: "task", status: "todo", order: 2, priority: "whenever" },
+          fm: { type: "task", status: "todo", order: 2, priority: "middling" },
           body: "\n# Second\n",
+        },
+        "Tasks/Third.md": {
+          fm: { type: "task", status: "todo", order: 3, priority: "whenever" },
+          body: "\n# Third\n",
+        },
+        // A value only this card carries: the note never listed it, so it gets no ramp position.
+        "Tasks/Fourth.md": {
+          fm: { type: "task", status: "todo", order: 4, priority: "invented" },
+          body: "\n# Fourth\n",
         },
       },
     );
@@ -1338,8 +1347,16 @@ describe("card context menu", () => {
       chip: "folia-chip folia-chip-prio-1",
     });
     expect(await tone("Second")).toEqual({
+      strip: "prio-2",
+      chip: "folia-chip folia-chip-prio-2",
+    });
+    expect(await tone("Third")).toEqual({
       strip: "prio-4",
       chip: "folia-chip folia-chip-prio-4",
+    });
+    expect(await tone("Fourth")).toEqual({
+      strip: "muted",
+      chip: "folia-chip folia-chip-muted",
     });
   });
 

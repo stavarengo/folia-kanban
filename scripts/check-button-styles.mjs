@@ -22,7 +22,14 @@ import process from "node:process";
 const UI_DIR = "src/ui";
 const CSS_FILE = "src/styles.css";
 
-/** What `button:not(.clickable-icon)` sets, and therefore what a plugin rule has to win to keep. */
+/**
+ * What `button:not(.clickable-icon)` sets in Obsidian's own app.css, and therefore what a plugin
+ * rule has to win to keep: `color`, `background-color` and `box-shadow`. `border` is not on the
+ * list because nothing at that specificity sets it — the border a button starts with comes from
+ * the user agent, which any single class already beats. `padding` is set, but only under
+ * `.is-tablet`, so on desktop it costs nothing and policing it here would flag every button rule
+ * in the stylesheet for a case none of them is designed for.
+ */
 const CONTESTED = ["background", "background-color", "box-shadow", "color"];
 /** The specificity of that theme selector: one pseudo-class, one element. */
 const THEME_SPECIFICITY = [0, 1, 1];
@@ -32,7 +39,10 @@ const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 /**
  * CSS specificity of a single (comma-free) selector as [ids, classes, elements]. Good enough for
  * the shapes this stylesheet uses: classes, elements, attributes, pseudo-classes and `:not()`/
- * `:is()`/`:where()`.
+ * `:is()`/`:where()`. Nested parentheses (`:is(a:not(b))`) and functional arguments that look like
+ * type selectors (`:nth-child(2n+1)`) are counted a little high — the error direction is towards
+ * "this rule wins", so a miscount can only let a rule through, never invent a failure. Neither
+ * shape appears in the stylesheet; if one ever does, count it by hand.
  */
 function specificity(selector) {
   let rest = selector;
@@ -93,7 +103,7 @@ function rules(css) {
     .filter((r) => r.selector && !r.selector.startsWith("@"));
 }
 
-const files = (await readdir(UI_DIR)).filter((f) => f.endsWith(".tsx"));
+const files = (await readdir(UI_DIR, { recursive: true })).filter((f) => f.endsWith(".tsx"));
 const tsx = (await Promise.all(files.map((f) => readFile(join(UI_DIR, f), "utf8")))).join("\n");
 const elements = buttons(tsx);
 const classes = new Set(elements.flatMap((b) => [...b.classes]));
@@ -104,6 +114,15 @@ const setsContested = (body) =>
   body
     .split(";")
     .some((decl) => CONTESTED.includes(decl.split(":")[0]?.trim().toLowerCase() ?? ""));
+
+// Finding nothing to check is a broken check, not a clean one: a moved file or a changed markup
+// convention would otherwise pass silently for as long as it takes someone to notice.
+if (elements.length === 0) {
+  console.error(
+    `check-button-styles: FAILED — found no <button> carrying a folia-* class in ${UI_DIR}/**. Either the markup convention changed or this script stopped finding the files.`,
+  );
+  process.exit(1);
+}
 
 const problems = [];
 let checked = 0;

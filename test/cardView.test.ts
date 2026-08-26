@@ -53,12 +53,12 @@ describe("priorityTone", () => {
   it("ranks a board's own scale across the four tones, ends pinned", () => {
     const ramp = (scale: string[]) => scale.map((v) => priorityTone(v, scale));
     expect(ramp(["blocker", "whenever"])).toEqual(["prio-1", "prio-4"]);
-    expect(ramp(["blocker", "meh", "whenever"])).toEqual(["prio-1", "prio-3", "prio-4"]);
+    expect(ramp(["blocker", "meh", "whenever"])).toEqual(["prio-1", "prio-2", "prio-4"]);
     expect(ramp(["s1", "s2", "s3", "s4"])).toEqual(["prio-1", "prio-2", "prio-3", "prio-4"]);
     expect(ramp(["s1", "s2", "s3", "s4", "s5"])).toEqual([
       "prio-1",
       "prio-2",
-      "prio-3",
+      "prio-2",
       "prio-3",
       "prio-4",
     ]);
@@ -71,13 +71,11 @@ describe("priorityTone", () => {
       "prio-4",
     ]);
   });
-  it("takes the ramp from the whole vocabulary, so a value it has not learned yet shifts it", () => {
-    const scale = ["blocker", "normal", "whenever"];
-    expect(priorityTone("whenever", scale)).toBe("prio-4");
-    // A card carrying a value the board note never listed widens the vocabulary, and the ramp
-    // spreads over the wider scale. Transient in practice: setting a priority folds it into the
-    // note, and the note's list is the user's to reorder.
-    expect(priorityTone("whenever", [...scale, "someday"])).toBe("prio-3");
+  it("ranks only what the board note lists, so a card-only value stays neutral", () => {
+    // The wider vocabulary appends card values alphabetically, an order nobody chose. Colouring by
+    // it would invent a ranking, so a value the note has not learned yet gets no ramp position.
+    expect(priorityTone("blocker", [])).toBe("muted");
+    expect(priorityTone("blocker", ["someday", "whenever"])).toBe("muted");
   });
   it("lets the fixed scales win over the board's order, so a known scale never repaints", () => {
     // `C` keeps its yellow even though this board lists it last, and `normal` keeps its orange
