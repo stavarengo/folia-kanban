@@ -63,10 +63,37 @@ export class FileSystemAdapter {
 /** A vault on storage that is not a folder on disk (mobile), so `absolutePath` must return null. */
 export class CapacitorAdapter {}
 
+/**
+ * A render in flight, held open until the test lets it finish. Obsidian's renderer is async and
+ * appends into its target while running, which is the only state in which the adapter's cancel
+ * guard means anything — an auto-resolving fake would make that code unreachable.
+ */
+interface PendingRender {
+  markdown: string;
+  el: HTMLElement;
+  finish: () => void;
+}
+
 export const MarkdownRenderer = {
+  /** Every render started and not yet finished, oldest first. */
+  pending: [] as PendingRender[],
   render(_app: unknown, markdown: string, el: HTMLElement, _sourcePath: string, _c: Component) {
-    el.appendChild(el.ownerDocument.createTextNode(markdown));
-    return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      MarkdownRenderer.pending.push({
+        markdown,
+        el,
+        finish: () => {
+          el.appendChild(el.ownerDocument.createTextNode(markdown));
+          resolve();
+        },
+      });
+    });
+  },
+  /** Let every in-flight render append its output, the way Obsidian's would when it completes. */
+  finishAll(): void {
+    const started = MarkdownRenderer.pending;
+    MarkdownRenderer.pending = [];
+    for (const render of started) render.finish();
   },
 };
 
@@ -115,6 +142,15 @@ export class FakeVault extends Events {
   private texts = new Map<string, string>();
   /** Every read that went through `cachedRead`, in order — the freshness rule's evidence. */
   readonly reads: string[] = [];
+  /** Every note the FileManager fake put in the trash, which is not the same as unlinking it. */
+  readonly trashed: string[] = [];
+  /** Every note created through `create`, with the text it was created WITH (not as it ended up). */
+  readonly created: { path: string; text: string }[] = [];
+  /**
+   * Set by the metadata-cache fake: a real vault indexes a file when it appears, and only catches
+   * up with a WRITE a tick later. Seeding and `create` index; writes deliberately do not.
+   */
+  index: ((path: string) => void) | null = null;
   adapter: unknown = new FileSystemAdapter("/vault");
 
   constructor() {
@@ -167,9 +203,16 @@ export class FakeVault extends Events {
   /** Seed a note. Its folder is created on the way, exactly as a vault would already have it. */
   addFile(path: string, text = ""): TFile {
     if (path.includes("/")) this.addFolder(path.slice(0, path.lastIndexOf("/")));
+    const existing = this.nodes.get(path);
+    if (existing instanceof TFile) {
+      this.texts.set(path, text);
+      this.index?.(path);
+      return existing;
+    }
     const file = new TFile(path);
     this.link(file);
     this.texts.set(path, text);
+    this.index?.(path);
     return file;
   }
 
@@ -208,6 +251,8 @@ export class FakeVault extends Events {
     const file = new TFile(path);
     this.link(file);
     this.texts.set(path, text);
+    this.created.push({ path, text });
+    this.index?.(path);
     this.emitEvent("create", file);
     return file;
   }
@@ -269,6 +314,19 @@ export class FakeMetadataCache extends Events {
   private caches = new Map<string, Record<string, unknown>>();
   constructor(private vault: FakeVault) {
     super();
+    // A real vault has a cache entry for every file it knows about. Only a WRITE leaves the cache
+    // behind, and `catchUp` is that lag ending — so a test that wants a stale (or missing) entry
+    // says so with `setFrontmatter`, instead of getting one for free.
+    vault.index = (path) => this.setFrontmatter(path, this.readOrNothing(path));
+  }
+
+  private readOrNothing(path: string): Record<string, unknown> | undefined {
+    try {
+      return this.vault.frontmatter(path);
+    } catch {
+      // Frontmatter Obsidian cannot parse is frontmatter it does not cache.
+      return undefined;
+    }
   }
 
   /** Set what the cache claims about a note, independently of the note's text. */
@@ -286,7 +344,7 @@ export class FakeMetadataCache extends Events {
   catchUp(path: string): void {
     const file = this.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) return;
-    this.setFrontmatter(path, this.vault.frontmatter(path));
+    this.setFrontmatter(path, this.readOrNothing(path));
     this.emitEvent("changed", file);
   }
 }
@@ -303,6 +361,7 @@ export class FakeFileManager {
   }
 
   async trashFile(file: TAbstractFile): Promise<void> {
+    this.vault.trashed.push(file.path);
     this.vault.remove(file);
   }
 }

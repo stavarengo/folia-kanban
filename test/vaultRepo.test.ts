@@ -5,10 +5,10 @@
 // reach the board.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "obsidian";
+import type { App, FileManager, MetadataCache, Vault } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DataCorruptionError } from "../src/model/schemas";
-import { CapacitorAdapter, FakeApp, TFolder } from "./obsidianFake";
+import { CapacitorAdapter, FakeApp, MarkdownRenderer, TFolder } from "./obsidianFake";
 
 const DEFAULT_CONFIG = "folia-board: true\ncard-folder: ./Cards\ncolumns:\n  - todo\n  - done";
 
@@ -27,6 +27,40 @@ function setup(config = DEFAULT_CONFIG, boardPath = "basic/Board.md") {
   const repo = new VaultRepository(app as unknown as App, boardPath);
   return { app, repo, vault: app.vault };
 }
+
+/**
+ * What the fake stands in for, named through the REAL types. Casting the fake to `App` throws away
+ * every compile-time check, so this is the one that is left: a method renamed in `obsidian.d.ts`
+ * fails `pnpm typecheck` here instead of leaving the suite green against an API that moved on.
+ */
+const MIRRORED: {
+  vault: (keyof Vault)[];
+  metadataCache: (keyof MetadataCache)[];
+  fileManager: (keyof FileManager)[];
+} = {
+  vault: [
+    "adapter",
+    "getAbstractFileByPath",
+    "getMarkdownFiles",
+    "cachedRead",
+    "process",
+    "create",
+    "createFolder",
+    "on",
+    "offref",
+  ],
+  metadataCache: ["getFileCache", "on", "offref"],
+  fileManager: ["processFrontMatter", "renameFile", "trashFile"],
+};
+
+describe("the fake this suite runs against", () => {
+  it("answers to every name the adapter calls on the real API", () => {
+    const { app } = setup();
+    for (const name of MIRRORED.vault) expect(app.vault).toHaveProperty(name);
+    for (const name of MIRRORED.metadataCache) expect(app.metadataCache).toHaveProperty(name);
+    for (const name of MIRRORED.fileManager) expect(app.fileManager).toHaveProperty(name);
+  });
+});
 
 describe("card-folder resolution against a live vault", () => {
   it("prefers the board-note-relative reading a './' asks for", async () => {
@@ -119,6 +153,16 @@ describe("card-folder resolution against a live vault", () => {
       "basic/Cards/Work/Two.md",
     ]);
   });
+
+  it("never shows the board note as a card, even when it sits in its own card folder", async () => {
+    const { app, repo } = setup("folia-board: true\ncard-folder: .\ncolumns:\n  - todo");
+    app.vault.addFile("basic/One.md", card("status: todo"));
+
+    const board = await repo.loadBoard();
+
+    expect(board.config.cardFolder).toBe("basic");
+    expect(Object.keys(board.cards)).toEqual(["basic/One.md"]);
+  });
 });
 
 describe("what the adapter reads: file text vs metadataCache", () => {
@@ -140,6 +184,8 @@ describe("what the adapter reads: file text vs metadataCache", () => {
     app.vault.addFile("basic/Cards/Cached.md", card("status: todo"));
     app.vault.addFile("basic/Cards/Uncached.md", card("status: done"));
     app.metadataCache.setFrontmatter("basic/Cards/Cached.md", { status: "done" });
+    // A note the cache has not indexed yet — a card that appeared a moment ago.
+    app.metadataCache.setFrontmatter("basic/Cards/Uncached.md", undefined);
 
     const board = await repo.loadBoard();
     const byPath = Object.fromEntries(
@@ -204,6 +250,9 @@ describe("creating cards", () => {
 
     const path = await repo.createCard("Fresh", "doing");
 
+    // The note is created with the body ALONE — the keys below arrive through Obsidian's own
+    // frontmatter writer, never as YAML this plugin built by hand.
+    expect(app.vault.created).toEqual([{ path, text: "# Fresh\n" }]);
     expect(app.vault.text(path)).toContain("# Fresh");
     const fm = app.vault.frontmatter(path);
     expect(fm["type"]).toBe("task");
@@ -279,7 +328,7 @@ describe("relationships the board note does not name", () => {
 });
 
 describe("renaming a card", () => {
-  it("renames the note through the link-aware rename when the title is the file name", async () => {
+  it("renames the note when the title is the file name", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/Old.md", "\n# Something else\n");
 
@@ -300,6 +349,25 @@ describe("renaming a card", () => {
     expect(app.vault.frontmatter("basic/Cards/One.md")["title"]).toBe("New");
   });
 
+  it("renames a card that sits at the vault root, with no leading slash", async () => {
+    const { app, repo } = setup("card-folder: Cards");
+    app.vault.addFile("Old.md", "\n# Something else\n");
+
+    const dest = await repo.renameCard("Old.md", "New");
+
+    expect(dest).toBe("New.md");
+    expect(app.vault.getAbstractFileByPath("New.md")).not.toBeNull();
+  });
+
+  it("walks past a taken name rather than renaming onto it", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Old.md", "\n# Old\n");
+    app.vault.addFile("basic/Cards/New.md", "\n# New\n");
+
+    expect(await repo.renameCard("basic/Cards/Old.md", "New")).toBe("basic/Cards/New 1.md");
+    expect(app.vault.text("basic/Cards/New.md")).toContain("# New");
+  });
+
   it("writes nothing for a blank or unchanged title", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/One.md", "\n# One\n");
@@ -311,6 +379,131 @@ describe("renaming a card", () => {
   });
 });
 
+describe("writing to the board note", () => {
+  it("remembers a priority the board note does not know yet, keeping the ones it does", async () => {
+    const { app, repo } = setup(`${DEFAULT_CONFIG}\npriorities:\n  - a\n  - b`);
+
+    await repo.rememberPriorities(["c"]);
+
+    expect(app.vault.frontmatter("basic/Board.md")["priorities"]).toEqual(["a", "b", "c"]);
+  });
+
+  it("leaves the board note byte-for-byte alone when it learns nothing", async () => {
+    const { app, repo } = setup(
+      `${DEFAULT_CONFIG}\npriorities:\n  - a\n  - b\nfilter: "priority:a"`,
+    );
+    const before = app.vault.text("basic/Board.md");
+
+    await repo.rememberPriorities(["b", "a"]);
+
+    // Not "the priorities are unchanged" — the note is untouched. Opening the write at all would
+    // reflow every other property (the quotes around `filter:` are the visible casualty).
+    expect(app.vault.text("basic/Board.md")).toBe(before);
+  });
+
+  it("never gives a board that learned nothing a priorities key it did not have", async () => {
+    const { app, repo } = setup();
+
+    await repo.rememberPriorities([]);
+
+    expect(app.vault.frontmatter("basic/Board.md")).not.toHaveProperty("priorities");
+  });
+
+  it("persists the column definitions", async () => {
+    const { app, repo } = setup();
+
+    await repo.setColumns([
+      { id: "todo", title: "Todo" },
+      { id: "done", title: "Done", color: "green" },
+    ]);
+
+    expect(app.vault.frontmatter("basic/Board.md")["columns"]).toEqual([
+      { id: "todo", title: "Todo" },
+      { id: "done", title: "Done", color: "green" },
+    ]);
+  });
+});
+
+describe("field edits and their history lines", () => {
+  function repoWithCard(scope: "moves" | "structural" | "all", body = "\n# One\n") {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/One.md", card("status: todo\npriority: B", body));
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => scope);
+    return { app, repo };
+  }
+
+  it("writes one line per key the history policy recognises", async () => {
+    const { app, repo } = repoWithCard("all");
+
+    await repo.setFrontmatter("basic/Cards/One.md", { priority: "A", due: "2026-09-01", order: 3 });
+
+    const text = app.vault.text("basic/Cards/One.md") ?? "";
+    expect(text).toContain("Priority → A");
+    expect(text).toContain("Due → 2026-09-01");
+    // `order` is move-managed and has no field-edit line of its own.
+    expect(text).not.toContain("Order");
+  });
+
+  it("stays silent about the same edit when the scope does not ask for it", async () => {
+    const { app, repo } = repoWithCard("moves");
+
+    await repo.setFrontmatter("basic/Cards/One.md", { priority: "A" });
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")["priority"]).toBe("A");
+    expect(app.vault.text("basic/Cards/One.md")).not.toContain("## History");
+  });
+
+  it("removes a single key and leaves the others where they were", async () => {
+    const { app, repo } = repoWithCard("all");
+
+    await repo.unsetFrontmatterKey("basic/Cards/One.md", "priority");
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")).not.toHaveProperty("priority");
+    expect(app.vault.frontmatter("basic/Cards/One.md")["status"]).toBe("todo");
+    expect(app.vault.text("basic/Cards/One.md")).not.toContain("## History");
+  });
+
+  it("names the subtask in its history line, reading the text BEFORE the edit lands", async () => {
+    const { app, repo } = repoWithCard("all", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n");
+
+    await repo.toggleSubtask("basic/Cards/One.md", 0, true);
+    await repo.removeSubtask("basic/Cards/One.md", 0);
+
+    const text = app.vault.text("basic/Cards/One.md") ?? "";
+    expect(text).toContain("Subtask done: Write the docs");
+    expect(text).toContain("Subtask removed: Write the docs");
+    expect(text).not.toContain("- [x] Write the docs");
+  });
+
+  it("keeps a comment's timestamp when its text is edited, and drops only the removed one", async () => {
+    const { app, repo } = repoWithCard("moves");
+
+    await repo.addComment("basic/Cards/One.md", "first");
+    await repo.addComment("basic/Cards/One.md", "second");
+    const stampLine = (app.vault.text("basic/Cards/One.md") ?? "")
+      .split("\n")
+      .find((l) => l.includes("first"));
+
+    await repo.updateComment("basic/Cards/One.md", 0, "edited");
+    await repo.removeComment("basic/Cards/One.md", 1);
+
+    const text = app.vault.text("basic/Cards/One.md") ?? "";
+    expect(text).toContain("edited");
+    expect(text).not.toContain("first");
+    expect(text).not.toContain("second");
+    expect(text).toContain((stampLine ?? "").replace("first", "edited"));
+  });
+
+  it("adds a todo to the card's checklist", async () => {
+    const { app, repo } = repoWithCard("moves");
+
+    await repo.addTodo("basic/Cards/One.md", "Buy milk");
+
+    expect(app.vault.text("basic/Cards/One.md")).toContain("- [ ] Buy milk");
+  });
+});
+
 describe("the rest of the vault surface", () => {
   it("moves a deleted card to the trash rather than unlinking it blindly", async () => {
     const { app, repo } = setup();
@@ -318,6 +511,7 @@ describe("the rest of the vault surface", () => {
 
     await repo.deleteCard("basic/Cards/One.md");
 
+    expect(app.vault.trashed).toEqual(["basic/Cards/One.md"]);
     expect(app.vault.getAbstractFileByPath("basic/Cards/One.md")).toBeNull();
   });
 
@@ -353,10 +547,36 @@ describe("the rest of the vault surface", () => {
     el.textContent = "previous render";
 
     const cleanup = repo.renderMarkdown(el, "hello", "basic/Cards/One.md");
+    expect(el.textContent).toBe("");
+    MarkdownRenderer.finishAll();
     await vi.waitFor(() => expect(el.textContent).toBe("hello"));
 
     cleanup();
     expect(el.textContent).toBe("");
+  });
+
+  it("drops the output of a render that was cancelled while still in flight", async () => {
+    const { repo } = setup();
+    const el = document.createElement("div");
+
+    const cleanup = repo.renderMarkdown(el, "slow", "basic/Cards/One.md");
+    cleanup();
+    MarkdownRenderer.finishAll();
+    await Promise.resolve();
+
+    expect(el.textContent).toBe("");
+  });
+
+  it("does not let a render still in flight stack onto the next one", async () => {
+    const { repo } = setup();
+    const el = document.createElement("div");
+
+    repo.renderMarkdown(el, "first", "basic/Cards/One.md");
+    const cleanup = repo.renderMarkdown(el, "second", "basic/Cards/One.md");
+    MarkdownRenderer.finishAll();
+    await vi.waitFor(() => expect(el.textContent).toBe("second"));
+
+    cleanup();
   });
 
   it("signs a comment with the live user name and honours the live history scope", async () => {
@@ -477,11 +697,13 @@ describe("following files as they move (onFileOp)", () => {
     const off = repo.onFileOp((op) => ops.push(op));
 
     app.vault.move(file, "basic/Cards/Two.md");
+    app.vault.addFile("basic/Old/Inside.md", card("status: todo"));
     app.vault.move(app.vault.addFolder("basic/Old"), "basic/New");
     app.vault.remove(file);
 
     expect(ops).toEqual([
       { kind: "rename", from: "basic/Cards/One.md", to: "basic/Cards/Two.md" },
+      // ONE op for the folder, never one per file inside it.
       { kind: "rename", from: "basic/Old", to: "basic/New" },
       { kind: "delete", path: "basic/Cards/Two.md" },
     ]);
@@ -551,7 +773,7 @@ describe("applying a move", () => {
     const { app, repo } = setup();
     app.vault.addFile(
       "basic/Cards/One.md",
-      card("status: todo", "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n"),
+      card("status: todo", "\n# One\n\n## Subtasks\n- [x] Write the docs [status:: doing]\n"),
     );
 
     await repo.applyMove({
@@ -559,6 +781,7 @@ describe("applying a move", () => {
       setSubtaskStatus: { index: 0, status: null },
     });
 
-    expect(app.vault.text("basic/Cards/One.md")).toContain("- [ ] Write the docs\n");
+    // The checkbox is not the move's business: a status-only move must leave it exactly as it was.
+    expect(app.vault.text("basic/Cards/One.md")).toContain("- [x] Write the docs\n");
   });
 });
