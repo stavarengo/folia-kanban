@@ -6,6 +6,7 @@
 // heading "looks like a title" purely by how it is built.
 
 import { SECTION, splitFrontmatter } from "./card";
+import { fencedLines } from "./fences";
 import type { CardFrontmatter, TitleMode, TitleSource } from "./types";
 
 /** The per-card frontmatter key that overrides every other source. */
@@ -42,10 +43,9 @@ export function looksLikeTitle(heading: string): boolean {
   return words.length >= 3 || (words.length === 2 && heading.trim().length >= 12);
 }
 
-// CommonMark shapes, because that is what Obsidian renders: an ATX heading may be indented by up
-// to three spaces, and a fence may be too.
+// CommonMark shape, because that is what Obsidian renders: an ATX heading may be indented by up
+// to three spaces.
 const HEADING_RE = /^( {0,3})(#{1,6})[ \t]+(.*?)([ \t]*#*[ \t]*)\r?$/;
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 /**
  * The section headings the card parser owns (`## Subtasks`, `## Comments`, `## History`). They are
@@ -73,35 +73,13 @@ interface Heading {
   text: string;
 }
 
-/**
- * Fence state after `line`, given the currently open fence marker (null = not in a fence). Returns
- * `false` when the line is not a fence delimiter at all.
- */
-function fenceAfter(line: string, open: string | null): string | null | false {
-  const m = FENCE_RE.exec(line);
-  if (m === null) return false;
-  const marker = m[1] ?? "";
-  if (open === null) return marker;
-  // A fence closes only on its own marker, at least as long, with nothing but space after it —
-  // so neither `~~~` nor ```` ```still code ```` ends a ``` block.
-  const closes =
-    marker[0] === open[0] && marker.length >= open.length && (m[2] ?? "").trim() === "";
-  return closes ? null : open;
-}
-
 /** The first heading (any level, outside code fences) whose plain text passes `accept`. */
 function findHeading(body: string, accept: (text: string) => boolean): Heading | null {
   const lines = body.split("\n");
-  let fence: string | null = null;
+  const fenced = fencedLines(lines);
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const next = fenceAfter(line, fence);
-    if (next !== false) {
-      fence = next;
-      continue;
-    }
-    if (fence !== null) continue;
-    const text = plainHeadingText(HEADING_RE.exec(line)?.[3] ?? "");
+    if (fenced[i]) continue;
+    const text = plainHeadingText(HEADING_RE.exec(lines[i] ?? "")?.[3] ?? "");
     if (!text || RESERVED_HEADINGS.has(text.toLowerCase())) continue;
     if (accept(text)) return { line: i, text };
   }

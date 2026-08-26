@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Board, Card, CardBody, RelationLink, SubItem } from "../model/types";
 import { syncSubtaskClaim } from "../model/board";
+import { ownedHeadingIn } from "../model/card";
 import { RELATION_KEYS } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -419,6 +420,8 @@ export function CardDetail({
   /** Which card `body` was read from — the unread block below must not trust a stale one. */
   const [bodyPath, setBodyPath] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState("");
+  // The owned heading (`## Comments`, …) that stopped the last save, shown until the draft changes.
+  const [descRefusal, setDescRefusal] = useState<string | null>(null);
   // Description defaults to a rendered view; clicking it (or the pencil) flips to the raw editor.
   const [editingDesc, setEditingDesc] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -1000,25 +1003,41 @@ export function CardDetail({
                     ? { minHeight: `${preservedDescHeight}px` }
                     : undefined
                 }
-                onChange={(e) => setDescDraft(e.target.value)}
+                onChange={(e) => {
+                  setDescDraft(e.target.value);
+                  setDescRefusal(null);
+                }}
                 placeholder="Add a description…"
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     // Stay inside the editor: don't let Escape bubble to the panel and close it.
                     e.stopPropagation();
                     if (body) setDescDraft(body.description);
+                    setDescRefusal(null);
                     setEditingDesc(false);
                   }
                 }}
               />
+              {descRefusal && (
+                <p className="folia-desc-refusal" role="alert">
+                  Not saved: <code>{descRefusal}</code> would start a section the plugin owns
+                  (Subtasks, Comments, History), and everything below it would leave the
+                  description. Rename the heading, or quote it inside a code fence.
+                </p>
+              )}
               <div className="folia-row-actions">
                 <button
                   className="folia-btn folia-btn-primary"
-                  onClick={() =>
+                  onClick={() => {
+                    const owned = ownedHeadingIn(descDraft);
+                    if (owned !== null) {
+                      setDescRefusal(owned);
+                      return;
+                    }
                     void mutate(() => repo.setDescription(path, descDraft)).then(() =>
                       setEditingDesc(false),
-                    )
-                  }
+                    );
+                  }}
                 >
                   Save
                 </button>
@@ -1026,6 +1045,7 @@ export function CardDetail({
                   className="folia-btn"
                   onClick={() => {
                     if (body) setDescDraft(body.description);
+                    setDescRefusal(null);
                     setEditingDesc(false);
                   }}
                 >

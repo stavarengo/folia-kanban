@@ -284,6 +284,32 @@ describe("card detail", () => {
     );
   });
 
+  it("refuses to save a description that would start a section the plugin owns", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.click(await within(detail).findByText("Desc A"));
+    const box = within(detail).getByRole("textbox", { name: "Edit description" });
+    const before = repo.files.get("Tasks/Alpha.md")!.body;
+    await user.clear(box);
+    await user.type(box, "Intro{enter}{enter}## History{enter}{enter}of the project");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    // Nothing written, the editor stays open with the draft, and the reason is on screen.
+    const alert = await within(detail).findByRole("alert");
+    expect(alert).toHaveTextContent("## History");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
+    expect(box).toHaveValue("Intro\n\n## History\n\nof the project");
+    // Editing the draft clears the message; a fixed heading then saves.
+    await user.type(box, " end");
+    expect(within(detail).queryByRole("alert")).toBeNull();
+    await user.clear(box);
+    await user.type(box, "Intro{enter}{enter}## Timeline{enter}{enter}of the project");
+    await user.click(within(detail).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("## Timeline"));
+  });
+
   it("saves an edited description via setDescription and returns to view", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

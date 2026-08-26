@@ -271,6 +271,12 @@
   color: var(--text-error);
 }
 
+.folia-desc-refusal {
+  margin: 0.25em 0 0;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-error);
+}
+
 .folia-card-folder-notice {
   padding: 0.5em 14px;
   font-size: var(--folia-font-size-xs);

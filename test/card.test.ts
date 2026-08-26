@@ -14,6 +14,7 @@ import {
   setSubtaskStatus,
   removeSubtask,
   setDescription,
+  ownedHeadingIn,
   cardStats,
   updateTimestampedLine,
   removeTimestampedLine,
@@ -560,13 +561,122 @@ All three landed.
     expect(splitFrontmatter(out).fmText).toBe(splitFrontmatter(ownHeadings).fmText);
   });
 
-  it("is fence-blind, like every other heading lookup here (known limitation)", () => {
-    // `card.ts` does not track code fences anywhere — `headingIndex`/`sectionEnd` don't either.
-    // The description boundary matches that blindness on purpose: making only this one
-    // fence-aware would desync it from the section readers. Pinned so the day it changes, it
-    // changes for all of them at once.
-    const fenced = "# T\n\ndesc\n\n```md\n## Comments\n- _t:_ sample\n```\n";
-    expect(parseBody(fenced).description).toBe("desc\n\n```md");
+  it("refuses a heading the plugin owns before it reaches the file", () => {
+    // The Description box asks before saving; `setDescription` itself stays permissive so a
+    // section can still be written by anything that means to.
+    expect(ownedHeadingIn("Intro\n\n## History\n\nof the project")).toBe("## History");
+    expect(ownedHeadingIn("Intro\n\n## comments \n")).toBe("## comments");
+    expect(ownedHeadingIn("Intro\n\n## Notes\n\n### Comments\n")).toBeNull();
+    expect(ownedHeadingIn("```md\n## Comments\n```\n")).toBeNull();
+  });
+});
+
+describe("code fences hide structure from every lookup at once", () => {
+  const fenced =
+    "# T\n\ndesc\n\n```md\n## Comments\n- _2026-08-21 11:49:_ sample\n```\n\nafter\n\n## Comments\n- _2026-08-22 09:00:_ real\n";
+
+  it("keeps a quoted owned heading inside the description, and out of the comments", () => {
+    const b = parseBody(fenced);
+    expect(b.description).toBe(
+      "desc\n\n```md\n## Comments\n- _2026-08-21 11:49:_ sample\n```\n\nafter",
+    );
+    expect(b.comments).toEqual([{ timestamp: "2026-08-22 09:00", author: null, text: "real" }]);
+  });
+
+  it("writes the description back around the quoted heading without reshaping the note", () => {
+    expect(setDescription(fenced, parseBody(fenced).description)).toBe(fenced);
+  });
+
+  it("appends to the real section, not the quoted one", () => {
+    const out = appendComment(fenced, "new", "2026-08-23 10:00");
+    expect(out).toBe(fenced + "- _2026-08-23 10:00:_ new\n");
+  });
+
+  it("edits and deletes address the real section's entries", () => {
+    expect(updateTimestampedLine(fenced, SECTION.comments, 0, "edited")).toBe(
+      fenced.replace("- _2026-08-22 09:00:_ real", "- _2026-08-22 09:00:_ edited"),
+    );
+    expect(removeTimestampedLine(fenced, SECTION.comments, 0)).toBe(
+      fenced.replace("- _2026-08-22 09:00:_ real\n", ""),
+    );
+  });
+
+  it("a quoted bullet inside a section is code, to the reader and the writers alike", () => {
+    const doc = "# T\n\n## Comments\n```\n- _t:_ quoted\n```\n- _2026-08-22 09:00:_ real\n";
+    expect(parseBody(doc).comments.map((c) => c.text)).toEqual(["real"]);
+    expect(removeTimestampedLine(doc, SECTION.comments, 0)).toBe(
+      "# T\n\n## Comments\n```\n- _t:_ quoted\n```\n",
+    );
+  });
+
+  it("a quoted checkbox is not a subtask", () => {
+    const doc = "# T\n\n## Subtasks\n~~~\n- [ ] quoted\n~~~\n- [ ] real\n";
+    expect(parseSubtasks(doc).map((s) => s.text)).toEqual(["real"]);
+    expect(setSubtaskDone(doc, 0, true)).toBe(doc.replace("- [ ] real", "- [x] real"));
+  });
+
+  it("a fence left open runs to the end, so the new section is written after closing it", () => {
+    const doc = "# T\n\n```\ncode\n";
+    const out = appendComment(doc, "c", "2026-08-23 10:00");
+    expect(out).toBe(doc + "```\n\n## Comments\n- _2026-08-23 10:00:_ c\n");
+    expect(parseBody(out).comments.map((c) => c.text)).toEqual(["c"]);
+  });
+
+  it("a fenced `# heading` is not the title", () => {
+    expect(parseBody("```\n# not me\n```\n# Me\n\nbody\n")).toMatchObject({
+      title: "Me",
+      description: "body",
+    });
+  });
+});
+
+describe("prose under Comments / History", () => {
+  const doc =
+    "# T\n\n## Comments\n\n**2026-08-21** — Applied and checked\nagainst the test suite.\n\n- _2026-08-22 09:00:_ bullet\n  a continuation line\n\nA closing remark.\n\n## History\n- _2026-08-20 08:00:_ Created\n";
+
+  it("reads a paragraph as one comment, without timestamp or author", () => {
+    expect(parseBody(doc).comments).toEqual([
+      {
+        timestamp: "",
+        author: null,
+        text: "**2026-08-21** — Applied and checked\nagainst the test suite.",
+      },
+      { timestamp: "2026-08-22 09:00", author: null, text: "bullet" },
+      { timestamp: "", author: null, text: "a continuation line" },
+      { timestamp: "", author: null, text: "A closing remark." },
+    ]);
+  });
+
+  it("edits the paragraph the panel showed, as one line, leaving every other byte alone", () => {
+    expect(updateTimestampedLine(doc, SECTION.comments, 0, "Applied.")).toBe(
+      doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.", "Applied."),
+    );
+    expect(updateTimestampedLine(doc, SECTION.comments, 3, "Bye.")).toBe(
+      doc.replace("A closing remark.", "Bye."),
+    );
+  });
+
+  it("deletes the whole paragraph the panel showed, and only it", () => {
+    expect(removeTimestampedLine(doc, SECTION.comments, 0)).toBe(
+      doc.replace("**2026-08-21** — Applied and checked\nagainst the test suite.\n", ""),
+    );
+  });
+
+  it("still addresses bullets by the same index the reader gives them", () => {
+    expect(updateTimestampedLine(doc, SECTION.comments, 1, "edited")).toBe(
+      doc.replace("- _2026-08-22 09:00:_ bullet", "- _2026-08-22 09:00:_ edited"),
+    );
+  });
+
+  it("an index past the end changes nothing", () => {
+    expect(updateTimestampedLine(doc, SECTION.comments, 9, "x")).toBe(doc);
+    expect(removeTimestampedLine(doc, SECTION.comments, 9)).toBe(doc);
+  });
+
+  it("counts a prose comment on the card, untracked for unread marking", () => {
+    const stats = cardStats(doc);
+    expect(stats.comments).toBe(4);
+    expect(stats.commentMarks[0]).toEqual({ timestamp: "", author: null });
   });
 });
 
