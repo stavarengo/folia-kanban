@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.19](https://github.com/stavarengo/folia-kanban/compare/0.0.18...0.0.19) (2026-08-26)
+
+### Features
+
+* **settings:** describe the settings tab declaratively so search finds it ([ae3b70b](https://github.com/stavarengo/folia-kanban/commit/ae3b70b16aab765f1d35e5f76414ec5ee4dceb16))
+
+### Bug Fixes
+
+* **docs:** say what each check and each setting actually does ([6cb24cb](https://github.com/stavarengo/folia-kanban/commit/6cb24cbb36919ba44b366d104e4864141be6dc31))
+* **settings:** refuse a control value that is not a number ([9c8c771](https://github.com/stavarengo/folia-kanban/commit/9c8c771b0e109c04be12fa71fb85e11f967d4c73))
+
+### Refactoring
+
+* **settings:** validate the typed name in one place ([5960909](https://github.com/stavarengo/folia-kanban/commit/5960909100f5bf4a71593c5b4162934a1b7ebcb7))
+
+### Documentation
+
+* **readme:** name checklist items as tasks, and guard the README against placeholders ([f547d96](https://github.com/stavarengo/folia-kanban/commit/f547d965d567e10e281926379bfd413861a194ab))
+
 ## [0.0.18](https://github.com/stavarengo/folia-kanban/compare/0.0.17...0.0.18) (2026-08-25)
 
 ### Bug Fixes
