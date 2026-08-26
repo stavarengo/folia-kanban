@@ -387,10 +387,16 @@ export function addSubcard(text: string, link: string): string {
   return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] [[${link}]]`));
 }
 
-/** Rewrite only the checkbox of line `i`; every other byte of the line passes through. */
+/**
+ * Rewrite only the character inside the checkbox of line `i`; every other byte of the line, the
+ * author's spacing included, passes through — this runs on notes nobody has open.
+ */
 function tickLine(lines: string[], i: number, done: boolean): void {
-  const m = CHECKBOX_RE.exec(lines[i] ?? "");
-  if (m) lines[i] = `${m[1] ?? ""}[${done ? "x" : " "}] ${m[3] ?? ""}`;
+  const line = lines[i] ?? "";
+  const m = CHECKBOX_RE.exec(line);
+  if (!m) return;
+  const at = (m[1] ?? "").length + 1;
+  lines[i] = line.slice(0, at) + (done ? "x" : " ") + line.slice(at + 1);
 }
 
 /** Toggle/set the done state of the index-th subtask (0-based among checklist items). */

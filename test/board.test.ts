@@ -301,6 +301,19 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     expect(moveCard(b2, "Tasks/Child.md", "done", 0)?.parentLines).toBeUndefined();
   });
 
+  it("treats a drop in the column a status-less card renders in as a reorder", () => {
+    // A and B link each other, so neither nests and both render top-level in the first column.
+    const b = buildBoard(config, [
+      withItems("A", { status: "todo" }, [link("B", 0, true)]),
+      withItems("B", {}, [link("A", 0)]),
+    ]);
+    expect(b.columns["todo"]).toEqual(["Tasks/A.md", "Tasks/B.md"]);
+    expect(moveCard(b, "Tasks/B.md", "todo", 0)?.parentLines).toBeUndefined();
+    expect(moveCard(b, "Tasks/B.md", "doing", 0)?.parentLines).toEqual([
+      { path: "Tasks/A.md", links: ["B"], done: false },
+    ]);
+  });
+
   it("writes every note that links the child, and nothing when no note does", () => {
     const b = buildBoard(config, [
       withItems("A", { status: "todo" }, [link("Child", 0)]),
@@ -370,6 +383,17 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     expect(syncSubtaskClaim(b, "Tasks/Parent.md", 2, false)).toEqual({
       path: "Tasks/Finished.md",
       unsetFrontmatter: ["status"],
+    });
+    // Another card listing the same child follows; the clicked note itself is not written twice.
+    const b2 = buildBoard(config, [
+      withItems("Parent", { status: "todo" }, [link("Placed", 0)]),
+      withItems("Other", { status: "doing" }, [link("Placed", 0)]),
+      card("Placed", { status: "doing" }),
+    ]);
+    expect(syncSubtaskClaim(b2, "Tasks/Parent.md", 0, true)).toEqual({
+      path: "Tasks/Placed.md",
+      setFrontmatter: { status: "done" },
+      parentLines: [{ path: "Tasks/Other.md", links: ["Placed"], done: true }],
     });
     // A child claiming nothing is left where it is, ticked or not.
     expect(syncSubtaskClaim(b, "Tasks/Parent.md", 1, true)).toBeNull();

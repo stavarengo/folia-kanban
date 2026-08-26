@@ -205,7 +205,7 @@ describe("setSubcardDone — a subcard line is found by its link, never by a pos
     "- [ ] [[Other|alias]]",
     "",
     "## Comments",
-    "- [ ] not a subtask",
+    "- [ ] [[Child]] is mentioned here, but this is not the checklist",
     "",
   ].join("\n");
 
@@ -230,6 +230,14 @@ describe("setSubcardDone — a subcard line is found by its link, never by a pos
     expect(setSubcardDone(tricky, ["Child"], true)).toBe(
       tricky.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
     );
+  });
+
+  it("changes one character: the author's spacing around the box is not the plugin's to tidy", () => {
+    const spaced = doc.replace("- [ ] [[Child]]", "  *   [ ]   [[Child]]   ");
+    expect(setSubcardDone(spaced, ["Child"], true)).toBe(
+      spaced.replace("  *   [ ]   [[Child]]   ", "  *   [x]   [[Child]]   "),
+    );
+    expect(setSubtaskDone(spaced, 2, true)).toBe(setSubcardDone(spaced, ["Child"], true));
   });
 });
 

@@ -900,9 +900,16 @@ export function syncSubtaskClaim(
     const child = item.link === undefined ? null : resolveOnBoard(board, item.link);
     const status = child === null ? undefined : board.cards[child]?.frontmatter.status;
     if (child === null || status === undefined) return null;
-    if (!done) return status === doneCol ? { path: child, unsetFrontmatter: ["status"] } : null;
-    if (doneCol === null || status === doneCol) return null;
-    return { path: child, setFrontmatter: { status: doneCol } };
+    const moving = done ? status !== doneCol && doneCol !== null : status === doneCol;
+    if (!moving) return null;
+    // The clicked note's own box was just written by the caller; any other card listing the
+    // same child follows along, as it would had the child's tile been dragged.
+    const mutation: CardMutation = done
+      ? { path: child, setFrontmatter: { status: doneCol ?? "" } }
+      : { path: child, unsetFrontmatter: ["status"] };
+    const parentLines = parentLinesOf(board, child, done, parentPath);
+    if (parentLines.length > 0) mutation.parentLines = parentLines;
+    return mutation;
   }
   if (item.status === undefined) return null; // claims nothing — nothing to keep in step
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
@@ -910,13 +917,11 @@ export function syncSubtaskClaim(
   return { path: parentPath, setSubtaskStatus: { index, status: next } };
 }
 
-/**
- * Resolve a `[[wikilink]]` against a built board, the way `buildBoard` did when it derived
- * `parentOf` — so a write that finds a line by its link binds it to the same card the graph did.
- * The synthetic cards minted for placed inline todos are skipped: they borrow their note's file
- * name and would otherwise answer to a link that names a real card.
- */
-export function resolveOnBoard(board: Board, link: string): string | null {
+/** The lookup tables `resolveLink` reads, built from a board's real cards (see {@link resolveOnBoard}). */
+function linkIndex(board: Board): {
+  byBasename: Map<string, string[]>;
+  byPath: Record<string, Card>;
+} {
   const byBasename = new Map<string, string[]>();
   const byPath: Record<string, Card> = {};
   for (const c of Object.values(board.cards)) {
@@ -926,31 +931,45 @@ export function resolveOnBoard(board: Board, link: string): string | null {
     if (arr) arr.push(c.path);
     else byBasename.set(c.basename, [c.path]);
   }
+  return { byBasename, byPath };
+}
+
+/**
+ * Resolve a `[[wikilink]]` against a built board, the way `buildBoard` did when it derived
+ * `parentOf` — so a write that finds a line by its link binds it to the same card the graph did.
+ * The synthetic cards minted for placed inline todos are skipped: they borrow their note's file
+ * name and would otherwise answer to a link that names a real card.
+ */
+export function resolveOnBoard(board: Board, link: string): string | null {
+  const { byBasename, byPath } = linkIndex(board);
   return resolveLink(link, byBasename, byPath);
 }
 
 /**
- * The checklist lines, in every note on the board, that name `childPath` and do not already say
+ * The checklist lines, in every card on the board, that name `childPath` and do not already say
  * `done` — what a subcard reaching or leaving the done column must tick or untick so its parent
- * tells the same story an inline todo would. Every note that links the child is included, not
+ * tells the same story an inline todo would. Every card that links the child is included, not
  * only the one `parentOf` picked: the child's progress is a fact about the child, and each of
- * those notes counts the line in its own progress bar.
+ * those cards counts the line in its own progress bar. `except` skips a note already written by
+ * the caller.
  */
 function parentLinesOf(
   board: Board,
   childPath: string,
   done: boolean,
+  except?: string,
 ): NonNullable<CardMutation["parentLines"]> {
+  const { byBasename, byPath } = linkIndex(board);
   const out: NonNullable<CardMutation["parentLines"]> = [];
   for (const c of Object.values(board.cards)) {
-    if (c.todoRef || c.path === childPath) continue;
+    if (c.todoRef || c.path === childPath || c.path === except) continue;
     const links = (c.subItems ?? [])
       .filter(
         (s): s is typeof s & { link: string } =>
           s.kind === "card" &&
           s.link !== undefined &&
           s.done !== done &&
-          resolveOnBoard(board, s.link) === childPath,
+          resolveLink(s.link, byBasename, byPath) === childPath,
       )
       .map((s) => s.link);
     if (links.length > 0) out.push({ path: c.path, links, done });
@@ -1057,11 +1076,13 @@ export function moveCard(
     setFrontmatter: { status: toColumnId, order },
     history: `Moved from ${columnTitle(board.config, fromStatus || "—")} to ${columnTitle(board.config, toColumnId)}`,
   };
-  // A reorder says nothing about finishing, so it leaves every parent's checkbox as it is.
   if (fromStatus === toColumnId) {
     mutation.history = `Reordered within ${columnTitle(board.config, toColumnId)}`;
-    return mutation;
   }
+  // A reorder says nothing about finishing, so it leaves every parent's checkbox as it is. Judged
+  // by the column the tile is rendered in, not by `status`: a card with no `status`, or one naming
+  // a column since removed, sits in the first column and is only being reordered there.
+  if (columnOf(board, cardPath) === toColumnId) return mutation;
   const parentLines = syncSubcardLines(board, cardPath, toColumnId)?.parentLines;
   if (parentLines) mutation.parentLines = parentLines;
   return mutation;
