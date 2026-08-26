@@ -209,10 +209,17 @@ export class FakeRepo implements CardRepository {
         const e = this.entry(path);
         const pending = pendingSubcardLinks(e.body, links, done);
         if (pending.length === 0) continue;
-        e.body = setSubcardDone(e.body, pending, done);
-        for (const link of pending) {
-          const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
-          this.maybeHistory(path, "subtask", line);
+        e.body = setSubcardDone(
+          e.body,
+          pending.map((p) => p.link),
+          done,
+        );
+        for (const { text } of pending) {
+          this.maybeHistory(
+            path,
+            "subtask",
+            done ? subtaskDoneLine(text) : subtaskReopenedLine(text),
+          );
         }
       } catch (e) {
         failure ??= e;

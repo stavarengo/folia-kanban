@@ -201,11 +201,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       if (!mut) return;
       try {
         await repo.applyMove(mut);
+      } catch (e) {
+        // A move can now touch more than one note; what failed in a second note must be seen.
+        reportError(e);
       } finally {
         await load();
       }
     },
-    [repo, load],
+    [repo, load, reportError],
   );
 
   const onAddCard = useCallback(

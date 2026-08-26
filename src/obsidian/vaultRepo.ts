@@ -382,16 +382,29 @@ export class VaultRepository implements CardRepository {
     let failure: Error | undefined;
     for (const { path, links, done } of mutation.parentLines ?? []) {
       try {
-        const pending = pendingSubcardLinks(
-          await this.app.vault.cachedRead(this.file(path)),
-          links,
-          done,
-        );
-        if (pending.length === 0) continue;
-        await this.editBody(path, (t) => setSubcardDone(t, pending, done));
-        for (const link of pending) {
-          const line = done ? subtaskDoneLine(`[[${link}]]`) : subtaskReopenedLine(`[[${link}]]`);
-          await this.maybeHistory(path, "subtask", line);
+        // Looked up twice on purpose: once to skip a note that needs nothing (so an unchanged
+        // note is not rewritten at all), and again inside the atomic write, which is the text the
+        // history line must describe.
+        if (
+          pendingSubcardLinks(await this.app.vault.cachedRead(this.file(path)), links, done)
+            .length === 0
+        )
+          continue;
+        let pending: { link: string; text: string }[] = [];
+        await this.editBody(path, (t) => {
+          pending = pendingSubcardLinks(t, links, done);
+          return setSubcardDone(
+            t,
+            pending.map((p) => p.link),
+            done,
+          );
+        });
+        for (const { text } of pending) {
+          await this.maybeHistory(
+            path,
+            "subtask",
+            done ? subtaskDoneLine(text) : subtaskReopenedLine(text),
+          );
         }
       } catch (e) {
         failure ??= e instanceof Error ? e : new Error(String(e));

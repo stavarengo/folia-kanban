@@ -234,13 +234,16 @@ describe("setSubcardDone — a subcard line is found by its link, never by a pos
   });
 
   it("reports each link that still needs the write once, so a writer can skip the rest", () => {
+    // The line's own text rides along, so a history line can name it as written.
     expect(pendingSubcardLinks(doc, ["Child", "Other", "Nobody"], true)).toEqual([
-      "Child",
-      "Other",
+      { link: "Child", text: "[[Child]]" },
+      { link: "Other", text: "[[Other|alias]]" },
     ]);
     expect(pendingSubcardLinks(doc, ["Child"], false)).toEqual([]); // already unticked
     const twice = doc.replace("- [ ] [[Other|alias]]", "- [ ] [[Child]]");
-    expect(pendingSubcardLinks(twice, ["Child", "Child"], true)).toEqual(["Child"]);
+    expect(pendingSubcardLinks(twice, ["Child", "Child"], true)).toEqual([
+      { link: "Child", text: "[[Child]]" },
+    ]);
     expect(setSubcardDone(twice, ["Child"], true)).toBe(
       doc
         .replace("- [ ] [[Child]]", "- [x] [[Child]]")

@@ -456,7 +456,8 @@ export function buildBoard(
         // but a `status` edited by hand in the child note reaches the parent only here — so the
         // progress bar tells the truth either way, and the note catches up on the next move.
         const child = item.link === undefined ? null : resolve(item.link);
-        const finished = child !== null && cardsByPath[child]?.frontmatter.status === doneCol;
+        const finished =
+          child !== null && child !== c.path && cardsByPath[child]?.frontmatter.status === doneCol;
         if (!item.done && doneCol !== null && finished) placedFor(c.path).doneByColumn++;
         continue;
       }
@@ -911,9 +912,19 @@ export function syncSubtaskClaim(
     if (!moving) return null;
     // The clicked note's own box was just written by the caller; any other card listing the
     // same child follows along, as it would had the child's tile been dragged.
+    // The child's note records it as the move it is, in the words a drag would leave.
+    const from = columnTitle(board.config, status);
     const mutation: CardMutation = done
-      ? { path: child, setFrontmatter: { status: doneCol ?? "" } }
-      : { path: child, unsetFrontmatter: ["status"] };
+      ? {
+          path: child,
+          setFrontmatter: { status: doneCol ?? "" },
+          history: `Moved from ${from} to ${columnTitle(board.config, doneCol ?? "")}`,
+        }
+      : {
+          path: child,
+          unsetFrontmatter: ["status"],
+          history: `Moved from ${from} to ${columnTitle(board.config, columnOf(board, parentPath) ?? "\u2014")}`,
+        };
     const parentLines = parentLinesOf(board, child, done, parentPath);
     if (parentLines.length > 0) mutation.parentLines = parentLines;
     return mutation;
@@ -1061,8 +1072,10 @@ export function moveCard(
     mutation.history = `Reordered within ${columnTitle(board.config, toColumnId)}`;
   }
   // The checkbox follows what the tile did: a card with no `status`, or one naming a column since
-  // removed, renders in the first column, and a drop there says nothing about finishing.
-  if (columnOf(board, cardPath) === toColumnId) return mutation;
+  // removed, renders in the first column, and a drop there says nothing about finishing — unless
+  // that column is Done, where landing is the statement whatever the tile did before.
+  const doneCol = findDoneColumn(board.config.columns);
+  if (toColumnId !== doneCol && columnOf(board, cardPath) === toColumnId) return mutation;
   const parentLines = syncSubcardLines(board, cardPath, toColumnId)?.parentLines;
   if (parentLines) mutation.parentLines = parentLines;
   return mutation;

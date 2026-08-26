@@ -465,16 +465,20 @@ describe("card detail", () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     repo.files.get("Tasks/Beta.md")!.fm.status = "doing"; // a child standing in a column of its own
+    // A second card listing the same child: its line follows without anyone opening it.
+    repo.files.get("Tasks/Gamma.md")!.body = "\n# Gamma\n\n## Subtasks\n- [ ] [[Beta]]\n";
     render_(repo);
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
     await user.click(within(detail).getByLabelText("Toggle [[Beta]]"));
     await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBe("done"));
     expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[x\] \[\[Beta\]\]/);
+    expect(repo.files.get("Tasks/Gamma.md")!.body).toMatch(/- \[x\] \[\[Beta\]\]/);
     // Unticking a child in Done drops its claim: it comes home to Alpha's group.
     await user.click(await within(detail).findByLabelText("Toggle [[Beta]]"));
     await waitFor(() => expect(repo.files.get("Tasks/Beta.md")!.fm.status).toBeUndefined());
     expect(repo.files.get("Tasks/Alpha.md")!.body).toMatch(/- \[ \] \[\[Beta\]\]/);
+    expect(repo.files.get("Tasks/Gamma.md")!.body).toMatch(/- \[ \] \[\[Beta\]\]/);
   });
 
   it("offers no column for a subtask whose link names no card on the board", async () => {

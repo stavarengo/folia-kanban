@@ -1419,10 +1419,11 @@ export function CardDetail({
                   aria-label={`Toggle ${s.text}`}
                   onChange={() =>
                     void mutate(async () => {
-                      await repo.toggleSubtask(path, s.index, !s.done);
                       // Same rule the board's own toggle follows: a line that claims a column has
                       // its claim moved with its checkbox, so the two never tell different stories.
+                      // Decided before the box is written, so a refused follow-up is known first.
                       const sync = syncSubtaskClaim(board, path, s, !s.done);
+                      await repo.toggleSubtask(path, s.index, !s.done);
                       if (sync) await repo.applyMove(sync);
                     })
                   }

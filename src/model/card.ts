@@ -433,17 +433,19 @@ export function setSubcardDone(text: string, links: readonly string[], done: boo
  * Which of `links` {@link setSubcardDone} would actually change in this text, each once: the
  * targets of the lines that link them and do not already say `done`. What a writer checks before
  * touching the note, so a note that no longer needs the write is left alone, and what its history
- * line names — never a link the note no longer carries.
+ * line names — the line's own text, never a link the note no longer carries.
  */
 export function pendingSubcardLinks(
   text: string,
   links: readonly string[],
   done: boolean,
-): string[] {
-  const out: string[] = [];
+): { link: string; text: string }[] {
+  const out: { link: string; text: string }[] = [];
   for (const item of parseSubtasks(text)) {
     if (item.kind !== "card" || item.link === undefined || item.done === done) continue;
-    if (links.includes(item.link) && !out.includes(item.link)) out.push(item.link);
+    const link = item.link;
+    if (links.includes(link) && !out.some((o) => o.link === link))
+      out.push({ link, text: item.text });
   }
   return out;
 }

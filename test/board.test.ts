@@ -314,6 +314,20 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     expect(moveCard(b, "Tasks/B.md", "doing", 0)?.parentLines).toEqual([
       { path: "Tasks/A.md", links: ["B"], done: false },
     ]);
+    // Unless the first column IS Done: landing there is the statement, whatever the tile did.
+    const doneFirst = { ...config, columns: [...config.columns].reverse() };
+    const b2 = buildBoard(doneFirst, [
+      withItems("A", { status: "todo" }, [link("B", 0)]),
+      withItems("B", {}, [link("A", 0)]),
+    ]);
+    expect(moveCard(b2, "Tasks/B.md", "done", 0)?.parentLines).toEqual([
+      { path: "Tasks/A.md", links: ["B"], done: true },
+    ]);
+  });
+
+  it("a self-link is never counted done through its own status, since it is never ticked for it", () => {
+    const self = withItems("Loop", { status: "done" }, [link("Loop", 0)]);
+    expect(buildBoard(config, [self]).cards["Tasks/Loop.md"]?.stats?.checklistDone).toBe(0);
   });
 
   it("writes every note that links the child, and nothing when no note does", () => {
@@ -376,15 +390,17 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       card("Home"),
       card("Finished", { status: "done" }),
     ]);
-    // Ticking a child that stands somewhere sends it to Done.
+    // Ticking a child that stands somewhere sends it to Done, recorded in its note as a move.
     expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 0, link: "Placed" }, true)).toEqual({
       path: "Tasks/Placed.md",
       setFrontmatter: { status: "done" },
+      history: "Moved from Doing to Done",
     });
     // Un-ticking one in Done drops its claim: it rejoins its card.
     expect(syncSubtaskClaim(b, "Tasks/Parent.md", { index: 2, link: "Finished" }, false)).toEqual({
       path: "Tasks/Finished.md",
       unsetFrontmatter: ["status"],
+      history: "Moved from Done to Todo",
     });
     // The write lands in another note, so the position alone never names it: the link the person
     // was shown must still be on that line, or nothing is written.
@@ -396,7 +412,9 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       withItems("Other", { status: "doing" }, [link("Placed", 0)]),
       card("Placed", { status: "doing" }),
     ]);
-    expect(syncSubtaskClaim(b2, "Tasks/Parent.md", { index: 0, link: "Placed" }, true)).toEqual({
+    expect(
+      syncSubtaskClaim(b2, "Tasks/Parent.md", { index: 0, link: "Placed" }, true),
+    ).toMatchObject({
       path: "Tasks/Placed.md",
       setFrontmatter: { status: "done" },
       parentLines: [{ path: "Tasks/Other.md", links: ["Placed"], done: true }],
