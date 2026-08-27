@@ -4,15 +4,14 @@ import type { Board as BoardModel, ColumnDef } from "../model/types";
 import {
   columnOf,
   findDoneColumn,
-  moveCard,
   moveColumn,
   moveSubtask,
   parseTodoPath,
   reassignColumn,
   relationCounts,
   syncSubtaskClaim,
-  resolveDrop,
 } from "../model/board";
+import { moveCardOver, moveCardTo } from "../model/boardOps";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -238,12 +237,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     async (activeId: string, overId: string) => {
       const b = boardRef.current;
       if (!b) return;
-      const drop = resolveDrop(b, activeId, overId);
-      if (!drop) return;
-      const mut = moveCard(b, activeId, drop.columnId, drop.index);
-      if (!mut) return;
       try {
-        await repo.applyMove(mut);
+        await moveCardOver(repo, b, { activeId, overId });
       } catch (e) {
         // A move can now touch more than one note; what failed in a second note must be seen.
         reportError(e);
@@ -283,11 +278,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     async (path: string, columnId: string) => {
       const b = boardRef.current;
       if (!b) return;
-      const target = (b.columns[columnId] ?? []).filter((p) => p !== path).length;
-      const mut = moveCard(b, path, columnId, target);
-      if (!mut) return;
       try {
-        await repo.applyMove(mut);
+        await moveCardTo(repo, b, { path, columnId });
       } finally {
         await load();
       }
@@ -521,11 +513,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         // dropIndex is computed against the list with `path` removed: up (-1) lands before the
         // former predecessor, down (+1) lands after the former successor.
         const dropIndex = i + dir;
-        const mut = moveCard(b, path, col, dropIndex);
-        if (!mut) return;
         void (async () => {
           try {
-            await repo.applyMove(mut);
+            await moveCardTo(repo, b, { path, columnId: col, index: dropIndex });
           } catch (e) {
             reportError(e);
           } finally {
