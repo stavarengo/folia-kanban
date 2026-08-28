@@ -36,6 +36,7 @@ import {
 import {
   CARD_NEXT_TODOS_MAX,
   MCP_TOKEN_COPY,
+  MCP_TOKEN_REGENERATE,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -601,6 +602,39 @@ export default class FoliaKanbanPlugin extends Plugin {
     new Notice(MCP_TOKEN_COPY.copied, 3000);
   }
 
+  /**
+   * Replace the bearer token and put the new one on the clipboard, so the client that has to be
+   * reconfigured can be reconfigured in the same gesture. The running server restarts on the new
+   * token through the ordinary settings write, which means every client still holding the old one
+   * is locked out from that moment.
+   */
+  async regenerateMcpToken(): Promise<void> {
+    if (!this.settings.mcpEnabled) {
+      new Notice(MCP_TOKEN_REGENERATE.missing, 5000);
+      return;
+    }
+    const token = newMcpToken();
+    await this.updateSettings({ mcpToken: token });
+    // `updateSettings` starts the restart but does not wait for it. Waiting here means the notice
+    // reports what actually happened: a port taken in the window between stopping on the old token
+    // and starting on the new one would otherwise be announced as success, and the separate
+    // failure notice would look unrelated to the button just pressed.
+    await this.mcp?.sync(this.settings);
+    if (this.mcp && this.mcp.port === null) {
+      new Notice(MCP_TOKEN_REGENERATE.replacedButDown, 10000);
+      return;
+    }
+    // The token is already replaced and saved; a clipboard that refuses does not undo that, and
+    // saying nothing would leave the user with a working server and no idea what its token is.
+    try {
+      await navigator.clipboard.writeText(token);
+    } catch {
+      new Notice(MCP_TOKEN_REGENERATE.replacedNotCopied, 10000);
+      return;
+    }
+    new Notice(MCP_TOKEN_REGENERATE.done, 5000);
+  }
+
   /** Re-render all open Folia Kanban views so settings changes reflect without a reload. */
   refreshViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_KANBAN)) {
@@ -674,7 +708,10 @@ class KanbanSettingTab extends PluginSettingTab {
     return settingDefinitions(
       () => this.plugin.settings,
       this.plugin.manifest.version,
-      () => void this.plugin.copyMcpToken(),
+      {
+        copy: () => void this.plugin.copyMcpToken(),
+        regenerate: () => void this.plugin.regenerateMcpToken(),
+      },
       Platform.isDesktop,
     );
   }
@@ -895,6 +932,17 @@ class KanbanSettingTab extends PluginSettingTab {
             .setButtonText(MCP_TOKEN_COPY.button)
             .setDisabled(!s.mcpEnabled)
             .onClick(() => void this.plugin.copyMcpToken()),
+        );
+
+      new Setting(containerEl)
+        .setName(MCP_TOKEN_REGENERATE.name)
+        .setDesc(MCP_TOKEN_REGENERATE.desc)
+        .setDisabled(!s.mcpEnabled)
+        .addButton((b) =>
+          b
+            .setButtonText(MCP_TOKEN_REGENERATE.button)
+            .setDisabled(!s.mcpEnabled)
+            .onClick(() => void this.plugin.regenerateMcpToken()),
         );
     }
 

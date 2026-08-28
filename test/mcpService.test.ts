@@ -154,6 +154,45 @@ describe("the server's lifetime", () => {
     expect(second.states).toEqual(["failed", "running"]);
     await second.service.stop();
   });
+
+  // Replacing the token is a security control, so the claim that matters is not that the setting
+  // changed but that the old bearer stops opening the door. Nothing asserted that until now.
+  it("stops accepting the old token once it is replaced", async () => {
+    const old = newMcpToken();
+    const s = setup({ mcpEnabled: true, mcpToken: old, mcpPort: 0 });
+    live = s.service;
+    await s.service.sync(s.settings());
+    const call = (token: string) =>
+      fetch(`http://${MCP_HOST}:${s.service.port ?? 0}${MCP_PATH}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      });
+    expect((await call(old)).status).toBe(200);
+
+    const fresh = newMcpToken();
+    await s.set({ mcpToken: fresh });
+    expect((await call(old)).status).toBe(401);
+    expect((await call(fresh)).status).toBe(200);
+  });
+
+  // The lifecycle tests all assert what the service believes about itself. Whether the socket was
+  // actually given back is a different claim, and the one that matters: a stop that only forgot
+  // the server would leave the port held until Obsidian restarted, and the next start would fail
+  // for a reason nothing in this suite would explain.
+  it("gives the port back, so the same one can be bound again", async () => {
+    const first = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
+    await first.service.sync(first.settings());
+    const port = first.service.port;
+    expect(port).toBeGreaterThan(0);
+    await first.service.stop();
+
+    const second = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: port ?? 0 });
+    live = second.service;
+    await second.service.sync(second.settings());
+    expect(second.service.port).toBe(port);
+    expect(second.states).toEqual(["running"]);
+  });
 });
 
 describe("the repository an agent writes through", () => {

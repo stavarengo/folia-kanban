@@ -157,13 +157,19 @@ function descriptionRange(lines: string[]): { h1: number; from: number; to: numb
  */
 export function descriptionRefusal(
   description: string,
-): { kind: "heading" | "fence"; line: string } | null {
+): { kind: "heading" | "fence" | "title"; line: string } | null {
   // Judge the bytes `setDescription` will write: it trims, so an indent on the first line that
   // would keep a heading or a fence inert here is gone by the time the note is read back.
   const lines = description.trim().split("\n");
   const fenced = fencedLines(lines);
   const i = lines.findIndex((l, n) => !fenced[n] && OWNED_HEADING_RE.test(l));
   if (i !== -1) return { kind: "heading", line: (lines[i] ?? "").trim() };
+  // A description opening with an `# H1` is not description at all once it is read back: that is
+  // where a card's title lives, so `descriptionRange` treats the line as the title and starts the
+  // description after it. Saved, the heading is silently eaten and never comes back.
+  if (!fenced[0] && /^#\s+/.test(lines[0] ?? "")) {
+    return { kind: "title", line: (lines[0] ?? "").trim() };
+  }
   const open = unclosedFence(lines);
   return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
