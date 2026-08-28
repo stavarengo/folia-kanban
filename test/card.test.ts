@@ -571,6 +571,13 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
     expect(out).toBe("# T\r\n\r\n## Comments\r\n- _t:_ one");
   });
 
+  it("updateTimestampedLine collapsing a multi-line last entry with no final newline never fabricates a dangling bare CR", () => {
+    const noFinalNewline = "## Comments\r\n- _2026-01-01 10:00:_ hello\r\nworld";
+    const out = updateTimestampedLine(noFinalNewline, SECTION.comments, 0, "new text");
+    expect(out.endsWith("\r")).toBe(false);
+    expect(out).toBe("## Comments\r\n- _2026-01-01 10:00:_ new text");
+  });
+
   it("a single-line body with no newline of its own falls back to the frontmatter's convention", () => {
     const singleLineCrlfFrontmatter = "---\r\nstatus: todo\r\n---\r\n# T";
     const out = addTodo(singleLineCrlfFrontmatter, "x");

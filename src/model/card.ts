@@ -604,7 +604,7 @@ export function updateTimestampedLine(
         ? "- "
         : "";
     lines.splice(entry.from, entry.to - entry.from, `${prefix}${safeText}${cr}`);
-    return lines.join("\n");
+    return joinLines(lines);
   });
 }
 
