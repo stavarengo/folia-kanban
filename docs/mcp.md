@@ -63,7 +63,7 @@ An empty string is not a second way to clear a value, except for `priority`, whe
 
 A `priority` the board has not seen before is accepted and added to the board's vocabulary, exactly as typing a new one into a card's details does. The board's scale is yours, not a fixed list — which also means an agent inventing one leaves it there for you to prune by hand.
 
-`create_card` and `update_card` refuse a `description` that would start one of the sections the board owns (`## Subtasks`, `## Comments`, `## History`) or leave a code fence open, exactly as the card's own Description box refuses it. Written through, such a line would stop being description and become that section — an agent could write the board's history, or sign a comment with your name — and everything below it would quietly stop being description at all. `add_comment` and `add_subtask` refuse a line break for the same reason: each writes one Markdown list item, and a second line would be read as structure rather than as what you wrote.
+`create_card` and `update_card` refuse a `description` that would start one of the sections the board owns (`## Subtasks`, `## Comments`, `## History`), that opens with a `#` heading — a card reads its title from that, so the line would be swallowed rather than kept — or that leaves a code fence open, exactly as the card's own Description box refuses it. Written through, such a line would stop being description and become that section — an agent could write the board's history, or sign a comment with your name — and everything below it would quietly stop being description at all. `add_comment` and `add_subtask` refuse a line break for the same reason: each writes one Markdown list item, and a second line would be read as structure rather than as what you wrote.
 
 A failure a caller can fix — an unknown board, an ambiguous card, a column that does not exist — comes back as a tool error with the text explaining it, so the model can correct itself. Only a malformed request is a protocol error.
 
@@ -79,7 +79,9 @@ The server speaks MCP revision `2025-06-18`, and the small half of it a board ne
 
 Every write tool is published with MCP's `destructiveHint`, so a client that asks before running destructive tools knows which these are: all six that write. The three readers carry `readOnlyHint`.
 
-Calls are answered one at a time. Every write reads the board, works out its change against what it read, and writes it back, so two moves into the same column running together would hand both cards the same slot. A board call is milliseconds of local file work, so the wait costs nothing worth having — but a queue is only as live as the call at its head, so a call that has not finished in a minute is answered `504` and the queue moves on, and a client that opens a request and then goes quiet is timed out rather than allowed to hold the line.
+Calls are answered one at a time. Every write reads the board, works out its change against what it read, and writes it back, so two moves into the same column running together would hand both cards the same slot. A board call is milliseconds of local file work, so the wait costs nothing worth having — but a queue is only as live as the call at its head. A call that has not finished in a minute is answered `504`, and a client that opens a request and then goes quiet is timed out rather than allowed to hold the line.
+
+A `504` means the server stopped making you wait, not that the call was cancelled — it is still running and may still write. Nothing here can safely abandon a write half-made, and letting the queue move on would put two calls in the board at once, which is what the queue is for. So check the board before sending a timed-out call again: a retried `create_card` whose first attempt then lands is how you get the card twice.
 
 ## What it does not protect you from
 

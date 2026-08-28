@@ -130,10 +130,18 @@ async function writeField(
 function refuseUnsafeDescription(description: string): void {
   const refusal = descriptionRefusal(description);
   if (refusal === null) return;
+  if (refusal.kind === "heading") {
+    throw new ToolError(
+      `That description contains "${refusal.line}", which starts a section the board owns. The note would read it as that section rather than as description, and everything after it would stop being description at all. Use add_comment for a comment; history is the board's to write.`,
+    );
+  }
+  if (refusal.kind === "title") {
+    throw new ToolError(
+      `That description opens with "${refusal.line}", and a card reads its title from the first \`#\` heading. The line would be taken as the title rather than kept as description, and it would not come back. Use \`##\` or lower, or set the title with update_card's own \`title\` field.`,
+    );
+  }
   throw new ToolError(
-    refusal.kind === "heading"
-      ? `That description contains "${refusal.line}", which starts a section the board owns. The note would read it as that section rather than as description, and everything after it would stop being description at all. Use add_comment for a comment; history is the board's to write.`
-      : `That description leaves a code fence open ("${refusal.line}"). Everything after it in the note, the board's own sections included, would be swallowed by the fence. Close it and try again.`,
+    `That description leaves a code fence open ("${refusal.line}"). Everything after it in the note, the board's own sections included, would be swallowed by the fence. Close it and try again.`,
   );
 }
 
@@ -141,10 +149,16 @@ function refuseUnsafeDescription(description: string): void {
  * Text that becomes one Markdown list item has to stay one line.
  *
  * A subtask and a comment are each written as a single `- …` line. A newline in the middle of one
- * is not a longer entry — it is raw Markdown spliced into the note, which is enough to mint a
- * second checklist line (with a `[status:: …]` claim, a whole card on the board) or to open a
- * `## History` section and forge an entry in it. The panel's subtask control is a one-line input,
- * so this is the first caller that could send a newline at all.
+ * is not a longer entry — it is raw Markdown spliced into the note: a second checklist line the
+ * caller did not ask for, or a `## History` heading that opens the real section and lets an agent
+ * write the record that is supposed to be about it. The panel's subtask control is a one-line
+ * input, so this is the first caller that could send a newline at all.
+ *
+ * What this does not do, and is not meant to, is police what one line may say. A single-line
+ * subtask carrying a `[status:: done]` claim promotes itself to a card on the board — and typing
+ * exactly that into the panel does the same thing. The tools are meant to be as capable as a
+ * person, not more careful than one; it is the forging of the board's own record that is out of
+ * bounds.
  */
 function refuseMultilineEntry(what: "subtask" | "comment", text: string): void {
   if (!/[\r\n]/.test(text)) return;

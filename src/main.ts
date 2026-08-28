@@ -615,7 +615,23 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
     const token = newMcpToken();
     await this.updateSettings({ mcpToken: token });
-    await navigator.clipboard.writeText(token);
+    // `updateSettings` starts the restart but does not wait for it. Waiting here means the notice
+    // reports what actually happened: a port taken in the window between stopping on the old token
+    // and starting on the new one would otherwise be announced as success, and the separate
+    // failure notice would look unrelated to the button just pressed.
+    await this.mcp?.sync(this.settings);
+    if (this.mcp && this.mcp.port === null) {
+      new Notice(MCP_TOKEN_REGENERATE.replacedButDown, 10000);
+      return;
+    }
+    // The token is already replaced and saved; a clipboard that refuses does not undo that, and
+    // saying nothing would leave the user with a working server and no idea what its token is.
+    try {
+      await navigator.clipboard.writeText(token);
+    } catch {
+      new Notice(MCP_TOKEN_REGENERATE.replacedNotCopied, 10000);
+      return;
+    }
     new Notice(MCP_TOKEN_REGENERATE.done, 5000);
   }
 

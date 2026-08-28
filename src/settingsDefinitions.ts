@@ -165,6 +165,10 @@ export const MCP_TOKEN_REGENERATE = {
   desc: "Issue a new token and forget the old one. Every client configured with the old one stops being able to reach this vault until you paste the new one in.",
   button: "Replace token",
   done: "New token generated and copied to the clipboard.",
+  replacedNotCopied:
+    "New token generated, but it could not be copied to the clipboard. Use Copy token to get it.",
+  replacedButDown:
+    "New token generated, but the server did not come back up on it. Check the port setting.",
   missing: "Turn agent access on first — the token is generated then.",
 } as const;
 
