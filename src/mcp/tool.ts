@@ -91,7 +91,10 @@ export async function openBoard(
  * than one card answering to it.
  */
 export function resolveCardPath(board: Board, ref: string): string {
-  if (board.cards[ref]) return ref;
+  // `hasOwn`, not a truthiness test: `board.cards` is a plain object, so a ref of
+  // "toString" or "constructor" would otherwise resolve to a function off the prototype and crash
+  // somewhere far from here, instead of getting the "no card answers to that" error.
+  if (Object.prototype.hasOwnProperty.call(board.cards, ref)) return ref;
   const matches = Object.values(board.cards).filter(
     (c) =>
       c.title === ref ||

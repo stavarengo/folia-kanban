@@ -523,10 +523,14 @@ export default class FoliaKanbanPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const loaded: unknown = await this.loadData();
     const { settings, stampedBaseline } = hydrateSettings(loaded, stamp());
-    this.settings = settings;
+    // Agent access switched on but carrying no token — data.json hand-edited, or synced from an
+    // install that could not mint one — would leave the toggle reading on with nothing listening
+    // and nothing said about it, because a server that is never asked to start never fails. Mint
+    // the token the enabled state implies, here, where the settings arrive.
+    this.settings = withMcpToken(settings, newMcpToken, Platform.isDesktop);
     // Persisted right away: the baseline is "when tracking started", and it must not drift to a
     // later launch if nothing else happens to save the settings before then.
-    if (stampedBaseline) await this.saveSettings();
+    if (stampedBaseline || this.settings !== settings) await this.saveSettings();
   }
 
   /** Serializes the writes: two `saveData` calls in flight at once can land on disk in either

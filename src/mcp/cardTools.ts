@@ -3,7 +3,8 @@
 // checkbox syncing and the fractional ordering it would have got from a person dragging it.
 
 import { z } from "zod";
-import { columnOf } from "../model/board";
+import { columnOf, parseTodoPath } from "../model/board";
+import type { Board } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import type { CardRepository } from "../model/repo";
 import {
@@ -17,6 +18,31 @@ import {
   ToolError,
   type ToolDefinition,
 } from "./tool";
+
+/**
+ * Which column a card ended up in, as the board draws it.
+ *
+ * `columnOf` answers from the column lists, and only a card with a tile of its own is in one. A
+ * card nested under a parent that sits in the same column is drawn inside that parent instead, and
+ * a checklist line that lands back in its parent's column stops being a card at all — the board
+ * mints no tile for it. Asked about either, `columnOf` says `null`, which about a move that just
+ * succeeded reads as failure and invites an agent to retry a write it already made. Both are in
+ * their parent's column, so that is what to report.
+ */
+function landedColumn(board: Board, path: string): string | null {
+  const seen = new Set<string>();
+  let at: string | undefined = path;
+  // Up the nesting until something has a tile: a child of a child drawn inside a grandparent is
+  // still in the grandparent's column. `seen` because `parentOf` links both ways across a cycle,
+  // which the board tolerates and this walk must not hang on.
+  while (at !== undefined && !seen.has(at)) {
+    const tiled = columnOf(board, at);
+    if (tiled !== null) return tiled;
+    seen.add(at);
+    at = board.placedOf[at] ?? board.parentOf[at] ?? parseTodoPath(at)?.parentPath;
+  }
+  return null;
+}
 
 /** Frontmatter this board owns through a dedicated tool or field; writing it by hand skips that. */
 const RESERVED_KEYS: Record<string, string> = {
@@ -34,22 +60,43 @@ const RESERVED_KEYS: Record<string, string> = {
 
 const propertyValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
+/**
+ * A due date, in the one format the board reads. The detail panel writes it from a date picker and
+ * so cannot produce anything else; a tool that says `YYYY-MM-DD` and then accepts "next Friday"
+ * would put a value in the frontmatter that every date sort and overdue badge silently misreads.
+ * Stated as a pattern so it reaches the agent in the published schema, not only on a failed call.
+ */
+const dueDate = z
+  .string()
+  .regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    "A due date must be written as YYYY-MM-DD, for example 2026-03-14.",
+  );
+
 /** Refuse the keys a dedicated tool or field owns, naming the one that should have been used. */
 function refuseReservedKeys(properties: Record<string, unknown> | undefined): void {
   for (const key of Object.keys(properties ?? {})) {
-    const reserved = RESERVED_KEYS[key];
+    // Own keys only, so a property named "toString" is an ordinary key rather than a match
+    // against Object.prototype that reports native code back to the caller.
+    const reserved = Object.prototype.hasOwnProperty.call(RESERVED_KEYS, key)
+      ? RESERVED_KEYS[key]
+      : undefined;
     if (reserved) throw new ToolError(`"${key}" cannot be set through properties: ${reserved}.`);
   }
 }
 
-/** Set or clear one frontmatter key; `null` clears it. */
+/**
+ * Set or clear one frontmatter key. `null` clears it, and only `null` — an agent that writes `""`
+ * asked for an empty value, and deleting the key instead is data loss it never asked for and is
+ * not told about. `docs/mcp.md` promises exactly this.
+ */
 async function writeField(
   repo: CardRepository,
   path: string,
   key: string,
   value: string | number | boolean | null,
 ): Promise<void> {
-  if (value === null || value === "") await repo.unsetFrontmatterKey(path, key);
+  if (value === null) await repo.unsetFrontmatterKey(path, key);
   else await repo.setFrontmatter(path, { [key]: value });
 }
 
@@ -69,7 +116,7 @@ const createCard = tool({
       .describe(
         "A priority value. One the board already uses is preferred; a new one is added to the board's vocabulary, exactly as typing one into the card's details does.",
       ),
-    due: z.string().optional().describe("Due date, `YYYY-MM-DD`."),
+    due: dueDate.optional().describe("Due date, `YYYY-MM-DD`."),
   }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
@@ -79,11 +126,20 @@ const createCard = tool({
       );
     }
     const path = await repo.createCard(args.title, args.column);
-    if (args.description !== undefined) await repo.setDescription(path, args.description);
-    if (args.priority !== undefined) {
-      await setCardPriority(repo, { path, value: args.priority }, board.config.priorities);
+    // The note exists from here on. A field write that fails afterwards must not be reported as
+    // "create_card failed", because an agent hearing that creates the card again and the board
+    // ends up with two. Name the card that is already there and what still needs doing to it.
+    try {
+      if (args.description !== undefined) await repo.setDescription(path, args.description);
+      if (args.priority !== undefined) {
+        await setCardPriority(repo, { path, value: args.priority }, board.config.priorities);
+      }
+      if (args.due !== undefined) await writeField(repo, path, "due", args.due);
+    } catch (e) {
+      throw new ToolError(
+        `Card "${path}" was created in "${args.column}", but filling in its fields failed: ${e instanceof Error ? e.message : String(e)}. The card is on the board — finish it with update_card rather than creating it again.`,
+      );
     }
-    if (args.due !== undefined) await writeField(repo, path, "due", args.due);
     return { path, column: args.column };
   },
 });
@@ -132,10 +188,14 @@ const moveCard = tool({
       throw new ToolError(`Nothing to move: "${path}" is not a card on this board.`);
     }
     const after = await repo.loadBoard();
+    const slot = (after.columns[args.column] ?? []).indexOf(path);
     return {
       path,
-      column: columnOf(after, path),
-      position: (after.columns[args.column] ?? []).indexOf(path),
+      column: landedColumn(after, path),
+      // Only a card with a tile of its own has a slot to report. One drawn inside its parent is
+      // ordered by that parent, so a number here would be an invitation to move_card a position
+      // this tool would refuse.
+      ...(slot < 0 ? {} : { position: slot }),
     };
   },
 });
@@ -161,7 +221,7 @@ const updateCard = tool({
         .describe(
           "A priority value, or null to clear it. A value the board does not know yet is added to its vocabulary, exactly as typing one into the card's details does.",
         ),
-      due: z.string().nullable().optional().describe("Due date `YYYY-MM-DD`, or null to clear it."),
+      due: dueDate.nullable().optional().describe("Due date `YYYY-MM-DD`, or null to clear it."),
       properties: z
         .record(z.string(), propertyValue)
         .optional()

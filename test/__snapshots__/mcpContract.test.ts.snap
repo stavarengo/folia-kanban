@@ -1,18 +1,27 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the MCP contract > publishes this exact tool surface 1`] = `
+exports[`the MCP contract > publishes this exact tool surface, annotations and all 1`] = `
 [
   {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
     "description": "Every Folia Kanban board in the vault: a note carrying \`folia-board: true\`. Start here — every other tool addresses a board by the path this returns.",
     "inputSchema": {
       "properties": {},
       "type": "object",
     },
     "name": "list_boards",
-    "readOnly": true,
     "title": "List boards",
   },
   {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
     "description": "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns.",
     "inputSchema": {
       "properties": {
@@ -27,10 +36,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "get_board",
-    "readOnly": true,
     "title": "Read a board",
   },
   {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
     "description": "One card in full: its column, frontmatter, description, subtasks, comments, history and relationships.",
     "inputSchema": {
       "properties": {
@@ -50,10 +63,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "get_card",
-    "readOnly": true,
     "title": "Read a card",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Add a card to a column. It is written into the board's card folder as a new note, exactly as the board's own add-card button writes it.",
     "inputSchema": {
       "properties": {
@@ -71,6 +88,7 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
         },
         "due": {
           "description": "Due date, \`YYYY-MM-DD\`.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string",
         },
         "priority": {
@@ -91,10 +109,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "create_card",
-    "readOnly": false,
     "title": "Create a card",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Move a card to a column, optionally to a given slot in it (0 is the top; leave it out to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does.",
     "inputSchema": {
       "properties": {
@@ -125,10 +147,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "move_card",
-    "readOnly": false,
     "title": "Move a card",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Change a card's title, description, priority, due date or any other frontmatter property. Set a value to null to clear it. Use move_card for the column.",
     "inputSchema": {
       "properties": {
@@ -146,6 +172,7 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
         "due": {
           "anyOf": [
             {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string",
             },
             {
@@ -200,10 +227,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "update_card",
-    "readOnly": false,
     "title": "Update a card",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Append a comment to a card's \`## Comments\` section, timestamped and signed with the name configured in the plugin's settings.",
     "inputSchema": {
       "properties": {
@@ -228,10 +259,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "add_comment",
-    "readOnly": false,
     "title": "Comment on a card",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Append an unchecked line to a card's \`## Subtasks\` checklist.",
     "inputSchema": {
       "properties": {
@@ -256,10 +291,14 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "add_subtask",
-    "readOnly": false,
     "title": "Add a subtask",
   },
   {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
     "description": "Check or uncheck one \`## Subtasks\` line by its index, as get_card reports it. A line that claims a column of its own is kept in step with its checkbox.",
     "inputSchema": {
       "properties": {
@@ -290,7 +329,6 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
       "type": "object",
     },
     "name": "set_subtask_done",
-    "readOnly": false,
     "title": "Tick or untick a subtask",
   },
 ]

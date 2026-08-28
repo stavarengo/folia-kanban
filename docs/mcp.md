@@ -48,8 +48,8 @@ Every tool takes `board`, the vault path of the board note (`Work/Board.md`), ex
 | `get_board` | reads | A board's columns and the cards in each, in the order the board shows them. A card nested under another one is in no column of its own, so it is listed under its parent's `children`. |
 | `get_card` | reads | One card in full: column, frontmatter, description, subtasks, comments, history, relationships. |
 | `create_card` | writes | Adds a card to a column, written into the board's card folder exactly as the add-card button writes it. Optional `description`, `priority`, `due`. |
-| `move_card` | writes | Moves a card to a `column`, optionally to a `position` in it (`0` is the top; omit to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist-line card takes no `position`: its order comes from where the line sits in its parent's list. |
-| `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears a value. |
+| `move_card` | writes | Moves a card to a `column`, optionally to a `position` in it (`0` is the top; omit to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist-line card takes no `position`: its order comes from where the line sits in its parent's list. The reply says which column the card landed in, and its `position` only when it has a tile of its own — a card drawn inside its parent is ordered by that parent, not by a slot. |
+| `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears a value; `""` sets an empty one. `due` is `YYYY-MM-DD` and is refused in any other shape, rather than written as prose the board cannot read. |
 | `add_comment` | writes | Appends a comment to `## Comments`, timestamped and signed with the **Your name** setting. |
 | `add_subtask` | writes | Appends an unchecked line to `## Subtasks`. |
 | `set_subtask_done` | writes | Ticks or unticks one subtask by its `index`, as `get_card` reports it. A line claiming a column of its own is kept in step with its checkbox. |
@@ -71,6 +71,8 @@ The **History — what to record** setting applies to agent writes exactly as it
 The tool names and their argument schemas are a public contract: your agent is configured against them, and a rename breaks it silently, in your vault, at run time. They are frozen in a snapshot (`test/__snapshots__/mcpContract.test.ts.snap`) that `pnpm contracts:check` verifies, so changing the surface has to be deliberate.
 
 The server speaks MCP revision `2025-06-18`, and the small half of it a board needs: `initialize`, `ping`, `tools/list`, `tools/call`. No resources, no prompts, no server-initiated messages.
+
+Every write tool is published with MCP's `destructiveHint`, so a client that asks before running destructive tools knows which these are: all six that write. The three readers carry `readOnlyHint`.
 
 Calls are answered one at a time. Every write reads the board, works out its change against what it read, and writes it back, so two moves into the same column running together would hand both cards the same slot. A board call is milliseconds of local file work, so the queue costs nothing worth having.
 

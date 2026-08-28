@@ -61,7 +61,15 @@ function toolListing(tool: ToolDefinition): Record<string, unknown> {
     title: tool.title,
     description: tool.description,
     inputSchema: tool.inputSchema,
-    annotations: { readOnlyHint: tool.readOnly, destructiveHint: false, openWorldHint: false },
+    // A write tool here really can destroy something a person cares about: update_card clears
+    // frontmatter keys and move_card rewrites status and order. Saying otherwise is not a
+    // harmless nicety — a client that auto-approves non-destructive tools reads this and stops
+    // asking. `destructiveHint` is only meaningful for a tool that writes at all.
+    annotations: {
+      readOnlyHint: tool.readOnly,
+      destructiveHint: !tool.readOnly,
+      openWorldHint: false,
+    },
   };
 }
 
@@ -148,8 +156,10 @@ export async function handleMessage(
   const { method, params } = parsed.data;
   const id = parsed.data.id ?? null;
   // A message without an id is a notification: it is acted on, and nothing is sent back — not even
-  // when it names a method we do not have.
-  const isNotification = parsed.data.id === undefined || parsed.data.id === null;
+  // when it names a method we do not have. JSON-RPC means *absent*, not null: `"id": null` is a
+  // request, and a buggy client that sends one would otherwise have its write carried out and be
+  // told nothing about it.
+  const isNotification = parsed.data.id === undefined;
   try {
     const result = await dispatch(host, info, method, params);
     return isNotification ? null : ok(id, result);
