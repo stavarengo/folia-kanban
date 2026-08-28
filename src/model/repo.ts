@@ -80,6 +80,13 @@ export interface CardRepository {
    * new) path. A blank/unchanged title is a no-op that returns the original path.
    */
   renameCard(path: string, newTitle: string): Promise<string>;
+  /**
+   * Rename the card's FILE, whatever source its displayed title happens to come from. This is the
+   * card's identity moving, so the rename is link-aware: every inbound `[[wikilink]]` follows.
+   * Returns the card's new path, or the original one when the name is blank, unchanged, or
+   * unchanged once it has been made safe to use as a file name.
+   */
+  renameFile(path: string, newBasename: string): Promise<string>;
 
   /** Persist column definitions to the board note frontmatter. */
   setColumns(columns: ColumnDef[]): Promise<void>;

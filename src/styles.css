@@ -1439,6 +1439,72 @@
   flex: 0 0 auto;
 }
 
+/* The title block at the top of the detail panel: the two inputs a card's title is made of (its
+   file name and its `title:` override) and, under them, the title they produce. The result is
+   read-only on purpose — it is an outcome, not a third place to type. */
+.folia-title-fields {
+  padding-bottom: var(--folia-gap);
+  border-bottom: 1px solid var(--folia-border);
+}
+.folia-title-result {
+  align-items: flex-start;
+}
+.folia-title-outcome {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.folia-title-value {
+  font-size: var(--folia-font-size-md);
+  font-weight: var(--folia-font-weight-semibold);
+  color: var(--text-normal);
+}
+.folia-title-reason {
+  margin: 0;
+  font-size: var(--folia-font-size-xs);
+}
+.folia-title-why {
+  align-self: flex-start;
+  font-size: var(--folia-font-size-xs);
+}
+/* The decision `resolveTitle` reported, one row per source it asked, the winner marked by its rule. */
+.folia-title-trace {
+  list-style: none;
+  margin: var(--folia-gap) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.folia-title-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--folia-border);
+}
+.folia-title-step.is-winner {
+  border-left-color: var(--folia-accent);
+}
+.folia-title-step-source {
+  font-size: var(--folia-font-size-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-faint, var(--text-muted));
+}
+.folia-title-step-value {
+  min-width: 0;
+  font-size: var(--folia-font-size-sm);
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+.folia-title-step-reason {
+  grid-column: 1 / -1;
+  font-size: var(--folia-font-size-xs);
+}
+
 .folia-section h3 {
   margin: 0 0 8px;
   font-size: var(--folia-font-size-xs);

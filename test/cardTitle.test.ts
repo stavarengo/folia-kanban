@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  TITLE_SOURCE_LABEL,
   asTitleMode,
   looksLikeSlug,
   looksLikeTitle,
   resolveTitle,
   setHeadingTitle,
+  type TitleStep,
 } from "../src/model/cardTitle";
+import type { TitleMode } from "../src/model/types";
 
 const slugNote = `---
 status: todo
@@ -61,13 +64,13 @@ describe("asTitleMode", () => {
 
 describe("resolveTitle", () => {
   it("auto: a slug file name takes the first title-shaped heading", () => {
-    expect(resolveTitle("01-fix-export", {}, slugNote, "auto")).toEqual({
+    expect(resolveTitle("01-fix-export", {}, slugNote, "auto")).toMatchObject({
       title: "Fix the export path on Windows",
       source: "heading",
     });
   });
   it("auto: a real file name keeps the file name even when a heading exists", () => {
-    expect(resolveTitle("Fix export", {}, slugNote, "auto")).toEqual({
+    expect(resolveTitle("Fix export", {}, slugNote, "auto")).toMatchObject({
       title: "Fix export",
       source: "filename",
     });
@@ -80,13 +83,13 @@ describe("resolveTitle", () => {
   });
   it("auto: falls back to the file name when no heading looks like a title", () => {
     const text = "## Question\n\nWhy?\n\n## Answer\n";
-    expect(resolveTitle("03-rename-helpers", {}, text, "auto")).toEqual({
+    expect(resolveTitle("03-rename-helpers", {}, text, "auto")).toMatchObject({
       title: "03-rename-helpers",
       source: "filename",
     });
   });
   it("heading: uses the first heading even when it is a single word", () => {
-    expect(resolveTitle("Fix export", {}, "# Draft\n", "heading")).toEqual({
+    expect(resolveTitle("Fix export", {}, "# Draft\n", "heading")).toMatchObject({
       title: "Draft",
       source: "heading",
     });
@@ -99,7 +102,7 @@ describe("resolveTitle", () => {
   });
   it("the card's own `title` key wins in every mode", () => {
     for (const mode of ["auto", "filename", "heading"] as const)
-      expect(resolveTitle("01-fix-export", { title: "From YAML" }, slugNote, mode)).toEqual({
+      expect(resolveTitle("01-fix-export", { title: "From YAML" }, slugNote, mode)).toMatchObject({
         title: "From YAML",
         source: "frontmatter",
       });
@@ -130,7 +133,7 @@ describe("resolveTitle", () => {
   });
   it("never takes a title from the parser's own section headings", () => {
     const text = "## Subtasks\n- [ ] [[Child]]\n\n## Comments\n\n## History\n";
-    expect(resolveTitle("01-fix", {}, text, "heading")).toEqual({
+    expect(resolveTitle("01-fix", {}, text, "heading")).toMatchObject({
       title: "01-fix",
       source: "filename",
     });
@@ -173,5 +176,73 @@ describe("setHeadingTitle", () => {
     expect(setHeadingTitle(text, "01-x", "auto", "New title here")).toBe(
       "# New title here\r\n\r\nbody\r\n",
     );
+  });
+});
+
+describe("the trace resolveTitle returns with its answer", () => {
+  const trace = (basename: string, fm: Record<string, unknown>, text: string, mode: TitleMode) =>
+    resolveTitle(basename, fm, text, mode).trace;
+  /** The winning step, which is always the last one: the decision stops when a source answers. */
+  const winner = (steps: readonly TitleStep[]) => steps[steps.length - 1]!;
+
+  it("stops at the override and says so", () => {
+    const steps = trace("01-fix-export", { title: "Chosen" }, slugNote, "auto");
+    expect(steps).toHaveLength(1);
+    expect(winner(steps)).toEqual({
+      source: "frontmatter",
+      value: "Chosen",
+      outcome: "won",
+      reason: "Taken from the override, which wins over every other source.",
+    });
+  });
+
+  it("names the slug-shaped file name as the reason a heading was read", () => {
+    const steps = trace("01-fix-export", {}, slugNote, "auto");
+    expect(steps.map((s) => [s.source, s.outcome])).toEqual([
+      ["frontmatter", "empty"],
+      ["heading", "won"],
+    ]);
+    expect(winner(steps).value).toBe("Fix the export path on Windows");
+    expect(winner(steps).reason).toBe(
+      "Taken from the note's first heading, because the file name reads like a slug.",
+    );
+  });
+
+  it("names the board's mode as the reason a heading was read", () => {
+    const steps = trace("Notes", {}, slugNote, "heading");
+    expect(winner(steps).reason).toBe(
+      "Taken from the note's first heading, because this board titles cards by heading.",
+    );
+  });
+
+  it("falls to the file name for three different reasons, and says which", () => {
+    expect(winner(trace("Notes", {}, slugNote, "filename")).reason).toBe(
+      "Taken from the file name, because this board titles cards by file name.",
+    );
+    expect(winner(trace("Notes", {}, slugNote, "auto")).reason).toBe(
+      "Taken from the file name, because it already reads as a name.",
+    );
+    expect(winner(trace("01-fix-export", {}, "\n# Notes\n", "auto")).reason).toBe(
+      "Taken from the file name, because no heading in the note could supply a title.",
+    );
+  });
+
+  it("records the step that was skipped, and the one that had nothing to offer", () => {
+    const skipped = trace("Notes", {}, slugNote, "filename")[1]!;
+    expect(skipped).toMatchObject({ source: "heading", outcome: "skipped", value: null });
+    expect(skipped.reason).toBe("This board titles cards by file name, so no heading is read.");
+    const empty = trace("01-fix-export", {}, "\n# Notes\n", "auto")[1]!;
+    expect(empty).toMatchObject({ source: "heading", outcome: "empty" });
+    expect(empty.reason).toBe(
+      "The file name reads like a slug, but no heading in the note reads as a title.",
+    );
+  });
+
+  it("labels every source it can decide by", () => {
+    expect(TITLE_SOURCE_LABEL).toEqual({
+      frontmatter: "Override card title",
+      heading: "First heading in the note",
+      filename: "File name",
+    });
   });
 });

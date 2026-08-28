@@ -167,8 +167,8 @@ export interface BoardActions {
   startCreate(columnId: string): void;
   /** Open the card's detail panel with its "Add a subcard" input focused, so the user types the title there. */
   addSubcard(path: string): void;
-  /** Open the card's detail panel with its "Display title" field focused (the `title:` override). */
-  editDisplayTitle(path: string): void;
+  /** Open the card's detail panel with its "Override card title" field focused (the `title:` key). */
+  editTitleOverride(path: string): void;
   /**
    * Show a failed write the way every board mutation's failure is shown (the error toast). For the
    * writes the detail panel makes itself, which otherwise have no path to that toast.
@@ -201,6 +201,8 @@ export interface BoardActions {
    * No-op for a blank/unchanged title.
    */
   renameCard(path: string, title: string): void;
+  /** Rename the card's file, whatever source its displayed title comes from. */
+  renameFile(path: string, newBasename: string): void;
   /** Reorder a card one step within its current column (-1 up, +1 down); a no-op at the edges. */
   moveWithinColumn(path: string, dir: -1 | 1): void;
   /** Whether the card can move up/down within its column (false at the respective edge). */

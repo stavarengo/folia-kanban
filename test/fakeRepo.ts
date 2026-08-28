@@ -352,8 +352,15 @@ export class FakeRepo implements CardRepository {
       e.body = setHeadingTitle(e.body, e.basename, this.config.titleMode, title);
       return path;
     }
-    const base = sanitizeFilename(title);
-    if (base === e.basename) return path; // unchanged after sanitize
+    return this.renameFile(path, title);
+  }
+
+  async renameFile(path: string, newBasename: string): Promise<string> {
+    const e = this.entry(path);
+    const wanted = newBasename.trim();
+    if (!wanted) return path; // a blank name is not a name — nothing to rename to
+    const base = sanitizeFilename(wanted);
+    if (base === e.basename) return path; // unchanged once made safe to use as a file name
     const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
     const prefix = folder ? `${folder}/` : "";
     let dest = `${prefix}${base}.md`;

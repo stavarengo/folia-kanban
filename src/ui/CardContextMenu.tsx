@@ -184,7 +184,7 @@ export function CardContextMenu({
         <>
           {item("Open details", "external-link", () => a.open(path))}
           {item("Rename", "pencil", onRename)}
-          {item("Display title", "type", () => a.editDisplayTitle(path))}
+          {item("Override card title", "type", () => a.editTitleOverride(path))}
           {!isDone && item("Mark done", "check-circle", () => a.complete(path))}
           {item("Open note", "external-link", () => a.openNote(path))}
 

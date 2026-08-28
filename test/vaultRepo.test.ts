@@ -379,6 +379,30 @@ describe("renaming a card", () => {
   });
 });
 
+describe("renaming a card's file", () => {
+  it("moves the file even when the displayed title comes from somewhere else", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Old.md", card("title: Shown"));
+
+    const dest = await repo.renameFile("basic/Cards/Old.md", "New");
+
+    expect(dest).toBe("basic/Cards/New.md");
+    expect(app.vault.getAbstractFileByPath("basic/Cards/Old.md")).toBeNull();
+    // The override is the card's title, not its identity: renaming the file leaves it alone.
+    expect(app.vault.frontmatter("basic/Cards/New.md")["title"]).toBe("Shown");
+  });
+
+  it("walks past a taken name, and writes nothing for a blank or unchanged one", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Old.md", "\n# Old\n");
+    app.vault.addFile("basic/Cards/New.md", "\n# New\n");
+
+    expect(await repo.renameFile("basic/Cards/Old.md", "New")).toBe("basic/Cards/New 1.md");
+    expect(await repo.renameFile("basic/Cards/New.md", "   ")).toBe("basic/Cards/New.md");
+    expect(await repo.renameFile("basic/Cards/New.md", "New")).toBe("basic/Cards/New.md");
+  });
+});
+
 describe("writing to the board note", () => {
   it("remembers a priority the board note does not know yet, keeping the ones it does", async () => {
     const { app, repo } = setup(`${DEFAULT_CONFIG}\npriorities:\n  - a\n  - b`);

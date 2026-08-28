@@ -123,7 +123,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
   const [focusAddSubcard, setFocusAddSubcard] = useState(false);
   // One-shot: focus the open card's "Override card title" field (the context-menu action).
-  const [focusDisplayTitle, setFocusDisplayTitle] = useState(false);
+  const [focusTitleOverride, setFocusTitleOverride] = useState(false);
   // The detail panel's identity, and the ONLY thing that remounts it. It is bumped when the panel
   // is pointed at something else (another card, the create form), and deliberately NOT when the
   // open card's own file is renamed or moved: the panel is then still about the same card, and a
@@ -349,7 +349,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setOpenOverride(null);
     setFocusNew(false);
     setFocusAddSubcard(false);
-    setFocusDisplayTitle(false);
+    setFocusTitleOverride(false);
     setCreateColumn(null);
     // A new panel identity, even for the card already open: the one-shot focus flags above are
     // cleared and re-set in the same batch, so only a fresh mount can act on them a second time.
@@ -359,6 +359,45 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     // place, so no caller has to know which kind of tile it just handed us.
     setSelected(parseTodoPath(path)?.parentPath ?? path);
   }, []);
+
+  /**
+   * Run a rename and let the view follow the file. A rename that moves the note is the card's
+   * identity changing, and everything this view keys by path has to move with it — otherwise a
+   * toggled card silently resets to the board default and its already-read comments all light up
+   * again, and the vacated path could later hand that state to an unrelated card reusing it.
+   * Settings move BEFORE the selection does: the detail panel snapshots the card's read marker on
+   * the render that first shows the new path, and it must find the migrated one there. The patch
+   * is built from the settings at write time, not this render's snapshot, so another view's write
+   * landing in between is not undone.
+   */
+  const runRename = useCallback(
+    async (path: string, rename: () => Promise<string>) => {
+      try {
+        const newPath = await rename();
+        if (newPath !== path) {
+          onUpdateSettings((s) => {
+            const migrated: Partial<KanbanSettings> = {};
+            const collapsed = s.collapsedCards[path];
+            if (collapsed !== undefined)
+              migrated.collapsedCards = {
+                ...withoutKey(s.collapsedCards, path),
+                [newPath]: collapsed,
+              };
+            const seen = s.commentsSeen[path];
+            if (seen !== undefined)
+              migrated.commentsSeen = { ...withoutKey(s.commentsSeen, path), [newPath]: seen };
+            return migrated;
+          });
+          setSelected((cur) => (cur === path ? newPath : cur));
+        }
+      } catch (e) {
+        reportError(e);
+      } finally {
+        await load();
+      }
+    },
+    [load, onUpdateSettings, reportError],
+  );
 
   const actions = useMemo<BoardActions>(
     () => ({
@@ -375,9 +414,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         openCard(path);
         setFocusAddSubcard(true);
       },
-      editDisplayTitle: (path) => {
+      editTitleOverride: (path) => {
         openCard(path);
-        setFocusDisplayTitle(true);
+        setFocusTitleOverride(true);
       },
       reportError,
       complete: (path) => {
@@ -447,40 +486,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       renameCard: (path, title) => {
         const t = title.trim();
         if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
-        void (async () => {
-          try {
-            const newPath = await repo.renameCard(path, t);
-            // When the title comes from the file name, a rename changes the path. If the renamed
-            // card was selected, follow it to its new path so the detail/selection holds.
-            if (newPath !== path) {
-              // Per-path plugin data is keyed by path in settings, same as selection — follow it
-              // to the new path, or a toggled card silently resets to the board default and its
-              // already-read comments all light up again; the vacated path could also later hand
-              // that state to an unrelated card reusing it. Read at write time (see the prune
-              // above), so nothing another view wrote meanwhile is lost. Settings move BEFORE the
-              // selection does: the panel snapshots the card's read marker on the render that
-              // first shows the new path, and it must find the migrated one there.
-              onUpdateSettings((s) => {
-                const migrated: Partial<KanbanSettings> = {};
-                const collapsed = s.collapsedCards[path];
-                if (collapsed !== undefined)
-                  migrated.collapsedCards = {
-                    ...withoutKey(s.collapsedCards, path),
-                    [newPath]: collapsed,
-                  };
-                const seen = s.commentsSeen[path];
-                if (seen !== undefined)
-                  migrated.commentsSeen = { ...withoutKey(s.commentsSeen, path), [newPath]: seen };
-                return migrated;
-              });
-              setSelected((cur) => (cur === path ? newPath : cur));
-            }
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
+        void runRename(path, () => repo.renameCard(path, t));
+      },
+      renameFile: (path, newBasename) => {
+        const name = newBasename.trim();
+        if (!name) return; // a blank file name is no name at all — the field reverts
+        void runRename(path, () => repo.renameFile(path, name));
       },
       moveWithinColumn: (path, dir) => {
         const b = boardRef.current;
@@ -790,7 +801,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setOpenOverride(null);
     setFocusNew(false);
     setFocusAddSubcard(false);
-    setFocusDisplayTitle(false);
+    setFocusTitleOverride(false);
   };
 
   // Both branches share `openId` as their key on purpose: the create form and the card it creates
@@ -803,7 +814,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       mode={detailMode}
       focusNew={focusNew}
       focusAddSubcard={focusAddSubcard}
-      focusDisplayTitle={focusDisplayTitle}
+      focusTitleOverride={focusTitleOverride}
       onClose={closeDetail}
       onNavigate={openCard}
       onChanged={() => void load()}

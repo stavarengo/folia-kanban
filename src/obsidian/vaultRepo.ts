@@ -626,8 +626,15 @@ export class VaultRepository implements CardRepository {
       await this.editBody(path, (t) => setHeadingTitle(t, file.basename, titleMode, title));
       return path;
     }
-    const base = sanitizeFilename(title);
-    if (base === file.basename) return path; // unchanged (after sanitize) — no write
+    return this.renameFile(path, title);
+  }
+
+  async renameFile(path: string, newBasename: string): Promise<string> {
+    const file = this.file(path);
+    const wanted = newBasename.trim();
+    if (!wanted) return path; // a blank name is not a name — nothing to rename to
+    const base = sanitizeFilename(wanted);
+    if (base === file.basename) return path; // unchanged once made safe to use as a file name
     const folder = file.parent?.path ?? "";
     const dest = await this.uniquePath(folder === "/" ? "" : folder, base);
     if (dest === path) return path;

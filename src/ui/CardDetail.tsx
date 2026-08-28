@@ -10,7 +10,15 @@ import {
   type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Board, Card, CardBody, RelationLink, RelationTypeDef, SubItem } from "../model/types";
+import type {
+  Board,
+  Card,
+  CardBody,
+  RelationLink,
+  RelationTypeDef,
+  SubItem,
+  TitleMode,
+} from "../model/types";
 import {
   boardLinkResolver,
   syncSubcardLines,
@@ -18,7 +26,7 @@ import {
   type LinkResolver,
 } from "../model/board";
 import { descriptionRefusal } from "../model/card";
-import { TITLE_KEY, resolveTitle } from "../model/cardTitle";
+import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle } from "../model/cardTitle";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -46,8 +54,8 @@ interface Props {
   focusNew?: boolean;
   /** When set, focus the "Add a subcard" input (the context-menu "Add subcard" action). */
   focusAddSubcard?: boolean;
-  /** When set, focus the "Display title" field (the context-menu "Display title" action). */
-  focusDisplayTitle?: boolean;
+  /** When set, focus the "Override card title" field (the context-menu action). */
+  focusTitleOverride?: boolean;
 }
 
 const clampWidth = (n: number) => Math.min(DETAIL_WIDTH_MAX, Math.max(DETAIL_WIDTH_MIN, n));
@@ -274,46 +282,137 @@ function subtaskColumn(
 const EDITED_KEYS = ["status", "priority", "due", "order", "type", "created", TITLE_KEY];
 
 /**
- * The card's `title:` override as one always-present row: what the card is called when neither
- * its file name nor its heading should be. Empty means "no override", and the placeholder shows
- * what the card falls back to, so clearing the field is a visible choice rather than a guess.
- * Commits on blur/Enter like the other property rows.
+ * The two inputs a card's title is actually made of, and the title they add up to.
+ *
+ * The FILE NAME is the card's identity — what `[[wikilinks]]` bind to — so editing it renames the
+ * note. The OVERRIDE is the `title:` frontmatter key, which beats every other source; empty means
+ * "no override", and its placeholder shows what the card falls back to, so clearing it is a
+ * visible choice rather than a guess. Both commit on blur/Enter, like every other field here.
+ *
+ * The RESULTING DISPLAY TITLE underneath is computed by `resolveTitle` — the very function the
+ * board titles tiles with — from what is TYPED in the two fields rather than from what is saved,
+ * so it answers "what will this card be called" before anything is written. The sentence beside
+ * it, and the step-by-step explanation behind "Why this title?", are the trace `resolveTitle`
+ * returns with its answer: the explanation is the algorithm's own account of itself, never a
+ * second copy of it kept in the UI.
  */
-function DisplayTitleRow({
-  value,
-  fallback,
-  inputRef,
-  onCommit,
+function TitleFields({
+  basename,
+  override,
+  overrideEditable,
+  text,
+  titleMode,
+  boardTitle,
+  overrideRef,
+  onRename,
+  onCommitOverride,
 }: {
-  value: string;
-  fallback: string;
-  inputRef: RefObject<HTMLInputElement>;
-  onCommit: (v: string) => void;
+  basename: string;
+  override: string;
+  /** False when the note's `title:` holds a shape this field cannot show; a generic row has it. */
+  overrideEditable: boolean;
+  /** The note as the title rules read it, or null while this card's body is still being read. */
+  text: string | null;
+  titleMode: TitleMode;
+  /** The board's own answer, shown until the body has arrived and a live one can be computed. */
+  boardTitle: string;
+  overrideRef: RefObject<HTMLInputElement>;
+  onRename: (v: string) => void;
+  onCommitOverride: (v: string) => void;
 }) {
-  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
+  const [showWhy, setShowWhy] = useState(false);
+  const name = useFieldDraft(basename, onRename, true);
+  const over = useFieldDraft(override, onCommitOverride, true);
+  // A blank file name renames nothing (the repository refuses it), so the preview says so too.
+  const nameNow = name.draft.trim() || basename;
+  const overNow = overrideEditable ? over.draft.trim() : "";
+  const resolveNow = (fm: Record<string, string>) =>
+    text === null ? null : resolveTitle(nameNow, fm, text, titleMode);
+  const resolved = resolveNow(overNow ? { [TITLE_KEY]: overNow } : {});
+  const fallback = resolveNow({})?.title ?? "";
+  const shown = resolved?.title ?? boardTitle;
+  const winner = resolved?.trace[resolved.trace.length - 1];
+  const commitOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    e.currentTarget.blur();
+  };
   return (
-    <div className="folia-prop-row">
-      <span
-        className="folia-prop-key"
-        title="Overrides the file name and the heading; clear it to fall back"
-      >
-        Display title
-      </span>
-      <input
-        ref={inputRef}
-        className="folia-prop-input"
-        value={draft}
-        placeholder={fallback}
-        aria-label="Display title"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.currentTarget.blur();
-          }
-        }}
-      />
+    <div className="folia-props folia-title-fields">
+      <div className="folia-prop-row">
+        <span
+          className="folia-prop-key"
+          title="The note's own file name, which [[wikilinks]] bind to. Editing it renames the note and rewrites the links pointing at it."
+        >
+          File name
+        </span>
+        <input
+          className="folia-prop-input"
+          value={name.draft}
+          aria-label="File name"
+          onChange={(e) => name.setDraft(e.target.value)}
+          onBlur={name.commit}
+          onKeyDown={commitOnEnter}
+        />
+      </div>
+      {overrideEditable && (
+        <div className="folia-prop-row">
+          <span
+            className="folia-prop-key"
+            title="Overrides the file name and the heading; clear it to fall back"
+          >
+            Override card title
+          </span>
+          <input
+            ref={overrideRef}
+            className="folia-prop-input"
+            value={over.draft}
+            placeholder={fallback}
+            aria-label="Override card title"
+            onChange={(e) => over.setDraft(e.target.value)}
+            onBlur={over.commit}
+            onKeyDown={commitOnEnter}
+          />
+        </div>
+      )}
+      <div className="folia-prop-row folia-title-result">
+        <span className="folia-prop-key">Resulting display title</span>
+        <div className="folia-title-outcome">
+          <span className="folia-title-value" title={shown}>
+            {shown}
+          </span>
+          {winner && <p className="folia-title-reason folia-muted">{winner.reason}</p>}
+          {resolved && (
+            <button
+              className="folia-link folia-title-why"
+              aria-expanded={showWhy}
+              onClick={() => setShowWhy((v) => !v)}
+            >
+              Why this title?
+            </button>
+          )}
+        </div>
+      </div>
+      {showWhy && resolved && (
+        <ol className="folia-title-trace">
+          {resolved.trace.map((step) => (
+            <li
+              key={step.source}
+              className={"folia-title-step" + (step.outcome === "won" ? " is-winner" : "")}
+            >
+              <span className="folia-title-step-source">{TITLE_SOURCE_LABEL[step.source]}</span>
+              <span className="folia-title-step-value">
+                {step.value === null
+                  ? step.outcome === "skipped"
+                    ? "not read"
+                    : "not set"
+                  : `\u201c${step.value}\u201d`}
+              </span>
+              <span className="folia-title-step-reason folia-muted">{step.reason}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
@@ -562,7 +661,7 @@ export function CardDetail({
   onCreated,
   focusNew,
   focusAddSubcard,
-  focusDisplayTitle,
+  focusTitleOverride,
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
@@ -582,7 +681,7 @@ export function CardDetail({
   const descRef = useRef<HTMLTextAreaElement | null>(null);
   const descViewRef = useRef<HTMLDivElement | null>(null);
   const subcardRef = useRef<HTMLInputElement | null>(null);
-  const displayTitleRef = useRef<HTMLInputElement | null>(null);
+  const titleOverrideRef = useRef<HTMLInputElement | null>(null);
   // Synchronous in-flight guard for the create form: blocks a second submit (rapid Enter, or
   // Enter-then-click) during the async createCard window before onCreated unmounts this branch.
   const creatingRef = useRef(false);
@@ -863,10 +962,10 @@ export function CardDetail({
     if (focusAddSubcard && !isCreate) subcardRef.current?.focus();
   }, [focusAddSubcard, path]);
 
-  // Same shape for the context-menu "Display title" action.
+  // Same shape for the context-menu "Override card title" action.
   useEffect(() => {
-    if (focusDisplayTitle && !isCreate) displayTitleRef.current?.focus();
-  }, [focusDisplayTitle, path]);
+    if (focusTitleOverride && !isCreate) titleOverrideRef.current?.focus();
+  }, [focusTitleOverride, path]);
 
   // Side modes: a pointerdown outside the panel closes it — but not when it lands on another
   // card (that card's own open handler switches the detail), nor on a menu/context surface.
@@ -1056,21 +1155,12 @@ export function CardDetail({
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? [];
   const curPriority = String(fm.priority ?? "");
-  // What the card would be called with no `title:` key, under this board's mode: the placeholder
-  // the Display title field shows, so clearing it is a visible choice. Judged on the headings the
-  // body holds (its H1 and whatever the description carries), the same way the board judges them.
-  const titleWithoutOverride =
-    body === null
-      ? card.titleSource === "frontmatter"
-        ? ""
-        : card.title
-      : resolveTitle(
-          card.basename,
-          {},
-          `${body.title ? `# ${body.title}\n` : ""}${body.description}`,
-          board.config.titleMode,
-        ).title;
-  // The Display title field only ever shows a non-blank string `title:`; any other shape (a
+  // The note as the title rules read it — its H1 and whatever headings the description carries —
+  // so the panel judges a title exactly the way the board does. Null until this card's body has
+  // been read; the title preview shows the board's own answer until then.
+  const noteText =
+    body === null ? null : `${body.title ? `# ${body.title}\n` : ""}${body.description}`;
+  // The override field only ever shows a non-blank string `title:`; any other shape (a
   // number, a blank written by hand) is a generic row instead, or it would have no way out of
   // the note.
   const titleRowIsGeneric =
@@ -1161,6 +1251,24 @@ export function CardDetail({
       )}
 
       <div className="folia-detail-body">
+        <TitleFields
+          basename={card.basename}
+          override={typeof fm[TITLE_KEY] === "string" ? fm[TITLE_KEY] : ""}
+          overrideEditable={!titleRowIsGeneric}
+          text={noteText}
+          titleMode={board.config.titleMode}
+          boardTitle={card.title}
+          overrideRef={titleOverrideRef}
+          onRename={(val) => actions.renameFile(path, val)}
+          onCommitOverride={(val) =>
+            void mutate(() =>
+              val === ""
+                ? repo.unsetFrontmatterKey(path, TITLE_KEY)
+                : repo.setFrontmatter(path, { [TITLE_KEY]: val }),
+            )
+          }
+        />
+
         <div className="folia-fields">
           <label>
             Status
@@ -1210,20 +1318,6 @@ export function CardDetail({
         </div>
 
         <div className="folia-props">
-          {!titleRowIsGeneric && (
-            <DisplayTitleRow
-              value={typeof fm[TITLE_KEY] === "string" ? fm[TITLE_KEY] : ""}
-              fallback={titleWithoutOverride}
-              inputRef={displayTitleRef}
-              onCommit={(val) =>
-                void mutate(() =>
-                  val === ""
-                    ? repo.unsetFrontmatterKey(path, TITLE_KEY)
-                    : repo.setFrontmatter(path, { [TITLE_KEY]: val }),
-                )
-              }
-            />
-          )}
           {extraProps.map(([k, v]) => (
             <PropRow
               key={k}

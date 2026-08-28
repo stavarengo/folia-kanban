@@ -83,7 +83,7 @@ The three boards in `title-modes/` share one `Cards/` folder and differ in one l
 | `02-write-docs.md` | `# Docs` | 02-write-docs | Docs | 02-write-docs |
 | `Override.md` (has `title: Set from the frontmatter`) | `# The heading of this note` | Set from the frontmatter | Set from the frontmatter | Set from the frontmatter |
 
-`auto` only reads a heading for a slug-shaped file name, and only when the heading reads as a real title, so `Notes.md` keeps its name and `02-write-docs.md` skips its one-word heading. A `title:` key wins everywhere; open `Override` and clear the **Display title** field in its detail panel to watch each board fall back to its own rule.
+`auto` only reads a heading for a slug-shaped file name, and only when the heading reads as a real title, so `Notes.md` keeps its name and `02-write-docs.md` skips its one-word heading. A `title:` key wins everywhere; open `Override` and clear the **Override card title** field in its detail panel to watch each board fall back to its own rule.
 
 ## Things to try (features you can't see in a static file)
 
@@ -97,7 +97,7 @@ The three boards in `title-modes/` share one `Cards/` folder and differ in one l
 - **Manage columns** from each column's `⋯` menu (rename, recolour, set WIP limit, reorder, delete) — changes are written back to the board note.
 - **Live reload:** edit a card `.md` in another pane and watch the board update.
 - **Swap the tab's view:** the tab header button flips between the board and the note's Markdown. Settings → *Board notes — open as* picks which one a board note starts in, and adding `folia-view: markdown` to one board note's frontmatter overrides that for that note alone.
-- **Set a display title:** open any card and type into the **Display title** field near the top of its detail panel (or right-click the tile and pick **Display title**). The tile reads that from then on, whatever the board's `card-title` says; clear the field to go back.
+- **Name a card, and see why it is called that:** open any card. The panel starts with **File name** (change it and the note is renamed, with the links pointing at it), **Override card title** (or right-click the tile and pick **Override card title**), and a **Resulting display title** that answers for whatever is typed in the two, before you save anything. One sentence beside it says which source won; **Why this title?** shows the whole decision.
 - **Rename a title-sourced card:** rename `04-tune-the-search-index` from the board and its `# ` heading is rewritten — the file keeps its slug name. Rename `Ship the release notes` and its `title:` frontmatter value changes instead.
 
 ## Authoring gotchas (worth knowing)

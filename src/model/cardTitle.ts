@@ -88,11 +88,30 @@ function findHeading(body: string, accept: (text: string) => boolean): Heading |
 
 const ANY_HEADING = () => true;
 
-/** The heading a given mode would take the title from, or null when the mode never reads one. */
-function headingFor(body: string, basename: string, mode: TitleMode): Heading | null {
-  if (mode === "heading") return findHeading(body, ANY_HEADING);
-  if (mode === "auto" && looksLikeSlug(basename)) return findHeading(body, looksLikeTitle);
-  return null;
+/**
+ * Why a heading was or was not read, alongside the heading itself. The reason is part of the
+ * answer rather than something a caller re-derives: `resolveTitle` turns it into the sentence a
+ * reader sees, and nothing outside this file gets to have its own opinion about when a heading
+ * counts.
+ */
+type HeadingLookup =
+  | { consulted: false; why: "mode-filename" | "name-reads-as-name" }
+  | { consulted: true; why: "mode-heading" | "name-reads-as-slug"; heading: Heading | null };
+
+/** Whether a given mode reads a heading for this card at all, and which one it lands on. */
+function headingFor(body: string, basename: string, mode: TitleMode): HeadingLookup {
+  if (mode === "heading")
+    return { consulted: true, why: "mode-heading", heading: findHeading(body, ANY_HEADING) };
+  if (mode === "filename") return { consulted: false, why: "mode-filename" };
+  return looksLikeSlug(basename)
+    ? { consulted: true, why: "name-reads-as-slug", heading: findHeading(body, looksLikeTitle) }
+    : { consulted: false, why: "name-reads-as-name" };
+}
+
+/** The heading a mode actually takes the title from, or null when it reads none (or finds none). */
+function selectedHeading(body: string, basename: string, mode: TitleMode): Heading | null {
+  const lookup = headingFor(body, basename, mode);
+  return lookup.consulted ? lookup.heading : null;
 }
 
 function frontmatterTitle(frontmatter: CardFrontmatter): string | null {
@@ -100,14 +119,84 @@ function frontmatterTitle(frontmatter: CardFrontmatter): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+/** The three sources `resolveTitle` can pick from, in the order it asks them. */
+export type TitleDecisionSource = Extract<TitleSource, "frontmatter" | "heading" | "filename">;
+
+/** What each source is called wherever a person reads about it — a field label, or a trace row. */
+export const TITLE_SOURCE_LABEL: Record<TitleDecisionSource, string> = {
+  frontmatter: "Override card title",
+  heading: "First heading in the note",
+  filename: "File name",
+};
+
+/** One source's turn in the decision: what it answered, and how that settled things. */
+export interface TitleStep {
+  source: TitleDecisionSource;
+  /** What the source offered, or null when it had nothing (or was never asked). */
+  value: string | null;
+  outcome: "won" | "empty" | "skipped";
+  /** One plain sentence, for a reader who has never seen the code. */
+  reason: string;
+}
+
 export interface ResolvedTitle {
   title: string;
   source: TitleSource;
+  /**
+   * The decision as it actually ran: one step per source consulted, in order, ending with the
+   * winner. Written here so anything that explains a title reads the algorithm's own account of
+   * itself rather than keeping a second copy that can drift from it.
+   */
+  trace: readonly TitleStep[];
+}
+
+/** The heading source's own account of its turn: what it found, or why it found nothing. */
+function headingStep(lookup: HeadingLookup): TitleStep {
+  if (lookup.consulted && lookup.heading)
+    return {
+      source: "heading",
+      value: lookup.heading.text,
+      outcome: "won",
+      reason:
+        lookup.why === "mode-heading"
+          ? "Taken from the note's first heading, because this board titles cards by heading."
+          : "Taken from the note's first heading, because the file name reads like a slug.",
+    };
+  if (lookup.consulted)
+    return {
+      source: "heading",
+      value: null,
+      outcome: "empty",
+      reason:
+        lookup.why === "mode-heading"
+          ? "The note has no heading to take a title from."
+          : "The file name reads like a slug, but no heading in the note reads as a title.",
+    };
+  return {
+    source: "heading",
+    value: null,
+    outcome: "skipped",
+    reason:
+      lookup.why === "mode-filename"
+        ? "This board titles cards by file name, so no heading is read."
+        : "The file name reads as a name rather than a slug, so no heading is read.",
+  };
+}
+
+/** Why the file name ended up answering — which depends on what stopped the heading from doing so. */
+function filenameReason(lookup: HeadingLookup): string {
+  if (lookup.consulted)
+    return "Taken from the file name, because no heading in the note could supply a title.";
+  return lookup.why === "mode-filename"
+    ? "Taken from the file name, because this board titles cards by file name."
+    : "Taken from the file name, because it already reads as a name.";
 }
 
 /**
  * Pick a card's displayed title. The card's own `title` frontmatter wins outright; otherwise the
  * board's mode decides whether a heading is consulted; the basename is always the last resort.
+ * Each source's turn is appended to the trace as it is taken, so the answer arrives with its own
+ * explanation rather than leaving one to be reconstructed elsewhere.
  */
 export function resolveTitle(
   basename: string,
@@ -115,11 +204,36 @@ export function resolveTitle(
   text: string,
   mode: TitleMode,
 ): ResolvedTitle {
+  const trace: TitleStep[] = [];
   const fromFrontmatter = frontmatterTitle(frontmatter);
-  if (fromFrontmatter !== null) return { title: fromFrontmatter, source: "frontmatter" };
-  const heading = headingFor(splitFrontmatter(text).body, basename, mode);
-  if (heading) return { title: heading.text, source: "heading" };
-  return { title: basename, source: "filename" };
+  if (fromFrontmatter !== null) {
+    trace.push({
+      source: "frontmatter",
+      value: fromFrontmatter,
+      outcome: "won",
+      reason: "Taken from the override, which wins over every other source.",
+    });
+    return { title: fromFrontmatter, source: "frontmatter", trace };
+  }
+  trace.push({
+    source: "frontmatter",
+    value: null,
+    outcome: "empty",
+    reason: "No override is set on this card, so the next source decides.",
+  });
+
+  const lookup = headingFor(splitFrontmatter(text).body, basename, mode);
+  trace.push(headingStep(lookup));
+  if (lookup.consulted && lookup.heading)
+    return { title: lookup.heading.text, source: "heading", trace };
+
+  trace.push({
+    source: "filename",
+    value: basename,
+    outcome: "won",
+    reason: filenameReason(lookup),
+  });
+  return { title: basename, source: "filename", trace };
 }
 
 /**
@@ -133,7 +247,7 @@ export function setHeadingTitle(
   newTitle: string,
 ): string {
   const { fmText, body } = splitFrontmatter(text);
-  const heading = headingFor(body, basename, mode);
+  const heading = selectedHeading(body, basename, mode);
   if (!heading) return text;
   const lines = body.split("\n");
   const current = lines[heading.line] ?? "";

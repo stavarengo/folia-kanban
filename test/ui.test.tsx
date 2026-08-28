@@ -3257,14 +3257,14 @@ describe("an open detail panel follows its note", () => {
   });
 });
 
-describe("display title override", () => {
-  it("sets and clears the card's title key from the panel's Display title field", async () => {
+describe("the card's title override", () => {
+  it("sets and clears the card's title key from the panel's Override card title field", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    const field = within(detail).getByLabelText("Display title") as HTMLInputElement;
+    const field = within(detail).getByLabelText("Override card title") as HTMLInputElement;
     expect(field).toHaveValue("");
     expect(field.placeholder).toBe("Alpha");
     await user.type(field, "Alpha, shown{Enter}");
@@ -3272,22 +3272,24 @@ describe("display title override", () => {
     expect(await screen.findByRole("heading", { name: "Alpha, shown" })).toBeInTheDocument();
     // The key has its own control, so the generic property rows must not offer it a second time.
     expect(within(detail).queryByLabelText("Value of title")).not.toBeInTheDocument();
-    await user.clear(within(detail).getByLabelText("Display title"));
+    await user.clear(within(detail).getByLabelText("Override card title"));
     await user.keyboard("{Enter}");
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBeUndefined());
     expect(await screen.findByRole("heading", { name: "Alpha" })).toBeInTheDocument();
   });
 
-  it("the card menu's Display title opens the panel on that field", async () => {
+  it("the card menu's Override card title opens the panel on that field", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
     const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     await user.click(
-      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Display title/ }),
+      within(await screen.findByRole("menu")).getByRole("menuitem", {
+        name: /Override card title/,
+      }),
     );
     const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(within(detail).getByLabelText("Display title")).toHaveFocus());
+    await waitFor(() => expect(within(detail).getByLabelText("Override card title")).toHaveFocus());
   });
 });
 
@@ -3329,7 +3331,7 @@ describe("the detail panel keeps its drafts when a write fails or the note moves
   });
 });
 
-describe("the Display title placeholder names the card's fallback under the board's mode", () => {
+describe("the Override card title placeholder names the card's fallback under the board's mode", () => {
   it("shows the heading a `card-title: heading` board would fall back to", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(
@@ -3344,7 +3346,7 @@ describe("the Display title placeholder names the card's fallback under the boar
     render_(repo);
     await user.click(await screen.findByText("Overridden"));
     const detail = await screen.findByTestId("card-detail");
-    const field = within(detail).getByLabelText("Display title") as HTMLInputElement;
+    const field = within(detail).getByLabelText("Override card title") as HTMLInputElement;
     await waitFor(() => expect(field.placeholder).toBe("Notes from the kickoff"));
     await user.clear(field);
     await user.keyboard("{Enter}");
@@ -3523,18 +3525,18 @@ describe("the detail panel's reads and field writes stay with their card", () =>
 });
 
 describe("a field draft belongs to the card it was typed on", () => {
-  it("does not carry a Display title draft over to the next card opened", async () => {
+  it("does not carry a title override draft over to the next card opened", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    await user.type(within(detail).getByLabelText("Display title"), "Alpha shown");
+    await user.type(within(detail).getByLabelText("Override card title"), "Alpha shown");
     await user.click(screen.getByText("Gamma"));
     await screen.findByRole("heading", { name: "Gamma" });
     const gammaDetail = await screen.findByTestId("card-detail");
-    expect(within(gammaDetail).getByLabelText("Display title")).toHaveValue("");
-    await user.click(within(gammaDetail).getByLabelText("Display title"));
+    expect(within(gammaDetail).getByLabelText("Override card title")).toHaveValue("");
+    await user.click(within(gammaDetail).getByLabelText("Override card title"));
     await user.keyboard("{Enter}");
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha shown"));
     expect(repo.files.get("Tasks/Gamma.md")!.fm["title"]).toBeUndefined();
@@ -3660,7 +3662,7 @@ describe("file operations done outside the board", () => {
     // panel. A selection left pointing at the old path resolves to no card, and the panel would
     // close for good instead of coming back on the card's new path.
     const detail = await screen.findByTestId("card-detail");
-    expect(within(detail).getByText("Gamma")).toBeInTheDocument();
+    expect(within(detail).getByRole("heading", { name: "Gamma" })).toBeInTheDocument();
   });
 
   it("follows a card whose whole folder was moved, which the vault reports as one operation", async () => {
@@ -3682,7 +3684,9 @@ describe("file operations done outside the board", () => {
     act(() => repo.notify());
 
     const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(within(detail).getByText("Delta")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(detail).getByRole("heading", { name: "Delta" })).toBeInTheDocument(),
+    );
   });
 
   // Not discriminating on its own — a selection left on the deleted path also resolves to no card
@@ -3713,14 +3717,16 @@ describe("file operations done outside the board", () => {
 
     fireEvent.contextMenu(beta.querySelector(".folia-card-title")!);
     await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
-    const input = screen.getByDisplayValue("Beta") as HTMLInputElement;
+    const input = within(beta).getByLabelText("Card title") as HTMLInputElement;
     await user.clear(input);
     await user.type(input, "Beta renamed{Enter}");
 
     const detail = await screen.findByTestId("card-detail");
     // The panel is still on the card, now under its new path — the two migrations did not undo
     // each other, and neither left the selection pointing at the old one.
-    await waitFor(() => expect(within(detail).getByText("Beta renamed")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(detail).getByRole("heading", { name: "Beta renamed" })).toBeInTheDocument(),
+    );
   });
 });
 
@@ -3871,20 +3877,22 @@ describe("the panel's section inputs belong to the card they were typed on (2026
       const tile = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
       fireEvent.contextMenu(tile.querySelector(".folia-card-title")!);
       await user.click(
-        within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Display title" }),
+        within(await screen.findByRole("menu")).getByRole("menuitem", {
+          name: "Override card title",
+        }),
       );
     };
     await openTitleField();
     const detail = await screen.findByTestId("card-detail");
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(detail).getByLabelText("Display title")),
+      expect(document.activeElement).toBe(within(detail).getByLabelText("Override card title")),
     );
     // Move focus elsewhere and ask again: the action has to land a second time on the same card.
     within(detail).getByLabelText("Write a comment").focus();
     await openTitleField();
     const reopened = await screen.findByTestId("card-detail");
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(reopened).getByLabelText("Display title")),
+      expect(document.activeElement).toBe(within(reopened).getByLabelText("Override card title")),
     );
   });
 });
@@ -3947,5 +3955,139 @@ describe("a rename under the open panel keeps what was typed in it (20260826.09)
     act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks/Alpha.md", to: "Elsewhere.md" }));
     act(() => repo.notify());
     await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+  });
+});
+
+describe("the panel names the file, names the override, and explains the title (20260827.01)", () => {
+  /** The read-only line under the two title fields, and the sentence that justifies it. */
+  const outcome = (detail: HTMLElement) => ({
+    title: detail.querySelector(".folia-title-value")?.textContent,
+    reason: detail.querySelector(".folia-title-reason")?.textContent,
+  });
+
+  it("previews the title from what is typed, before anything is committed", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() => expect(outcome(detail).title).toBe("Alpha"));
+    expect(outcome(detail).reason).toBe(
+      "Taken from the file name, because it already reads as a name.",
+    );
+
+    // Typed, not saved: the note is untouched and the line already answers for it.
+    await user.type(within(detail).getByLabelText("Override card title"), "Shown instead");
+    expect(outcome(detail).title).toBe("Shown instead");
+    expect(outcome(detail).reason).toBe(
+      "Taken from the override, which wins over every other source.",
+    );
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBeUndefined();
+
+    // A slug-shaped file name sends the rules looking for a heading — with nothing to find here.
+    await user.clear(within(detail).getByLabelText("Override card title"));
+    const name = within(detail).getByLabelText("File name");
+    await user.clear(name);
+    await user.type(name, "01-fix-export");
+    expect(outcome(detail).title).toBe("01-fix-export");
+    expect(outcome(detail).reason).toBe(
+      "Taken from the file name, because no heading in the note could supply a title.",
+    );
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(true);
+  });
+
+  it("explains a title that comes from a heading", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/01-fix-export.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Fix the export path\n\nDesc\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Fix the export path"));
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() => expect(outcome(detail).title).toBe("Fix the export path"));
+    expect(outcome(detail).reason).toBe(
+      "Taken from the note's first heading, because the file name reads like a slug.",
+    );
+
+    // "Why this title?" shows the sources in the order they were asked, the winner marked.
+    await user.click(within(detail).getByRole("button", { name: "Why this title?" }));
+    const steps = [...detail.querySelectorAll(".folia-title-step")].map((li) => ({
+      source: li.querySelector(".folia-title-step-source")?.textContent,
+      value: li.querySelector(".folia-title-step-value")?.textContent,
+      winner: li.classList.contains("is-winner"),
+    }));
+    expect(steps).toEqual([
+      { source: "Override card title", value: "not set", winner: false },
+      { source: "First heading in the note", value: "“Fix the export path”", winner: true },
+    ]);
+  });
+
+  it("explains a title that comes from the override, and one skipped heading step", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      { ...config, titleMode: "filename" },
+      {
+        "Tasks/Notes.md": {
+          fm: { type: "task", status: "todo", title: "What it is really about" },
+          body: "\n# Notes from the kickoff\n",
+        },
+      },
+    );
+    render_(repo);
+    await user.click(await screen.findByText("What it is really about"));
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() => expect(outcome(detail).title).toBe("What it is really about"));
+    await user.click(within(detail).getByRole("button", { name: "Why this title?" }));
+    expect(detail.querySelectorAll(".folia-title-step")).toHaveLength(1);
+    expect(detail.querySelector(".folia-title-step-reason")?.textContent).toBe(
+      "Taken from the override, which wins over every other source.",
+    );
+
+    // Clearing the override hands the decision to the board's mode, which reads no heading at all.
+    await user.clear(within(detail).getByLabelText("Override card title"));
+    expect(outcome(detail).reason).toBe(
+      "Taken from the file name, because this board titles cards by file name.",
+    );
+    const skipped = [...detail.querySelectorAll(".folia-title-step")][1];
+    expect(skipped?.querySelector(".folia-title-step-reason")?.textContent).toBe(
+      "This board titles cards by file name, so no heading is read.",
+    );
+  });
+
+  it("renames the file from the File name field, even when an override names the card", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Old name.md": {
+        fm: { type: "task", status: "todo", title: "Shown title" },
+        body: "\n# Old name\n",
+      },
+      "Tasks/Parent.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Old name]]\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Shown title"));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByLabelText("Write a comment");
+    await user.type(within(detail).getByLabelText("Write a comment"), "still being written");
+
+    const name = within(detail).getByLabelText("File name");
+    await user.clear(name);
+    await user.type(name, "New name{Enter}");
+
+    // The FILE moved — the override was not rewritten in its place — and inbound links followed.
+    await waitFor(() => expect(repo.files.has("Tasks/New name.md")).toBe(true));
+    expect(repo.files.has("Tasks/Old name.md")).toBe(false);
+    expect(repo.files.get("Tasks/New name.md")!.fm["title"]).toBe("Shown title");
+    expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New name]]");
+    // The panel stayed on the card, with what was being typed in it.
+    const after = await screen.findByTestId("card-detail");
+    expect(after).toBe(detail);
+    expect(within(after).getByLabelText("File name")).toHaveValue("New name");
+    expect(within(after).getByLabelText("Write a comment")).toHaveValue("still being written");
   });
 });
