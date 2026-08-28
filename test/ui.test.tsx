@@ -1906,6 +1906,10 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass(
       "folia-card--nested",
     );
+    // Alpha is a plain, draggable top-level tile: it carries no non-draggable marker.
+    expect(within(todoCol).getByText("Alpha").closest(".folia-card")).not.toHaveClass(
+      "folia-card--static",
+    );
 
     await user.type(screen.getByLabelText("Search cards"), "beta");
 
@@ -1924,6 +1928,9 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     // the smaller, quieter nested styling of a card sitting inside a parent's group.
     expect(beta).toHaveClass("folia-card--subitem");
     expect(beta).not.toHaveClass("folia-card--nested");
+    // It does carry the marker every non-draggable tile carries, which is what drops the grab
+    // cursor: a tile must not offer an affordance it cannot honour.
+    expect(beta).toHaveClass("folia-card--static");
 
     // The toolbar agrees with the screen: one card tile is rendered and the counter credits
     // exactly one match, out of every card the board holds (Alpha, Beta, Gamma) — the denominator

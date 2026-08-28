@@ -189,6 +189,7 @@ function CardItemInner({
       style={ctxColor ? { ...style, ["--folia-ctx-color" as string]: ctxColor } : style}
       className={
         "folia-card" +
+        (draggable ? "" : " folia-card--static") +
         (nested ? " folia-card--nested" : "") +
         (parentPath ? " folia-card--subitem" : "") +
         (todoRef ? " folia-card--todo" : "") +

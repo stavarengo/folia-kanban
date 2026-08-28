@@ -500,34 +500,27 @@ export function Column({
             // the lane rule and the global search filter), so a filtered column only touches what
             // the user can see. The whole family, not just the top-level tiles: an "expand all"
             // that stopped there would leave a grandchild collapsed from an earlier individual
-            // toggle still hidden. `subtreePaths` still walks the FULL board.childrenOf tree
-            // (it does not know about the filter), so under an active filter it is narrowed to
-            // cards that themselves match — the same test SubcardGroup applies to decide what it
-            // nests — so a descendant the filter has hidden does not pick up a toggle override the
-            // user could not have meant. Further filtered to cards that HAVE subitems (subcard
-            // children OR an inline-todos preview) — a card with none has no state to change. That
-            // last test is deliberately unfiltered, unlike the toggle CardItem draws: a card whose
-            // only child the filter hides shows no toggle right now but will once the filter is
-            // cleared, and collapse-all should still have reached it.
+            // toggle still hidden. Deliberately NOT narrowed to what the filter currently paints:
+            // this is a bulk state operation on the cards of this column, and the state outlives the
+            // filter. Skipping a hidden descendant would leave exactly the grandchild this walk
+            // exists to reach still collapsed once the filter clears, and would do it asymmetrically
+            // — collapse-all has no such problem, expand-all does. Filtered only to cards that
+            // actually have a toggle (subcard children OR an inline-todos preview) — a card with
+            // neither has no state to change, so giving it an override would just be a wasted
+            // `data.json` entry nothing ever reads.
             onCollapseAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths)
-                  .filter((p) => {
-                    const c = board.cards[p];
-                    return c != null && (!globalFiltering || matchCard(c, filter, matchCtx));
-                  })
-                  .filter((p) => hasNestedSubitems(board, settings.cardNextTodos, p)),
+                subtreePaths(board, paths).filter((p) =>
+                  hasNestedSubitems(board, settings.cardNextTodos, p),
+                ),
                 true,
               )
             }
             onExpandAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths)
-                  .filter((p) => {
-                    const c = board.cards[p];
-                    return c != null && (!globalFiltering || matchCard(c, filter, matchCtx));
-                  })
-                  .filter((p) => hasNestedSubitems(board, settings.cardNextTodos, p)),
+                subtreePaths(board, paths).filter((p) =>
+                  hasNestedSubitems(board, settings.cardNextTodos, p),
+                ),
                 false,
               )
             }

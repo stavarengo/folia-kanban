@@ -818,6 +818,13 @@
 .folia-card-main:active {
   cursor: grabbing;
 }
+/* A tile that cannot be drag-reordered — nested inside a parent's group, or lifted to a column's
+   top level by the active filter and so a member of no column bucket — must not offer a grab
+   cursor it has no way to honour. Keyed to the same condition CardItem disables the sortable on. */
+.folia-card--static .folia-card-main,
+.folia-card--static .folia-card-main:active {
+  cursor: default;
+}
 .folia-card-title {
   font-size: var(--folia-font-size-md-plus);
   font-weight: var(--folia-font-weight-semibold);
@@ -879,18 +886,15 @@
   flex-direction: column;
   gap: 6px;
 }
-/* Nested cards are a touch smaller/denser and shed their own grab affordance. */
+/* Nested cards are a touch smaller and denser; the grab affordance they shed comes from
+   `--static` above, which every non-draggable tile carries. */
 .folia-card--nested {
   box-shadow: none;
   border-color: color-mix(in srgb, var(--folia-border) 80%, transparent);
 }
 .folia-card--nested .folia-card-main {
-  cursor: default;
   gap: 5px;
   padding: 7px 10px;
-}
-.folia-card--nested .folia-card-main:active {
-  cursor: default;
 }
 .folia-card--nested .folia-card-title {
   font-size: var(--folia-font-size-sm-plus);
