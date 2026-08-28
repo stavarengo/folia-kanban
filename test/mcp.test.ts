@@ -669,3 +669,34 @@ describe("a create_card that gets the note written but not its fields", () => {
     expect((await repo.loadBoard()).columns["todo"]).toContain("Tasks/Half made.md");
   });
 });
+
+describe("two cards that each claim the other as their parent", () => {
+  // The board refuses to nest a cycle — its members are surfaced as top-level cards instead of
+  // vanishing into each other — so each one has a tile of its own and the walk that reports where
+  // a move landed stops on the first look. This pins that: without a tile, the walk would follow
+  // `parentOf` into the cycle and could answer with the partner's column instead of the card's.
+  it("are reported by their own column, not by their partner's", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": { fm: { status: "todo", order: 1 }, body: "\n## Subtasks\n\n- [ ] [[B]]\n" },
+        "Tasks/B.md": { fm: { status: "todo", order: 2 }, body: "\n## Subtasks\n\n- [ ] [[A]]\n" },
+      },
+      () => "all",
+      () => "",
+    );
+    const host: BoardHost = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path) => (path === "Board.md" ? repo : null),
+    };
+    const moved = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/A.md",
+      column: "done",
+    })) as { column: string | null };
+    expect(moved.column).toBe("done");
+    const board = await repo.loadBoard();
+    expect(board.columns["done"]).toContain("Tasks/A.md");
+    expect(board.columns["todo"]).toContain("Tasks/B.md");
+  });
+});

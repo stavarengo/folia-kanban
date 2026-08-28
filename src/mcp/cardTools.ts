@@ -33,8 +33,10 @@ function landedColumn(board: Board, path: string): string | null {
   const seen = new Set<string>();
   let at: string | undefined = path;
   // Up the nesting until something has a tile: a child of a child drawn inside a grandparent is
-  // still in the grandparent's column. `seen` because `parentOf` links both ways across a cycle,
-  // which the board tolerates and this walk must not hang on.
+  // still in the grandparent's column. A cycle never gets walked at all — the board refuses to
+  // nest one and gives its members tiles of their own, so `columnOf` answers on the first look —
+  // but `parentOf` does link both ways across one, so `seen` keeps a board that changed underneath
+  // this from turning a wrong assumption into a hang.
   while (at !== undefined && !seen.has(at)) {
     const tiled = columnOf(board, at);
     if (tiled !== null) return tiled;
