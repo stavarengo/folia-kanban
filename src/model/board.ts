@@ -652,16 +652,20 @@ export function nestedCards(board: Board): NestedCard[] {
 
 /**
  * Every card path that renders SOMEWHERE on the board under `matches` (a filter's own verdict per
- * card) — the single source of truth both Column (what it draws) and a caller like the search
- * counter (how many of those draws matched) must agree with, so the two can never diverge the way
- * a hand-rolled second count once did.
+ * card). This is a MIRROR of the rule Column.tsx applies while drawing, kept here so it is stated
+ * once, in the pure layer, and can be tested without a DOM: Column still owns the drawing (it needs
+ * a per-column lifted-parent map this set cannot carry), and `test/ui.test.tsx` pins the two against
+ * each other on a rendered board — change Column's lift and that test fails here too.
  *
- * A top-level or already-placed card (a member of some `board.columns` bucket) always renders
- * SOMEWHERE — filtering only changes whether it is shown, never where it would be. A genuinely
- * nested, non-placed card (`nestedCards`) renders nested under its immediate parent exactly when
- * that parent both matches and is itself visible; otherwise it needs Column's lift, which only
- * reaches a PLAIN inherited column — `laneColumnIds` names every column carrying a `filter` rule,
- * the same boundary the lift stops at (see Column.tsx).
+ * The rule: a top-level or already-placed card (a member of some `board.columns` bucket) always
+ * renders SOMEWHERE — filtering only decides whether it is shown, never where it would be. A
+ * genuinely nested, non-placed card (`nestedCards`) renders nested under its immediate parent
+ * exactly when that parent both matches and is itself visible; otherwise it needs Column's lift,
+ * which only reaches a PLAIN inherited column — `laneColumnIds` names every column carrying a
+ * `filter` rule, the same boundary the lift stops at.
+ *
+ * A caller reporting on the filter ANDs this with its own match verdict, so it can never credit a
+ * match the board shows nowhere.
  */
 export function filterVisiblePaths(board: Board, matches: (path: string) => boolean): Set<string> {
   const nestedByPath = new Map(nestedCards(board).map((n) => [n.path, n]));

@@ -766,11 +766,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         const c = board.cards[p];
         return c != null && matchCard(c, filter, matchCtx);
       };
-      // `total` is every real card on the board, however it renders. `match` credits a card only
-      // when it BOTH matches the filter AND actually renders somewhere — `filterVisiblePaths` is
-      // the one place that decides "somewhere" (nested under a matching parent, lifted to a plain
-      // column, or plainly top-level/placed), shared with Column so the count can never show a
-      // number the board itself does not back up.
+      // The two halves of "N of M" are deliberately asymmetric. M is every card that EXISTS on the
+      // board, nested ones included, so the denominator does not shift while you type. N credits a
+      // card only when it both matches AND actually renders somewhere — `filterVisiblePaths` is the
+      // one place that decides "somewhere" (nested under a matching parent, lifted to a plain
+      // column, or plainly top-level/placed), mirroring Column, so the count can never claim a
+      // match the board shows nowhere. Counting nested cards in M is what keeps N ≤ M once a lifted
+      // subcard can be credited at all: the old bucket-only denominator could be exceeded by it.
       const visible = filterVisiblePaths(board, matchesFilter);
       for (const path of Object.keys(board.cards)) {
         total++;

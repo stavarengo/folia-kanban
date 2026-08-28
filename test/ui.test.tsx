@@ -1921,6 +1921,14 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(beta.querySelector('[aria-roledescription="sortable"]')).toBeNull();
     expect(within(beta).getByRole("button", { name: /Part of Alpha/ })).toBeInTheDocument();
 
+    // The toolbar agrees with the screen: one card tile is rendered and the counter credits
+    // exactly one match, out of every card the board holds (Alpha, Beta, Gamma) — the denominator
+    // counts nested cards too, so it does not shrink the moment a filter is typed.
+    expect(document.querySelectorAll(".folia-card")).toHaveLength(1);
+    expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
+      "1 of 3",
+    );
+
     // Clearing the filter restores the original nesting — nothing changes when no filter is active.
     await user.clear(screen.getByLabelText("Search cards"));
     expect(await within(todoCol).findByText("Alpha")).toBeInTheDocument();

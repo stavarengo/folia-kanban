@@ -297,14 +297,15 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     expect(visible.has("Tasks/Child.md")).toBe(false); // would need a lift, but its column is a lane
   });
 
-  it("excludes a matching grandchild whose whole matching chain breaks one level up", () => {
+  it("lifts a matching grandchild whose immediate parent breaks the chain", () => {
     const b = buildBoard(config, [
       card("Root", { status: "todo" }, ["Mid"]),
       card("Mid", {}, ["Leaf"]),
       card("Leaf", {}),
     ]);
-    // Root matches (irrelevant, it's already visible either way); Mid does not; Leaf does.
-    // Leaf's immediate parent (Mid) does not match, so Leaf is lifted instead — still visible.
+    // Root matches (irrelevant, it's already visible either way); Mid does not; Leaf does. Only
+    // the IMMEDIATE parent decides: Mid does not match, so Leaf cannot nest and is lifted instead
+    // — a matching ancestor further up neither saves it nor is needed.
     const matchesRootAndLeaf = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Leaf.md";
     expect(filterVisiblePaths(b, matchesRootAndLeaf).has("Tasks/Leaf.md")).toBe(true);
   });
