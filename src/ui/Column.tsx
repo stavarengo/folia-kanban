@@ -281,8 +281,10 @@ export function Column({
   // vetted, just because it happens to inherit the lane's column id. That is a bigger feature (lanes
   // reading nested cards) than this fix; a plain column's inherited-column lift is unaffected.
   // `board` is the only input `nestedCards` reads — memoized here so a keystroke in the search box
-  // (which changes `filter`, not `board`) does not rebuild the whole-board column-index map on
-  // every column on every render; only a board reload does.
+  // (which changes `filter`, not `board`) rebuilds the whole-board column index once per board
+  // rather than once per column per render. The toolbar's tally still rebuilds its own copy per
+  // keystroke inside `filterVisiblePaths`; that is one pass over the board for the whole toolbar,
+  // against one per column here, which is what this memo is worth.
   const boardNestedCards = useMemo(() => nestedCards(board), [board]);
   const liftedParentOf: Record<string, string> = {};
   if (globalFiltering && !columnFilter) {
@@ -307,7 +309,12 @@ export function Column({
       return c != null && (!globalFiltering || matchCard(c, filter, matchCtx));
     });
 
-  // Count + WIP reflect the lane's matched cards for a filter-lane (#1.4), the status bucket otherwise.
+  // Count + WIP reflect the lane's matched cards for a filter-lane (#1.4), the status bucket
+  // otherwise — deliberately not the tiles on screen. The badge answers "how much work is in this
+  // column", which no search should change: a lifted subcard is a visitor the filter put here for
+  // as long as the filter lasts, and counting it would let typing in the search box trip a WIP
+  // limit. Under a filter, then, the badge can read lower than the number of tiles, the same way it
+  // has always been able to read higher.
   const countPaths = lanePaths;
 
   // Drop INTO a filter-lane stays minimal: the existing move path (App.onMove → moveCard) still sets
@@ -496,11 +503,12 @@ export function Column({
             triggerRef={menuBtnRef}
             onClose={() => setMenuOpen(false)}
             onEdit={() => setEditModalOpen(true)}
-            // `paths`, not the raw status bucket: what's actually rendered here right now (after
-            // the lane rule and the global search filter), so a filtered column only touches what
-            // the user can see. The whole family, not just the top-level tiles: an "expand all"
-            // that stopped there would leave a grandchild collapsed from an earlier individual
-            // toggle still hidden. Deliberately NOT narrowed to what the filter currently paints:
+            // Rooted in `paths`, not in the raw status bucket: the roots are the tiles actually
+            // rendered here right now (after the lane rule and the global search filter), so the
+            // command starts from what the user can see. From each root it takes the whole family,
+            // not just the top-level tile: an "expand all" that stopped there would leave a
+            // grandchild collapsed from an earlier individual toggle still hidden. Those
+            // descendants are deliberately NOT narrowed to what the filter currently paints:
             // this is a bulk state operation on the cards of this column, and the state outlives the
             // filter. Skipping a hidden descendant would leave exactly the grandchild this walk
             // exists to reach still collapsed once the filter clears, and would do it asymmetrically

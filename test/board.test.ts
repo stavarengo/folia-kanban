@@ -298,6 +298,24 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     );
   });
 
+  it("includes a card another lane pulls in, though its own status names a lane that will not", () => {
+    // Every lane pulls from every bucket, so the lane a card's `status` happens to name is not the
+    // only one that can draw it: this card fails laneA's rule but passes laneB's, and laneB shows
+    // it. Asking only the column its status names would deny a card the user is looking at.
+    const twoLanes: BoardConfig = {
+      ...config,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "laneA", title: "Lane A", filter: "area:aaa" },
+        { id: "laneB", title: "Lane B", filter: "area:bbb" },
+      ],
+    };
+    const b = buildBoard(twoLanes, [card("Cross", { status: "laneA", area: "bbb" })]);
+    const laneRules = (columnId: string, path: string) =>
+      b.cards[path]?.frontmatter.area === (columnId === "laneA" ? "aaa" : "bbb");
+    expect(filterVisiblePaths(b, rules({ laneDraws: laneRules })).has("Tasks/Cross.md")).toBe(true);
+  });
+
   it("includes a matching nested card whose non-matching parent lifts it", () => {
     const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
     const matches = (p: string) => p === "Tasks/Leaf.md";
