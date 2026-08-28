@@ -3,6 +3,13 @@ import { remapPathKeys } from "./model/pathOps";
 import type { HistoryScope } from "./model/types";
 import type { BoardViewMode } from "./viewMode";
 
+/** Where the MCP server listens by default. Neighbour of the Local REST API plugin's 27124. */
+const MCP_DEFAULT_PORT = 27125;
+
+/** The range a port setting is held to: the unprivileged ports. */
+export const MCP_PORT_MIN = 1024;
+export const MCP_PORT_MAX = 65535;
+
 export interface KanbanSettings {
   detailPresentation: "side" | "modal";
   sidePanelMode: "split" | "float";
@@ -63,6 +70,19 @@ export interface KanbanSettings {
    * counts".
    */
   commentsBaseline: string;
+  /**
+   * Whether the plugin hosts an MCP server so agents can drive the boards in this vault. Off until
+   * the user turns it on, desktop only, and bound to loopback — see `docs/mcp.md`.
+   */
+  mcpEnabled: boolean;
+  /** The loopback port that server listens on. */
+  mcpPort: number;
+  /**
+   * The bearer token every MCP request must carry, generated on this install the first time the
+   * server is switched on and kept afterwards — a token that changed on each load would break the
+   * agent configured against it. Empty means "none generated yet", and the server stays off.
+   */
+  mcpToken: string;
 }
 
 /**
@@ -100,7 +120,25 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   userName: "",
   commentsSeen: {},
   commentsBaseline: "",
+  mcpEnabled: false,
+  mcpPort: MCP_DEFAULT_PORT,
+  mcpToken: "",
 };
+
+/**
+ * Agent access switched on for the first time is when its token comes into existence. `mint` is
+ * called only then: the token is generated once and kept, because a token that changed on each
+ * load would break the client configured against it. `desktop` is what keeps a phone from minting
+ * a secret for a server it can never run.
+ */
+export function withMcpToken(
+  settings: KanbanSettings,
+  mint: () => string,
+  desktop: boolean,
+): KanbanSettings {
+  if (!settings.mcpEnabled || settings.mcpToken || !desktop) return settings;
+  return { ...settings, mcpToken: mint() };
+}
 
 /**
  * Settings as loaded from plugin data: defaults filled in, and the comments baseline stamped with

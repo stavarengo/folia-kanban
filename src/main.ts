@@ -9,6 +9,7 @@ import {
   FuzzySuggestModal,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -28,11 +29,13 @@ import {
   applySettingsPatch,
   hydrateSettings,
   migratePathKeyedSettings,
+  withMcpToken,
   type KanbanSettings,
   type SettingsPatch,
 } from "./settings";
 import {
   CARD_NEXT_TODOS_MAX,
+  MCP_TOKEN_COPY,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -48,6 +51,7 @@ import {
   cardFolderFor,
   uniqueNotePath,
 } from "./boardNote";
+import { McpService, newMcpToken, type McpState } from "./obsidian/mcpService";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
@@ -97,6 +101,9 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Tail of the settings-write chain; see {@link saveSettings}. */
   private pendingWrite: Promise<void> = Promise.resolve();
 
+  /** The MCP server's lifetime. Null on mobile, where the plugin never hosts one. */
+  private mcp: McpService | null = null;
+
   override async onload(): Promise<void> {
     await this.loadSettings();
 
@@ -123,6 +130,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.registerBoardSetupActions();
 
     this.addSettingTab(new KanbanSettingTab(this.app, this));
+    this.buildMcp();
 
     this.patchLeafSetViewState();
     this.registerEvent(this.app.workspace.on("file-open", () => this.syncMarkdownActions()));
@@ -154,12 +162,18 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.register(() => {
       this.unloaded = true;
       this.removeMarkdownActions();
+      void this.mcp?.stop();
     });
     // `onLayoutReady` cannot be unregistered, and it can still fire after an unload that happened
     // during startup — which would put the buttons straight back, wired to a view type Obsidian
     // no longer has.
     this.app.workspace.onLayoutReady(() => {
-      if (!this.unloaded) this.syncMarkdownActions();
+      if (this.unloaded) return;
+      this.syncMarkdownActions();
+      // Only now: the tools read board notes out of the metadata cache, and until the layout is
+      // ready that cache is still filling — an agent connecting in the first seconds would be told
+      // this vault has no boards.
+      void this.mcp?.sync(this.settings);
     });
   }
 
@@ -509,10 +523,14 @@ export default class FoliaKanbanPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const loaded: unknown = await this.loadData();
     const { settings, stampedBaseline } = hydrateSettings(loaded, stamp());
-    this.settings = settings;
+    // Agent access switched on but carrying no token — data.json hand-edited, or synced from an
+    // install that could not mint one — would leave the toggle reading on with nothing listening
+    // and nothing said about it, because a server that is never asked to start never fails. Mint
+    // the token the enabled state implies, here, where the settings arrive.
+    this.settings = withMcpToken(settings, newMcpToken, Platform.isDesktop);
     // Persisted right away: the baseline is "when tracking started", and it must not drift to a
     // later launch if nothing else happens to save the settings before then.
-    if (stampedBaseline) await this.saveSettings();
+    if (stampedBaseline || this.settings !== settings) await this.saveSettings();
   }
 
   /** Serializes the writes: two `saveData` calls in flight at once can land on disk in either
@@ -535,9 +553,52 @@ export default class FoliaKanbanPlugin extends Plugin {
   async updateSettings(patch: SettingsPatch): Promise<void> {
     const next = applySettingsPatch(this.settings, patch);
     if (next === this.settings) return;
-    this.settings = next;
+    // Switching agent access on for the first time is when its token comes into existence: it is
+    // generated once and kept, so the client configured against it keeps working across restarts.
+    this.settings = withMcpToken(next, newMcpToken, Platform.isDesktop);
     this.refreshViews();
+    void this.mcp?.sync(this.settings);
     await this.saveSettings();
+  }
+
+  /**
+   * Host the MCP server, on desktop only. `Platform.isDesktop` is a runtime gate rather than a
+   * manifest one: the board itself works everywhere, and declaring the whole plugin desktop-only
+   * would take it off mobile for the sake of a feature that is off by default.
+   */
+  private buildMcp(): void {
+    if (!Platform.isDesktop) return;
+    this.mcp = new McpService({
+      app: this.app,
+      getSettings: () => this.settings,
+      info: {
+        name: this.manifest.id,
+        title: this.manifest.name,
+        version: this.manifest.version,
+      },
+      onState: (state) => this.reportMcpState(state),
+    });
+  }
+
+  private reportMcpState(state: McpState): void {
+    if (state.kind !== "failed") return;
+    // A toggle left on while nothing is listening is the one state the user cannot see, so the
+    // failure says both what broke and that the switch is now lying.
+    new Notice(
+      `Folia Kanban: agent access could not start on port ${this.settings.mcpPort}. ${state.message}`,
+      10000,
+    );
+  }
+
+  /** Put the bearer token on the clipboard, for pasting into an MCP client's configuration. */
+  async copyMcpToken(): Promise<void> {
+    const token = this.settings.mcpToken;
+    if (!token) {
+      new Notice(MCP_TOKEN_COPY.missing, 5000);
+      return;
+    }
+    await navigator.clipboard.writeText(token);
+    new Notice(MCP_TOKEN_COPY.copied, 3000);
   }
 
   /** Re-render all open Folia Kanban views so settings changes reflect without a reload. */
@@ -597,18 +658,32 @@ class KanbanSettingTab extends PluginSettingTab {
   private pendingUserName: string | null = null;
 
   /**
+   * The port, held the same way and for a sharper reason. Every write restarts the server, and a
+   * half-typed port is a real number: typing 8080 over 27125 passes through 8, 80 and 808, each of
+   * which is pulled up to the lowest allowed port and each of which would bind, fail, or both. Held
+   * until the field is left, only the port the user actually meant is ever bound.
+   */
+  private pendingMcpPort: number | null = null;
+
+  /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
    * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
    */
   override getSettingDefinitions(): SettingDefinitionItem[] {
-    return settingDefinitions(() => this.plugin.settings, this.plugin.manifest.version);
+    return settingDefinitions(
+      () => this.plugin.settings,
+      this.plugin.manifest.version,
+      () => void this.plugin.copyMcpToken(),
+      Platform.isDesktop,
+    );
   }
 
   /** Where the declarative rendering reads a control's current value from: our own settings, not
    *  the vault config the base implementation would reach for. */
   override getControlValue(key: string): unknown {
     if (key === "userName") return this.pendingUserName ?? this.plugin.settings.userName;
+    if (key === "mcpPort") return this.pendingMcpPort ?? this.plugin.settings.mcpPort;
     const settings: KanbanSettings = this.plugin.settings;
     return Object.prototype.hasOwnProperty.call(settings, key)
       ? settings[key as keyof KanbanSettings]
@@ -623,6 +698,10 @@ class KanbanSettingTab extends PluginSettingTab {
     // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
     if (patch.userName !== undefined) {
       this.pendingUserName = patch.userName;
+      return;
+    }
+    if (patch.mcpPort !== undefined) {
+      this.pendingMcpPort = patch.mcpPort;
       return;
     }
     void this.plugin.updateSettings(patch).then(() => {
@@ -640,6 +719,7 @@ class KanbanSettingTab extends PluginSettingTab {
 
   override hide(): void {
     this.commitUserName();
+    this.commitMcpPort();
     super.hide();
   }
 
@@ -648,6 +728,13 @@ class KanbanSettingTab extends PluginSettingTab {
     this.pendingUserName = null;
     if (name !== null && name !== this.plugin.settings.userName)
       void this.plugin.updateSettings({ userName: name });
+  }
+
+  private commitMcpPort(): void {
+    const port = this.pendingMcpPort;
+    this.pendingMcpPort = null;
+    if (port !== null && port !== this.plugin.settings.mcpPort)
+      void this.plugin.updateSettings({ mcpPort: port });
   }
 
   /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
@@ -771,11 +858,43 @@ class KanbanSettingTab extends PluginSettingTab {
     );
 
     for (const key of TOGGLE_SETTING_KEYS) {
+      if (key === "mcpEnabled" && !Platform.isDesktop) continue;
       new Setting(containerEl)
         .setName(SETTING_COPY[key].name)
         .setDesc(SETTING_COPY[key].desc)
         .addToggle((t) =>
-          t.setValue(s[key]).onChange((v) => void this.plugin.updateSettings({ [key]: v })),
+          t.setValue(s[key]).onChange((v) => {
+            const saved = this.plugin.updateSettings({ [key]: v });
+            // Agent access gates the two rows below it, so switching it redraws the tab.
+            if (key === "mcpEnabled") void saved.then(() => this.render());
+          }),
+        );
+    }
+
+    if (Platform.isDesktop) {
+      new Setting(containerEl)
+        .setName(SETTING_COPY.mcpPort.name)
+        .setDesc(SETTING_COPY.mcpPort.desc)
+        .setDisabled(!s.mcpEnabled)
+        .addText((t) => {
+          t.inputEl.type = "number";
+          t.setValue(String(s.mcpPort))
+            .setDisabled(!s.mcpEnabled)
+            .onChange((v) => {
+              this.pendingMcpPort = settingsPatchFor("mcpPort", v)?.mcpPort ?? null;
+            });
+          t.inputEl.addEventListener("blur", () => this.commitMcpPort());
+        });
+
+      new Setting(containerEl)
+        .setName(MCP_TOKEN_COPY.name)
+        .setDesc(MCP_TOKEN_COPY.desc)
+        .setDisabled(!s.mcpEnabled)
+        .addButton((b) =>
+          b
+            .setButtonText(MCP_TOKEN_COPY.button)
+            .setDisabled(!s.mcpEnabled)
+            .onClick(() => void this.plugin.copyMcpToken()),
         );
     }
 

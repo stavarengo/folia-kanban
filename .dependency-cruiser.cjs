@@ -4,6 +4,7 @@
 //   model    — pure domain + the CardRepository port; depends on nothing app-specific
 //   obsidian — the Vault adapter that implements the port (the only data/transport layer)
 //   ui       — React board; depends on model + the port, never the adapter
+//   mcp      — the MCP tool surface; same rule as ui (model + the port, never the adapter)
 // The plugin shell (main.ts, view.tsx) wires the adapter into Obsidian.
 // The "only the adapter/shell may import the 'obsidian' package" rule is enforced
 // in eslint.config.mjs via no-restricted-imports (precise specifier match).
@@ -32,6 +33,14 @@ module.exports = {
         "src/ui depends on the model and the CardRepository port (in src/model). It must never import the Obsidian adapter (src/obsidian) directly.",
       from: { path: "^src/ui/" },
       to: { path: "^src/obsidian/" },
+    },
+    {
+      name: "mcp-is-a-port-consumer",
+      severity: "error",
+      comment:
+        "src/mcp is the agent-facing tool surface. Like src/ui it reaches the vault only through the CardRepository port in src/model, never the Obsidian adapter or the plugin shell. The adapter that implements its BoardHost lives in src/obsidian and imports it, not the other way round.",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/ui/|^src/obsidian/|^src/(main|view|settings)\\.(ts|tsx)$" },
     },
     {
       name: "no-orphans",

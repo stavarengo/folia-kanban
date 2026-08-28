@@ -6,6 +6,7 @@ import {
   hydrateSettings,
   migratePathKeyedSettings,
   seenMarkerFor,
+  withMcpToken,
 } from "../src/settings";
 
 const NOW = "2026-08-25 14:00";
@@ -130,5 +131,48 @@ describe("the plugin follows external file operations", () => {
     expect(followFileOp).toContain("iterateAllLeaves");
     expect(followFileOp).toContain("this.markdownTabs");
     expect(followFileOp).toContain("remapPath(");
+  });
+});
+
+describe("the agent-access token", () => {
+  const mint = () => "minted";
+
+  it("comes into existence the first time agent access is switched on", () => {
+    const on = { ...DEFAULT_SETTINGS, mcpEnabled: true };
+    expect(withMcpToken(on, mint, true).mcpToken).toBe("minted");
+  });
+
+  // A token that changed on each load would break the client configured against it, silently, in
+  // the user's own editor.
+  it("is kept once it exists, never reissued", () => {
+    const settled = { ...DEFAULT_SETTINGS, mcpEnabled: true, mcpToken: "already here" };
+    expect(withMcpToken(settled, mint, true)).toBe(settled);
+    expect(withMcpToken(settled, mint, true).mcpToken).toBe("already here");
+  });
+
+  it("is not minted while agent access is off", () => {
+    expect(withMcpToken(DEFAULT_SETTINGS, mint, true)).toBe(DEFAULT_SETTINGS);
+  });
+
+  // The rows are hidden on mobile, but a vault synced from a desktop arrives with the setting on;
+  // a phone that cannot host the server has no business holding its secret.
+  it("is not minted on a platform that cannot host the server", () => {
+    const on = { ...DEFAULT_SETTINGS, mcpEnabled: true };
+    expect(withMcpToken(on, mint, false)).toBe(on);
+    expect(withMcpToken(on, mint, false).mcpToken).toBe("");
+  });
+
+  // How the plugin loads its settings, in one line: this pairing is what stops an enabled-but
+  // tokenless data.json — hand-edited, or synced back from a phone that could not mint one — from
+  // leaving the toggle reading on with nothing listening. A server that is never asked to start
+  // never fails, so nothing would have told the user either.
+  it("repairs settings that arrive switched on with no token, the way loading does", () => {
+    const stored = { mcpEnabled: true, mcpToken: "" };
+    const { settings } = hydrateSettings(stored, NOW);
+    expect(settings.mcpToken).toBe("");
+    const repaired = withMcpToken(settings, mint, true);
+    expect(repaired.mcpToken).toBe("minted");
+    // Not the same object, which is what tells the caller to persist it.
+    expect(repaired).not.toBe(settings);
   });
 });

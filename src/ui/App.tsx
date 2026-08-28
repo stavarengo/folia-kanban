@@ -5,15 +5,13 @@ import {
   columnOf,
   filterVisiblePaths,
   findDoneColumn,
-  moveCard,
   moveColumn,
   moveSubtask,
   parseTodoPath,
   reassignColumn,
   relationCounts,
-  syncSubtaskClaim,
-  resolveDrop,
 } from "../model/board";
+import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -239,12 +237,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     async (activeId: string, overId: string) => {
       const b = boardRef.current;
       if (!b) return;
-      const drop = resolveDrop(b, activeId, overId);
-      if (!drop) return;
-      const mut = moveCard(b, activeId, drop.columnId, drop.index);
-      if (!mut) return;
       try {
-        await repo.applyMove(mut);
+        await moveCardOver(repo, b, { activeId, overId });
       } catch (e) {
         // A move can now touch more than one note; what failed in a second note must be seen.
         reportError(e);
@@ -284,11 +278,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     async (path: string, columnId: string) => {
       const b = boardRef.current;
       if (!b) return;
-      const target = (b.columns[columnId] ?? []).filter((p) => p !== path).length;
-      const mut = moveCard(b, path, columnId, target);
-      if (!mut) return;
       try {
-        await repo.applyMove(mut);
+        await moveCardTo(repo, b, { path, columnId });
       } finally {
         await load();
       }
@@ -336,16 +327,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       // value — the very thing remembering is supposed to prevent. Only real values are learned:
       // the `A`/`B`/`C` starting set is a suggestion, never something the board is told it uses.
       const b = boardRef.current;
-      const learn =
-        b && value !== ""
-          ? [...boardPriorities(b.config.priorities, Object.values(b.cards)), value]
-          : [];
+      const learn = b ? boardPriorities(b.config.priorities, Object.values(b.cards)) : [];
       try {
-        // Empty value clears the key cleanly (removes the `priority:` line) per the contract,
-        // instead of writing a stray empty `priority:` and a misleading `Priority → ` history line.
-        if (value === "") await repo.unsetFrontmatterKey(path, "priority");
-        else await repo.setFrontmatter(path, { priority: value });
-        if (learn.length) await repo.rememberPriorities(learn);
+        await setCardPriority(repo, { path, value }, learn);
       } catch (e) {
         reportError(e);
       } finally {
@@ -522,11 +506,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         // dropIndex is computed against the list with `path` removed: up (-1) lands before the
         // former predecessor, down (+1) lands after the former successor.
         const dropIndex = i + dir;
-        const mut = moveCard(b, path, col, dropIndex);
-        if (!mut) return;
         void (async () => {
           try {
-            await repo.applyMove(mut);
+            await moveCardTo(repo, b, { path, columnId: col, index: dropIndex });
           } catch (e) {
             reportError(e);
           } finally {
@@ -545,13 +527,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       toggleTodo: (path, index, done) => {
         void (async () => {
           try {
-            await repo.toggleSubtask(path, index, done);
             // Ticking a box is also a statement about where the work belongs, for a line that
-            // claims a column: keep the claim and the checkbox from telling two stories. A second
-            // write rather than one, so the toggle keeps writing its own history line unchanged.
+            // claims a column, so the claim is kept in step with the checkbox.
             const b = boardRef.current;
-            const sync = b ? syncSubtaskClaim(b, path, { index }, done) : null;
-            if (sync) await repo.applyMove(sync);
+            if (b) await setSubtaskDone(repo, b, { path, index, done });
+            else await repo.toggleSubtask(path, index, done);
           } catch (e) {
             reportError(e);
           } finally {
