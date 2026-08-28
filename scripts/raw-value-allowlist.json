@@ -1,190 +1,236 @@
 {
-  "_comment": "Baseline of tolerated raw design values (ratchet). New raw values fail the check; existing ones are grandfathered here. Pay this debt down via tracking/waivers/ — open a waiver, remove entries as you tokenize. Regenerate with: node scripts/audit-raw-values.mjs --update",
-  "note": "Every entry below is an INTENTIONAL RESIDUAL — a grandfathered one-off layout constant or trivial value with no semantic token home, deliberately left raw. There is no remaining migration debt: the radius-pill (999px), scrim, shadow-panel, shadow-pop and accent focus-ring were all moved to var(--folia-*) and are live (sourced from tokens/source/, verified by scripts/check-tokens.mjs), as were typography size/weight, z-index and opacity earlier. What stays here: one-off component-dimension px lengths (e.g. 200/220/224/280/320/440/640px panel/column widths and assorted 10–92px paddings/sizes), ad-hoc padding shorthands, the 25%-accent focus-ring one-off, the #fff toast color, the 1.5px hairline border, the font-family monospace fallback, the 24px JS layout offset in src/ui/CardDetail.tsx, and the 8 column hexes in src/ui/columnColors.ts (the single-source palette, mirrored into tokens/source/). The box-shadow entries that reference var(--folia-*) are matched literals on consuming lines, not raw values; they remain allowlisted because the detector flags the whole declaration. Keyframe opacity endpoints (0/1) and var(...) opacity are exempt by the detector, not listed here.",
+  "_comment": "Baseline of tolerated raw design values (ratchet). New raw values fail the check; existing ones are grandfathered here, one count per (file, snippet) pair for how many occurrences are tolerated — a new, unlisted copy of an already-allowed value is new debt too. Pay this debt down via tracking/waivers/ — open a waiver, remove/decrement entries as you tokenize. Regenerate with: node scripts/audit-raw-values.mjs --update",
+  "note": "Every entry below is an INTENTIONAL RESIDUAL — a grandfathered one-off layout constant or trivial value with no semantic token home, deliberately left raw. There is no remaining migration debt: the radius-pill (999px), scrim, shadow-panel, shadow-pop and accent focus-ring were all moved to var(--folia-*) and are live (sourced from tokens/source/, verified by scripts/check-tokens.mjs), as were typography size/weight, z-index and opacity earlier. What stays here: one-off component-dimension px lengths (e.g. 200/220/224/280/320/440/640px panel/column widths and assorted 10–92px paddings/sizes), ad-hoc padding shorthands, the 25%-accent focus-ring one-off, the #fff toast color, the 1.5px hairline border, the font-family monospace fallback, the 24px JS layout offset in src/ui/CardDetail.tsx, and the 8 column hexes in src/ui/columnColors.ts (the single-source palette, mirrored into tokens/source/). The box-shadow entries that reference var(--folia-*) are matched literals on consuming lines, not raw values; they remain allowlisted because the detector flags the whole declaration. Keyframe opacity endpoints (0/1) and var(...) opacity are exempt by the detector, not listed here. Each entry's count is how many times that exact snippet legitimately recurs in that file today (e.g. box-shadow: none; appears 4 times) — a new, unlisted copy beyond the count is new debt, not a free pass.",
   "findings": [
     {
       "file": "src/styles.css",
-      "snippet": "#fff"
+      "snippet": "#fff",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "1.5px"
+      "snippet": "1.5px",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "10px"
+      "snippet": "10px",
+      "count": 16
     },
     {
       "file": "src/styles.css",
-      "snippet": "11px"
+      "snippet": "11px",
+      "count": 3
     },
     {
       "file": "src/styles.css",
-      "snippet": "12px"
+      "snippet": "12px",
+      "count": 10
     },
     {
       "file": "src/styles.css",
-      "snippet": "13px"
+      "snippet": "13px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "14px"
+      "snippet": "14px",
+      "count": 11
     },
     {
       "file": "src/styles.css",
-      "snippet": "16px"
+      "snippet": "16px",
+      "count": 4
     },
     {
       "file": "src/styles.css",
-      "snippet": "18px"
+      "snippet": "18px",
+      "count": 3
     },
     {
       "file": "src/styles.css",
-      "snippet": "20px"
+      "snippet": "20px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "220px"
+      "snippet": "220px",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "224px"
+      "snippet": "224px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "22px"
+      "snippet": "22px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "24px"
+      "snippet": "24px",
+      "count": 8
     },
     {
       "file": "src/styles.css",
-      "snippet": "26px"
+      "snippet": "26px",
+      "count": 3
     },
     {
       "file": "src/styles.css",
-      "snippet": "280px"
+      "snippet": "280px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "30px"
+      "snippet": "30px",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "320px"
+      "snippet": "320px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "440px"
+      "snippet": "440px",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "48px"
+      "snippet": "48px",
+      "count": 3
     },
     {
       "file": "src/styles.css",
-      "snippet": "640px"
+      "snippet": "640px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "72px"
+      "snippet": "72px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "86px"
+      "snippet": "86px",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "90px"
+      "snippet": "90px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "92px"
+      "snippet": "92px",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);"
+      "snippet": "box-shadow: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent);"
+      "snippet": "box-shadow: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);"
+      "snippet": "box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);",
+      "count": 2
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);"
+      "snippet": "box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: none;"
+      "snippet": "box-shadow: none;",
+      "count": 4
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-ring);"
+      "snippet": "box-shadow: var(--folia-ring);",
+      "count": 7
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-shadow-card);"
+      "snippet": "box-shadow: var(--folia-shadow-card-hover);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-shadow-card-hover);"
+      "snippet": "box-shadow: var(--folia-shadow-card);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-shadow-overlay);"
+      "snippet": "box-shadow: var(--folia-shadow-overlay);",
+      "count": 4
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-shadow-panel);"
+      "snippet": "box-shadow: var(--folia-shadow-panel);",
+      "count": 1
     },
     {
       "file": "src/styles.css",
-      "snippet": "box-shadow: var(--folia-shadow-pop);"
+      "snippet": "box-shadow: var(--folia-shadow-pop);",
+      "count": 4
     },
     {
       "file": "src/styles.css",
-      "snippet": "font-family: var(--font-monospace, monospace);"
+      "snippet": "font-family: var(--font-monospace, monospace);",
+      "count": 1
     },
     {
       "file": "src/ui/CardDetail.tsx",
-      "snippet": "24px"
+      "snippet": "24px",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#4c9aff"
+      "snippet": "#4c9aff",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#57d9a3"
+      "snippet": "#57d9a3",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#8fd14f"
+      "snippet": "#8fd14f",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#9aa0a6"
+      "snippet": "#9aa0a6",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#9c8cff"
+      "snippet": "#9c8cff",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#f78fb3"
+      "snippet": "#f78fb3",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#ff5c5c"
+      "snippet": "#ff5c5c",
+      "count": 1
     },
     {
       "file": "src/ui/columnColors.ts",
-      "snippet": "#ffab00"
+      "snippet": "#ffab00",
+      "count": 1
     }
   ]
 }
