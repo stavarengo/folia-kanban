@@ -90,7 +90,7 @@ const getBoard = tool({
  * and `cards` here is the column's plain status bucket instead. The two are different sets, and a
  * caller told only the bucket would conclude a lane was empty when the person looking at the board
  * can see cards in it. Saying so is the honest answer until lane membership lives in the model
- * where both callers can ask the same question — `docs/ai/backlog/20260828.01` tracks that.
+ * where both callers can ask the same question — `docs/ai/backlog/20260828.04` tracks that.
  */
 const LANE_NOTE =
   "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card here may also appear in its own status column. `cards` below lists this column's status bucket, which is not the same set — resolve `filter` yourself if you need the lane as drawn.";
