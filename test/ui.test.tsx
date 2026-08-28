@@ -3474,10 +3474,12 @@ describe("the detail panel's reads and field writes stay with their card", () =>
     };
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
-    const detail = await screen.findByTestId("card-detail");
+    let detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("Add a todo"), "slow todo{Enter}");
     await user.click(within(detail).getByRole("button", { name: "Beta" }));
     await screen.findByRole("heading", { name: "Beta" });
+    // Opening another card is a new panel: re-read the live one, the old node is gone.
+    detail = await screen.findByTestId("card-detail");
     // Hold the board reload that follows the write, so the window in which Alpha's own re-read
     // lands on the panel now showing Beta stays open long enough to look at.
     let releaseLoad: () => void = () => {};
@@ -3530,8 +3532,9 @@ describe("a field draft belongs to the card it was typed on", () => {
     await user.type(within(detail).getByLabelText("Display title"), "Alpha shown");
     await user.click(screen.getByText("Gamma"));
     await screen.findByRole("heading", { name: "Gamma" });
-    expect(within(detail).getByLabelText("Display title")).toHaveValue("");
-    await user.click(within(detail).getByLabelText("Display title"));
+    const gammaDetail = await screen.findByTestId("card-detail");
+    expect(within(gammaDetail).getByLabelText("Display title")).toHaveValue("");
+    await user.click(within(gammaDetail).getByLabelText("Display title"));
     await user.keyboard("{Enter}");
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha shown"));
     expect(repo.files.get("Tasks/Gamma.md")!.fm["title"]).toBeUndefined();
@@ -3583,12 +3586,13 @@ describe("work started on one card does not reach the card opened next", () => {
     };
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
-    const detail = await screen.findByTestId("card-detail");
+    let detail = await screen.findByTestId("card-detail");
     await user.click(await within(detail).findByLabelText("Edit description"));
     await user.type(within(detail).getByLabelText("Edit description"), " saved late");
     await user.click(within(detail).getByRole("button", { name: "Save" }));
     await user.click(within(detail).getByRole("button", { name: "Beta" }));
     await screen.findByRole("heading", { name: "Beta" });
+    detail = await screen.findByTestId("card-detail");
     await user.click(await within(detail).findByLabelText("Edit description"));
     await user.type(within(detail).getByLabelText("Edit description"), "Beta words");
     release();
@@ -3606,7 +3610,7 @@ describe("the previous card's description never seeds the next card's editor", (
     const repo = makeRepo();
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
-    const detail = await screen.findByTestId("card-detail");
+    let detail = await screen.findByTestId("card-detail");
     await user.click(await within(detail).findByLabelText("Edit description"));
     await user.type(within(detail).getByLabelText("Edit description"), " typed on Alpha");
     let releaseRead: () => void = () => {};
@@ -3620,6 +3624,7 @@ describe("the previous card's description never seeds the next card's editor", (
     };
     await user.click(within(detail).getByRole("button", { name: "Beta" }));
     await screen.findByRole("heading", { name: "Beta" });
+    detail = await screen.findByTestId("card-detail");
     await user.click(within(detail).getByLabelText("Edit description"));
     expect(within(detail).getByLabelText("Edit description")).toHaveValue("");
     releaseRead();
@@ -3818,5 +3823,68 @@ describe("copy a card's path", () => {
       failNext = false;
     }
     expect(await screen.findByText("Could not write to the clipboard")).toBeInTheDocument();
+  });
+});
+
+describe("the panel's section inputs belong to the card they were typed on (20260826.07)", () => {
+  it("drops every half-typed section input when the panel moves to another card", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const alpha = await screen.findByTestId("card-detail");
+    await user.type(within(alpha).getByLabelText("Write a comment"), "half a comment");
+    await user.type(within(alpha).getByLabelText("Add a todo"), "half a todo");
+    await user.type(within(alpha).getByLabelText("Add a subcard"), "half a subcard");
+    await user.type(within(alpha).getByLabelText("Link a card under Blocks"), "half a link");
+    await user.type(within(alpha).getByLabelText("New property name"), "energy");
+    await user.type(within(alpha).getByLabelText("New property value"), "high");
+
+    await user.click(screen.getByText("Gamma"));
+    await screen.findByRole("heading", { name: "Gamma" });
+    const gamma = await screen.findByTestId("card-detail");
+    for (const label of [
+      "Write a comment",
+      "Add a todo",
+      "Add a subcard",
+      "Link a card under Blocks",
+      "New property name",
+      "New property value",
+    ]) {
+      expect(within(gamma).getByLabelText(label)).toHaveValue("");
+    }
+
+    // The point of the drop: Enter on the second card writes to the second card, and the first
+    // card never receives the text that was typed on it.
+    await user.type(within(gamma).getByLabelText("Write a comment"), "for Gamma{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Gamma.md")!.body).toContain("for Gamma"));
+    expect(repo.files.get("Tasks/Gamma.md")!.body).not.toContain("half a comment");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).not.toContain("half a comment");
+  });
+
+  it("re-runs a one-shot focus action invoked twice on the card already open", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const openTitleField = async () => {
+      const tile = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
+      fireEvent.contextMenu(tile.querySelector(".folia-card-title")!);
+      await user.click(
+        within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Display title" }),
+      );
+    };
+    await openTitleField();
+    const detail = await screen.findByTestId("card-detail");
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(detail).getByLabelText("Display title")),
+    );
+    // Move focus elsewhere and ask again: the action has to land a second time on the same card.
+    within(detail).getByLabelText("Write a comment").focus();
+    await openTitleField();
+    const reopened = await screen.findByTestId("card-detail");
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(reopened).getByLabelText("Display title")),
+    );
   });
 });

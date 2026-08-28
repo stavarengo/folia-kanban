@@ -640,11 +640,7 @@ export function CardDetail({
    * deletions made from this panel keep the list in step (see `postedHereEdited` /
    * `postedHereRemoved`), and a post is only recorded once its write has succeeded.
    */
-  const postedHere = useRef<{ path: string; posts: { floor: number; text: string }[] }>({
-    path,
-    posts: [],
-  });
-  if (postedHere.current.path !== path) postedHere.current = { path, posts: [] };
+  const postedHere = useRef<{ posts: { floor: number; text: string }[] }>({ posts: [] });
   const claimable = (c: { author: string | null }): boolean =>
     c.author === null || isMine(c.author, settings.userName);
   /** Which comment each post owns, as a map from comment index to its position in `posts`. */
@@ -677,12 +673,8 @@ export function CardDetail({
       .filter((_, i) => i !== n)
       .map((p) => (p.floor > index ? { ...p, floor: p.floor - 1 } : p));
   };
-  const seenOnOpen = useRef<{ path: string; seen: string | undefined }>({
-    path,
-    seen: seenMarkerFor(settings, path),
-  });
-  if (seenOnOpen.current.path !== path)
-    seenOnOpen.current = { path, seen: seenMarkerFor(settings, path) };
+  const seenOnOpen = useRef<{ seen: string | undefined } | null>(null);
+  seenOnOpen.current ??= { seen: seenMarkerFor(settings, path) };
   const seenAtOpen = seenOnOpen.current.seen;
   /**
    * Who "me" is for this panel. With a name set it is that name as the line grammar writes it
@@ -748,13 +740,14 @@ export function CardDetail({
   const isSide = mode !== "modal";
   const width = dragWidth ?? settings.detailWidth;
 
-  // Reads can overlap (a write's own reload and the board's); only the latest may land.
+  // Reads can overlap (a write's own reload and the board's); only the latest may land. Every
+  // read this panel starts is for its one card — the panel is remounted for another — so the
+  // newest read is always the one to keep, whichever path it was started under.
   const readSeq = useRef(0);
   const reload = async () => {
     const seq = ++readSeq.current;
     try {
       const b = await repo.readBody(path);
-      // Neither an older read nor one started for a card since navigated away from may land.
       if (seq !== readSeq.current || !stillHere()) return;
       setBody(b);
       setBodyPath(path);
@@ -769,34 +762,27 @@ export function CardDetail({
     }
   };
 
-  // The card on screen right now, as of this render — what a write or read started on an
-  // earlier card checks before touching state, since the panel is one instance across cards and
-  // the async work of the previous one keeps resolving after navigation.
-  const livePath = useRef(path);
-  livePath.current = path;
-  const stillHere = () => livePath.current === path;
-  // Which card the panel state below belongs to; the effect resets it only when that changes.
-  const shownPath = useRef<string | null>(null);
+  // Whether this panel is still on screen. Async work started here (a read, a write's follow-up)
+  // keeps resolving after the panel is gone, and it must not hand text back to a field nobody is
+  // looking at. Re-armed on mount, since a remount reuses the same ref.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const stillHere = () => alive.current;
   // The body is re-read whenever the board reloads — its own writes and edits landing from
   // elsewhere (another pane, an agent, sync) come through the same signal — so what the panel
   // shows is what the note says, not what it said when the panel opened. Each field with a draft
   // decides for itself what a reload may touch: see `descDirty`, and the comment list's keys.
+  //
+  // `path` changing is NOT a change of card here: App remounts the panel for that. It means the
+  // card's own file was renamed or moved, so the note is re-read under its new name and every
+  // draft stays exactly where it was.
   useEffect(() => {
     if (isCreate) return; // no card to read while the create form is up
-    if (shownPath.current !== path) {
-      shownPath.current = path;
-      setBody(null);
-      setBodyPath(null);
-      setConfirmDelete(false);
-      setEditingDesc(false); // navigating cards starts the new card in view mode
-      setDescRefusal(null);
-      // The previous card's draft goes with it: until this card's read lands, an editor opened
-      // from the empty state would otherwise start from the other card's text.
-      descDirty.current = false;
-      descBase.current = "";
-      descLatest.current = "";
-      setDescDraft("");
-    }
     void reload();
   }, [path, isCreate, board]);
 
@@ -1194,10 +1180,7 @@ export function CardDetail({
           {/* The one field that does not go through `mutate`: setting a priority also teaches the
               board note its vocabulary, which lives in the shared action, and that action already
               reloads the board. Going through `mutate` would reload it a second time. */}
-          {/* Keyed by card, as every field with a draft is: what was typed on one card must not
-              be sitting in the field when the panel moves to the next one. */}
           <PriorityField
-            key={path}
             value={curPriority}
             options={priorityOptions(actions.priorities, curPriority)}
             onCommit={(value) =>
@@ -1222,7 +1205,6 @@ export function CardDetail({
         <div className="folia-props">
           {!titleRowIsGeneric && (
             <DisplayTitleRow
-              key={path}
               value={typeof fm[TITLE_KEY] === "string" ? fm[TITLE_KEY] : ""}
               fallback={titleWithoutOverride}
               inputRef={displayTitleRef}
@@ -1237,7 +1219,7 @@ export function CardDetail({
           )}
           {extraProps.map(([k, v]) => (
             <PropRow
-              key={`${path}\u0000${k}`}
+              key={k}
               name={k}
               value={String(v)}
               onCommit={(val) => void mutate(() => repo.setFrontmatter(path, { [k]: val }))}
@@ -1550,8 +1532,7 @@ export function CardDetail({
 
         {board.config.relations.map((type) => (
           <RelationTypeSections
-            // Keyed by card as well: the link input's draft belongs to the card it was typed on.
-            key={`${path}\u0000${type.key}`}
+            key={type.key}
             type={type}
             links={relations.filter((l) => l.type === type.key)}
             board={board}

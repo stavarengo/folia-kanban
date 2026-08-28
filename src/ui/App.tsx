@@ -122,8 +122,15 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const [focusNew, setFocusNew] = useState(false);
   // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
   const [focusAddSubcard, setFocusAddSubcard] = useState(false);
-  // One-shot: focus the open card's "Display title" field (the context-menu "Display title" action).
+  // One-shot: focus the open card's "Override card title" field (the context-menu action).
   const [focusDisplayTitle, setFocusDisplayTitle] = useState(false);
+  // The detail panel's identity, and the ONLY thing that remounts it. It is bumped when the panel
+  // is pointed at something else (another card, the create form), and deliberately NOT when the
+  // open card's own file is renamed or moved: the panel is then still about the same card, and a
+  // remount would throw away everything half-typed in it. Every per-card draft in `CardDetail`
+  // rides on this — the panel's state is scoped to one mount, so nothing typed on one card can
+  // still be sitting in a field when the panel moves to the next.
+  const [openId, setOpenId] = useState(0);
   const [error, setError] = useState<string | null>(null);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
@@ -221,6 +228,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         if (settings.addCardFlow === "inline-edit") {
           setOpenOverride(mapOpenMode(settings.addCardOpenMode));
           setFocusNew(true);
+          setOpenId((n) => n + 1);
           setSelected(path);
         }
       } catch (e) {
@@ -319,6 +327,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setFocusAddSubcard(false);
     setFocusDisplayTitle(false);
     setCreateColumn(null);
+    // A new panel identity, even for the card already open: the one-shot focus flags above are
+    // cleared and re-set in the same batch, so only a fresh mount can act on them a second time.
+    setOpenId((n) => n + 1);
     // An inline todo placed in its own column has no note of its own, so opening its tile opens the
     // note that owns the checklist line — where the todo is edited, exactly as it always was. One
     // place, so no caller has to know which kind of tile it just handed us.
@@ -331,6 +342,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       startCreate: (col) => {
         setSelected(null);
         setCreateColumn(col);
+        setOpenId((n) => n + 1);
         setOpenOverride(mapOpenMode(settings.addCardOpenMode));
       },
       addSubcard: (path) => {
@@ -757,8 +769,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setFocusDisplayTitle(false);
   };
 
+  // Both branches share `openId` as their key on purpose: the create form and the card it creates
+  // are one panel the user never sees close, so they must be one mounted component.
   const detail = detailOpen ? (
     <CardDetail
+      key={openId}
       path={selected}
       board={board}
       mode={detailMode}
@@ -771,6 +786,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     />
   ) : createMode ? (
     <CardDetail
+      key={openId}
       path=""
       board={board}
       mode={detailMode}
