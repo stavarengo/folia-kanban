@@ -775,7 +775,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       // all: the old bucket-only denominator could be exceeded by it. One gap survives, inherited
       // from `board.columns` and shared with Column: a card whose own status names a filter-lane
       // sits in that lane's bucket while the lane draws only what its rule matches, so it can still
-      // be credited unseen (see backlog 20260828.02).
+      // be credited unseen (see backlog 20260828.03).
       const visible = filterVisiblePaths(board, matchesFilter, (p) => !isCollapsedIn(settings, p));
       for (const path of Object.keys(board.cards)) {
         total++;

@@ -671,7 +671,7 @@ export function nestedCards(board: Board): NestedCard[] {
  *
  * Known gap, shared with Column: a card sitting in a filter-lane's bucket because its own `status`
  * names that lane is treated here as rendering, though the lane draws only what its own rule
- * matches. See `docs/ai/backlog/20260828.02.filter-lanes-and-nested-cards-do-not-compose.md`.
+ * matches. See `docs/ai/backlog/20260828.03.filter-lanes-and-nested-cards-do-not-compose.md`.
  */
 export function filterVisiblePaths(
   board: Board,
