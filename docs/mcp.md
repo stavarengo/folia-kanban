@@ -13,6 +13,7 @@ It is off until you turn it on, it listens on `127.0.0.1` only, and every reques
 | **Agent access (MCP) — enable** | Off by default. Switching it on generates the token (once, kept afterwards) and starts the server. Desktop only: on mobile these three rows are not shown at all, because the plugin has no way to listen for connections there. |
 | **Agent access (MCP) — port** | `27125` by default; any port from 1024 to 65535. Change it if something else already holds it. |
 | **Agent access (MCP) — token** | A **Copy token** button. The token is a password for every board in this vault — paste it into your client's configuration and nowhere else. |
+| **Agent access (MCP) — replace token** | A **Replace token** button, for when the old one has been somewhere it should not have been. It issues a new token, copies it, and locks out every client still holding the old one until you paste the new one in. Switching agent access off and on again does *not* change the token: a client configured once should keep working. |
 
 If the port is already taken, the plugin says so in a notice naming the port and the reason. The toggle stays on — it is what you asked for, and the fix is usually a different port rather than giving up — but nothing is listening until you change it, and the plugin will not keep retrying a bind it already knows fails.
 
@@ -50,8 +51,8 @@ Every tool takes `board`, the vault path of the board note (`Work/Board.md`), ex
 | `create_card` | writes | Adds a card to a column, written into the board's card folder exactly as the add-card button writes it. Optional `description`, `priority`, `due`. |
 | `move_card` | writes | Moves a card to a `column`, optionally to a `position` in it (`0` is the top; omit to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist-line card takes no `position`: its order comes from where the line sits in its parent's list. The reply says which column the card landed in, and its `position` only when it has a tile of its own — a card drawn inside its parent is ordered by that parent, not by a slot. |
 | `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears any of them. `due` is `YYYY-MM-DD` and is refused in any other shape, rather than written as prose the board cannot read. |
-| `add_comment` | writes | Appends a comment to `## Comments`, timestamped and signed with the **Your name** setting. |
-| `add_subtask` | writes | Appends an unchecked line to `## Subtasks`. |
+| `add_comment` | writes | Appends a comment to `## Comments`, timestamped and signed with the **Your name** setting. One line: a comment is stored as a single list item. |
+| `add_subtask` | writes | Appends an unchecked line to `## Subtasks`, and reports the `index` of the line it added. One line, for the same reason. |
 | `set_subtask_done` | writes | Ticks or unticks one subtask by its `index`, as `get_card` reports it. A line claiming a column of its own is kept in step with its checkbox. |
 
 `update_card` refuses `status`, `order`, `priority`, `due`, `title` and `folia-board` inside `properties`, and says which tool or field owns each instead — so an agent cannot set a column by hand and skip the history line that move is owed, or retitle a card in the frontmatter while the file and every link to it keep the old name.
@@ -61,6 +62,8 @@ An empty string is not a second way to clear a value, except for `priority`, whe
 `update_card` also needs at least one field to change. That rule cannot be expressed in JSON Schema, so a client sees an all-optional object and meets the requirement as a tool error on the call.
 
 A `priority` the board has not seen before is accepted and added to the board's vocabulary, exactly as typing a new one into a card's details does. The board's scale is yours, not a fixed list — which also means an agent inventing one leaves it there for you to prune by hand.
+
+`create_card` and `update_card` refuse a `description` that would start one of the sections the board owns (`## Subtasks`, `## Comments`, `## History`), that opens with a `#` heading — a card reads its title from that, so the line would be swallowed rather than kept — or that leaves a code fence open, exactly as the card's own Description box refuses it. Written through, such a line would stop being description and become that section — an agent could write the board's history, or sign a comment with your name — and everything below it would quietly stop being description at all. `add_comment` and `add_subtask` refuse a line break for the same reason: each writes one Markdown list item, and a second line would be read as structure rather than as what you wrote.
 
 A failure a caller can fix — an unknown board, an ambiguous card, a column that does not exist — comes back as a tool error with the text explaining it, so the model can correct itself. Only a malformed request is a protocol error.
 
@@ -76,7 +79,9 @@ The server speaks MCP revision `2025-06-18`, and the small half of it a board ne
 
 Every write tool is published with MCP's `destructiveHint`, so a client that asks before running destructive tools knows which these are: all six that write. The three readers carry `readOnlyHint`.
 
-Calls are answered one at a time. Every write reads the board, works out its change against what it read, and writes it back, so two moves into the same column running together would hand both cards the same slot. A board call is milliseconds of local file work, so the queue costs nothing worth having.
+Calls are answered one at a time. Every write reads the board, works out its change against what it read, and writes it back, so two moves into the same column running together would hand both cards the same slot. A board call is milliseconds of local file work, so the wait costs nothing worth having — but a queue is only as live as the call at its head. A call that has not finished in a minute is answered `504`, and a client that opens a request and then goes quiet is timed out rather than allowed to hold the line.
+
+A `504` means the server stopped making you wait, not that the call was cancelled — it is still running and may still write. Nothing here can safely abandon a write half-made, and letting the queue move on would put two calls in the board at once, which is what the queue is for. So check the board before sending a timed-out call again: a retried `create_card` whose first attempt then lands is how you get the card twice.
 
 ## What it does not protect you from
 

@@ -5,8 +5,15 @@
 
 import { z } from "zod";
 import type { Board, Card } from "../model/types";
-import { columnOf } from "../model/board";
-import { boardArg, cardArg, openBoard, resolveCardPath, tool, type ToolDefinition } from "./tool";
+import {
+  boardArg,
+  cardArg,
+  landedColumn,
+  openBoard,
+  resolveCardPath,
+  tool,
+  type ToolDefinition,
+} from "./tool";
 
 /**
  * What a card looks like in a column listing: enough to decide, not the whole note.
@@ -83,7 +90,7 @@ const getBoard = tool({
  * and `cards` here is the column's plain status bucket instead. The two are different sets, and a
  * caller told only the bucket would conclude a lane was empty when the person looking at the board
  * can see cards in it. Saying so is the honest answer until lane membership lives in the model
- * where both callers can ask the same question — `docs/ai/backlog/20260828.01` tracks that.
+ * where both callers can ask the same question — `docs/ai/backlog/20260828.04` tracks that.
  */
 const LANE_NOTE =
   "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card here may also appear in its own status column. `cards` below lists this column's status bucket, which is not the same set — resolve `filter` yourself if you need the lane as drawn.";
@@ -95,7 +102,7 @@ function todoCard(board: Board, path: string, card: Card): Record<string, unknow
     kind: "todo",
     path,
     title: card.title,
-    column: columnOf(board, path),
+    column: landedColumn(board, path),
     note: ref?.parentPath,
     subtaskIndex: ref?.index,
     claimedColumn: ref?.claim,
@@ -121,7 +128,7 @@ const getCard = tool({
       path,
       title: card?.title,
       titleSource: card?.titleSource,
-      column: columnOf(board, path),
+      column: landedColumn(board, path),
       frontmatter: card?.frontmatter,
       context: card?.context,
       parent: board.parentOf[path],
