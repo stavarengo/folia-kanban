@@ -776,7 +776,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       // surface it — lifted to the top level of its inherited column — when it matches the filter
       // on its own merits (see nestedCards). Leaving it out here would make the "N of M" count lie
       // about what is actually on screen: a match the board is showing that the count denies.
+      //
+      // Scoped to a PLAIN column exactly the way Column.tsx scopes the lift itself: a filter-lane
+      // column's `board.columns` bucket never reaches into `childrenOf`, so a nested card whose only
+      // inherited column is a lane is never actually shown anywhere — counting it here would recreate
+      // the same lie in the other direction (an "N of M" that credits a match nothing on screen has).
+      const laneColumnIds = new Set(board.config.columns.filter((c) => c.filter).map((c) => c.id));
       for (const n of nestedCards(board)) {
+        if (n.column === undefined || laneColumnIds.has(n.column)) continue;
         const c = board.cards[n.path];
         if (c) tally(c);
       }
