@@ -14,6 +14,22 @@ export const TITLE_KEY = "title";
 
 const TITLE_MODES: readonly TitleMode[] = ["auto", "filename", "heading"];
 
+/**
+ * The file name a typed name actually becomes: Obsidian (and the filesystems under it) refuse
+ * `\ / : * ? " < > |`, and `# ^ [ ]` carry meaning inside a `[[wikilink]]`, so a name containing
+ * them would not link back. A name left with nothing usable still has to be a file, hence the
+ * fallback. One definition, shared by the vault adapter that writes the file, the fake that stands
+ * in for it, and the detail panel that shows what a name will produce before it is saved.
+ */
+export function sanitizeFilename(name: string): string {
+  return (
+    name
+      .replace(/[\\/:*?"<>|#^[\]]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || "Untitled card"
+  );
+}
+
 /** Normalize a raw `card-title` frontmatter value; anything unrecognized means `auto`. */
 export function asTitleMode(raw: unknown): TitleMode {
   return typeof raw === "string" && (TITLE_MODES as readonly string[]).includes(raw)

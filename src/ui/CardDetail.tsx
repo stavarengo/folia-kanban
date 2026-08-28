@@ -26,7 +26,7 @@ import {
   type LinkResolver,
 } from "../model/board";
 import { descriptionRefusal } from "../model/card";
-import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle } from "../model/cardTitle";
+import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -56,6 +56,13 @@ interface Props {
   focusAddSubcard?: boolean;
   /** When set, focus the "Override card title" field (the context-menu action). */
   focusTitleOverride?: boolean;
+  /**
+   * Advances on every request to open a card, including a re-open of the card already showing.
+   * The two flags above are one-shot actions, and a repeat of one lands on the same panel with
+   * the same flag already true — so what makes it act a second time is this counter changing,
+   * not a remount. (A remount would take every draft in the panel with it.)
+   */
+  focusSeq?: number;
 }
 
 const clampWidth = (n: number) => Math.min(DETAIL_WIDTH_MAX, Math.max(DETAIL_WIDTH_MIN, n));
@@ -66,6 +73,11 @@ const clampWidth = (n: number) => Math.min(DETAIL_WIDTH_MAX, Math.max(DETAIL_WID
  * reads what the field showed before: anything typed, committed or not, is never taken away. So a
  * write that fails keeps its text in the field, and an edit landing from elsewhere waits for the
  * field to be left. `trim` also strips the draft on commit.
+ *
+ * Committing counts as showing what was committed. That matters where the write answers back with
+ * something other than what was asked for — a file name made safe to use as one, or given a
+ * suffix because that name was taken — since the field would otherwise keep the asked-for text,
+ * read as still unsaved, and re-submit it on the next blur, renaming again and again.
  */
 function useFieldDraft(value: string, onCommit: (v: string) => void, trim = false) {
   const [draft, setDraft] = useState(value);
@@ -79,7 +91,9 @@ function useFieldDraft(value: string, onCommit: (v: string) => void, trim = fals
     const next = trim ? draft.trim() : draft;
     if (next !== draft) setDraft(next);
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
-    if (next !== (trim ? value.trim() : value)) onCommit(next);
+    if (next === (trim ? value.trim() : value)) return;
+    shown.current = next;
+    onCommit(next);
   };
   return { draft, setDraft, commit };
 }
@@ -324,8 +338,11 @@ function TitleFields({
   const [expanded, setExpanded] = useState(false);
   const name = useFieldDraft(basename, onRename, true);
   const over = useFieldDraft(override, onCommitOverride, true);
-  // A blank file name renames nothing (the repository refuses it), so the preview says so too.
-  const nameNow = name.draft.trim() || basename;
+  // A blank file name renames nothing (the repository refuses it), so the preview says so too, and
+  // what is typed is read through the same rule that will name the file — `A/B` becomes `AB` here
+  // exactly as it will on disk. A name already taken is the one thing the preview cannot know:
+  // only the vault can say whether `New` is free, and a guessed `New 1` would be a worse answer.
+  const nameNow = sanitizeFilename(name.draft.trim() || basename);
   const overNow = overrideEditable ? over.draft.trim() : "";
   const resolveNow = (fm: Record<string, string>) =>
     text === null ? null : resolveTitle(nameNow, fm, text, titleMode);
@@ -671,6 +688,7 @@ export function CardDetail({
   focusNew,
   focusAddSubcard,
   focusTitleOverride,
+  focusSeq,
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
@@ -967,14 +985,16 @@ export function CardDetail({
 
   // The "Add subcard" context-menu action opens this card and lands focus on its subcard input,
   // letting the user type the title there (the input's Enter handler calls repo.addSubcard).
+  // Keyed on the open counter, not on `path`: a rename moves the path under a panel that is still
+  // about the same card, and must not pull focus back here.
   useEffect(() => {
     if (focusAddSubcard && !isCreate) subcardRef.current?.focus();
-  }, [focusAddSubcard, path]);
+  }, [focusSeq]);
 
   // Same shape for the context-menu "Override card title" action.
   useEffect(() => {
     if (focusTitleOverride && !isCreate) titleOverrideRef.current?.focus();
-  }, [focusTitleOverride, path]);
+  }, [focusSeq]);
 
   // Side modes: a pointerdown outside the panel closes it — but not when it lands on another
   // card (that card's own open handler switches the detail), nor on a menu/context surface.

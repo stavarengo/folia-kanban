@@ -131,8 +131,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // rides on this — the panel's state is scoped to one mount, so nothing typed on one card can
   // still be sitting in a field when the panel moves to the next.
   const [openId, setOpenId] = useState(0);
-  // The path a rename has just moved the open card to; see the `onFileOp` effect below.
-  const [renamedTo, setRenamedTo] = useState<string | null>(null);
+  // Advances on every open, including a re-open of the card already showing. The panel's one-shot
+  // focus actions ride on this instead of on a remount; see `openCard`.
+  const [focusSeq, setFocusSeq] = useState(0);
+  // The rename a file op has just made under the open card, from its old path to its new one; see
+  // the `onFileOp` effect below.
+  const [renamedTo, setRenamedTo] = useState<{ from: string; to: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
@@ -202,15 +206,23 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         if (cur === null) return;
         const next = remapPath(cur, op);
         if (next === cur) return;
-        if (next !== null) setRenamedTo(next);
+        // A delete leaves nothing to follow: the selection clears and the panel closes at once.
+        setRenamedTo(next === null ? null : { from: cur, to: next });
         setSelected(next);
       }),
     [repo],
   );
-  // Any board that has landed since has an answer for the new path — the card is there, or it
-  // really is gone (moved out of the card folder, say) and the panel closes as it always did.
+  // The window closes on the first board that can actually answer for the new path: one that has
+  // the card there, or one that no longer has it under the old path either (moved out of the card
+  // folder, say) and so really does close the panel. A board still showing the old path was read
+  // before the rename and finished after it — it knows nothing about this, and letting it clear
+  // the window would unmount the panel and take every draft with it.
   useEffect(() => {
-    setRenamedTo(null);
+    setRenamedTo((r) =>
+      r === null || board === null || board.cards[r.to] != null || board.cards[r.from] == null
+        ? null
+        : r,
+    );
   }, [board]);
 
   // Obsidian's status bar is fixed to the window bottom; reserve clearance so the columns and the
@@ -351,13 +363,17 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     setFocusAddSubcard(false);
     setFocusTitleOverride(false);
     setCreateColumn(null);
-    // A new panel identity, even for the card already open: the one-shot focus flags above are
-    // cleared and re-set in the same batch, so only a fresh mount can act on them a second time.
-    setOpenId((n) => n + 1);
     // An inline todo placed in its own column has no note of its own, so opening its tile opens the
     // note that owns the checklist line — where the todo is edited, exactly as it always was. One
     // place, so no caller has to know which kind of tile it just handed us.
-    setSelected(parseTodoPath(path)?.parentPath ?? path);
+    const target = parseTodoPath(path)?.parentPath ?? path;
+    // A new panel identity ONLY when the panel is pointed at something else. Re-opening the card
+    // already showing — a second click on its tile, or a context-menu action on it — leaves the
+    // mount alone, because remounting would throw away everything half-typed in it. The one-shot
+    // focus actions still fire, on `focusSeq` rather than on the new mount.
+    if (target !== selectedRef.current) setOpenId((n) => n + 1);
+    setFocusSeq((n) => n + 1);
+    setSelected(target);
   }, []);
 
   /**
@@ -791,7 +807,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         ? "float"
         : "split";
   const detailMode: DetailMode = openOverride ?? globalDetailMode;
-  const detailOpen = selected != null && (board.cards[selected] != null || renamedTo === selected);
+  const detailOpen =
+    selected != null && (board.cards[selected] != null || renamedTo?.to === selected);
   const createMode = createColumn != null && !detailOpen;
   const panelShown = detailOpen || createMode;
 
@@ -815,6 +832,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       focusNew={focusNew}
       focusAddSubcard={focusAddSubcard}
       focusTitleOverride={focusTitleOverride}
+      focusSeq={focusSeq}
       onClose={closeDetail}
       onNavigate={openCard}
       onChanged={() => void load()}

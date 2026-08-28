@@ -3888,6 +3888,8 @@ describe("the panel's section inputs belong to the card they were typed on (2026
     await waitFor(() =>
       expect(document.activeElement).toBe(within(detail).getByLabelText("Override card title")),
     );
+    // Something half-typed, so re-opening has something to lose.
+    await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
     // Move focus elsewhere and ask again: the action has to land a second time on the same card.
     within(detail).getByLabelText("Write a comment").focus();
     await openTitleField();
@@ -3895,6 +3897,27 @@ describe("the panel's section inputs belong to the card they were typed on (2026
     await waitFor(() =>
       expect(document.activeElement).toBe(within(reopened).getByLabelText("Override card title")),
     );
+    // ...on the SAME panel: re-opening the card already showing must not remount it, or the
+    // action would land on an empty panel and the comment would be gone.
+    expect(reopened).toBe(detail);
+    expect(within(reopened).getByLabelText("Write a comment")).toHaveValue("half a comment");
+  });
+
+  it("keeps the drafts when the open card's own tile is clicked again", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const tile = () => within(todoCol).getAllByText("Alpha")[0]!;
+    await user.click(tile());
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
+    await user.type(within(detail).getByLabelText("Add a todo"), "half a todo");
+    await user.click(tile());
+    const again = await screen.findByTestId("card-detail");
+    expect(again).toBe(detail);
+    expect(within(again).getByLabelText("Write a comment")).toHaveValue("half a comment");
+    expect(within(again).getByLabelText("Add a todo")).toHaveValue("half a todo");
   });
 });
 
@@ -4091,12 +4114,99 @@ describe("the panel names the file, names the override, and explains the title (
     expect(within(after).getByLabelText("File name")).toHaveValue("New name");
     expect(within(after).getByLabelText("Write a comment")).toHaveValue("still being written");
   });
+
+  it("ignores a board that was read before the rename and landed after it", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
+
+    // The vault reports the rename immediately. A board read BEFORE it can still be in flight and
+    // land now, and it knows the card only under the old path — it has no answer about this move.
+    act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks/Alpha.md", to: "Tasks/Moved.md" }));
+    await act(async () => {
+      repo.notify();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("card-detail")).toBe(detail);
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("half a comment");
+
+    // Then the real post-rename board arrives and the panel simply carries on, same mount.
+    const entry = repo.files.get("Tasks/Alpha.md")!;
+    repo.files.delete("Tasks/Alpha.md");
+    repo.files.set("Tasks/Moved.md", { ...entry, basename: "Moved" });
+    await act(async () => {
+      repo.notify();
+      await Promise.resolve();
+    });
+    const after = await screen.findByTestId("card-detail");
+    expect(after).toBe(detail);
+    expect(within(after).getByLabelText("Write a comment")).toHaveValue("half a comment");
+    expect(within(after).getByLabelText("File name")).toHaveValue("Moved");
+  });
+
+  it("shows the name the file actually got, and does not rename again on the next blur", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Old.md": { fm: { type: "task", status: "todo" }, body: "\n# Old\n" },
+      "Tasks/New.md": { fm: { type: "task", status: "todo" }, body: "\n# New\n" },
+      "Tasks/Parent.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Old]]\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Old"));
+    const detail = await screen.findByTestId("card-detail");
+    const name = () => within(detail).getByLabelText("File name");
+    await user.clear(name());
+    await user.type(name(), "New{Enter}");
+
+    // The name was taken, so the file got the next one free — and the link followed it there,
+    // rather than to the card it collided with.
+    await waitFor(() => expect(repo.files.has("Tasks/New 1.md")).toBe(true));
+    expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New 1]]");
+    // The field says so too. Anything else reads as still-unsaved text...
+    await waitFor(() => expect(name()).toHaveValue("New 1"));
+
+    // ...which the next blur would submit all over again, walking the file to `New 2` and
+    // rewriting the link a second time. Leaving the field without typing must write nothing.
+    await user.click(name());
+    await user.tab();
+    await waitFor(() => expect(name()).toHaveValue("New 1"));
+    expect(repo.files.has("Tasks/New 2.md")).toBe(false);
+    expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New 1]]");
+  });
+
+  it("previews the file name as the name the file can actually take", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Plain.md": { fm: { type: "task", status: "todo" }, body: "\n# Plain\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Plain"));
+    const detail = await screen.findByTestId("card-detail");
+    const name = within(detail).getByLabelText("File name");
+    await user.clear(name);
+    // `/` and `?` cannot be in a file name, so the preview drops them exactly as the write will.
+    await user.type(name, "Ship: v2/final?");
+    await waitFor(() =>
+      expect((detail.querySelector(".folia-title-value") as HTMLElement).textContent).toBe(
+        "Ship v2final",
+      ),
+    );
+  });
 });
 
 describe("a title far wider than the panel (20260827.02)", () => {
   // One 200-character token with nothing to break on: the shape that used to push the header's
-  // buttons out of reach. jsdom does no layout, so what is pinned here is the markup and the rules
-  // the behaviour rests on; how it actually looks is checked in Obsidian.
+  // buttons out of reach. jsdom has no layout engine, so these tests cannot say the buttons are
+  // on screen — no test in this suite can. What they pin is everything the fix is made of that a
+  // DOM can hold: the actions live beside the title rather than inside it, the whole title is
+  // recoverable without the header growing to hold it, and the CSS rules the behaviour rests on
+  // are still in the stylesheet. Whether it looks right is a human's answer, in Obsidian.
   const HUGE = "x".repeat(200);
   const css = readFileSync("src/styles.css", "utf8");
   /** The declarations of one CSS rule, by exact selector. */
@@ -4105,7 +4215,7 @@ describe("a title far wider than the panel (20260827.02)", () => {
     return at === -1 ? "" : css.slice(at, css.indexOf("\n}", at));
   };
 
-  it("keeps the header a fixed shape and the actions outside the title", async () => {
+  it("keeps the actions out of the title, and the whole title reachable from the header", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/Wide.md": { fm: { type: "task", status: "todo", title: HUGE }, body: "\n# Wide\n" },

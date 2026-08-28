@@ -64,7 +64,13 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../model/history";
-import { TITLE_KEY, asTitleMode, resolveTitle, setHeadingTitle } from "../model/cardTitle";
+import {
+  TITLE_KEY,
+  asTitleMode,
+  resolveTitle,
+  sanitizeFilename,
+  setHeadingTitle,
+} from "../model/cardTitle";
 import type { CardRepository } from "../model/repo";
 import type { FileOp } from "../model/pathOps";
 import {
@@ -73,15 +79,6 @@ import {
   DataCorruptionError,
   decode,
 } from "../model/schemas";
-
-function sanitizeFilename(title: string): string {
-  return (
-    title
-      .replace(/[\\/:*?"<>|#^[\]]/g, "")
-      .replace(/\s+/g, " ")
-      .trim() || "Untitled card"
-  );
-}
 
 /** The per-context config note (#14). Lives inside a context subfolder; read-only for the plugin. */
 const CONTEXT_NOTE = "_context.md";

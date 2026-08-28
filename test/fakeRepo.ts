@@ -36,7 +36,7 @@ import {
   updateTimestampedLine,
 } from "../src/model/card";
 
-import { TITLE_KEY, resolveTitle, setHeadingTitle } from "../src/model/cardTitle";
+import { TITLE_KEY, resolveTitle, sanitizeFilename, setHeadingTitle } from "../src/model/cardTitle";
 import { isSelfRelation, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {
@@ -367,14 +367,17 @@ export class FakeRepo implements CardRepository {
     let n = 1;
     while (this.files.has(dest) && dest !== path) dest = `${prefix}${base} ${n++}.md`;
     if (dest === path) return path;
-    // Move the map entry under its new basename...
+    // Move the map entry under its new basename — the one the destination path actually got, which
+    // a collision suffixes (`New` landing beside an existing `New.md` becomes `New 1`)...
+    const newBase = basename(dest);
     this.files.delete(path);
-    this.files.set(dest, { ...e, basename: base });
-    // ...and rewrite every inbound `[[OldBasename]]` wikilink so parentage follows (mirrors
-    // Obsidian's link-aware fileManager.renameFile, keeping buildBoard's `## Subtasks` graph correct).
+    this.files.set(dest, { ...e, basename: newBase });
+    // ...and rewrite every inbound `[[OldBasename]]` wikilink to THAT name, so a suffixed rename
+    // links to the card that moved rather than to the one it collided with (mirrors Obsidian's
+    // link-aware fileManager.renameFile, keeping buildBoard's `## Subtasks` graph correct).
     const oldBase = e.basename;
     for (const other of this.files.values()) {
-      other.body = rewriteWikilinks(other.body, oldBase, base);
+      other.body = rewriteWikilinks(other.body, oldBase, newBase);
     }
     // The vault reports the plugin's own file operations too, so the fake does the same — that is
     // what makes a test cover the in-app path and the listener path running over each other.
@@ -427,16 +430,6 @@ export class FakeRepo implements CardRepository {
 
 function basename(path: string): string {
   return path.split("/").pop()!.replace(/\.md$/i, "");
-}
-
-// Mirrors VaultRepository.sanitizeFilename so the fake derives the same basename for a rename.
-function sanitizeFilename(title: string): string {
-  return (
-    title
-      .replace(/[\\/:*?"<>|#^[\]]/g, "")
-      .replace(/\s+/g, " ")
-      .trim() || "Untitled card"
-  );
 }
 
 /** Rewrite `[[old]]` / `[[old|alias]]` / `[[old#heading]]` wikilink targets to `new`, by basename. */
