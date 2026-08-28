@@ -556,6 +556,21 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
     expect(out).toBe("# T\r\n\nmostly LF\n\n## Subtasks\n- [ ] one\n- [ ] two\n");
   });
 
+  it("removeSubtask on a CRLF note with no final newline never leaves a dangling bare CR", () => {
+    const noFinalNewline = "# T\r\n\r\n## Subtasks\r\n- [ ] one\r\n- [ ] two";
+    const out = removeSubtask(noFinalNewline, 1);
+    expect(out.endsWith("\r")).toBe(false);
+    expect(out).toBe("# T\r\n\r\n## Subtasks\r\n- [ ] one");
+    expect(parseSubtasks(out).map((s) => s.text)).toEqual(["one"]);
+  });
+
+  it("removeTimestampedLine on a CRLF note with no final newline never leaves a dangling bare CR", () => {
+    const noFinalNewline = "# T\r\n\r\n## Comments\r\n- _t:_ one\r\n- _t:_ two";
+    const out = removeTimestampedLine(noFinalNewline, SECTION.comments, 1);
+    expect(out.endsWith("\r")).toBe(false);
+    expect(out).toBe("# T\r\n\r\n## Comments\r\n- _t:_ one");
+  });
+
   it("a single-line body with no newline of its own falls back to the frontmatter's convention", () => {
     const singleLineCrlfFrontmatter = "---\r\nstatus: todo\r\n---\r\n# T";
     const out = addTodo(singleLineCrlfFrontmatter, "x");
