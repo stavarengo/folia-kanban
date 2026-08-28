@@ -4115,7 +4115,7 @@ describe("the panel names the file, names the override, and explains the title (
     expect(within(after).getByLabelText("Write a comment")).toHaveValue("still being written");
   });
 
-  it("ignores a board that was read before the rename and landed after it", async () => {
+  it("ignores a board that arrives still knowing the card under its old path", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
@@ -4123,8 +4123,12 @@ describe("the panel names the file, names the override, and explains the title (
     const detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
 
-    // The vault reports the rename immediately. A board read BEFORE it can still be in flight and
-    // land now, and it knows the card only under the old path — it has no answer about this move.
+    // The vault reports the rename immediately, and a board that still places the card at the old
+    // path can land after it — a read that began before the rename and finished after it looks
+    // exactly like this from here. Either way that board has no answer about the move, so it must
+    // not be allowed to close the window the panel is being held open by. (What is reproduced here
+    // is the arriving board's CONTENT; the true in-flight interleaving is not something this fake
+    // can stage, and is the general out-of-order hazard recorded in backlog 20260828.02.)
     act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks/Alpha.md", to: "Tasks/Moved.md" }));
     await act(async () => {
       repo.notify();
