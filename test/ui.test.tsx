@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { readFileSync } from "node:fs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { act, render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -4089,5 +4090,65 @@ describe("the panel names the file, names the override, and explains the title (
     expect(after).toBe(detail);
     expect(within(after).getByLabelText("File name")).toHaveValue("New name");
     expect(within(after).getByLabelText("Write a comment")).toHaveValue("still being written");
+  });
+});
+
+describe("a title far wider than the panel (20260827.02)", () => {
+  // One 200-character token with nothing to break on: the shape that used to push the header's
+  // buttons out of reach. jsdom does no layout, so what is pinned here is the markup and the rules
+  // the behaviour rests on; how it actually looks is checked in Obsidian.
+  const HUGE = "x".repeat(200);
+  const css = readFileSync("src/styles.css", "utf8");
+  /** The declarations of one CSS rule, by exact selector. */
+  const rule = (selector: string) => {
+    const at = css.indexOf(`\n${selector} {`);
+    return at === -1 ? "" : css.slice(at, css.indexOf("\n}", at));
+  };
+
+  it("keeps the header a fixed shape and the actions outside the title", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Wide.md": { fm: { type: "task", status: "todo", title: HUGE }, body: "\n# Wide\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText(HUGE));
+    const detail = await screen.findByTestId("card-detail");
+    const heading = within(detail).getByRole("heading", { name: HUGE });
+    // The whole title is recoverable from the header without it growing to hold it...
+    expect(heading).toHaveAttribute("title", HUGE);
+    expect(rule(".folia-detail-title")).toContain("-webkit-line-clamp: 2");
+    expect(rule(".folia-detail-title")).toContain("overflow-wrap: anywhere");
+    // ...and the action buttons are the title's siblings, never inside it, and never shrink.
+    const actions = detail.querySelector(".folia-detail-header .folia-row-actions") as HTMLElement;
+    expect(heading.contains(actions)).toBe(false);
+    expect(actions.parentElement).toBe(heading.parentElement);
+    expect(rule(".folia-detail-header .folia-row-actions")).toContain("flex: 0 0 auto");
+    for (const name of ["Close", "Delete card", "Open note"]) {
+      expect(within(actions).getByLabelText(name)).toBeInTheDocument();
+    }
+  });
+
+  it("wraps the resulting title, clamps it, and expands it on demand", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Wide.md": { fm: { type: "task", status: "todo", title: HUGE }, body: "\n# Wide\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText(HUGE));
+    const detail = await screen.findByTestId("card-detail");
+    const value = await waitFor(() => {
+      const el = detail.querySelector(".folia-title-value") as HTMLButtonElement;
+      expect(el).toHaveTextContent(HUGE);
+      return el;
+    });
+    expect(value).toHaveAttribute("title", HUGE);
+    expect(value).toHaveAttribute("aria-expanded", "false");
+    expect(rule(".folia-title-value.folia-title-value")).toContain("-webkit-line-clamp: 3");
+    expect(rule(".folia-title-value.folia-title-value")).toContain("overflow-wrap: anywhere");
+
+    await user.click(value);
+    expect(value).toHaveClass("is-expanded");
+    expect(value).toHaveAttribute("aria-expanded", "true");
+    expect(rule(".folia-title-value.is-expanded")).toContain("-webkit-line-clamp: none");
   });
 });

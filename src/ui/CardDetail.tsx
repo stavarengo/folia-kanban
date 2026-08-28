@@ -321,6 +321,7 @@ function TitleFields({
   onCommitOverride: (v: string) => void;
 }) {
   const [showWhy, setShowWhy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const name = useFieldDraft(basename, onRename, true);
   const over = useFieldDraft(override, onCommitOverride, true);
   // A blank file name renames nothing (the repository refuses it), so the preview says so too.
@@ -378,9 +379,17 @@ function TitleFields({
       <div className="folia-prop-row folia-title-result">
         <span className="folia-prop-key">Resulting display title</span>
         <div className="folia-title-outcome">
-          <span className="folia-title-value" title={shown}>
+          {/* Where a long title stays readable: it wraps mid-word if it has to, so no title can
+              widen the panel, and three lines in it clamps — one click opens the rest. */}
+          <button
+            className={"folia-link folia-title-value" + (expanded ? " is-expanded" : "")}
+            title={shown}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Show less of the title" : "Show the whole title"}
+            onClick={() => setExpanded((v) => !v)}
+          >
             {shown}
-          </span>
+          </button>
           {winner && <p className="folia-title-reason folia-muted">{winner.reason}</p>}
           {resolved && (
             <button
@@ -1197,7 +1206,12 @@ export function CardDetail({
         />
       )}
       <div className="folia-detail-header">
-        <h2 className="folia-detail-title">{card.title}</h2>
+        {/* A label, not the place to read a long title: clamped to two lines (see
+            `.folia-detail-title`) with the whole of it on hover, and the full, wrapping copy
+            sitting in the "Resulting display title" row a few pixels below. */}
+        <h2 className="folia-detail-title" title={card.title}>
+          {card.title}
+        </h2>
         <div className="folia-row-actions">
           {actions.doneColumnId && fm.status !== actions.doneColumnId && (
             <button

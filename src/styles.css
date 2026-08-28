@@ -1336,13 +1336,28 @@
   background: var(--folia-col-bg);
   z-index: var(--folia-z-index-base);
 }
+/* The sticky header names the card; it is not where a long title is read. `overflow-wrap: anywhere`
+   makes an unbreakable 200-character slug break instead of widening the panel or shouldering the
+   buttons off the edge, and the two-line clamp stops a long title from growing the header over the
+   body it is stuck above. The whole title is in the `title` attribute, and in full, expandable form
+   in the "Resulting display title" row just below. */
 .folia-detail-title {
   flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--folia-font-size-xl);
   font-weight: var(--folia-font-weight-semibold);
   line-height: 1.35;
   color: var(--text-normal);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Whatever the title does, the close/done/open/delete buttons keep their full width. */
+.folia-detail-header .folia-row-actions {
+  flex: 0 0 auto;
 }
 .folia-detail-confirm {
   display: flex;
@@ -1456,10 +1471,22 @@
   flex-direction: column;
   gap: 2px;
 }
-.folia-title-value {
+/* Named twice so it out-specifies Obsidian's own `button:not(.clickable-icon)` colouring — this
+   reads as text, not as a control, and the theme's raised face would say otherwise. */
+.folia-title-value.folia-title-value {
+  text-align: left;
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   color: var(--text-normal);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.folia-title-value.is-expanded {
+  display: block;
+  -webkit-line-clamp: none;
 }
 .folia-title-reason {
   margin: 0;

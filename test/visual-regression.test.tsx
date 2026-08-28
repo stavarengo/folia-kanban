@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
@@ -69,6 +70,24 @@ describe("structural visual-regression snapshots", () => {
     await screen.findByText("Alpha");
     const header = (await screen.findByText("Todo", { selector: ".folia-column-title" })).closest(
       ".folia-column-header",
+    ) as HTMLElement;
+    expect(stable(header)).toMatchSnapshot();
+  });
+
+  // The detail panel's sticky header, with a title that has nothing to break on. Snapshotted
+  // because this is the header that has to keep its shape and its buttons whatever the title is:
+  // the structure here is what `.folia-detail-title`'s clamp and the actions' `flex: 0 0 auto`
+  // hang off of, and jsdom has no layout to check the result any other way.
+  it("the detail header keeps its structural shape under an unbreakable title (.folia-detail-header)", async () => {
+    const user = userEvent.setup();
+    const title = "x".repeat(200);
+    const repo = new FakeRepo(config, {
+      "Tasks/Wide.md": { fm: { type: "task", status: "todo", title }, body: "\n# Wide\n" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText(title));
+    const header = (await screen.findByTestId("card-detail")).querySelector(
+      ".folia-detail-header",
     ) as HTMLElement;
     expect(stable(header)).toMatchSnapshot();
   });
