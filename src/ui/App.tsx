@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Board as BoardModel, Card, ColumnDef } from "../model/types";
+import type { Board as BoardModel, ColumnDef } from "../model/types";
 import {
   columnOf,
+  filterVisiblePaths,
   findDoneColumn,
   moveCard,
   moveColumn,
   moveSubtask,
-  nestedCards,
   parseTodoPath,
   reassignColumn,
   relationCounts,
@@ -761,31 +761,20 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
-    const tally = (c: Card) => {
-      total++;
-      if (matchCard(c, filter, matchCtx)) match++;
-    };
     if (board) {
-      for (const col of board.config.columns) {
-        for (const p of board.columns[col.id] ?? []) {
-          const c = board.cards[p];
-          if (c) tally(c);
-        }
-      }
-      // A genuinely-nested, non-placed subcard has no column bucket of its own, but Column can now
-      // surface it — lifted to the top level of its inherited column — when it matches the filter
-      // on its own merits (see nestedCards). Leaving it out here would make the "N of M" count lie
-      // about what is actually on screen: a match the board is showing that the count denies.
-      //
-      // Scoped to a PLAIN column exactly the way Column.tsx scopes the lift itself: a filter-lane
-      // column's `board.columns` bucket never reaches into `childrenOf`, so a nested card whose only
-      // inherited column is a lane is never actually shown anywhere — counting it here would recreate
-      // the same lie in the other direction (an "N of M" that credits a match nothing on screen has).
-      const laneColumnIds = new Set(board.config.columns.filter((c) => c.filter).map((c) => c.id));
-      for (const n of nestedCards(board)) {
-        if (n.column === undefined || laneColumnIds.has(n.column)) continue;
-        const c = board.cards[n.path];
-        if (c) tally(c);
+      const matchesFilter = (p: string) => {
+        const c = board.cards[p];
+        return c != null && matchCard(c, filter, matchCtx);
+      };
+      // `total` is every real card on the board, however it renders. `match` credits a card only
+      // when it BOTH matches the filter AND actually renders somewhere — `filterVisiblePaths` is
+      // the one place that decides "somewhere" (nested under a matching parent, lifted to a plain
+      // column, or plainly top-level/placed), shared with Column so the count can never show a
+      // number the board itself does not back up.
+      const visible = filterVisiblePaths(board, matchesFilter);
+      for (const path of Object.keys(board.cards)) {
+        total++;
+        if (visible.has(path) && matchesFilter(path)) match++;
       }
     }
     return { total, match };

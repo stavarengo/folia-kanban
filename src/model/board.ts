@@ -650,6 +650,39 @@ export function nestedCards(board: Board): NestedCard[] {
   return out;
 }
 
+/**
+ * Every card path that renders SOMEWHERE on the board under `matches` (a filter's own verdict per
+ * card) — the single source of truth both Column (what it draws) and a caller like the search
+ * counter (how many of those draws matched) must agree with, so the two can never diverge the way
+ * a hand-rolled second count once did.
+ *
+ * A top-level or already-placed card (a member of some `board.columns` bucket) always renders
+ * SOMEWHERE — filtering only changes whether it is shown, never where it would be. A genuinely
+ * nested, non-placed card (`nestedCards`) renders nested under its immediate parent exactly when
+ * that parent both matches and is itself visible; otherwise it needs Column's lift, which only
+ * reaches a PLAIN inherited column — `laneColumnIds` names every column carrying a `filter` rule,
+ * the same boundary the lift stops at (see Column.tsx).
+ */
+export function filterVisiblePaths(board: Board, matches: (path: string) => boolean): Set<string> {
+  const nestedByPath = new Map(nestedCards(board).map((n) => [n.path, n]));
+  const laneColumnIds = new Set(board.config.columns.filter((c) => c.filter).map((c) => c.id));
+  const memo = new Map<string, boolean>();
+  const visible = (path: string): boolean => {
+    const cached = memo.get(path);
+    if (cached !== undefined) return cached;
+    const n = nestedByPath.get(path);
+    if (!n) return true; // top-level or placed: always renders somewhere
+    memo.set(path, false); // cycle guard while this path's own answer is being computed
+    const nestsUnderParent = matches(n.parentPath) && visible(n.parentPath);
+    const result = nestsUnderParent || (n.column !== undefined && !laneColumnIds.has(n.column));
+    memo.set(path, result);
+    return result;
+  };
+  const out = new Set<string>();
+  for (const path of Object.keys(board.cards)) if (visible(path)) out.add(path);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Drag reducer
 // ---------------------------------------------------------------------------

@@ -2017,12 +2017,11 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     // Not shown anywhere else either — TopParent's own column never resolves to a lane rule it
     // does not itself pass, and lifting into a lane is out of scope for this fix (see Column.tsx).
     expect(screen.queryByText("Widget")).toBeNull();
-    // The toolbar's "N of M" count must not credit a match nothing on screen shows: Widget is
-    // excluded from it too (the same lane-scope App.tsx's counter mirrors from Column) — only
-    // TopParent (a real top-level card, counted regardless of the lane it sits in) is in the
-    // denominator, and it does not itself match "widget".
+    // The toolbar's "N of M" count must not credit a match nothing on screen shows: Widget still
+    // counts toward the denominator (it is a real card), but not the numerator — it needs a lift
+    // its lane-inherited column cannot give it, so nothing on screen backs up crediting it a match.
     expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
-      "0 of 1",
+      "0 of 2",
     );
   });
 });
