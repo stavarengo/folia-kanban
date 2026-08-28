@@ -657,15 +657,19 @@ export interface FilterVisibility {
   /** Is this card drawing the group of subcards nested under it, or is it collapsed? */
   showsChildren: (path: string) => boolean;
   /** Does the filter-lane column `columnId` pull this card into itself? A lane's population is its
-   *  own rule applied across the board, which is again UI-side filter grammar. */
+   *  own rule applied to every card standing in a column (never to nested ones), which is again
+   *  UI-side filter grammar. Only ever asked about a card that is in some column's bucket. */
   laneDraws: (columnId: string, path: string) => boolean;
 }
 
 /**
- * Every card path that renders SOMEWHERE on the board under the given rules. This is a MIRROR of
- * what Column.tsx does while drawing, kept here so it is stated once, in the pure layer, and can be
- * tested without a DOM: Column still owns the drawing (it needs a per-column lifted-parent map this
- * set cannot carry).
+ * Every card path that renders SOMEWHERE on the board under the given rules. Column.tsx owns the
+ * drawing and states the same rule again in its own terms — it needs a per-column lifted-parent map
+ * this set cannot carry — so the two are a mirrored pair, not one shared implementation. The value
+ * of restating it here is that a second consumer (today the toolbar's tally) can ask the question
+ * without a DOM, and that the rule can be tested branch by branch. What keeps the pair honest is
+ * `test/ui.test.tsx`, which asserts the tally against the tiles a real render produces; a change to
+ * Column's lift that is not made here fails there.
  *
  * Branch for branch as Column has it:
  * - a card in some `board.columns` bucket renders there, EXCEPT in a filter-lane's bucket: a lane

@@ -2003,6 +2003,31 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(screen.queryByText("OtherChild")).toBeNull();
   });
 
+  it("drops the subitems toggle from a match whose only child the filter hides", async () => {
+    const user = userEvent.setup();
+    // Root matches; Kid does not, so nothing would appear if Root were expanded. A toggle that
+    // reveals nothing is a control that does nothing, so it is not drawn while the filter holds.
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo", tags: ["urgent"] },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Kid]]\n",
+      },
+      "Tasks/Kid.md": { fm: { type: "task" }, body: "\n# Kid\n" },
+    });
+    render_(repo);
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+    // Unfiltered, the toggle is there and Kid is nested under Root.
+    expect(screen.getByRole("button", { name: /subitems for "Root"/ })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search cards"), "urgent");
+
+    expect(screen.queryByText("Kid")).toBeNull();
+    expect(screen.queryByRole("button", { name: /subitems for "Root"/ })).toBeNull();
+
+    await user.clear(screen.getByLabelText("Search cards"));
+    expect(await screen.findByRole("button", { name: /subitems for "Root"/ })).toBeInTheDocument();
+  });
+
   it("counts nothing for a matching card its lane refuses to draw, nor for its children", async () => {
     const user = userEvent.setup();
     // TopParent's own status files it in the Research lane's bucket, but the lane ignores its
