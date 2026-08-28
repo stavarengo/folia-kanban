@@ -650,47 +650,59 @@ export function nestedCards(board: Board): NestedCard[] {
   return out;
 }
 
+/** What the UI knows and the model cannot work out for itself, injected into `filterVisiblePaths`. */
+export interface FilterVisibility {
+  /** Does this card match the active filter on its own merits? (The filter grammar lives in the UI.) */
+  matches: (path: string) => boolean;
+  /** Is this card drawing the group of subcards nested under it, or is it collapsed? */
+  showsChildren: (path: string) => boolean;
+  /** Does the filter-lane column `columnId` pull this card into itself? A lane's population is its
+   *  own rule applied across the board, which is again UI-side filter grammar. */
+  laneDraws: (columnId: string, path: string) => boolean;
+}
+
 /**
- * Every card path that renders SOMEWHERE on the board under `matches` (a filter's own verdict per
- * card) and `showsChildren` (does that card currently draw the group of subcards nested under it —
- * the collapse toggle, which is UI state the model has no other way to know). This is a MIRROR of
- * the rule Column.tsx applies while drawing, kept here so it is stated once, in the pure layer, and
- * can be tested without a DOM: Column still owns the drawing (it needs a per-column lifted-parent
- * map this set cannot carry).
+ * Every card path that renders SOMEWHERE on the board under the given rules. This is a MIRROR of
+ * what Column.tsx does while drawing, kept here so it is stated once, in the pure layer, and can be
+ * tested without a DOM: Column still owns the drawing (it needs a per-column lifted-parent map this
+ * set cannot carry).
  *
- * The rule, branch for branch as Column has it:
- * - a top-level or already-placed card (a member of some `board.columns` bucket) renders wherever
- *   it would render unfiltered — the filter decides whether it is shown, never where;
+ * Branch for branch as Column has it:
+ * - a card in some `board.columns` bucket renders there, EXCEPT in a filter-lane's bucket: a lane
+ *   ignores its own bucket and pulls by its rule instead, so such a card renders only where some
+ *   lane's rule actually reaches it (any lane, not just the one whose id its `status` names — every
+ *   lane pulls from every bucket);
  * - a genuinely nested, non-placed card (`nestedCards`) NESTS under its immediate parent when that
  *   parent matches, is itself visible, and is drawing its children;
  * - and is LIFTED to the top level of its inherited column when that parent does NOT match — the
  *   branches are exclusive, exactly as in Column, so a collapsed matching parent hides its child
- *   rather than quietly lifting it. The lift only reaches a PLAIN column: `laneColumnIds` names
- *   every column carrying a `filter` rule, whose population is pulled by that rule against
- *   top-level cards only, and that is where Column's lift stops too.
- *
- * Known gap, shared with Column: a card sitting in a filter-lane's bucket because its own `status`
- * names that lane is treated here as rendering, though the lane draws only what its own rule
- * matches. See `docs/ai/backlog/20260828.03.filter-lanes-and-nested-cards-do-not-compose.md`.
+ *   rather than quietly lifting it. The lift only reaches a PLAIN column, which is where Column
+ *   stops too: a lane never shows a card its own rule has not vetted.
  */
-export function filterVisiblePaths(
-  board: Board,
-  matches: (path: string) => boolean,
-  showsChildren: (path: string) => boolean,
-): Set<string> {
+export function filterVisiblePaths(board: Board, rules: FilterVisibility): Set<string> {
   const nestedByPath = new Map(nestedCards(board).map((n) => [n.path, n]));
-  const laneColumnIds = new Set(board.config.columns.filter((c) => c.filter).map((c) => c.id));
+  const laneColumnIds = board.config.columns.filter((c) => c.filter).map((c) => c.id);
+  const laneColumnIdSet = new Set(laneColumnIds);
+  const columnOfPath: Record<string, string> = {};
+  for (const [colId, paths] of Object.entries(board.columns)) {
+    for (const p of paths) columnOfPath[p] = colId;
+  }
+  const drawnInItsBucket = (path: string): boolean => {
+    const col = columnOfPath[path];
+    if (col === undefined || !laneColumnIdSet.has(col)) return true;
+    return laneColumnIds.some((id) => rules.laneDraws(id, path));
+  };
   const memo = new Map<string, boolean>();
   const visible = (path: string): boolean => {
     const cached = memo.get(path);
     if (cached !== undefined) return cached;
     const n = nestedByPath.get(path);
-    if (!n) return true; // top-level or placed: always renders somewhere
+    if (!n) return drawnInItsBucket(path);
     memo.set(path, false); // cycle guard while this path's own answer is being computed
-    const parentMatches = matches(n.parentPath);
-    const nests = parentMatches && visible(n.parentPath) && showsChildren(n.parentPath);
-    const lifted = !parentMatches && n.column !== undefined && !laneColumnIds.has(n.column);
-    const result = matches(path) && (nests || lifted);
+    const parentMatches = rules.matches(n.parentPath);
+    const nests = parentMatches && visible(n.parentPath) && rules.showsChildren(n.parentPath);
+    const lifted = !parentMatches && n.column !== undefined && !laneColumnIdSet.has(n.column);
+    const result = rules.matches(path) && (nests || lifted);
     memo.set(path, result);
     return result;
   };

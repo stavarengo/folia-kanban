@@ -758,6 +758,14 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     [todayValue, doneColumnId, relationCountsValue, settings, pinnedSeen],
   );
 
+  // Each filter-lane column's rule, parsed once per board rather than per keystroke: the tally has
+  // to ask whether a lane draws a given card, and a lane's population is its rule, not its bucket.
+  const laneFilters = useMemo(() => {
+    const out = new Map<string, ReturnType<typeof parseFilter>>();
+    for (const c of board?.config.columns ?? []) if (c.filter) out.set(c.id, parseFilter(c.filter));
+    return out;
+  }, [board]);
+
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
@@ -769,21 +777,26 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       // The two halves of "N of M" are deliberately asymmetric. M is every card that EXISTS on the
       // board, nested ones included, so the denominator does not shift while you type. N credits a
       // card only when it both matches AND renders somewhere — `filterVisiblePaths` is the one
-      // place that decides "somewhere" (nested under a matching parent that is drawing its
-      // children, lifted to a plain column, or plainly top-level/placed), mirroring Column.
-      // Counting nested cards in M is what keeps N ≤ M once a lifted subcard can be credited at
-      // all: the old bucket-only denominator could be exceeded by it. One gap survives, inherited
-      // from `board.columns` and shared with Column: a card whose own status names a filter-lane
-      // sits in that lane's bucket while the lane draws only what its rule matches, so it can still
-      // be credited unseen (see backlog 20260828.03).
-      const visible = filterVisiblePaths(board, matchesFilter, (p) => !isCollapsedIn(settings, p));
+      // place that decides "somewhere", mirroring Column: nested under a matching parent that is
+      // drawing its children, lifted to a plain column, or standing in a column that actually draws
+      // it. Counting nested cards in M is what keeps N ≤ M once a lifted subcard can be credited at
+      // all: the old bucket-only denominator could be exceeded by it.
+      const visible = filterVisiblePaths(board, {
+        matches: matchesFilter,
+        showsChildren: (p) => !isCollapsedIn(settings, p),
+        laneDraws: (columnId, p) => {
+          const rule = laneFilters.get(columnId);
+          const c = board.cards[p];
+          return rule != null && c != null && matchCard(c, rule, matchCtx);
+        },
+      });
       for (const path of Object.keys(board.cards)) {
         total++;
         if (visible.has(path) && matchesFilter(path)) match++;
       }
     }
     return { total, match };
-  }, [board, filter, matchCtx, settings]);
+  }, [board, filter, matchCtx, settings, laneFilters]);
 
   // "/" focuses the search box (the placeholder advertises it), but only when this board view is
   // the active, visible one and the user isn't already typing in a field. A document-level listener

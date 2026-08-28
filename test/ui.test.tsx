@@ -2003,6 +2003,39 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(screen.queryByText("OtherChild")).toBeNull();
   });
 
+  it("counts nothing for a matching card its lane refuses to draw, nor for its children", async () => {
+    const user = userEvent.setup();
+    // TopParent's own status files it in the Research lane's bucket, but the lane ignores its
+    // bucket and pulls by its rule (`area:research`), which TopParent fails. Nothing draws it, and
+    // nothing can draw a child under a parent that is not on screen. Both match the search; the
+    // toolbar must still credit neither.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/TopParent.md": {
+          fm: { type: "task", status: "research", area: "home", tags: ["urgent"] },
+          body: "\n# TopParent\n\n## Subtasks\n- [ ] [[Widget]]\n",
+        },
+        "Tasks/Widget.md": { fm: { type: "task", tags: ["urgent"] }, body: "\n# Widget\n" },
+      },
+    );
+    render_(repo);
+    await screen.findByText("Research");
+
+    await user.type(screen.getByLabelText("Search cards"), "urgent");
+
+    expect(document.querySelectorAll(".folia-card")).toHaveLength(0);
+    expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
+      "0 of 2",
+    );
+  });
+
   it("does not credit a match hidden inside a collapsed parent", async () => {
     const user = userEvent.setup();
     // Root matches the search itself, so its child is NOT lifted — it belongs nested under Root.

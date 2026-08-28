@@ -16,6 +16,7 @@ import {
   reassignColumn,
   isComputedOrder,
   filterVisiblePaths,
+  type FilterVisibility,
   makeCardDragId,
   moveCard,
   moveColumn,
@@ -26,7 +27,7 @@ import {
   splitCardDragId,
   subtreePaths,
 } from "../src/model/board";
-import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
+import type { Board, BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
 import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {
@@ -256,10 +257,18 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       { id: "research", title: "Research", filter: "area:research" },
     ],
   };
-  /** Nothing collapsed: every card draws the subcards nested under it. */
-  const allExpanded = () => true;
+  /** The rules for a board with nothing collapsed and no lane pulling anything, unless overridden. */
+  const rules = (over: Partial<FilterVisibility> = {}): FilterVisibility => ({
+    matches: () => true,
+    showsChildren: () => true,
+    laneDraws: () => false,
+    ...over,
+  });
+  /** The lane rule of `laneConfig`, applied for real: `area: research`. */
+  const researchLane = (b: Board) => (columnId: string, path: string) =>
+    columnId === "research" && b.cards[path]?.frontmatter.area === "research";
 
-  it("always includes a top-level or placed card, filter or not", () => {
+  it("always includes a card standing in a plain column, filter or not", () => {
     // Solo stands on its own; Placed is a subcard whose own status puts it in a column of its own,
     // which is a bucket member exactly like a top-level card and renders there whatever the filter
     // says about its parent.
@@ -268,43 +277,56 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       card("Root", { status: "todo" }, ["Placed"]),
       card("Placed", { status: "doing" }),
     ]);
-    const visible = filterVisiblePaths(b, () => false, allExpanded);
+    const visible = filterVisiblePaths(b, rules({ matches: () => false }));
     expect(visible.has("Tasks/Solo.md")).toBe(true);
     expect(visible.has("Tasks/Placed.md")).toBe(true);
   });
 
+  it("excludes a card sitting in a lane's bucket that no lane's rule pulls in", () => {
+    // Its own `status` names the lane, so buildBoard files it there — but a lane ignores its bucket
+    // and pulls by its rule, which this card fails. Nothing draws it, so nothing may count it.
+    const b = buildBoard(laneConfig, [card("Stray", { status: "research", area: "home" })]);
+    expect(filterVisiblePaths(b, rules({ laneDraws: researchLane(b) })).has("Tasks/Stray.md")).toBe(
+      false,
+    );
+  });
+
+  it("includes a card in a lane's bucket that the lane does pull in", () => {
+    const b = buildBoard(laneConfig, [card("Real", { status: "research", area: "research" })]);
+    expect(filterVisiblePaths(b, rules({ laneDraws: researchLane(b) })).has("Tasks/Real.md")).toBe(
+      true,
+    );
+  });
+
   it("includes a matching nested card whose non-matching parent lifts it", () => {
     const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
-    const matchesLeafOnly = (p: string) => p === "Tasks/Leaf.md";
-    const visible = filterVisiblePaths(b, matchesLeafOnly, allExpanded);
+    const matches = (p: string) => p === "Tasks/Leaf.md";
+    const visible = filterVisiblePaths(b, rules({ matches }));
     expect(visible.has("Tasks/Leaf.md")).toBe(true); // lifted
-    // Root is top-level, so it always renders SOMEWHERE regardless of whether it matches — a
+    // Root stands in a plain column, so it renders SOMEWHERE regardless of whether it matches — a
     // caller ANDs this with its own match predicate to decide whether to CREDIT it as a match.
     expect(visible.has("Tasks/Root.md")).toBe(true);
   });
 
   it("includes a matching nested card whose matching parent nests it, even in a lane's column", () => {
-    // Regression: a nested card renders NESTED under a matching parent regardless of whether that
-    // parent's inherited column happens to be a filter-lane — only the LIFT path (a non-matching
-    // parent) is lane-scoped. Counting every lane-column nested card as invisible would wrongly
-    // drop this one, which SubcardGroup genuinely renders.
+    // The lane genuinely pulls Root in (`area: research`), so Root is on screen and SubcardGroup
+    // nests Child below it. Nesting is not lane-scoped — only the LIFT is — so Child counts.
     const b = buildBoard(laneConfig, [
-      card("Root", { status: "research", area: "home" }, ["Child"]),
+      card("Root", { status: "research", area: "research" }, ["Child"]),
       card("Child", {}),
     ]);
-    const matchesBoth = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Child.md";
-    const visible = filterVisiblePaths(b, matchesBoth, allExpanded);
-    expect(visible.has("Tasks/Root.md")).toBe(true); // top-level, always visible
-    expect(visible.has("Tasks/Child.md")).toBe(true); // nests under its matching, visible parent
+    const visible = filterVisiblePaths(b, rules({ laneDraws: researchLane(b) }));
+    expect(visible.has("Tasks/Root.md")).toBe(true);
+    expect(visible.has("Tasks/Child.md")).toBe(true);
   });
 
   it("excludes a matching nested card whose non-matching parent's inherited column is a lane", () => {
     const b = buildBoard(laneConfig, [
-      card("Root", { status: "research", area: "home" }, ["Child"]),
+      card("Root", { status: "research", area: "research" }, ["Child"]),
       card("Child", {}),
     ]);
-    const matchesChildOnly = (p: string) => p === "Tasks/Child.md";
-    const visible = filterVisiblePaths(b, matchesChildOnly, allExpanded);
+    const matches = (p: string) => p === "Tasks/Child.md";
+    const visible = filterVisiblePaths(b, rules({ matches, laneDraws: researchLane(b) }));
     expect(visible.has("Tasks/Child.md")).toBe(false); // would need a lift, but its column is a lane
   });
 
@@ -313,16 +335,17 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     // and its child is NOT lifted instead (the lift is for a parent that does not match). Counting
     // it would credit a match the board shows nowhere.
     const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
-    const both = () => true;
     const rootCollapsed = (p: string) => p !== "Tasks/Root.md";
-    expect(filterVisiblePaths(b, both, rootCollapsed).has("Tasks/Leaf.md")).toBe(false);
-    expect(filterVisiblePaths(b, both, allExpanded).has("Tasks/Leaf.md")).toBe(true);
+    expect(
+      filterVisiblePaths(b, rules({ showsChildren: rootCollapsed })).has("Tasks/Leaf.md"),
+    ).toBe(false);
+    expect(filterVisiblePaths(b, rules()).has("Tasks/Leaf.md")).toBe(true);
   });
 
   it("excludes a nested card that does not match, however visible its parent is", () => {
     const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
-    const matchesRootOnly = (p: string) => p === "Tasks/Root.md";
-    expect(filterVisiblePaths(b, matchesRootOnly, allExpanded).has("Tasks/Leaf.md")).toBe(false);
+    const matches = (p: string) => p === "Tasks/Root.md";
+    expect(filterVisiblePaths(b, rules({ matches })).has("Tasks/Leaf.md")).toBe(false);
   });
 
   it("lifts a matching grandchild whose immediate parent breaks the chain", () => {
@@ -334,8 +357,8 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     // Root matches (irrelevant, it's already visible either way); Mid does not; Leaf does. Only
     // the IMMEDIATE parent decides: Mid does not match, so Leaf cannot nest and is lifted instead
     // — a matching ancestor further up neither saves it nor is needed.
-    const matchesRootAndLeaf = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Leaf.md";
-    expect(filterVisiblePaths(b, matchesRootAndLeaf, allExpanded).has("Tasks/Leaf.md")).toBe(true);
+    const matches = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Leaf.md";
+    expect(filterVisiblePaths(b, rules({ matches })).has("Tasks/Leaf.md")).toBe(true);
   });
 });
 
