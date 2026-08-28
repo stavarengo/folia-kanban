@@ -5,8 +5,15 @@
 
 import { z } from "zod";
 import type { Board, Card } from "../model/types";
-import { columnOf } from "../model/board";
-import { boardArg, cardArg, openBoard, resolveCardPath, tool, type ToolDefinition } from "./tool";
+import {
+  boardArg,
+  cardArg,
+  landedColumn,
+  openBoard,
+  resolveCardPath,
+  tool,
+  type ToolDefinition,
+} from "./tool";
 
 /**
  * What a card looks like in a column listing: enough to decide, not the whole note.
@@ -95,7 +102,7 @@ function todoCard(board: Board, path: string, card: Card): Record<string, unknow
     kind: "todo",
     path,
     title: card.title,
-    column: columnOf(board, path),
+    column: landedColumn(board, path),
     note: ref?.parentPath,
     subtaskIndex: ref?.index,
     claimedColumn: ref?.claim,
@@ -121,7 +128,7 @@ const getCard = tool({
       path,
       title: card?.title,
       titleSource: card?.titleSource,
-      column: columnOf(board, path),
+      column: landedColumn(board, path),
       frontmatter: card?.frontmatter,
       context: card?.context,
       parent: board.parentOf[path],

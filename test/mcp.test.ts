@@ -858,3 +858,119 @@ describe("a column filled by a rule rather than by status", () => {
     expect(moved.warning).toBeUndefined();
   });
 });
+
+describe("text that would be read back as the board's own structure", () => {
+  // The description is spliced into the note verbatim, so a line reading `## History` inside it
+  // does not stay text — the note is parsed back and that heading starts the real section. The
+  // detail panel refuses exactly this before it saves; so must the tool, or the audit trail is
+  // writable by the thing it audits.
+  it("refuses a description that would start a section the board owns", async () => {
+    const { host, repo } = fixture({ userName: "rafa" });
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        description: "Intro\n\n## History\n\n- _2020-01-01 09:00:_ Moved from Todo to Done",
+      }),
+    ).rejects.toThrow(/section the board owns/);
+    const body = await repo.readBody("Tasks/Ship it.md");
+    expect(body.history).toEqual([]);
+    expect(body.comments).toEqual([]);
+  });
+
+  it("refuses a description that leaves a code fence open", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        description: "Here is how:\n\n```sh\nnpm run build",
+      }),
+    ).rejects.toThrow(/code fence open/);
+  });
+
+  it("refuses one at create time too, before the card exists", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "create_card", {
+        board: "Board.md",
+        title: "Forged",
+        column: "todo",
+        description: "## Comments\n\n- _rafa, 2020-01-01 09:00:_ approved",
+      }),
+    ).rejects.toThrow(/section the board owns/);
+    // Nothing half-made left behind.
+    expect((await repo.loadBoard()).cards["Tasks/Forged.md"]).toBeUndefined();
+  });
+
+  // A subtask is one `- [ ] …` line. A newline in the middle of it is raw Markdown spliced into
+  // the note: a second checklist line, and with a `[status:: …]` claim on it, a whole card on the
+  // board that nobody asked for.
+  it("refuses a subtask carrying a line break, which would mint a second line", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "add_subtask", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        text: "one\n- [ ] two [status:: done]",
+      }),
+    ).rejects.toThrow(/single line/);
+    expect((await repo.readBody("Tasks/Ship it.md")).subtasks).toEqual([]);
+  });
+
+  it("refuses a comment carrying a line break", async () => {
+    const { host, repo } = fixture({ userName: "rafa" });
+    await expect(
+      call(host, "add_comment", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        text: "ok\n\n## History\n\n- _2020-01-01 09:00:_ Moved from Todo to Done",
+      }),
+    ).rejects.toThrow(/single line/);
+    expect((await repo.readBody("Tasks/Ship it.md")).history).toEqual([]);
+  });
+
+  it("reports the index of the line the caller actually added", async () => {
+    const { host } = fixture();
+    await call(host, "add_subtask", { board: "Board.md", card: "Tasks/Ship it.md", text: "first" });
+    const second = (await call(host, "add_subtask", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      text: "second",
+    })) as { index: number; subtasks: number };
+    expect(second.subtasks).toBe(2);
+    const card = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+    })) as { subtasks: { index: number; text: string }[] };
+    expect(card.subtasks.find((s) => s.index === second.index)?.text).toBe("second");
+  });
+});
+
+describe("get_card answering about a card the board draws inside its parent", () => {
+  // move_card was fixed to stop saying `null` about a card that is really somewhere; get_card was
+  // left answering the old way about the same card at the same instant.
+  it("gives the same column move_card does", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { status: "todo", order: 1 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    const host: BoardHost = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path) => (path === "Board.md" ? repo : null),
+    };
+    const card = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Child.md",
+    })) as { column: string | null };
+    expect(card.column).toBe("todo");
+  });
+});

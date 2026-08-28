@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_NEXT_TODOS_MAX,
   MCP_TOKEN_COPY,
+  MCP_TOKEN_REGENERATE,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -21,7 +22,12 @@ import {
 
 const noop = (): void => {};
 
-const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop, true);
+const definitions = settingDefinitions(
+  () => DEFAULT_SETTINGS,
+  "1.2.3",
+  { copy: noop, regenerate: noop },
+  true,
+);
 
 /** The keys of every `control` row of the declarative tab, in the order it renders them. */
 const controlKeys = definitions.flatMap((d) =>
@@ -59,9 +65,12 @@ describe("settingDefinitions", () => {
 
   it("disables the rows that depend on another setting only while that setting says so", () => {
     const disabledOf = (key: string, settings: KanbanSettings): boolean => {
-      const def = settingDefinitions(() => settings, "1.2.3", noop, true).find(
-        (d) => "control" in d && d.control?.key === key,
-      );
+      const def = settingDefinitions(
+        () => settings,
+        "1.2.3",
+        { copy: noop, regenerate: noop },
+        true,
+      ).find((d) => "control" in d && d.control?.key === key);
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
       // for the wrong reason: no definition found, so nothing to be disabled.
       if (!def || !("control" in def) || !def.control) throw new Error(`no control for ${key}`);
@@ -155,7 +164,7 @@ describe("settingsPatchFor", () => {
 
 describe("agent access on a platform that cannot host it", () => {
   const rows = (desktop: boolean) =>
-    settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop, desktop);
+    settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", { copy: noop, regenerate: noop }, desktop);
 
   const named = (desktop: boolean, name: string) =>
     rows(desktop).find((d) => "name" in d && d.name === name);
@@ -168,11 +177,12 @@ describe("agent access on a platform that cannot host it", () => {
 
   // Toggling it on used to persist the setting and mint a token for a server the phone can never
   // run, and say nothing about it. Now the three rows simply are not there.
-  it("hides all three rows on mobile and shows them on desktop", () => {
+  it("hides every agent-access row on mobile and shows them on desktop", () => {
     for (const name of [
       SETTING_COPY.mcpEnabled.name,
       SETTING_COPY.mcpPort.name,
       MCP_TOKEN_COPY.name,
+      MCP_TOKEN_REGENERATE.name,
     ]) {
       expect(visibleOf(named(false, name)), `${name} on mobile`).toBe(false);
       expect(visibleOf(named(true, name)), `${name} on desktop`).toBe(true);
@@ -181,5 +191,36 @@ describe("agent access on a platform that cannot host it", () => {
 
   it("leaves every other row alone on mobile", () => {
     expect(visibleOf(named(false, SETTING_COPY.historyScope.name))).toBe(true);
+  });
+
+  // A token that cannot be replaced is a password only until it leaks. The row is there, and it is
+  // dead until there is a token to replace.
+  it("offers replacing the token, disabled until agent access is on", () => {
+    const row = named(true, MCP_TOKEN_REGENERATE.name);
+    expect(row).toBeDefined();
+    const disabled = row && "disabled" in row ? row.disabled : undefined;
+    expect(typeof disabled === "function" ? disabled() : false).toBe(true);
+    const on = settingDefinitions(
+      () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
+      "1.2.3",
+      { copy: noop, regenerate: noop },
+      true,
+    ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
+    const onDisabled = on && "disabled" in on ? on.disabled : undefined;
+    expect(typeof onDisabled === "function" ? onDisabled() : false).toBe(false);
+  });
+
+  it("runs the action it was given", () => {
+    let called = 0;
+    const row = settingDefinitions(
+      () => DEFAULT_SETTINGS,
+      "1.2.3",
+      { copy: noop, regenerate: () => (called += 1) },
+      true,
+    ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
+    const action = row && "action" in row ? row.action : undefined;
+    // Obsidian hands the row element and its index; neither is read here.
+    action?.(document.createElement("div"), 0);
+    expect(called).toBe(1);
   });
 });

@@ -32,6 +32,14 @@ const MAX_BODY_BYTES = 1_000_000;
 const HEADERS_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * How long one call may hold the queue before it is answered for. Node's own timeouts bound how
+ * long a client may take to *send* a request; nothing bounds how long answering one takes, and
+ * because calls are answered strictly one at a time, a read that never settles would stop the
+ * server answering anything again until the plugin is reloaded.
+ */
+const HANDLING_TIMEOUT_MS = 60_000;
+
 const PARSE_ERROR = -32700;
 
 export interface McpServerOptions {
@@ -92,6 +100,9 @@ function originAllowed(req: IncomingMessage): boolean {
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
+  // A call answered by the handling timeout may still be running; when it finishes it must not
+  // write a second time over a response that is already gone.
+  if (res.writableEnded) return;
   if (body === null) {
     res.writeHead(status).end();
     return;
@@ -182,6 +193,28 @@ async function respond(req: IncomingMessage, res: ServerResponse, options: McpSe
 }
 
 /**
+ * Answer for a call that has taken too long, so the queue behind it moves. The call itself is not
+ * cancellable — it may be mid-write — so this only stops it holding everyone else up; whatever it
+ * was doing still finishes, and `send` ignores its reply when it comes.
+ *
+ * `AbortSignal.timeout` rather than a timer of our own: its timer is unref'd, so a pending one
+ * never keeps the process alive, and it is the same call in Electron and under Node, where these
+ * tests run without a `window` to reach for.
+ */
+function giveUpAfter(res: ServerResponse): Promise<void> {
+  return new Promise((resolve) => {
+    AbortSignal.timeout(HANDLING_TIMEOUT_MS).addEventListener(
+      "abort",
+      () => {
+        send(res, 504, { error: "The board plugin took too long to answer this call." });
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
  * Start the server. Rejects when the platform has no server to give, the port is taken or the token
  * is empty, so a caller can say what went wrong instead of leaving a dead toggle switched on.
  */
@@ -198,7 +231,7 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
   let turn: Promise<void> = Promise.resolve();
   const server: Server = createServer((req, res) => {
     const answer = () =>
-      respond(req, res, options).catch(() => {
+      Promise.race([respond(req, res, options), giveUpAfter(res)]).catch(() => {
         if (!res.headersSent) send(res, 500, { error: "The board plugin failed to answer." });
         else res.end();
       });
