@@ -1920,6 +1920,10 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(beta.closest(".folia-subcard-group")).toBeNull();
     expect(beta.querySelector('[aria-roledescription="sortable"]')).toBeNull();
     expect(within(beta).getByRole("button", { name: /Part of Alpha/ })).toBeInTheDocument();
+    // And it is drawn as what it now is: a full-size tile carrying the subitem's dashed edge, not
+    // the smaller, quieter nested styling of a card sitting inside a parent's group.
+    expect(beta).toHaveClass("folia-card--subitem");
+    expect(beta).not.toHaveClass("folia-card--nested");
 
     // The toolbar agrees with the screen: one card tile is rendered and the counter credits
     // exactly one match, out of every card the board holds (Alpha, Beta, Gamma) — the denominator
@@ -1990,6 +1994,30 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     );
     // ...while OtherChild does not match the filter and is hidden entirely, not lifted anywhere.
     expect(screen.queryByText("OtherChild")).toBeNull();
+  });
+
+  it("does not credit a match hidden inside a collapsed parent", async () => {
+    const user = userEvent.setup();
+    // Root matches the search itself, so its child is NOT lifted — it belongs nested under Root.
+    // But Root is collapsed, so it draws no group and the child is on screen nowhere. The tally
+    // has to agree with that, or it advertises a match the user cannot find.
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo", tags: ["urgent"] },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[MatchChild]]\n",
+      },
+      "Tasks/MatchChild.md": { fm: { type: "task", tags: ["urgent"] }, body: "\n# MatchChild\n" },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, subitemsDefault: "collapsed" });
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+
+    await user.type(screen.getByLabelText("Search cards"), "urgent");
+
+    expect(screen.queryByText("MatchChild")).toBeNull();
+    expect(document.querySelectorAll(".folia-card")).toHaveLength(1);
+    expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
+      "1 of 2",
+    );
   });
 
   it("does not lift a nested card into a filter-lane column, even when it inherits the lane's id", async () => {

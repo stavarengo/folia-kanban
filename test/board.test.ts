@@ -256,16 +256,27 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       { id: "research", title: "Research", filter: "area:research" },
     ],
   };
+  /** Nothing collapsed: every card draws the subcards nested under it. */
+  const allExpanded = () => true;
 
   it("always includes a top-level or placed card, filter or not", () => {
-    const b = buildBoard(config, [card("Solo", { status: "todo" })]);
-    expect(filterVisiblePaths(b, () => false).has("Tasks/Solo.md")).toBe(true);
+    // Solo stands on its own; Placed is a subcard whose own status puts it in a column of its own,
+    // which is a bucket member exactly like a top-level card and renders there whatever the filter
+    // says about its parent.
+    const b = buildBoard(config, [
+      card("Solo", { status: "todo" }),
+      card("Root", { status: "todo" }, ["Placed"]),
+      card("Placed", { status: "doing" }),
+    ]);
+    const visible = filterVisiblePaths(b, () => false, allExpanded);
+    expect(visible.has("Tasks/Solo.md")).toBe(true);
+    expect(visible.has("Tasks/Placed.md")).toBe(true);
   });
 
   it("includes a matching nested card whose non-matching parent lifts it", () => {
     const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
     const matchesLeafOnly = (p: string) => p === "Tasks/Leaf.md";
-    const visible = filterVisiblePaths(b, matchesLeafOnly);
+    const visible = filterVisiblePaths(b, matchesLeafOnly, allExpanded);
     expect(visible.has("Tasks/Leaf.md")).toBe(true); // lifted
     // Root is top-level, so it always renders SOMEWHERE regardless of whether it matches — a
     // caller ANDs this with its own match predicate to decide whether to CREDIT it as a match.
@@ -282,7 +293,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       card("Child", {}),
     ]);
     const matchesBoth = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Child.md";
-    const visible = filterVisiblePaths(b, matchesBoth);
+    const visible = filterVisiblePaths(b, matchesBoth, allExpanded);
     expect(visible.has("Tasks/Root.md")).toBe(true); // top-level, always visible
     expect(visible.has("Tasks/Child.md")).toBe(true); // nests under its matching, visible parent
   });
@@ -293,8 +304,25 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       card("Child", {}),
     ]);
     const matchesChildOnly = (p: string) => p === "Tasks/Child.md";
-    const visible = filterVisiblePaths(b, matchesChildOnly);
+    const visible = filterVisiblePaths(b, matchesChildOnly, allExpanded);
     expect(visible.has("Tasks/Child.md")).toBe(false); // would need a lift, but its column is a lane
+  });
+
+  it("excludes a matching nested card whose matching parent is collapsed", () => {
+    // The two branches are exclusive, the way Column has them: a collapsed parent draws no group,
+    // and its child is NOT lifted instead (the lift is for a parent that does not match). Counting
+    // it would credit a match the board shows nowhere.
+    const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
+    const both = () => true;
+    const rootCollapsed = (p: string) => p !== "Tasks/Root.md";
+    expect(filterVisiblePaths(b, both, rootCollapsed).has("Tasks/Leaf.md")).toBe(false);
+    expect(filterVisiblePaths(b, both, allExpanded).has("Tasks/Leaf.md")).toBe(true);
+  });
+
+  it("excludes a nested card that does not match, however visible its parent is", () => {
+    const b = buildBoard(config, [card("Root", { status: "todo" }, ["Leaf"]), card("Leaf", {})]);
+    const matchesRootOnly = (p: string) => p === "Tasks/Root.md";
+    expect(filterVisiblePaths(b, matchesRootOnly, allExpanded).has("Tasks/Leaf.md")).toBe(false);
   });
 
   it("lifts a matching grandchild whose immediate parent breaks the chain", () => {
@@ -307,7 +335,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     // the IMMEDIATE parent decides: Mid does not match, so Leaf cannot nest and is lifted instead
     // — a matching ancestor further up neither saves it nor is needed.
     const matchesRootAndLeaf = (p: string) => p === "Tasks/Root.md" || p === "Tasks/Leaf.md";
-    expect(filterVisiblePaths(b, matchesRootAndLeaf).has("Tasks/Leaf.md")).toBe(true);
+    expect(filterVisiblePaths(b, matchesRootAndLeaf, allExpanded).has("Tasks/Leaf.md")).toBe(true);
   });
 });
 

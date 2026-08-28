@@ -128,6 +128,16 @@ export function seenMarkerFor(settings: KanbanSettings, path: string): string | 
 }
 
 /**
+ * Whether one card's nested subitems are collapsed right now: its own override if it has ever been
+ * toggled, else the board-wide default. Stated here once because both the UI (the toggle, the
+ * groups it unmounts) and the search tally (a match hidden inside a collapsed card is not on
+ * screen) have to answer it the same way.
+ */
+export function isCollapsedIn(settings: KanbanSettings, path: string): boolean {
+  return settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed";
+}
+
+/**
  * Every setting keyed by card path. One list, so a file operation that bypasses the plugin's own
  * actions keeps reaching all of them: adding the next path-keyed map means adding it here, not
  * finding this code again.

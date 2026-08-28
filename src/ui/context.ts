@@ -4,7 +4,7 @@ import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
-import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
+import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
 import type { MatchContext } from "./cardView";
 
 /**
@@ -83,13 +83,12 @@ export function useSubitemsCollapse(): SubitemsCollapse {
   const { settings, update } = c;
   return useMemo<SubitemsCollapse>(
     () => ({
-      isCollapsed: (path) =>
-        settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed",
+      isCollapsed: (path) => isCollapsedIn(settings, path),
       // Both write through the function form: the map is replaced whole, and built from this
       // render's snapshot it would drop an override another board view wrote a moment ago.
       toggle: (path) =>
         update((s) => {
-          const cur = s.collapsedCards[path] ?? s.subitemsDefault === "collapsed";
+          const cur = isCollapsedIn(s, path);
           return { collapsedCards: { ...s.collapsedCards, [path]: !cur } };
         }),
       setMany: (paths, collapsed) =>

@@ -17,7 +17,7 @@ import {
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
-import { seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
+import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
 import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
 import {
   BoardActionsContext,
@@ -768,19 +768,22 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       };
       // The two halves of "N of M" are deliberately asymmetric. M is every card that EXISTS on the
       // board, nested ones included, so the denominator does not shift while you type. N credits a
-      // card only when it both matches AND actually renders somewhere — `filterVisiblePaths` is the
-      // one place that decides "somewhere" (nested under a matching parent, lifted to a plain
-      // column, or plainly top-level/placed), mirroring Column, so the count can never claim a
-      // match the board shows nowhere. Counting nested cards in M is what keeps N ≤ M once a lifted
-      // subcard can be credited at all: the old bucket-only denominator could be exceeded by it.
-      const visible = filterVisiblePaths(board, matchesFilter);
+      // card only when it both matches AND renders somewhere — `filterVisiblePaths` is the one
+      // place that decides "somewhere" (nested under a matching parent that is drawing its
+      // children, lifted to a plain column, or plainly top-level/placed), mirroring Column.
+      // Counting nested cards in M is what keeps N ≤ M once a lifted subcard can be credited at
+      // all: the old bucket-only denominator could be exceeded by it. One gap survives, inherited
+      // from `board.columns` and shared with Column: a card whose own status names a filter-lane
+      // sits in that lane's bucket while the lane draws only what its rule matches, so it can still
+      // be credited unseen (see backlog 20260828.02).
+      const visible = filterVisiblePaths(board, matchesFilter, (p) => !isCollapsedIn(settings, p));
       for (const path of Object.keys(board.cards)) {
         total++;
         if (visible.has(path) && matchesFilter(path)) match++;
       }
     }
     return { total, match };
-  }, [board, filter, matchCtx]);
+  }, [board, filter, matchCtx, settings]);
 
   // "/" focuses the search box (the placeholder advertises it), but only when this board view is
   // the active, visible one and the user isn't already typing in a field. A document-level listener

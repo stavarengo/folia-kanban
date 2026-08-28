@@ -652,22 +652,32 @@ export function nestedCards(board: Board): NestedCard[] {
 
 /**
  * Every card path that renders SOMEWHERE on the board under `matches` (a filter's own verdict per
- * card). This is a MIRROR of the rule Column.tsx applies while drawing, kept here so it is stated
- * once, in the pure layer, and can be tested without a DOM: Column still owns the drawing (it needs
- * a per-column lifted-parent map this set cannot carry), and `test/ui.test.tsx` pins the two against
- * each other on a rendered board — change Column's lift and that test fails here too.
+ * card) and `showsChildren` (does that card currently draw the group of subcards nested under it —
+ * the collapse toggle, which is UI state the model has no other way to know). This is a MIRROR of
+ * the rule Column.tsx applies while drawing, kept here so it is stated once, in the pure layer, and
+ * can be tested without a DOM: Column still owns the drawing (it needs a per-column lifted-parent
+ * map this set cannot carry).
  *
- * The rule: a top-level or already-placed card (a member of some `board.columns` bucket) always
- * renders SOMEWHERE — filtering only decides whether it is shown, never where it would be. A
- * genuinely nested, non-placed card (`nestedCards`) renders nested under its immediate parent
- * exactly when that parent both matches and is itself visible; otherwise it needs Column's lift,
- * which only reaches a PLAIN inherited column — `laneColumnIds` names every column carrying a
- * `filter` rule, the same boundary the lift stops at.
+ * The rule, branch for branch as Column has it:
+ * - a top-level or already-placed card (a member of some `board.columns` bucket) renders wherever
+ *   it would render unfiltered — the filter decides whether it is shown, never where;
+ * - a genuinely nested, non-placed card (`nestedCards`) NESTS under its immediate parent when that
+ *   parent matches, is itself visible, and is drawing its children;
+ * - and is LIFTED to the top level of its inherited column when that parent does NOT match — the
+ *   branches are exclusive, exactly as in Column, so a collapsed matching parent hides its child
+ *   rather than quietly lifting it. The lift only reaches a PLAIN column: `laneColumnIds` names
+ *   every column carrying a `filter` rule, whose population is pulled by that rule against
+ *   top-level cards only, and that is where Column's lift stops too.
  *
- * A caller reporting on the filter ANDs this with its own match verdict, so it can never credit a
- * match the board shows nowhere.
+ * Known gap, shared with Column: a card sitting in a filter-lane's bucket because its own `status`
+ * names that lane is treated here as rendering, though the lane draws only what its own rule
+ * matches. See `docs/ai/backlog/20260828.02.filter-lanes-and-nested-cards-do-not-compose.md`.
  */
-export function filterVisiblePaths(board: Board, matches: (path: string) => boolean): Set<string> {
+export function filterVisiblePaths(
+  board: Board,
+  matches: (path: string) => boolean,
+  showsChildren: (path: string) => boolean,
+): Set<string> {
   const nestedByPath = new Map(nestedCards(board).map((n) => [n.path, n]));
   const laneColumnIds = new Set(board.config.columns.filter((c) => c.filter).map((c) => c.id));
   const memo = new Map<string, boolean>();
@@ -677,8 +687,10 @@ export function filterVisiblePaths(board: Board, matches: (path: string) => bool
     const n = nestedByPath.get(path);
     if (!n) return true; // top-level or placed: always renders somewhere
     memo.set(path, false); // cycle guard while this path's own answer is being computed
-    const nestsUnderParent = matches(n.parentPath) && visible(n.parentPath);
-    const result = nestsUnderParent || (n.column !== undefined && !laneColumnIds.has(n.column));
+    const parentMatches = matches(n.parentPath);
+    const nests = parentMatches && visible(n.parentPath) && showsChildren(n.parentPath);
+    const lifted = !parentMatches && n.column !== undefined && !laneColumnIds.has(n.column);
+    const result = matches(path) && (nests || lifted);
     memo.set(path, result);
     return result;
   };

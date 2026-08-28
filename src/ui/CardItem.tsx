@@ -25,10 +25,9 @@ interface Props {
   dragId?: string;
   today: string;
   selected: boolean;
-  /** A nested subcard rendered inside its parent's `.folia-subcard-group`, OR a subcard the active
-   *  filter lifted to a column's top level past a non-matching parent (Column): either way, not
-   *  drag-reorderable, rendered without a drag affordance, but keeps click/keyboard open and the
-   *  context menu. */
+  /** A subcard rendered inside its parent's `.folia-subcard-group`: drawn smaller and quieter than
+   *  a tile standing in a column, and not drag-reorderable. A card standing at a column's top level
+   *  is never `nested`, even when it cannot be dragged (see `dragId`). */
   nested?: boolean;
   /** Set when this tile is a SUBITEM sitting in a column of its own: the note it belongs to. Drives
    *  the `↳ parent` reference line that replaces the nesting as the visible sign of whose work it is. */
@@ -61,14 +60,20 @@ function CardItemInner({
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  // Hooks can't be conditional, so always call useSortable — but disable it for nested children so
-  // they aren't draggable and aren't registered as drop targets in the parent's SortableContext.
-  // Top-level cards use the `dragId` Column computed (`col::path`, or the original id while this card
-  // is mid cross-column relocation) so the sortable identity matches the column's SortableContext
-  // item set — and so the same card in a lane + its status column registers two distinct sortables.
+  // Two ways a tile is not drag-reorderable: it is nested inside its parent's group, or Column
+  // withheld a `dragId` because this tile is not a member of any column bucket right now (a subcard
+  // the active filter lifted past a non-matching parent — a drop onto it could not be resolved).
+  // Either way it must not register as a drop target in the surrounding SortableContext, nor
+  // advertise itself as draggable; both keep click/keyboard open and the context menu.
+  //
+  // Hooks can't be conditional, so always call useSortable and disable it instead. A draggable tile
+  // uses the `dragId` Column computed (`col::path`, or the original id while this card is mid
+  // cross-column relocation) so the sortable identity matches the column's SortableContext item
+  // set — and so the same card in a lane + its status column registers two distinct sortables.
+  const draggable = !nested && dragId != null;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: nested || dragId == null ? card.path : dragId,
-    disabled: nested,
+    id: draggable ? dragId : card.path,
+    disabled: !draggable,
   });
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -202,13 +207,13 @@ function CardItemInner({
       {/* #14 context grouping: a left accent strip, shown only when the context defines a color
           (inset past the priority bar so the two left-edge cues don't overlap). */}
       {ctxColor && <span className="folia-card-context-strip" aria-hidden="true" />}
-      {/* a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit nested branch */}
+      {/* a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit non-draggable branch */}
       <div
         className="folia-card-main"
-        // Nested cards aren't draggable: skip the drag listeners/attributes (which also supply
-        // tabIndex/role), and restore keyboard reachability + open semantics explicitly.
-        {...(nested ? { tabIndex: 0, role: "button" } : attributes)}
-        {...(nested ? {} : listeners)}
+        // A tile that can't be dragged skips the drag listeners/attributes (which also supply
+        // tabIndex/role), and restores keyboard reachability + open semantics explicitly.
+        {...(draggable ? attributes : { tabIndex: 0, role: "button" })}
+        {...(draggable ? listeners : {})}
         onClick={open}
         onKeyDown={onKeyDown}
         // Unread comments are folded into the tile's OWN accessible name: everything inside this
@@ -347,7 +352,7 @@ function CardItemInner({
       )}
 
       {/* Sibling of `.folia-card-main`, never inside it: that div carries `role="button"` (from the
-          drag attributes, or the explicit nested branch), and a button within it is unreachable to
+          drag attributes, or the explicit non-draggable branch), and a button within it is unreachable to
           assistive tech — the same reason the action cluster below lives out here. */}
       {parentPath && (
         <button

@@ -503,10 +503,12 @@ export function Column({
             // toggle still hidden. `subtreePaths` still walks the FULL board.childrenOf tree
             // (it does not know about the filter), so under an active filter it is narrowed to
             // cards that themselves match — the same test SubcardGroup applies to decide what it
-            // nests — so a non-matching, invisible descendant does not pick up a toggle override
-            // nothing on screen will ever read. Further filtered to cards that actually have a
-            // toggle (subcard children OR an inline-todos preview) — a card with neither has no
-            // state to change, so giving it an override would just be a wasted `data.json` entry.
+            // nests — so a descendant the filter has hidden does not pick up a toggle override the
+            // user could not have meant. Further filtered to cards that HAVE subitems (subcard
+            // children OR an inline-todos preview) — a card with none has no state to change. That
+            // last test is deliberately unfiltered, unlike the toggle CardItem draws: a card whose
+            // only child the filter hides shows no toggle right now but will once the filter is
+            // cleared, and collapse-all should still have reached it.
             onCollapseAll={() =>
               subitems.setMany(
                 subtreePaths(board, paths)
@@ -544,11 +546,13 @@ export function Column({
                 <div key={c.path} className="folia-card-tree">
                   <CardItem
                     card={c}
-                    // A lifted card gets no dragId at all — see the note on `orderedDragIds` above.
+                    // A lifted card gets no dragId at all — see the note on `orderedDragIds` above,
+                    // and CardItem, which reads the absence as "this tile can't be dragged". It is
+                    // NOT `nested`: it stands at this column's top level and is drawn full size,
+                    // told apart by the `↳ parent` reference every subitem in a column carries.
                     {...(liftedPaths.has(c.path) ? {} : { dragId: dragIdFor(c.path) })}
                     today={today}
                     selected={c.path === selectedPath}
-                    nested={liftedPaths.has(c.path)}
                     // Only a subitem standing in a column of its own is in `placedOf` (one still
                     // living with its card renders inside SubcardGroup below, where the nesting
                     // already says whose it is). So this doubles as "show the ↳ reference".
