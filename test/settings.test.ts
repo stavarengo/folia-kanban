@@ -161,4 +161,18 @@ describe("the agent-access token", () => {
     expect(withMcpToken(on, mint, false)).toBe(on);
     expect(withMcpToken(on, mint, false).mcpToken).toBe("");
   });
+
+  // How the plugin loads its settings, in one line: this pairing is what stops an enabled-but
+  // tokenless data.json — hand-edited, or synced back from a phone that could not mint one — from
+  // leaving the toggle reading on with nothing listening. A server that is never asked to start
+  // never fails, so nothing would have told the user either.
+  it("repairs settings that arrive switched on with no token, the way loading does", () => {
+    const stored = { mcpEnabled: true, mcpToken: "" };
+    const { settings } = hydrateSettings(stored, NOW);
+    expect(settings.mcpToken).toBe("");
+    const repaired = withMcpToken(settings, mint, true);
+    expect(repaired.mcpToken).toBe("minted");
+    // Not the same object, which is what tells the caller to persist it.
+    expect(repaired).not.toBe(settings);
+  });
 });

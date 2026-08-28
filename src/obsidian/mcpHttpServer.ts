@@ -48,8 +48,13 @@ export interface RunningMcpServer {
 }
 
 /**
- * Compare two secrets without letting the time taken say how much of the guess was right — or, by
- * returning early on a length mismatch, how long the real one is.
+ * Compare two secrets without letting the time taken say how much of the guess was right: every
+ * character is looked at whether or not an earlier one already differed, and a length mismatch
+ * folds into the same accumulator instead of returning early.
+ *
+ * It does not hide the real token's length — the loop runs as many times as the longer of the two
+ * — and it is not trying to. That would need a fixed-width comparison, and the length of a
+ * constant-width token is not the secret; its contents are.
  */
 function secretsMatch(a: string, b: string): boolean {
   let diff = a.length ^ b.length;

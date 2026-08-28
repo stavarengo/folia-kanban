@@ -327,6 +327,26 @@ describe("the JSON-RPC layer", () => {
     expect(await send({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
   });
 
+  // JSON-RPC calls a message a notification when it carries no `id` member at all. `"id": null` is
+  // a request — a malformed one, and one some client libraries send by accident. Treating it as a
+  // notification carried the write out and then said nothing, so the board changed under an agent
+  // that was never told it had.
+  it("answers a request whose id is null, rather than writing in silence", async () => {
+    const { host, repo } = fixture();
+    const reply = await handleMessage(host, INFO, {
+      jsonrpc: "2.0",
+      id: null,
+      method: "tools/call",
+      params: {
+        name: "move_card",
+        arguments: { board: "Board.md", card: "Tasks/Ship it.md", column: "done" },
+      },
+    });
+    expect(reply).not.toBeNull();
+    expect(reply?.id).toBeNull();
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter.status).toBe("done");
+  });
+
   it("answers ping", async () => {
     const reply = await send({ jsonrpc: "2.0", id: 7, method: "ping" });
     expect(reply?.result).toEqual({});
@@ -451,6 +471,75 @@ describe("a checklist line standing in a column of its own", () => {
       call(host, "move_card", { board: "Board.md", card: "Tasks/Ghost.md", column: "done" }),
     ).rejects.toThrow(/No card "Tasks\/Ghost\.md"/);
   });
+
+  // Moved home to its parent's column, the line stops being a card of its own: the board draws it
+  // back inside the note and mints no tile. The write still happened, so reporting `null` would
+  // tell the agent its move failed and invite it to do the whole thing again.
+  it("is reported as in its parent's column when it is moved back home", async () => {
+    const { host, repo } = claimed();
+    const result = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/Write docs.md#todo:0",
+      column: "todo",
+    })) as { column: string | null; position?: number };
+    expect(result.column).toBe("todo");
+    // No tile of its own, so no slot to report — rather than the -1 an indexOf miss would give.
+    expect(result.position).toBeUndefined();
+    expect((await repo.readBody("Tasks/Write docs.md")).subtasks[0]?.status ?? "").toBe("");
+  });
+});
+
+describe("a subcard moved into the column its parent is in", () => {
+  /** A parent in `todo` with a genuinely-nested child, which the board draws inside it. */
+  function nested(childStatus = "doing"): Fixture {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { status: childStatus, order: 1 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    return {
+      repo,
+      host: {
+        listBoards: () => [{ path: "Board.md", name: "Board" }],
+        repoFor: (path) => (path === "Board.md" ? repo : null),
+      },
+    };
+  }
+
+  // `get_board` hands an agent this card's path under its parent's `children`, so asking to move
+  // it is an ordinary next step — and landing it in the parent's column is the ordinary answer.
+  it("is reported where it landed, not as a card that vanished", async () => {
+    const { host, repo } = nested();
+    const result = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/Child.md",
+      column: "todo",
+    })) as { column: string | null };
+    expect(result.column).toBe("todo");
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Child.md"]?.frontmatter.status).toBe("todo");
+    // The premise of the test: it really is drawn inside its parent rather than as its own tile.
+    expect(board.columns["todo"]).not.toContain("Tasks/Child.md");
+    expect(board.childrenOf["Tasks/Parent.md"]).toContain("Tasks/Child.md");
+  });
+
+  it("still reports a column of its own when it has one", async () => {
+    const { host } = nested();
+    const result = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/Child.md",
+      column: "done",
+    })) as { column: string | null; position?: number };
+    expect(result.column).toBe("done");
+    expect(result.position).toBe(0);
+  });
 });
 
 describe("the frontmatter keys update_card will not write by hand", () => {
@@ -476,5 +565,107 @@ describe("the frontmatter keys update_card will not write by hand", () => {
         properties: { "folia-board": true },
       }),
     ).rejects.toThrow(/makes a note a board/);
+  });
+});
+
+describe("the values a card's own fields will and will not take", () => {
+  it("keeps an empty string as an empty value instead of deleting the key", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { area: "docs" },
+    });
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { area: "" },
+    });
+    const board = await repo.loadBoard();
+    // `null` is how the documented contract clears a key; `""` asked for an empty value, and
+    // quietly removing the property instead is a deletion the agent never requested.
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter.area).toBe("");
+  });
+
+  it("still clears a key on null", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { area: "docs" },
+    });
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { area: null },
+    });
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty("area");
+  });
+
+  it("refuses a due date it cannot read, rather than writing prose into the frontmatter", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        due: "next Friday",
+      }),
+    ).rejects.toThrow(/YYYY-MM-DD/);
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty("due");
+  });
+
+  it("takes a due date in the one format the board reads, and clears it on null", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      due: "2026-03-14",
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter.due).toBe("2026-03-14");
+    await call(host, "update_card", { board: "Board.md", card: "Tasks/Ship it.md", due: null });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty(
+      "due",
+    );
+  });
+});
+
+describe("names that belong to every object, not to any card", () => {
+  // `board.cards` is a plain object, so a lookup that only asks whether the key is truthy finds
+  // `toString` on the prototype and hands a function to code expecting a card.
+  it("says no card answers to a prototype method name", async () => {
+    const { host } = fixture();
+    await expect(call(host, "get_card", { board: "Board.md", card: "toString" })).rejects.toThrow(
+      /No card "toString"/,
+    );
+  });
+
+  it("treats a property named like a prototype method as an ordinary property", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { toString: "mine" },
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter.toString).toBe("mine");
+  });
+});
+
+describe("a create_card that gets the note written but not its fields", () => {
+  // Reported as a plain failure, this is how a board ends up with two of the same card: the agent
+  // hears "create_card failed" about a card that is already there, and creates it again.
+  it("names the card it did create rather than reporting nothing happened", async () => {
+    const { host, repo } = fixture();
+    repo.setDescription = () => Promise.reject(new Error("disk full"));
+    await expect(
+      call(host, "create_card", {
+        board: "Board.md",
+        title: "Half made",
+        column: "todo",
+        description: "Some detail.",
+      }),
+    ).rejects.toThrow(/was created in "todo".*finish it with update_card/s);
+    expect((await repo.loadBoard()).columns["todo"]).toContain("Tasks/Half made.md");
   });
 });
