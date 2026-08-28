@@ -432,9 +432,16 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
   ].join("\n");
 
   const everyLineKeepsCRLF = (s: string) => {
+    expect(s.includes("\r\r")).toBe(false); // never a doubled CR
     const segs = s.split("\n");
-    // Every segment except the final (post-trailing-\n) empty one must end with \r.
-    for (let i = 0; i < segs.length - 1; i++) expect((segs[i] ?? "").endsWith("\r")).toBe(true);
+    // Every non-empty segment must end with \r; a segment can only be "" as the very last one
+    // (the split artifact of a file that ends in a newline) — anywhere else it would mean two
+    // bare \n in a row, which a CRLF note should never produce.
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i] ?? "";
+      if (seg === "" && i === segs.length - 1) continue;
+      expect(seg.endsWith("\r")).toBe(true);
+    }
   };
 
   it("updateComment edits comment 2 of 3 with the CR preserved on that line", () => {
@@ -509,6 +516,68 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
     const out = setDescription(crlfSubtasks, "New description");
     everyLineKeepsCRLF(out);
     expect(parseBody(out).description).toBe("New description");
+  });
+
+  it("setDescription round-trips a multi-line CRLF description without doubling any CR", () => {
+    const doc = "# T\r\n\r\none\r\ntwo\r\n";
+    const desc = parseBody(doc).description;
+    expect(desc).toBe("one\r\ntwo");
+    expect(setDescription(doc, desc)).toBe(doc); // no-op: reading back the same text changes nothing
+  });
+
+  it("setDescription follows the BODY's own convention over CRLF frontmatter's, on a mixed-EOL card", () => {
+    const mixed = "---\r\nstatus: todo\r\n---\r\n# T\n\nold\n";
+    expect(setDescription(mixed, "new")).toBe("---\r\nstatus: todo\r\n---\r\n# T\n\nnew\n");
+  });
+
+  it("setDescription picks the body's MAJORITY convention, not swayed by one stray CRLF line", () => {
+    const mostlyLF = "# T\r\n\nold\n\n## Comments\n- _t:_ hi\n";
+    expect(setDescription(mostlyLF, "new")).toBe("# T\r\n\nnew\n\n## Comments\n- _t:_ hi\n");
+  });
+
+  it("setDescription keeps a real trailing blank line CRLF when a section follows", () => {
+    const doc = "# T\r\n\r\nold\r\n\r\n## Comments\r\n- _2026-08-28 10:00:_ hi\r\n";
+    const out = setDescription(doc, "new");
+    expect(out).toBe("# T\r\n\r\nnew\r\n\r\n## Comments\r\n- _2026-08-28 10:00:_ hi\r\n");
+  });
+
+  it("addTodo on a CRLF note whose last line has no trailing newline preserves that line untouched and inserts a real CRLF separator", () => {
+    const noFinalNewline = "# C\r\n\r\n## Subtasks\r\n- [ ] one";
+    const out = addTodo(noFinalNewline, "two");
+    expect(out.includes("\r\r")).toBe(false);
+    expect(out.startsWith(noFinalNewline)).toBe(true); // the untouched line is not rewritten
+    expect(out).toBe("# C\r\n\r\n## Subtasks\r\n- [ ] one\r\n- [ ] two\r\n");
+  });
+
+  it("addTodo picks CRLF/LF by MAJORITY, not by whether any single separator happens to differ", () => {
+    // Title line is CRLF, every other separator in the body is plain LF: LF must still win.
+    const mostlyLF = "# T\r\n\nmostly LF\n\n## Subtasks\n- [ ] one\n";
+    const out = addTodo(mostlyLF, "two");
+    expect(out).toBe("# T\r\n\nmostly LF\n\n## Subtasks\n- [ ] one\n- [ ] two\n");
+  });
+
+  it("a single-line body with no newline of its own falls back to the frontmatter's convention", () => {
+    const singleLineCrlfFrontmatter = "---\r\nstatus: todo\r\n---\r\n# T";
+    const out = addTodo(singleLineCrlfFrontmatter, "x");
+    expect(out).toBe("---\r\nstatus: todo\r\n---\r\n# T\r\n\r\n## Subtasks\r\n- [ ] x\r\n");
+  });
+
+  it("a CRLF-frontmatter, LF-body card keeps writing LF in the body it is actually editing", () => {
+    const mixed = "---\r\nstatus: todo\r\n---\r\n# Card\n\n## Subtasks\n- [ ] one\n";
+    const out = addTodo(mixed, "two");
+    expect(out).toBe("---\r\nstatus: todo\r\n---\r\n# Card\n\n## Subtasks\n- [ ] one\n- [ ] two\n");
+  });
+
+  it("addTodo on a frontmatter-only CRLF card (empty body) still writes CRLF, not LF", () => {
+    const frontmatterOnly = "---\r\nstatus: todo\r\n---\r\n";
+    const out = addTodo(frontmatterOnly, "x");
+    expect(out).toBe("---\r\nstatus: todo\r\n---\r\n## Subtasks\r\n- [ ] x\r\n");
+  });
+
+  it("appendComment does not add a second blank line when a CRLF blank line already precedes the new section", () => {
+    const doc = "# T\r\n\r\n";
+    const out = appendComment(doc, "hi", "2026-08-28 10:00");
+    expect(out).toBe("# T\r\n\r\n## Comments\r\n- _2026-08-28 10:00:_ hi\r\n");
   });
 });
 

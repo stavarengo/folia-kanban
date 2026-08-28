@@ -168,18 +168,42 @@ export function descriptionRefusal(
   return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
 
-/** The line ending a brand-new line should carry to match the rest of a note: `\r` when the body
- * is CRLF (so joining on `\n` reproduces `\r\n`), or nothing on a plain-`\n` note. */
-function noteCr(body: string): string {
-  return body.includes("\r\n") ? "\r" : "";
+/**
+ * Whether `s`'s lines are majority `\r\n`-terminated (`"\r"`) or majority bare-`\n` (`""`), or
+ * `null` when `s` has no real line separator to judge at all (empty, or a single line with no
+ * newline in it). Judged by majority, not "any `\r\n` anywhere": a file that is genuinely uniform
+ * but happens to carry one stray CRLF (or one stray bare LF) line must not flip the verdict for
+ * the whole file.
+ */
+function lineEndingOf(s: string): "\r" | "" | null {
+  const lines = s.split("\n");
+  const total = lines.length - 1; // the last element never carries separator info of its own
+  if (total === 0) return null;
+  let crCount = 0;
+  for (let i = 0; i < total; i++) if ((lines[i] ?? "").endsWith("\r")) crCount++;
+  return crCount * 2 >= total ? "\r" : "";
 }
 
-/** Append a single line to a section, creating the section at end if absent. */
-function appendToSection(body: string, name: string, line: string): string {
+/**
+ * The line ending a brand-new line appended to `body` should carry. The body's own MAJORITY
+ * convention wins whenever the body has any real separator to judge — even when the card's
+ * frontmatter disagrees, since the body is what is actually being edited. Only falls back to
+ * `fullText` (frontmatter included) when the body itself carries no separator evidence at all: an
+ * empty body (frontmatter-only card) or a single line with no newline in it.
+ */
+function bodyCr(body: string, fullText: string): string {
+  return lineEndingOf(body) ?? lineEndingOf(fullText) ?? "";
+}
+
+/** Append a single line to a section, creating the section at end if absent. `fullText` is the
+ * card's full original text (frontmatter included), the fallback for a body with no line-ending
+ * evidence of its own — see {@link bodyCr}. */
+function appendToSection(body: string, name: string, line: string, fullText: string): string {
   const lines = body.split("\n");
   const fenced = fencedLines(lines);
   const start = headingIndex(lines, name, fenced);
-  const cr = noteCr(body);
+  const cr = bodyCr(body, fullText);
+  const newLine = `${line}${cr}`;
   if (start === -1) {
     let out = body;
     if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
@@ -187,8 +211,8 @@ function appendToSection(body: string, name: string, line: string): string {
     const open = unclosedFence(lines);
     if (open !== null) out += `${open.marker}${cr}\n`;
     // ensure a blank line before the new heading when there's preceding content
-    if (out.trim() !== "" && !out.endsWith("\n\n")) out += `${cr}\n`;
-    out += `## ${name}${cr}\n${line}${cr}\n`;
+    if (out.trim() !== "" && !out.endsWith(`${cr}\n${cr}\n`)) out += `${cr}\n`;
+    out += `## ${name}${cr}\n${newLine}\n`;
     return out;
   }
   const end = sectionEnd(lines, start, fenced);
@@ -196,7 +220,22 @@ function appendToSection(body: string, name: string, line: string): string {
   while (insert - 1 > start && lines[insert - 1]?.trim() === "") insert--;
   // The same open fence, inside the section itself, would swallow the new line.
   const open = end === lines.length ? unclosedFence(lines) : null;
-  const newLine = `${line}${cr}`;
+  if (insert === lines.length) {
+    // Appending at the note's absolute end: build by concatenation, exactly like the
+    // section-absent branch above, rather than `lines.splice` + `join("\n")`. join always uses a
+    // bare "\n" between array elements regardless of what each element's own text carries, so if
+    // the untouched final line has no trailing newline at all (the file simply stops there), a
+    // join-based append would either dangle a `\r` with no `\n` after it or leave a bare `\n`
+    // where the rest of the note uses `\r\n` — both wrong, and neither fixable without either
+    // corrupting the join or rewriting a byte of a line this function must not touch. Appending a
+    // real `\r\n` (or `\n`) here is new content placed after the existing end of the file, not a
+    // change to any existing byte, so it stays inside the "append only" contract.
+    let out = body;
+    if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
+    if (open !== null) out += `${open.marker}${cr}\n`;
+    out += `${newLine}\n`;
+    return out;
+  }
   lines.splice(insert, 0, ...(open === null ? [newLine] : [`${open.marker}${cr}`, newLine]));
   return lines.join("\n");
 }
@@ -379,20 +418,24 @@ export function appendComment(
 ): string {
   const signature = author ? normalizeAuthor(author) : "";
   const prefix = signature ? `${timestamp} @${signature}` : timestamp;
-  return withBody(text, (b) => appendToSection(b, SECTION.comments, `- _${prefix}:_ ${comment}`));
+  return withBody(text, (b) =>
+    appendToSection(b, SECTION.comments, `- _${prefix}:_ ${comment}`, text),
+  );
 }
 
 export function appendHistory(text: string, entry: string, timestamp: string): string {
-  return withBody(text, (b) => appendToSection(b, SECTION.history, `- _${timestamp}:_ ${entry}`));
+  return withBody(text, (b) =>
+    appendToSection(b, SECTION.history, `- _${timestamp}:_ ${entry}`, text),
+  );
 }
 
 export function addTodo(text: string, todo: string): string {
-  return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] ${todo}`));
+  return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] ${todo}`, text));
 }
 
 /** Add a subcard reference (a checklist item linking to a child card). */
 export function addSubcard(text: string, link: string): string {
-  return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] [[${link}]]`));
+  return withBody(text, (b) => appendToSection(b, SECTION.subtasks, `- [ ] [[${link}]]`, text));
 }
 
 /**
@@ -573,12 +616,22 @@ export function removeTimestampedLine(text: string, section: string, index: numb
  */
 export function setDescription(text: string, description: string): string {
   return withBody(text, (body) => {
+    const cr = bodyCr(body, text);
     const lines = body.split("\n");
     const { from, to } = descriptionRange(lines);
-    const desc = description.trim();
-    const cr = noteCr(body);
-    const block = (desc === "" ? [""] : ["", ...desc.split("\n"), ""]).map((l) => `${l}${cr}`);
+    // Strip any \r already embedded in `description` (it may be `parseBody`'s own round-tripped
+    // CRLF output, one \r per line) before re-adding exactly one per line below — otherwise a
+    // plain edit-and-save of a CRLF card's description would double every \r into \r\r\n.
+    const desc = description.trim().replace(/\r\n/g, "\n");
     const tail = to < lines.length ? lines.slice(to) : [];
+    const rawBlock = desc === "" ? [""] : ["", ...desc.split("\n"), ""];
+    // When nothing follows, the last element is the split artifact standing for "file ends right
+    // here" (an empty string, the same one a plain `.split("\n")` would leave), not a real blank
+    // line — it must stay bare, or a trailing \r would appear that was never in the note.
+    const block =
+      tail.length > 0
+        ? rawBlock.map((l) => `${l}${cr}`)
+        : rawBlock.map((l, i) => (i === rawBlock.length - 1 ? l : `${l}${cr}`));
     const head = lines.slice(0, from);
     const rebuilt = [...head, ...block, ...tail];
     return rebuilt.join("\n");
