@@ -21,7 +21,7 @@ import {
 
 const noop = (): void => {};
 
-const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop);
+const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop, true);
 
 /** The keys of every `control` row of the declarative tab, in the order it renders them. */
 const controlKeys = definitions.flatMap((d) =>
@@ -59,7 +59,7 @@ describe("settingDefinitions", () => {
 
   it("disables the rows that depend on another setting only while that setting says so", () => {
     const disabledOf = (key: string, settings: KanbanSettings): boolean => {
-      const def = settingDefinitions(() => settings, "1.2.3", noop).find(
+      const def = settingDefinitions(() => settings, "1.2.3", noop, true).find(
         (d) => "control" in d && d.control?.key === key,
       );
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
@@ -150,5 +150,36 @@ describe("settingsPatchFor", () => {
 
   it("trims the name comments are signed with", () => {
     expect(settingsPatchFor("userName", "  alex  ")).toEqual({ userName: "alex" });
+  });
+});
+
+describe("agent access on a platform that cannot host it", () => {
+  const rows = (desktop: boolean) =>
+    settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop, desktop);
+
+  const named = (desktop: boolean, name: string) =>
+    rows(desktop).find((d) => "name" in d && d.name === name);
+
+  const visibleOf = (item: ReturnType<typeof named>): boolean => {
+    if (!item || !("visible" in item)) return true;
+    const { visible } = item;
+    return typeof visible === "function" ? visible() : (visible ?? true);
+  };
+
+  // Toggling it on used to persist the setting and mint a token for a server the phone can never
+  // run, and say nothing about it. Now the three rows simply are not there.
+  it("hides all three rows on mobile and shows them on desktop", () => {
+    for (const name of [
+      SETTING_COPY.mcpEnabled.name,
+      SETTING_COPY.mcpPort.name,
+      MCP_TOKEN_COPY.name,
+    ]) {
+      expect(visibleOf(named(false, name)), `${name} on mobile`).toBe(false);
+      expect(visibleOf(named(true, name)), `${name} on desktop`).toBe(true);
+    }
+  });
+
+  it("leaves every other row alone on mobile", () => {
+    expect(visibleOf(named(false, SETTING_COPY.historyScope.name))).toBe(true);
   });
 });

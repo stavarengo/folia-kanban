@@ -79,9 +79,17 @@ interface Target {
   token: string;
 }
 
+function same(a: Target | null, b: Target | null): boolean {
+  if (a === null || b === null) return false;
+  return a.port === b.port && a.token === b.token;
+}
+
 export class McpService {
   private running: RunningMcpServer | null = null;
   private wanted: Target | null = null;
+  /** The target that would not start. Kept so an unrelated settings write does not retry a bind
+   *  that is going to fail again and pop the same notice — the user has already been told. */
+  private refused: Target | null = null;
   /** Serialises overlapping syncs, so a fast toggle-off/on cannot leave two servers behind. */
   private queue: Promise<void> = Promise.resolve();
 
@@ -112,17 +120,18 @@ export class McpService {
 
   private async reconcile(target: Target | null): Promise<void> {
     if (this.serving(target)) return;
+    if (target && same(this.refused, target)) return;
     await this.shutDown();
     if (target) await this.start(target);
   }
 
   /** Is a server already up and answering on exactly what `target` asks for? */
   private serving(target: Target | null): boolean {
-    if (this.running === null || target === null) return false;
-    return this.wanted?.port === target.port && this.wanted.token === target.token;
+    return this.running !== null && same(this.wanted, target);
   }
 
   private async shutDown(): Promise<void> {
+    this.refused = null;
     if (!this.running) return;
     await this.running.close();
     this.running = null;
@@ -142,6 +151,7 @@ export class McpService {
       this.options.onState?.({ kind: "running", port: this.running.port });
     } catch (e) {
       this.wanted = null;
+      this.refused = target;
       this.options.onState?.({
         kind: "failed",
         message: e instanceof Error ? e.message : String(e),

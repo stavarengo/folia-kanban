@@ -126,6 +126,21 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
 };
 
 /**
+ * Agent access switched on for the first time is when its token comes into existence. `mint` is
+ * called only then: the token is generated once and kept, because a token that changed on each
+ * load would break the client configured against it. `desktop` is what keeps a phone from minting
+ * a secret for a server it can never run.
+ */
+export function withMcpToken(
+  settings: KanbanSettings,
+  mint: () => string,
+  desktop: boolean,
+): KanbanSettings {
+  if (!settings.mcpEnabled || settings.mcpToken || !desktop) return settings;
+  return { ...settings, mcpToken: mint() };
+}
+
+/**
  * Settings as loaded from plugin data: defaults filled in, and the comments baseline stamped with
  * `now` when the stored data carries none. `stampedBaseline` tells the caller to persist that.
  */

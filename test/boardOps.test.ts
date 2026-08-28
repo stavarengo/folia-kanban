@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { moveCardOver, moveCardTo } from "../src/model/boardOps";
+import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../src/model/boardOps";
 import { columnOf } from "../src/model/board";
 import type { BoardConfig } from "../src/model/types";
 import { FakeRepo } from "./fakeRepo";
@@ -95,5 +95,77 @@ describe("moveCardOver", () => {
     expect(await moveCardOver(repo, board, { activeId: "Tasks/A.md", overId: "nowhere" })).toBe(
       false,
     );
+  });
+});
+
+describe("setSubtaskDone", () => {
+  function withClaimedLine(): FakeRepo {
+    return new FakeRepo(
+      { ...config, priorities: ["high"] },
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+  }
+
+  it("ticks the box", async () => {
+    const repo = withClaimedLine();
+    await setSubtaskDone(repo, await repo.loadBoard(), {
+      path: "Tasks/A.md",
+      index: 0,
+      done: true,
+    });
+    expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.done).toBe(true);
+  });
+
+  // The line claims a column; ticking it is also a statement about where the work now belongs, so
+  // the claim must not go on saying "doing" about work that is finished.
+  it("brings a line's column claim into step with its checkbox", async () => {
+    const repo = withClaimedLine();
+    await setSubtaskDone(repo, await repo.loadBoard(), {
+      path: "Tasks/A.md",
+      index: 0,
+      done: true,
+    });
+    expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.status).toBe("done");
+  });
+});
+
+describe("setCardPriority", () => {
+  function repoWithOneCard(): FakeRepo {
+    return new FakeRepo(
+      { ...config, priorities: ["high"] },
+      {
+        "Tasks/A.md": { fm: { status: "todo", order: 1 }, body: "" },
+      },
+    );
+  }
+
+  it("sets the value and teaches it to the board", async () => {
+    const repo = repoWithOneCard();
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" }, ["high"]);
+    expect((await repo.loadBoard()).cards["Tasks/A.md"]?.frontmatter.priority).toBe("urgent");
+    expect(repo.config.priorities).toEqual(["high", "urgent"]);
+  });
+
+  // Clearing a priority removes the key outright rather than writing an empty one, so the card
+  // reads as having no priority and its history gets no `Priority → ` line about nothing.
+  it("clears the key on an empty value, and teaches the board nothing", async () => {
+    const repo = repoWithOneCard();
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" }, ["high"]);
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "" }, ["high"]);
+    expect((await repo.loadBoard()).cards["Tasks/A.md"]?.frontmatter.priority).toBeUndefined();
+    expect(repo.config.priorities).toEqual(["high", "urgent"]);
+  });
+
+  it("does not lose a value the board already knew", async () => {
+    const repo = repoWithOneCard();
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "later" }, ["high", "hand-written"]);
+    expect(repo.config.priorities).toEqual(["high", "hand-written", "later"]);
   });
 });

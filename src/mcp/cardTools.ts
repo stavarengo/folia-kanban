@@ -24,6 +24,12 @@ const RESERVED_KEYS: Record<string, string> = {
   order: "a card's position in its column is set by move_card",
   priority: "use update_card's own `priority` field, so the board remembers the value",
   due: "use update_card's own `due` field",
+  // Written by hand, this retitles the card in the frontmatter and nowhere else: the file keeps its
+  // old name and every `[[wikilink]]` pointing at it — a parent's checklist line included — still
+  // names the card that no longer exists under that title.
+  title: "use update_card's own `title` field, which renames the note and its inbound links",
+  "folia-board":
+    "that flag is what makes a note a board, not a card — setting it on a card would hand agents a second, broken board",
 };
 
 const propertyValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -57,7 +63,12 @@ const createCard = tool({
     title: z.string().min(1).describe("The card's title; it also names the file."),
     column: columnArg,
     description: z.string().optional().describe("Body text above the card's own sections."),
-    priority: z.string().optional().describe("A value from the board's priority vocabulary."),
+    priority: z
+      .string()
+      .optional()
+      .describe(
+        "A priority value. One the board already uses is preferred; a new one is added to the board's vocabulary, exactly as typing one into the card's details does.",
+      ),
     due: z.string().optional().describe("Due date, `YYYY-MM-DD`."),
   }),
   run: async (host, args) => {
@@ -101,14 +112,25 @@ const moveCard = tool({
       );
     }
     // A checklist line standing in a column of its own moves too — on its own line — so this is
-    // the one write that accepts a card without a note behind it.
+    // the one write that accepts a card without a note behind it. What it cannot do is take a slot:
+    // its position comes from where the line sits in its parent's checklist, which is not this
+    // tool's to rewrite. Saying so beats silently ignoring the argument.
     const path = resolveCardPath(board, args.card);
+    if (board.cards[path]?.todoRef && args.position !== undefined) {
+      throw new ToolError(
+        `"${path}" is a checklist line; it is ordered by its place in its parent's list, so move_card cannot give it a position. Drop the argument to move it to "${args.column}".`,
+      );
+    }
     const moved = await moveCardTo(repo, board, {
       path,
       columnId: args.column,
       ...(args.position === undefined ? {} : { index: args.position }),
     });
-    if (!moved) throw new ToolError(`Nothing to move: "${path}" is not a card on this board.`);
+    // Nothing to write is not the same as nothing to report: a checklist line already claiming the
+    // column it was asked to move to is exactly where the caller wants it.
+    if (!moved && columnOf(board, path) !== args.column) {
+      throw new ToolError(`Nothing to move: "${path}" is not a card on this board.`);
+    }
     const after = await repo.loadBoard();
     return {
       path,
@@ -132,13 +154,21 @@ const updateCard = tool({
         .optional()
         .describe("Retitles the card at whichever source its title comes from."),
       description: z.string().optional(),
-      priority: z.string().nullable().optional(),
-      due: z.string().nullable().optional(),
+      priority: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          "A priority value, or null to clear it. A value the board does not know yet is added to its vocabulary, exactly as typing one into the card's details does.",
+        ),
+      due: z.string().nullable().optional().describe("Due date `YYYY-MM-DD`, or null to clear it."),
       properties: z
         .record(z.string(), propertyValue)
         .optional()
         .describe("Any other frontmatter keys to set, or null to remove."),
     })
+    // Not expressible in the published JSON Schema, so clients see an all-optional object and only
+    // meet this at call time; `docs/mcp.md` says so.
     .refine(
       (v) =>
         v.title !== undefined ||

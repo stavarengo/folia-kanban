@@ -8,11 +8,18 @@ import type { Board, Card } from "../model/types";
 import { columnOf } from "../model/board";
 import { boardArg, cardArg, openBoard, resolveCardPath, tool, type ToolDefinition } from "./tool";
 
-/** What a card looks like in a column listing: enough to decide, not the whole note. */
+/**
+ * What a card looks like in a column listing: enough to decide, not the whole note.
+ *
+ * A card nested under another one is in no column of its own — the board draws it inside its
+ * parent — so it is listed under `children` here. Without that, an agent surveying a board that
+ * uses subcards would be shown a board with cards missing and no way to learn their paths.
+ */
 function cardSummary(board: Board, path: string): Record<string, unknown> {
   const card: Card | undefined = board.cards[path];
   if (!card) return { path, title: path };
   const stats = card.stats;
+  const children = board.childrenOf[path];
   return {
     path,
     title: card.title,
@@ -24,6 +31,7 @@ function cardSummary(board: Board, path: string): Record<string, unknown> {
     parent: board.placedOf[path],
     subtasks: stats?.checklist ? { total: stats.checklist, done: stats.checklistDone } : undefined,
     comments: stats?.comments || undefined,
+    children: children?.length ? children.map((child) => cardSummary(board, child)) : undefined,
   };
 }
 

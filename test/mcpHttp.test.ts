@@ -59,6 +59,7 @@ async function rpc(method: string, params?: unknown): Promise<JsonRpcResponse> {
 beforeEach(async () => {
   repo = new FakeRepo(config, {
     "Tasks/A card.md": { fm: { status: "todo", order: 1 }, body: "" },
+    "Tasks/B card.md": { fm: { status: "todo", order: 2 }, body: "" },
   });
   const host: BoardHost = {
     listBoards: () => [{ path: "Board.md", name: "Board" }],
@@ -77,8 +78,11 @@ afterEach(async () => {
 });
 
 describe("the MCP endpoint", () => {
+  // Asked of the socket, not of the constant it was handed: this is the property that keeps the
+  // board off the local network, and asserting `MCP_HOST === "127.0.0.1"` would prove nothing.
   it("binds loopback only", () => {
     expect(server.port).toBeGreaterThan(0);
+    expect(server.address).toBe("127.0.0.1");
   });
 
   it("refuses a request with no token", async () => {
@@ -162,5 +166,51 @@ describe("the MCP endpoint", () => {
         token: "",
       }),
     ).rejects.toThrow(/token/);
+  });
+});
+
+describe("what the endpoint refuses before it means anything", () => {
+  // A sandboxed iframe and a `file://` page both send this, and both are somebody else's page
+  // talking to a server on the user's own machine.
+  it("refuses an opaque origin rather than reading it as no origin at all", async () => {
+    const res = await post({}, { headers: { origin: "null" } });
+    expect(res.status).toBe(403);
+  });
+
+  it("still accepts a request that carries no origin, which is every MCP client", async () => {
+    const res = await rpc("ping");
+    expect(res.result).toEqual({});
+  });
+
+  // The body used to be cut off by destroying the socket, so the answer explaining why never
+  // arrived — the client saw a connection reset, and, had it seen anything, would have been told
+  // its JSON was malformed.
+  it("answers an oversized body as one, on a connection still able to hear it", async () => {
+    const res = await post({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ping",
+      params: "x".repeat(1_100_000),
+    });
+    expect(res.status).toBe(413);
+    expect((await res.json()) as { error: string }).toMatchObject({ error: /larger than/ });
+  });
+});
+
+describe("two agents at once", () => {
+  // Every write reads the board, works out its change against what it read, and writes it back.
+  // Run together, two moves into one column would compute the same slot from the same snapshot.
+  it("answers calls one at a time, so concurrent moves do not collide", async () => {
+    const moves = ["Tasks/A card.md", "Tasks/B card.md"].map((card) =>
+      rpc("tools/call", {
+        name: "move_card",
+        arguments: { board: "Board.md", card, column: "done" },
+      }),
+    );
+    await Promise.all(moves);
+    const board = await repo.loadBoard();
+    const orders = (board.columns["done"] ?? []).map((p) => board.cards[p]?.frontmatter.order);
+    expect(board.columns["done"]).toHaveLength(2);
+    expect(new Set(orders).size).toBe(2);
   });
 });

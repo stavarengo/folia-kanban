@@ -337,3 +337,144 @@ describe("the JSON-RPC layer", () => {
     expect(reply?.error?.code).toBe(-32600);
   });
 });
+
+// Everything below was found by an unprimed review of the first version of this server: each one
+// is a way an agent was handed a board that did not match the board.
+describe("the shapes a board can take that a column listing hides", () => {
+  /** A parent whose child sits in the same column: the board draws the child inside the parent, so
+   *  the child is in no column of its own. */
+  function nested(): Fixture {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { status: "todo", order: 1 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    return {
+      repo,
+      host: {
+        listBoards: () => [{ path: "Board.md", name: "Board" }],
+        repoFor: (path) => (path === "Board.md" ? repo : null),
+      },
+    };
+  }
+
+  it("reports a nested subcard under its parent, so no card is missing from the board", async () => {
+    const { host } = nested();
+    const result = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { id: string; cards: { path: string; children?: { path: string }[] }[] }[];
+    };
+    const todo = result.columns.find((c) => c.id === "todo");
+    expect(todo?.cards.map((c) => c.path)).toEqual(["Tasks/Parent.md"]);
+    expect(todo?.cards[0]?.children?.map((c) => c.path)).toEqual(["Tasks/Child.md"]);
+  });
+
+  // What the client actually receives is the JSON, where an undefined field is simply absent —
+  // which is the difference between "this card has no children" and "this card has an empty list".
+  it("leaves `children` out of the JSON for a card that has none", async () => {
+    const { host } = fixture();
+    const result = await call(host, "get_board", { board: "Board.md" });
+    const wire = JSON.parse(JSON.stringify(result)) as {
+      columns: { cards: Record<string, unknown>[] }[];
+    };
+    expect(wire.columns[0]?.cards[0]).not.toHaveProperty("children");
+  });
+});
+
+describe("a checklist line standing in a column of its own", () => {
+  /** One note whose checklist line claims a column, so the board shows two cards for one file. */
+  function claimed(claim = "doing"): Fixture {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Write docs.md": {
+          fm: { status: "todo", order: 1 },
+          body: `\n## Subtasks\n\n- [ ] Draft it [status:: ${claim}]\n`,
+        },
+      },
+      () => "all",
+      () => "",
+    );
+    return {
+      repo,
+      host: {
+        listBoards: () => [{ path: "Board.md", name: "Board" }],
+        repoFor: (path) => (path === "Board.md" ? repo : null),
+      },
+    };
+  }
+
+  // The synthetic card carries its parent's file name, so matching on that made every claimed line
+  // a rival of the note it lives in — and a board with one card became too ambiguous to address.
+  it("does not answer to its parent's file name", async () => {
+    const { host } = claimed();
+    const card = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Write docs",
+    })) as { path: string };
+    expect(card.path).toBe("Tasks/Write docs.md");
+  });
+
+  it("is refused a position rather than being given one that is ignored", async () => {
+    const { host } = claimed();
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "done",
+        position: 0,
+      }),
+    ).rejects.toThrow(/ordered by its place in its parent's list/);
+  });
+
+  // Moving it where it already is writes nothing, which used to be reported as "not a card on this
+  // board" — a denial of the card `get_board` had listed one call earlier.
+  it("is reported as where it is when it is already there", async () => {
+    const { host } = claimed();
+    const result = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/Write docs.md#todo:0",
+      column: "doing",
+    })) as { column: string };
+    expect(result.column).toBe("doing");
+  });
+
+  it("still refuses a card that really is not on the board", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "move_card", { board: "Board.md", card: "Tasks/Ghost.md", column: "done" }),
+    ).rejects.toThrow(/No card "Tasks\/Ghost\.md"/);
+  });
+});
+
+describe("the frontmatter keys update_card will not write by hand", () => {
+  it("refuses a title, which belongs to the rename that also fixes the links", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { title: "Renamed by hand" },
+      }),
+    ).rejects.toThrow(/renames the note and its inbound links/);
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty("title");
+  });
+
+  it("refuses the board flag, which would make a card answer as a board of its own", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { "folia-board": true },
+      }),
+    ).rejects.toThrow(/makes a note a board/);
+  });
+});

@@ -74,7 +74,7 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
           "type": "string",
         },
         "priority": {
-          "description": "A value from the board's priority vocabulary.",
+          "description": "A priority value. One the board already uses is preferred; a new one is added to the board's vocabulary, exactly as typing one into the card's details does.",
           "type": "string",
         },
         "title": {
@@ -152,6 +152,7 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
               "type": "null",
             },
           ],
+          "description": "Due date \`YYYY-MM-DD\`, or null to clear it.",
         },
         "priority": {
           "anyOf": [
@@ -162,6 +163,7 @@ exports[`the MCP contract > publishes this exact tool surface 1`] = `
               "type": "null",
             },
           ],
+          "description": "A priority value, or null to clear it. A value the board does not know yet is added to its vocabulary, exactly as typing one into the card's details does.",
         },
         "properties": {
           "additionalProperties": {

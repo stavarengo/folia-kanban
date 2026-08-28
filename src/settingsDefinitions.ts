@@ -226,6 +226,7 @@ export function settingDefinitions(
   read: () => KanbanSettings,
   version: string,
   copyToken: () => void,
+  desktop: boolean,
 ): SettingDefinitionItem[] {
   const dropdown = (key: DropdownKey, disabled?: () => boolean): SettingDefinitionItem => ({
     ...SETTING_COPY[key],
@@ -240,6 +241,9 @@ export function settingDefinitions(
   const toggle = (key: ToggleKey): SettingDefinitionItem => ({
     ...SETTING_COPY[key],
     control: { type: "toggle", key },
+    // A phone cannot listen for connections, so the row that promises it can does not appear —
+    // rather than switching on, minting a token and quietly doing nothing.
+    ...(key === "mcpEnabled" ? { visible: desktop } : {}),
   });
 
   return [
@@ -272,6 +276,7 @@ export function settingDefinitions(
     ...TOGGLE_SETTING_KEYS.map(toggle),
     {
       ...SETTING_COPY.mcpPort,
+      visible: desktop,
       control: {
         type: "number",
         key: "mcpPort",
@@ -284,6 +289,7 @@ export function settingDefinitions(
     {
       name: MCP_TOKEN_COPY.name,
       desc: MCP_TOKEN_COPY.desc,
+      visible: desktop,
       action: copyToken,
       disabled: () => !read().mcpEnabled,
     },
