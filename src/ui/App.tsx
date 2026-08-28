@@ -131,6 +131,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // rides on this — the panel's state is scoped to one mount, so nothing typed on one card can
   // still be sitting in a field when the panel moves to the next.
   const [openId, setOpenId] = useState(0);
+  // The path a rename has just moved the open card to; see the `onFileOp` effect below.
+  const [renamedTo, setRenamedTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
@@ -184,10 +186,32 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // is gone. In-app renames/deletes do this in `renameCard`/`remove`; this covers everything else.
   // Only the selection: it belongs to this view. The per-card maps in plugin data are followed by
   // the plugin itself (`followFileOp` in main.ts), which is also awake when no board is open.
+  //
+  // A file op is reported the moment the vault makes it, while the board reload it triggers is
+  // debounced — so for a short window the board still knows this card only under its old path.
+  // `renamedTo` names the path the selection was just moved to, and keeps the panel open across
+  // that window; without it the panel would unmount and take every uncommitted draft with it.
+  // Holding the PATH rather than a flag is what makes it self-checking: a board that arrives
+  // knowing some other card cannot keep a panel open for this one.
+  const selectedRef = useRef<string | null>(null);
+  selectedRef.current = selected;
   useEffect(
-    () => repo.onFileOp((op) => setSelected((cur) => (cur === null ? cur : remapPath(cur, op)))),
+    () =>
+      repo.onFileOp((op) => {
+        const cur = selectedRef.current;
+        if (cur === null) return;
+        const next = remapPath(cur, op);
+        if (next === cur) return;
+        if (next !== null) setRenamedTo(next);
+        setSelected(next);
+      }),
     [repo],
   );
+  // Any board that has landed since has an answer for the new path — the card is there, or it
+  // really is gone (moved out of the card folder, say) and the panel closes as it always did.
+  useEffect(() => {
+    setRenamedTo(null);
+  }, [board]);
 
   // Obsidian's status bar is fixed to the window bottom; reserve clearance so the columns and the
   // side detail panel don't clip their last content behind it. Measure the real height once the
@@ -756,7 +780,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         ? "float"
         : "split";
   const detailMode: DetailMode = openOverride ?? globalDetailMode;
-  const detailOpen = selected != null && board.cards[selected] != null;
+  const detailOpen = selected != null && (board.cards[selected] != null || renamedTo === selected);
   const createMode = createColumn != null && !detailOpen;
   const panelShown = detailOpen || createMode;
 

@@ -3888,3 +3888,64 @@ describe("the panel's section inputs belong to the card they were typed on (2026
     );
   });
 });
+
+describe("a rename under the open panel keeps what was typed in it (20260826.09)", () => {
+  /** Move a card's file the way the file explorer or a sync pull would: the vault reports the
+   *  rename at once, and the board reload that will know the new path comes later. */
+  const externalRename = (repo: FakeRepo, from: string, to: string) => {
+    const entry = repo.files.get(from)!;
+    repo.files.delete(from);
+    repo.files.set(to, { ...entry, basename: to.replace(/^.*\//, "").replace(/\.md$/, "") });
+    act(() => repo.notifyFileOp({ kind: "rename", from, to }));
+  };
+
+  it("keeps the panel, and every draft in it, across an external rename", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
+    await user.type(within(detail).getByLabelText("Add a todo"), "half a todo");
+    const area = within(detail).getByLabelText("Value of area");
+    await user.clear(area);
+    await user.type(area, "garden");
+    await user.click(await within(detail).findByLabelText("Edit description"));
+    await user.type(within(detail).getByLabelText("Edit description"), " and more");
+
+    externalRename(repo, "Tasks/Alpha.md", "Tasks/Renamed.md");
+
+    // The board has not reloaded yet: this is exactly the window the panel used to disappear in.
+    expect(screen.getByTestId("card-detail")).toBe(detail);
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("half a comment");
+    expect(within(detail).getByLabelText("Add a todo")).toHaveValue("half a todo");
+    expect(within(detail).getByLabelText("Value of area")).toHaveValue("garden");
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("Desc A and more");
+
+    act(() => repo.notify());
+    await screen.findByRole("heading", { name: "Renamed" });
+    expect(screen.getByTestId("card-detail")).toBe(detail);
+    expect(within(detail).getByLabelText("Write a comment")).toHaveValue("half a comment");
+    expect(within(detail).getByLabelText("Edit description")).toHaveValue("Desc A and more");
+
+    // And the drafts still commit — to the card under its new name.
+    await user.type(within(detail).getByLabelText("Write a comment"), "{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Renamed.md")!.body).toContain("half a comment"),
+    );
+  });
+
+  it("still closes the panel when the open card's file leaves the board", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    await screen.findByTestId("card-detail");
+    // Moved somewhere the board has no card for it: the selection follows the file, and the first
+    // board that lands after the move has no answer at the new path, so the panel closes as before.
+    repo.files.delete("Tasks/Alpha.md");
+    act(() => repo.notifyFileOp({ kind: "rename", from: "Tasks/Alpha.md", to: "Elsewhere.md" }));
+    act(() => repo.notify());
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+  });
+});

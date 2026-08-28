@@ -568,7 +568,14 @@ export function CardDetail({
   const actions = useBoardActions();
   const settings = useSettings();
   const updateSettings = useSettingsUpdater();
-  const card = board.cards[path];
+  // The board reloads on a debounce, so for a moment after this card's file is renamed or moved
+  // the board still knows the card only under its old path. Keep showing what it last said about
+  // this card instead of flashing "Card not found" at a card that is right there; the next board
+  // brings the real thing back. `null` only ever means a path the board has never had a card for.
+  const liveCard: Card | undefined = board.cards[path];
+  const lastCard = useRef<Card | null>(null);
+  if (liveCard) lastCard.current = liveCard;
+  const card = liveCard ?? lastCard.current;
   const isCreate = createColumn != null;
   const panelRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
