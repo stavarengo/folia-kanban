@@ -16,7 +16,7 @@ import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
-const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*)$/;
+const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*?)\r?$/;
 const BULLET_RE = /^\s*[-*]\s+/;
 const WIKILINK_ONLY_RE = /^\[\[([^\]]+)\]\]$/;
 // A checklist line's own column, written as an Obsidian/Dataview inline field: `- [ ] Ship it
@@ -168,20 +168,27 @@ export function descriptionRefusal(
   return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
 
+/** The line ending a brand-new line should carry to match the rest of a note: `\r` when the body
+ * is CRLF (so joining on `\n` reproduces `\r\n`), or nothing on a plain-`\n` note. */
+function noteCr(body: string): string {
+  return body.includes("\r\n") ? "\r" : "";
+}
+
 /** Append a single line to a section, creating the section at end if absent. */
 function appendToSection(body: string, name: string, line: string): string {
   const lines = body.split("\n");
   const fenced = fencedLines(lines);
   const start = headingIndex(lines, name, fenced);
+  const cr = noteCr(body);
   if (start === -1) {
     let out = body;
-    if (out.length > 0 && !out.endsWith("\n")) out += "\n";
+    if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
     // A fence left open runs to the end of the note, and would swallow the new section with it.
     const open = unclosedFence(lines);
-    if (open !== null) out += `${open.marker}\n`;
+    if (open !== null) out += `${open.marker}${cr}\n`;
     // ensure a blank line before the new heading when there's preceding content
-    if (out.trim() !== "" && !out.endsWith("\n\n")) out += "\n";
-    out += `## ${name}\n${line}\n`;
+    if (out.trim() !== "" && !out.endsWith("\n\n")) out += `${cr}\n`;
+    out += `## ${name}${cr}\n${line}${cr}\n`;
     return out;
   }
   const end = sectionEnd(lines, start, fenced);
@@ -189,7 +196,8 @@ function appendToSection(body: string, name: string, line: string): string {
   while (insert - 1 > start && lines[insert - 1]?.trim() === "") insert--;
   // The same open fence, inside the section itself, would swallow the new line.
   const open = end === lines.length ? unclosedFence(lines) : null;
-  lines.splice(insert, 0, ...(open === null ? [line] : [open.marker, line]));
+  const newLine = `${line}${cr}`;
+  lines.splice(insert, 0, ...(open === null ? [newLine] : [`${open.marker}${cr}`, newLine]));
   return lines.join("\n");
 }
 
@@ -466,7 +474,7 @@ export function setSubtaskStatus(text: string, index: number, status: string | n
     const cr = line.endsWith("\r") ? "\r" : "";
     const prefix = m[1] ?? "";
     const box = m[2] ?? " ";
-    const content = (m[3] ?? "").replace(/\r$/, "");
+    const content = m[3] ?? "";
     const field = status === null ? "" : `[status:: ${status}]`;
     const existing = INLINE_STATUS_RE.exec(content);
     const before = existing ? content.slice(0, existing.index) : "";
@@ -568,7 +576,8 @@ export function setDescription(text: string, description: string): string {
     const lines = body.split("\n");
     const { from, to } = descriptionRange(lines);
     const desc = description.trim();
-    const block = desc === "" ? [""] : ["", ...desc.split("\n"), ""];
+    const cr = noteCr(body);
+    const block = (desc === "" ? [""] : ["", ...desc.split("\n"), ""]).map((l) => `${l}${cr}`);
     const tail = to < lines.length ? lines.slice(to) : [];
     const head = lines.slice(0, from);
     const rebuilt = [...head, ...block, ...tail];

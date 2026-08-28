@@ -455,6 +455,61 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
     everyLineKeepsCRLF(out);
     expect(parseBody(out).comments.map((c) => c.text)).toEqual(["one", "three"]);
   });
+
+  const crlfSubtasks = ["# C\r", "\r", "## Subtasks\r", "- [ ] one\r", "- [x] two\r", ""].join(
+    "\n",
+  );
+
+  it("parses checklist lines on a CRLF note instead of finding none", () => {
+    const items = parseSubtasks(crlfSubtasks);
+    expect(items).toEqual([
+      { kind: "todo", text: "one", done: false, index: 0 },
+      { kind: "todo", text: "two", done: true, index: 1 },
+    ]);
+  });
+
+  it("cardStats reports real progress on a CRLF note instead of 0/0", () => {
+    const stats = cardStats(crlfSubtasks);
+    expect(stats.checklist).toBe(2);
+    expect(stats.checklistDone).toBe(1);
+    expect(stats.nextTodos).toEqual([{ text: "one", index: 0 }]);
+  });
+
+  it("setSubtaskDone actually ticks the line on a CRLF note", () => {
+    const out = setSubtaskDone(crlfSubtasks, 0, true);
+    expect(out).not.toBe(crlfSubtasks); // must not silently no-op
+    everyLineKeepsCRLF(out);
+    expect(parseSubtasks(out).map((s) => s.done)).toEqual([true, true]);
+  });
+
+  it("removeSubtask actually removes the line on a CRLF note", () => {
+    const out = removeSubtask(crlfSubtasks, 0);
+    expect(parseSubtasks(out).map((s) => s.text)).toEqual(["two"]);
+    everyLineKeepsCRLF(out);
+  });
+
+  it("setSubtaskStatus writes the inline field on a CRLF note", () => {
+    const out = setSubtaskStatus(crlfSubtasks, 0, "doing");
+    expect(out).toContain("- [ ] one [status:: doing]\r");
+    everyLineKeepsCRLF(out);
+  });
+
+  it("addTodo appends a new CRLF-terminated line instead of mixing endings", () => {
+    const out = addTodo(crlfSubtasks, "three");
+    everyLineKeepsCRLF(out);
+    expect(parseSubtasks(out).map((s) => s.text)).toEqual(["one", "two", "three"]);
+  });
+
+  it("appendComment on a CRLF note with no existing Comments section keeps the whole file CRLF", () => {
+    const out = appendComment(crlfSubtasks, "hi", "2026-08-28 10:00");
+    everyLineKeepsCRLF(out);
+  });
+
+  it("setDescription on a CRLF note keeps the whole file CRLF", () => {
+    const out = setDescription(crlfSubtasks, "New description");
+    everyLineKeepsCRLF(out);
+    expect(parseBody(out).description).toBe("New description");
+  });
 });
 
 describe("historyAllows — scope policy", () => {
@@ -739,7 +794,9 @@ describe("code fences hide structure from every lookup at once", () => {
     const b = parseBody(doc);
     expect(b.description).toBe("```md\r\n## Comments\r\n- _t:_ quoted\r\n```");
     expect(b.comments).toEqual([{ timestamp: "2026-08-22 09:00", author: null, text: "real" }]);
-    expect(appendComment(doc, "new", "2026-08-23 10:00")).toBe(doc + "- _2026-08-23 10:00:_ new\n");
+    expect(appendComment(doc, "new", "2026-08-23 10:00")).toBe(
+      doc + "- _2026-08-23 10:00:_ new\r\n",
+    );
   });
 
   it("a fenced `# heading` is not the title", () => {
