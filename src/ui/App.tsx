@@ -9,9 +9,8 @@ import {
   parseTodoPath,
   reassignColumn,
   relationCounts,
-  syncSubtaskClaim,
 } from "../model/board";
-import { moveCardOver, moveCardTo } from "../model/boardOps";
+import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -327,16 +326,9 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       // value — the very thing remembering is supposed to prevent. Only real values are learned:
       // the `A`/`B`/`C` starting set is a suggestion, never something the board is told it uses.
       const b = boardRef.current;
-      const learn =
-        b && value !== ""
-          ? [...boardPriorities(b.config.priorities, Object.values(b.cards)), value]
-          : [];
+      const learn = b ? boardPriorities(b.config.priorities, Object.values(b.cards)) : [];
       try {
-        // Empty value clears the key cleanly (removes the `priority:` line) per the contract,
-        // instead of writing a stray empty `priority:` and a misleading `Priority → ` history line.
-        if (value === "") await repo.unsetFrontmatterKey(path, "priority");
-        else await repo.setFrontmatter(path, { priority: value });
-        if (learn.length) await repo.rememberPriorities(learn);
+        await setCardPriority(repo, { path, value }, learn);
       } catch (e) {
         reportError(e);
       } finally {
@@ -534,13 +526,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       toggleTodo: (path, index, done) => {
         void (async () => {
           try {
-            await repo.toggleSubtask(path, index, done);
             // Ticking a box is also a statement about where the work belongs, for a line that
-            // claims a column: keep the claim and the checkbox from telling two stories. A second
-            // write rather than one, so the toggle keeps writing its own history line unchanged.
+            // claims a column, so the claim is kept in step with the checkbox.
             const b = boardRef.current;
-            const sync = b ? syncSubtaskClaim(b, path, { index }, done) : null;
-            if (sync) await repo.applyMove(sync);
+            if (b) await setSubtaskDone(repo, b, { path, index, done });
+            else await repo.toggleSubtask(path, index, done);
           } catch (e) {
             reportError(e);
           } finally {

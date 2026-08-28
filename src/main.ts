@@ -9,6 +9,7 @@ import {
   FuzzySuggestModal,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -33,6 +34,7 @@ import {
 } from "./settings";
 import {
   CARD_NEXT_TODOS_MAX,
+  MCP_TOKEN_COPY,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -48,6 +50,7 @@ import {
   cardFolderFor,
   uniqueNotePath,
 } from "./boardNote";
+import { McpService, newMcpToken, type McpState } from "./obsidian/mcpService";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
@@ -97,6 +100,9 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Tail of the settings-write chain; see {@link saveSettings}. */
   private pendingWrite: Promise<void> = Promise.resolve();
 
+  /** The MCP server's lifetime. Null on mobile, where the plugin never hosts one. */
+  private mcp: McpService | null = null;
+
   override async onload(): Promise<void> {
     await this.loadSettings();
 
@@ -123,6 +129,8 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.registerBoardSetupActions();
 
     this.addSettingTab(new KanbanSettingTab(this.app, this));
+
+    this.setUpMcp();
 
     this.patchLeafSetViewState();
     this.registerEvent(this.app.workspace.on("file-open", () => this.syncMarkdownActions()));
@@ -154,6 +162,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.register(() => {
       this.unloaded = true;
       this.removeMarkdownActions();
+      void this.mcp?.stop();
     });
     // `onLayoutReady` cannot be unregistered, and it can still fire after an unload that happened
     // during startup — which would put the buttons straight back, wired to a view type Obsidian
@@ -535,9 +544,53 @@ export default class FoliaKanbanPlugin extends Plugin {
   async updateSettings(patch: SettingsPatch): Promise<void> {
     const next = applySettingsPatch(this.settings, patch);
     if (next === this.settings) return;
-    this.settings = next;
+    // Switching agent access on for the first time is when its token comes into existence: it is
+    // generated once and kept, so the client configured against it keeps working across restarts.
+    this.settings = next.mcpEnabled && !next.mcpToken ? { ...next, mcpToken: newMcpToken() } : next;
     this.refreshViews();
+    void this.mcp?.sync(this.settings);
     await this.saveSettings();
+  }
+
+  /**
+   * Host the MCP server, on desktop only. `Platform.isDesktop` is a runtime gate rather than a
+   * manifest one: the board itself works everywhere, and declaring the whole plugin desktop-only
+   * would take it off mobile for the sake of a feature that is off by default.
+   */
+  private setUpMcp(): void {
+    if (!Platform.isDesktop) return;
+    this.mcp = new McpService({
+      app: this.app,
+      getSettings: () => this.settings,
+      info: {
+        name: this.manifest.id,
+        title: this.manifest.name,
+        version: this.manifest.version,
+      },
+      onState: (state) => this.reportMcpState(state),
+    });
+    void this.mcp.sync(this.settings);
+  }
+
+  private reportMcpState(state: McpState): void {
+    if (state.kind !== "failed") return;
+    // A toggle left on while nothing is listening is the one state the user cannot see, so the
+    // failure says both what broke and that the switch is now lying.
+    new Notice(
+      `Folia Kanban: agent access could not start on port ${this.settings.mcpPort}. ${state.message}`,
+      10000,
+    );
+  }
+
+  /** Put the bearer token on the clipboard, for pasting into an MCP client's configuration. */
+  async copyMcpToken(): Promise<void> {
+    const token = this.settings.mcpToken;
+    if (!token) {
+      new Notice(MCP_TOKEN_COPY.missing, 5000);
+      return;
+    }
+    await navigator.clipboard.writeText(token);
+    new Notice(MCP_TOKEN_COPY.copied, 3000);
   }
 
   /** Re-render all open Folia Kanban views so settings changes reflect without a reload. */
@@ -602,7 +655,11 @@ class KanbanSettingTab extends PluginSettingTab {
    * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
    */
   override getSettingDefinitions(): SettingDefinitionItem[] {
-    return settingDefinitions(() => this.plugin.settings, this.plugin.manifest.version);
+    return settingDefinitions(
+      () => this.plugin.settings,
+      this.plugin.manifest.version,
+      () => void this.plugin.copyMcpToken(),
+    );
   }
 
   /** Where the declarative rendering reads a control's current value from: our own settings, not
@@ -775,9 +832,38 @@ class KanbanSettingTab extends PluginSettingTab {
         .setName(SETTING_COPY[key].name)
         .setDesc(SETTING_COPY[key].desc)
         .addToggle((t) =>
-          t.setValue(s[key]).onChange((v) => void this.plugin.updateSettings({ [key]: v })),
+          t.setValue(s[key]).onChange((v) => {
+            // Agent access gates the two rows below it, so switching it redraws the tab.
+            const saved = this.plugin.updateSettings({ [key]: v });
+            if (key === "mcpEnabled") void saved.then(() => this.render());
+          }),
         );
     }
+
+    new Setting(containerEl)
+      .setName(SETTING_COPY.mcpPort.name)
+      .setDesc(SETTING_COPY.mcpPort.desc)
+      .setDisabled(!s.mcpEnabled)
+      .addText((t) => {
+        t.inputEl.type = "number";
+        t.setValue(String(s.mcpPort))
+          .setDisabled(!s.mcpEnabled)
+          .onChange((v) => {
+            const patch = settingsPatchFor("mcpPort", v);
+            if (patch) void this.plugin.updateSettings(patch);
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(MCP_TOKEN_COPY.name)
+      .setDesc(MCP_TOKEN_COPY.desc)
+      .setDisabled(!s.mcpEnabled)
+      .addButton((b) =>
+        b
+          .setButtonText(MCP_TOKEN_COPY.button)
+          .setDisabled(!s.mcpEnabled)
+          .onClick(() => void this.plugin.copyMcpToken()),
+      );
 
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     new Setting(containerEl).setName(VERSION_SETTING_NAME).setDesc(this.plugin.manifest.version);

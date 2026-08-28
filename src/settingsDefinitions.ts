@@ -1,5 +1,11 @@
 import type { SettingDefinitionItem } from "obsidian";
-import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, type KanbanSettings } from "./settings";
+import {
+  DETAIL_WIDTH_MAX,
+  DETAIL_WIDTH_MIN,
+  MCP_PORT_MAX,
+  MCP_PORT_MIN,
+  type KanbanSettings,
+} from "./settings";
 
 /**
  * The settings a user edits from the settings tab. The rest of `KanbanSettings` is bookkeeping the
@@ -19,7 +25,9 @@ export type EditableSettingKey =
   | "boardPan"
   | "boardSetupCommands"
   | "boardSetupFileMenu"
-  | "boardSetupEditorMenu";
+  | "boardSetupEditorMenu"
+  | "mcpEnabled"
+  | "mcpPort";
 
 /** The settings that are a plain on/off. Kept as a value, not only a type, so `settingsPatchFor`
  *  can recognise one at runtime — a boolean reaching the dropdown branch would be refused. */
@@ -27,6 +35,7 @@ export const TOGGLE_SETTING_KEYS = [
   "boardSetupCommands",
   "boardSetupFileMenu",
   "boardSetupEditorMenu",
+  "mcpEnabled",
 ] as const satisfies readonly EditableSettingKey[];
 
 type ToggleKey = (typeof TOGGLE_SETTING_KEYS)[number];
@@ -36,7 +45,7 @@ const isToggleKey = (key: string): key is ToggleKey =>
 
 type DropdownKey = Exclude<
   EditableSettingKey,
-  "detailWidth" | "cardNextTodos" | "userName" | ToggleKey
+  "detailWidth" | "cardNextTodos" | "userName" | "mcpPort" | ToggleKey
 >;
 
 /**
@@ -126,7 +135,24 @@ export const SETTING_COPY = {
     name: "Board setup — editor menu",
     desc: "Offer turning the note into a board from the right-click menu inside its editor.",
   },
+  mcpEnabled: {
+    name: "Agent access (MCP) — enable",
+    desc: "Let AI agents read and change the boards in this vault through an MCP server the plugin hosts on this computer only (127.0.0.1). Every change an agent makes goes through the board's own rules, so cards get the same history lines they get when you edit them by hand. Desktop only; off until you turn it on. See docs/mcp.md for how to connect a client.",
+  },
+  mcpPort: {
+    name: "Agent access (MCP) — port",
+    desc: `The loopback port the server listens on (${MCP_PORT_MIN}–${MCP_PORT_MAX}). Change it if something else on this computer already holds it.`,
+  },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
+
+/** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */
+export const MCP_TOKEN_COPY = {
+  name: "Agent access (MCP) — token",
+  desc: "The bearer token an agent must send. Copy it into your MCP client's configuration. Treat it as a password: anything holding it can change every board in this vault.",
+  button: "Copy token",
+  copied: "Token copied to the clipboard.",
+  missing: "Turn agent access on first — the token is generated then.",
+} as const;
 
 /** Placeholder shown in the "Your name" field. */
 export const USER_NAME_PLACEHOLDER = "Alex";
@@ -161,22 +187,23 @@ const toNumber = (value: unknown): number | null => {
  */
 export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
   if (isToggleKey(key)) return typeof value === "boolean" ? { [key]: value } : null;
-  switch (key) {
-    case "detailWidth": {
-      const n = toNumber(value);
-      return n === null
-        ? null
-        : { detailWidth: clamp(Math.round(n), DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX) };
-    }
-    case "cardNextTodos": {
-      const n = toNumber(value);
-      return n === null ? null : { cardNextTodos: clamp(Math.round(n), 0, CARD_NEXT_TODOS_MAX) };
-    }
-    case "userName":
-      return typeof value === "string" ? { userName: value.trim() } : null;
-    default:
-      return dropdownPatchFor(key, value);
-  }
+  if (key === "userName") return typeof value === "string" ? { userName: value.trim() } : null;
+  return numberPatchFor(key, value) ?? dropdownPatchFor(key, value);
+}
+
+/** The bounds of every setting that is a number, so a value out of range is pulled in, not refused. */
+const NUMBER_RANGES = {
+  detailWidth: [DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX],
+  cardNextTodos: [0, CARD_NEXT_TODOS_MAX],
+  mcpPort: [MCP_PORT_MIN, MCP_PORT_MAX],
+} as const satisfies Partial<Record<EditableSettingKey, readonly [number, number]>>;
+
+/** The patch a numeric setting's new value means, or `null` when `key` is not one, or not a number. */
+function numberPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
+  if (!hasOwn(NUMBER_RANGES, key)) return null;
+  const [min, max] = NUMBER_RANGES[key as keyof typeof NUMBER_RANGES];
+  const n = toNumber(value);
+  return n === null ? null : { [key]: clamp(Math.round(n), min, max) };
 }
 
 /** The patch a dropdown's new value means, or `null` when the setting does not offer that value. */
@@ -198,6 +225,7 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
 export function settingDefinitions(
   read: () => KanbanSettings,
   version: string,
+  copyToken: () => void,
 ): SettingDefinitionItem[] {
   const dropdown = (key: DropdownKey, disabled?: () => boolean): SettingDefinitionItem => ({
     ...SETTING_COPY[key],
@@ -242,6 +270,23 @@ export function settingDefinitions(
     dropdown("historyScope"),
     dropdown("boardPan"),
     ...TOGGLE_SETTING_KEYS.map(toggle),
+    {
+      ...SETTING_COPY.mcpPort,
+      control: {
+        type: "number",
+        key: "mcpPort",
+        min: MCP_PORT_MIN,
+        max: MCP_PORT_MAX,
+        step: 1,
+        disabled: () => !read().mcpEnabled,
+      },
+    },
+    {
+      name: MCP_TOKEN_COPY.name,
+      desc: MCP_TOKEN_COPY.desc,
+      action: copyToken,
+      disabled: () => !read().mcpEnabled,
+    },
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     { name: VERSION_SETTING_NAME, desc: version },
   ];

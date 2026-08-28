@@ -7,7 +7,8 @@
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
 import type { Board } from "./types";
-import { moveCard, resolveDrop } from "./board";
+import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
+import { dedupePriorities } from "./priorities";
 import type { CardRepository } from "./repo";
 
 /** Where a move lands: a column, and a slot in it. An absent `index` means the end of the column. */
@@ -54,4 +55,45 @@ export async function moveCardOver(
     columnId: resolved.columnId,
     index: resolved.index,
   });
+}
+
+/**
+ * Tick or untick one `## Subtasks` line, and keep the line's `[status:: …]` claim from telling a
+ * different story than its checkbox. Two writes rather than one, so the toggle still appends its
+ * own history line exactly as it did before the claim existed.
+ */
+export async function setSubtaskDone(
+  repo: CardRepository,
+  board: Board,
+  target: { path: string; index: number; done: boolean },
+): Promise<void> {
+  const { path, index, done } = target;
+  await repo.toggleSubtask(path, index, done);
+  const sync = syncSubtaskClaim(board, path, { index }, done);
+  if (sync) await repo.applyMove(sync);
+}
+
+/**
+ * Set (or, with an empty value, clear) a card's priority and let the board note learn from it.
+ *
+ * `learn` is what the board should be told it uses once the write lands, and it is the caller's
+ * to decide: the board view hands over every value its cards currently carry, so a priority
+ * hand-written into a note outlives that note; a headless caller usually knows only the value it
+ * just set. Either way the value being set is learned, and clearing one learns nothing — a removal
+ * is not a statement about the board's vocabulary.
+ */
+export async function setCardPriority(
+  repo: CardRepository,
+  target: { path: string; value: string },
+  learn: readonly string[] = [],
+): Promise<void> {
+  const value = target.value.trim();
+  // An empty value clears the key cleanly (the `priority:` line goes away) rather than writing a
+  // stray empty value and a misleading `Priority → ` history line.
+  if (value === "") {
+    await repo.unsetFrontmatterKey(target.path, "priority");
+    return;
+  }
+  await repo.setFrontmatter(target.path, { priority: value });
+  await repo.rememberPriorities(dedupePriorities([...learn, value]));
 }

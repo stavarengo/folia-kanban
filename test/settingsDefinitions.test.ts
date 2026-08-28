@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CARD_NEXT_TODOS_MAX,
+  MCP_TOKEN_COPY,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -13,10 +14,14 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
+  MCP_PORT_MAX,
+  MCP_PORT_MIN,
   type KanbanSettings,
 } from "../src/settings";
 
-const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3");
+const noop = (): void => {};
+
+const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", noop);
 
 /** The keys of every `control` row of the declarative tab, in the order it renders them. */
 const controlKeys = definitions.flatMap((d) =>
@@ -42,7 +47,7 @@ describe("settingDefinitions", () => {
   // drift the first time one of them is reworded.
   it("is the only place the imperative tab can get a setting's wording from", () => {
     const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
-    for (const copy of Object.values(SETTING_COPY)) {
+    for (const copy of [...Object.values(SETTING_COPY), MCP_TOKEN_COPY]) {
       expect(main).not.toContain(JSON.stringify(copy.name).slice(1, -1));
       expect(main).not.toContain(JSON.stringify(copy.desc).slice(1, -1));
     }
@@ -54,7 +59,7 @@ describe("settingDefinitions", () => {
 
   it("disables the rows that depend on another setting only while that setting says so", () => {
     const disabledOf = (key: string, settings: KanbanSettings): boolean => {
-      const def = settingDefinitions(() => settings, "1.2.3").find(
+      const def = settingDefinitions(() => settings, "1.2.3", noop).find(
         (d) => "control" in d && d.control?.key === key,
       );
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
@@ -123,8 +128,24 @@ describe("settingsPatchFor", () => {
       // render, click, and silently never persist.
       expect(settingsPatchFor(key, "true")).toBeNull();
       expect(settingsPatchFor(key, 1)).toBeNull();
-      expect(DEFAULT_SETTINGS[key]).toBe(true);
+      expect(typeof DEFAULT_SETTINGS[key]).toBe("boolean");
     }
+  });
+
+  it("keeps the board-setup affordances on and agent access off out of the box", () => {
+    expect(DEFAULT_SETTINGS.boardSetupCommands).toBe(true);
+    expect(DEFAULT_SETTINGS.boardSetupFileMenu).toBe(true);
+    expect(DEFAULT_SETTINGS.boardSetupEditorMenu).toBe(true);
+    // Agent access opens a port; nothing should do that until the user asks for it.
+    expect(DEFAULT_SETTINGS.mcpEnabled).toBe(false);
+    expect(DEFAULT_SETTINGS.mcpToken).toBe("");
+  });
+
+  it("holds the MCP port to the unprivileged range", () => {
+    expect(settingsPatchFor("mcpPort", "8080")).toEqual({ mcpPort: 8080 });
+    expect(settingsPatchFor("mcpPort", 80)).toEqual({ mcpPort: MCP_PORT_MIN });
+    expect(settingsPatchFor("mcpPort", 999999)).toEqual({ mcpPort: MCP_PORT_MAX });
+    expect(settingsPatchFor("mcpPort", "not a port")).toBeNull();
   });
 
   it("trims the name comments are signed with", () => {
