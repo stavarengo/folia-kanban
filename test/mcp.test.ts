@@ -930,6 +930,10 @@ describe("text that would be read back as the board's own structure", () => {
     expect((await repo.readBody("Tasks/Ship it.md")).history).toEqual([]);
   });
 
+  // The property that matters is that the reported index names the text the caller sent, whatever
+  // else the section already held. With a line break refused above, nothing reachable can put the
+  // caller's line anywhere but last — so this pins the promise rather than one implementation of
+  // it, and the guard against reporting some other line stays cheap either way.
   it("reports the index of the line the caller actually added", async () => {
     const { host } = fixture();
     await call(host, "add_subtask", { board: "Board.md", card: "Tasks/Ship it.md", text: "first" });
@@ -972,5 +976,31 @@ describe("get_card answering about a card the board draws inside its parent", ()
       card: "Tasks/Child.md",
     })) as { column: string | null };
     expect(card.column).toBe("todo");
+  });
+});
+
+describe("a description that opens with a heading the card reads as its title", () => {
+  // Saved, the line is not description at all: it is where the title comes from, so it is eaten
+  // and never comes back. The call reported success over text that was already gone.
+  it("is refused rather than silently swallowed", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        description: "# Injected\n\nreal body",
+      }),
+    ).rejects.toThrow(/reads its title/);
+    expect((await repo.readBody("Tasks/Ship it.md")).description).not.toBe("real body");
+  });
+
+  it("still allows a smaller heading, which survives the round trip", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      description: "## Question\n\nwhy?",
+    });
+    expect((await repo.readBody("Tasks/Ship it.md")).description).toBe("## Question\n\nwhy?");
   });
 });

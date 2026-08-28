@@ -237,3 +237,98 @@ describe("two agents at once", () => {
     expect(new Set(orders).size).toBe(2);
   });
 });
+
+describe("a call that outruns the deadline", () => {
+  /** A host whose board reads take `delay` ms, and a log of when each call is inside one. */
+  function slowServer(delay: number, deadline: number) {
+    const events: string[] = [];
+    let seq = 0;
+    const slow = new FakeRepo(config, {
+      "Tasks/A card.md": { fm: { status: "todo", order: 1 }, body: "" },
+    });
+    const realLoad = slow.loadBoard.bind(slow);
+    slow.loadBoard = async () => {
+      const n = seq++;
+      events.push(`enter${n}`);
+      await new Promise((r) => setTimeout(r, delay));
+      events.push(`leave${n}`);
+      return await realLoad();
+    };
+    return {
+      events,
+      start: () =>
+        startMcpServer({
+          host: {
+            listBoards: () => [{ path: "Board.md", name: "Board" }],
+            repoFor: (p) => (p === "Board.md" ? slow : null),
+          },
+          info: { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" },
+          port: 0,
+          token: TOKEN,
+          handlingTimeoutMs: deadline,
+        }),
+    };
+  }
+
+  // The queue exists so that two writes never compute against the same snapshot of the board. A
+  // timeout that let the queue advance would give that up exactly when the board is slow enough
+  // for it to matter — the client is released, the work is not.
+  it("still lets no two calls into the board at once", async () => {
+    const { events, start } = slowServer(200, 50);
+    const slowSrv = await start();
+    const call = (id: number) =>
+      fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: "get_board", arguments: { board: "Board.md" } },
+        }),
+      });
+    const [a, b] = await Promise.all([call(1), call(2)]);
+    expect([a.status, b.status]).toEqual([504, 504]);
+    // Both calls are still running at this point — that is the whole point of the 504. Wait for
+    // them to finish before judging the order they went through the board in.
+    await new Promise((r) => setTimeout(r, 600));
+    // Interleaved would read enter0, enter1, leave0, leave1.
+    expect(events).toEqual(["enter0", "leave0", "enter1", "leave1"]);
+    await slowSrv.close();
+  });
+
+  // A bare `{error}` body would be unattributable: the client could not tell which of its calls
+  // had timed out, and nothing would warn it that retrying may double the write.
+  it("answers as JSON-RPC, keeping the call's id, and says the call may still be running", async () => {
+    const { start } = slowServer(200, 50);
+    const slowSrv = await start();
+    const res = await fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "abc",
+        method: "tools/call",
+        params: { name: "get_board", arguments: { board: "Board.md" } },
+      }),
+    });
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as JsonRpcResponse;
+    expect(body.id).toBe("abc");
+    expect(body.error?.message).toMatch(/still running/);
+    await new Promise((r) => setTimeout(r, 300));
+    await slowSrv.close();
+  });
+
+  it("does not fire for a call that finishes in time", async () => {
+    const { start } = slowServer(5, 5_000);
+    const slowSrv = await start();
+    const res = await fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    expect(res.status).toBe(200);
+    await slowSrv.close();
+  });
+});

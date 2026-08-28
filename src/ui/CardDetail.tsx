@@ -1433,7 +1433,9 @@ export function CardDetail({
                   Not saved: <code>{descRefusal.line}</code>{" "}
                   {descRefusal.kind === "heading"
                     ? "would start a section the plugin owns (Subtasks, Comments, History), and everything below it would leave the description. Rename the heading, or quote it inside a code fence."
-                    : "opens a code block that is never closed, so it would run to the end of the note and swallow the sections after it. Close the fence."}
+                    : descRefusal.kind === "title"
+                      ? "is where the card's title is read from, so saving it would swallow the line and it would not come back. Use a smaller heading, or put it after a line of text."
+                      : "opens a code block that is never closed, so it would run to the end of the note and swallow the sections after it. Close the fence."}
                 </p>
               )}
               {body && body.description !== descBase.current && (

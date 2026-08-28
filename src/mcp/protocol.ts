@@ -78,7 +78,7 @@ function toolListing(tool: ToolDefinition): Record<string, unknown> {
  * two types JSON-RPC allows count; anything else is as good as absent, and `null` is what the spec
  * says to answer with when the id cannot be determined.
  */
-function idOf(message: unknown): string | number | null {
+export function idOf(message: unknown): string | number | null {
   if (!message || typeof message !== "object") return null;
   const id: unknown = (message as { id?: unknown }).id;
   return typeof id === "string" || typeof id === "number" ? id : null;

@@ -13,7 +13,13 @@
 
 import { Platform } from "obsidian";
 import type { BoardHost } from "../mcp/host";
-import { PROTOCOL_VERSION, handleMessage, jsonRpcError, type ServerInfo } from "../mcp/protocol";
+import {
+  PROTOCOL_VERSION,
+  handleMessage,
+  idOf,
+  jsonRpcError,
+  type ServerInfo,
+} from "../mcp/protocol";
 
 type IncomingMessage = import("http").IncomingMessage;
 type ServerResponse = import("http").ServerResponse;
@@ -33,7 +39,7 @@ const HEADERS_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * How long one call may hold the queue before it is answered for. Node's own timeouts bound how
+ * How long one call may run before the client is told it is still waiting. Node's own timeouts bound how
  * long a client may take to *send* a request; nothing bounds how long answering one takes, and
  * because calls are answered strictly one at a time, a read that never settles would stop the
  * server answering anything again until the plugin is reloaded.
@@ -41,6 +47,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const HANDLING_TIMEOUT_MS = 60_000;
 
 const PARSE_ERROR = -32700;
+const INTERNAL_ERROR = -32603;
 
 export interface McpServerOptions {
   host: BoardHost;
@@ -48,6 +55,9 @@ export interface McpServerOptions {
   port: number;
   /** The bearer token every request must carry. Never empty — the server refuses to start. */
   token: string;
+  /** How long one call may take before the client is told it is still waiting. Tests set it low;
+   *  everything else takes {@link HANDLING_TIMEOUT_MS}. */
+  handlingTimeoutMs?: number;
 }
 
 export interface RunningMcpServer {
@@ -160,7 +170,20 @@ function reject(
   return null;
 }
 
-async function respond(req: IncomingMessage, res: ServerResponse, options: McpServerOptions) {
+/**
+ * Everything that can be decided about a request without touching the board: auth, path, method,
+ * and the body. Returns the parsed message wrapped, or `null` when the request has already been
+ * answered — wrapped because a parsed body may legitimately be any value at all, `null` included.
+ *
+ * Deliberately outside the one-at-a-time queue. None of it reads or writes a card, so none of it
+ * needs the lock — and a client that dribbles its body in would otherwise hold every other call up
+ * while it did.
+ */
+async function prepare(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: McpServerOptions,
+): Promise<{ message: unknown } | null> {
   // Set before anything can go wrong, so a refusal identifies the protocol it is refusing under
   // too. A client deciding whether it is talking to a server it understands should not have to
   // guess from a 401.
@@ -170,7 +193,7 @@ async function respond(req: IncomingMessage, res: ServerResponse, options: McpSe
     if (refusal.status === 401) res.setHeader("www-authenticate", "Bearer");
     if (refusal.status === 405) res.setHeader("allow", "POST");
     send(res, refusal.status, refusal.body);
-    return;
+    return null;
   }
   let message: unknown;
   try {
@@ -178,38 +201,71 @@ async function respond(req: IncomingMessage, res: ServerResponse, options: McpSe
   } catch (e) {
     if (e instanceof BodyTooLarge) {
       send(res, 413, { error: e.message });
-      return;
+      return null;
     }
     send(res, 400, jsonRpcError(null, PARSE_ERROR, e instanceof Error ? e.message : String(e)));
-    return;
+    return null;
   }
   if (Array.isArray(message)) {
     send(res, 400, jsonRpcError(null, PARSE_ERROR, "Batched requests are not supported."));
-    return;
+    return null;
   }
+  return { message };
+}
+
+/** Answer one prepared message. This is the part that reads and writes the board. */
+async function dispatch(
+  res: ServerResponse,
+  options: McpServerOptions,
+  message: unknown,
+): Promise<void> {
   const reply = await handleMessage(options.host, options.info, message);
   // A notification is acknowledged and nothing more, which is what 202 is for.
   send(res, reply ? 200 : 202, reply);
 }
 
 /**
- * Answer for a call that has taken too long, so the queue behind it moves. The call itself is not
- * cancellable — it may be mid-write — so this only stops it holding everyone else up; whatever it
- * was doing still finishes, and `send` ignores its reply when it comes.
+ * Tell the client we have stopped waiting, once a call has taken too long.
  *
- * `AbortSignal.timeout` rather than a timer of our own: its timer is unref'd, so a pending one
- * never keeps the process alive, and it is the same call in Electron and under Node, where these
- * tests run without a `window` to reach for.
+ * It does NOT release the queue. The call is still running and still holds its turn, because the
+ * queue exists so that no two writes ever compute against the same snapshot of the board — trading
+ * that away to unblock a stuck call would swap a stall for silently interleaved writes, which is
+ * the bug the queue was built to prevent and a far worse one to have. So this frees the client to
+ * stop waiting; the board stays consistent, and a call that truly never returns still needs the
+ * plugin reloaded.
+ *
+ * `settled` cancels the timer, so a request that finishes normally leaves nothing behind.
  */
-function giveUpAfter(res: ServerResponse): Promise<void> {
+function answerLate(
+  res: ServerResponse,
+  settled: Promise<unknown>,
+  ms: number,
+  id: string | number | null,
+): Promise<void> {
+  const finished = new AbortController();
+  void settled.then(
+    () => finished.abort(),
+    () => finished.abort(),
+  );
   return new Promise((resolve) => {
-    AbortSignal.timeout(HANDLING_TIMEOUT_MS).addEventListener(
+    AbortSignal.timeout(ms).addEventListener(
       "abort",
       () => {
-        send(res, 504, { error: "The board plugin took too long to answer this call." });
+        // A JSON-RPC error rather than a bare object, so the client can match it to the call it
+        // sent. It says the call may still be running because it is: retrying a create_card whose
+        // 504 arrived early is how a board ends up with the card twice.
+        send(
+          res,
+          504,
+          jsonRpcError(
+            id,
+            INTERNAL_ERROR,
+            "The board plugin has not answered this call yet. It is still running and may still complete — check the board before sending it again.",
+          ),
+        );
         resolve();
       },
-      { once: true },
+      { once: true, signal: finished.signal },
     );
   });
 }
@@ -229,13 +285,23 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
   // the transport imposes it. A board call is milliseconds of local file work; nothing is waiting
   // long enough for the lost parallelism to matter.
   let turn: Promise<void> = Promise.resolve();
+  const deadline = options.handlingTimeoutMs ?? HANDLING_TIMEOUT_MS;
   const server: Server = createServer((req, res) => {
-    const answer = () =>
-      Promise.race([respond(req, res, options), giveUpAfter(res)]).catch(() => {
-        if (!res.headersSent) send(res, 500, { error: "The board plugin failed to answer." });
-        else res.end();
-      });
-    turn = turn.then(answer, answer);
+    void (async () => {
+      const prepared = await prepare(req, res, options);
+      if (prepared === null) return;
+      const { message } = prepared;
+      const work = () => dispatch(res, options, message);
+      // `turn` is chained on the work itself and never on the deadline: the queue's whole purpose
+      // is that two board calls never overlap, and letting it advance on a timeout would give that
+      // up exactly when the board is slow enough for it to matter.
+      const done = turn.then(work, work);
+      turn = done;
+      await Promise.race([done, answerLate(res, done, deadline, idOf(message))]);
+    })().catch(() => {
+      if (!res.headersSent) send(res, 500, { error: "The board plugin failed to answer." });
+      else res.end();
+    });
   });
   // Because calls are answered one at a time, a request that stalls is not its own problem: it is
   // everyone's, for as long as it lasts. Node's defaults would hold the queue for five minutes on
