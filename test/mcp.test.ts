@@ -347,6 +347,19 @@ describe("the JSON-RPC layer", () => {
     expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter.status).toBe("done");
   });
 
+  // A client matches a reply to its call by id. Answering `null` to a malformed request hands it
+  // an error it cannot attribute to anything it sent — the one failure it most needs to place.
+  it("keeps the id of a malformed request, so the client can place the error", async () => {
+    const reply = await send({ jsonrpc: "2.0", id: 7, method: 123 });
+    expect(reply?.id).toBe(7);
+    expect(reply?.error?.code).toBe(-32600);
+  });
+
+  it("still answers with a null id when the request carries none it can use", async () => {
+    const reply = await send({ hello: "there" });
+    expect(reply?.id).toBeNull();
+  });
+
   it("answers ping", async () => {
     const reply = await send({ jsonrpc: "2.0", id: 7, method: "ping" });
     expect(reply?.result).toEqual({});
@@ -698,5 +711,150 @@ describe("two cards that each claim the other as their parent", () => {
     const board = await repo.loadBoard();
     expect(board.columns["done"]).toContain("Tasks/A.md");
     expect(board.columns["todo"]).toContain("Tasks/B.md");
+  });
+});
+
+describe("ticking a checklist line that names a child note", () => {
+  /** A parent whose subtask list links a child card, which is what `kind: "card"` means. */
+  function withChild(childStatus = "doing"): Fixture {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { status: childStatus, order: 1 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    return {
+      repo,
+      host: {
+        listBoards: () => [{ path: "Board.md", name: "Board" }],
+        repoFor: (path) => (path === "Board.md" ? repo : null),
+      },
+    };
+  }
+
+  // The promise the whole server rests on is that an agent's write is what a person's click
+  // produces. The detail panel passes the line's `[[link]]` when it ticks one, and without it the
+  // move that should follow is refused — leaving the box ticked and the child where it was.
+  it("moves the child to Done, the way the detail panel does", async () => {
+    const { host, repo } = withChild();
+    await call(host, "set_subtask_done", {
+      board: "Board.md",
+      card: "Tasks/Parent.md",
+      index: 0,
+      done: true,
+    });
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Child.md"]?.frontmatter.status).toBe("done");
+    expect((await repo.readBody("Tasks/Child.md")).history.map((h) => h.text)).toEqual([
+      "Moved from Doing to Done",
+    ]);
+  });
+
+  it("brings the child back out of Done when the box is unticked", async () => {
+    const { host, repo } = withChild("done");
+    await call(host, "set_subtask_done", {
+      board: "Board.md",
+      card: "Tasks/Parent.md",
+      index: 0,
+      done: false,
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Child.md"]?.frontmatter.status).not.toBe("done");
+  });
+});
+
+describe("a board whose relationship keys an agent might write by hand", () => {
+  // The board really would draw the link, which is what makes this worth refusing: it looks like
+  // it worked, while skipping the history line the board records and the self-relation check.
+  it("refuses a relation key through properties and says why", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { blocks: "[[Write docs]]" },
+      }),
+    ).rejects.toThrow(/relationship key/);
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty(
+      "blocks",
+    );
+  });
+});
+
+describe("a column filled by a rule rather than by status", () => {
+  /** A board whose `research` column is an auto-populated lane. */
+  function laned(): Fixture {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "priority:high" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/A.md": { fm: { status: "todo", order: 1, priority: "high" }, body: "" },
+        "Tasks/B.md": { fm: { status: "todo", order: 2 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    return {
+      repo,
+      host: {
+        listBoards: () => [{ path: "Board.md", name: "Board" }],
+        repoFor: (path) => (path === "Board.md" ? repo : null),
+      },
+    };
+  }
+
+  // The board draws `A` in Research because it matches the rule, but that matching lives in the
+  // board view, above the port these tools read through. The listing here is the status bucket,
+  // which for a lane is a different set — so it says so rather than letting an agent read an empty
+  // `cards` as an empty lane.
+  it("says the listing is the status bucket, not the lane the board draws", async () => {
+    const { host } = laned();
+    const result = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { id: string; filter?: string; lane?: string; cards: unknown[] }[];
+    };
+    const research = result.columns.find((c) => c.id === "research");
+    expect(research?.filter).toBe("priority:high");
+    expect(research?.lane).toMatch(/filter rule/);
+    expect(research?.cards).toEqual([]);
+    // A plain column says nothing of the sort, because for it the two sets are the same.
+    expect(result.columns.find((c) => c.id === "todo")?.lane).toBeUndefined();
+  });
+
+  it("warns a write that claims a lane, because status is not what puts a card there", async () => {
+    const { host } = laned();
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: "Invisible",
+      column: "research",
+    })) as { warning?: string };
+    expect(created.warning).toMatch(/only draws it there if it matches the rule/);
+
+    const moved = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/B.md",
+      column: "research",
+    })) as { warning?: string };
+    expect(moved.warning).toMatch(/filled by the rule/);
+  });
+
+  it("says nothing extra about a move into an ordinary column", async () => {
+    const { host } = laned();
+    const moved = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/B.md",
+      column: "done",
+    })) as { warning?: string };
+    expect(moved.warning).toBeUndefined();
   });
 });

@@ -22,7 +22,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": true,
     },
-    "description": "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns.",
+    "description": "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns. A column carrying a \`filter\` rule is an auto-populated lane whose drawn contents this server cannot resolve; it is marked with a \`lane\` note saying so.",
     "inputSchema": {
       "properties": {
         "board": {

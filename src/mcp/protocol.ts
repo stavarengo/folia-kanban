@@ -73,6 +73,17 @@ function toolListing(tool: ToolDefinition): Record<string, unknown> {
   };
 }
 
+/**
+ * The id a message carries, for answering one that is otherwise too malformed to parse. Only the
+ * two types JSON-RPC allows count; anything else is as good as absent, and `null` is what the spec
+ * says to answer with when the id cannot be determined.
+ */
+function idOf(message: unknown): string | number | null {
+  if (!message || typeof message !== "object") return null;
+  const id: unknown = (message as { id?: unknown }).id;
+  return typeof id === "string" || typeof id === "number" ? id : null;
+}
+
 /** A tool result as MCP carries it: one text block holding the JSON the tool returned. */
 function toolResult(value: unknown, isError = false): Record<string, unknown> {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -151,7 +162,10 @@ export async function handleMessage(
   const parsed = MessageSchema.safeParse(message);
   if (!parsed.success) {
     if (message && typeof message === "object" && "result" in message) return null;
-    return jsonRpcError(null, INVALID_REQUEST, z.prettifyError(parsed.error));
+    // The rest of the message being malformed does not make its id unusable. A client matches the
+    // reply to the call by id, so answering `null` hands it an error it cannot attribute to
+    // anything it sent — the failure it most needs to attribute.
+    return jsonRpcError(idOf(message), INVALID_REQUEST, z.prettifyError(parsed.error));
   }
   const { method, params } = parsed.data;
   const id = parsed.data.id ?? null;

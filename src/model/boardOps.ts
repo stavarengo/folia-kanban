@@ -65,11 +65,20 @@ export async function moveCardOver(
 export async function setSubtaskDone(
   repo: CardRepository,
   board: Board,
-  target: { path: string; index: number; done: boolean },
+  target: { path: string; index: number; done: boolean; link?: string },
 ): Promise<void> {
-  const { path, index, done } = target;
+  const { path, index, done, link } = target;
   await repo.toggleSubtask(path, index, done);
-  const sync = syncSubtaskClaim(board, path, { index }, done);
+  // `link` matters: for a line naming a child note, `syncSubtaskClaim` refuses to act unless the
+  // caller shows the `[[link]]` it read, so that a line that has since been edited underneath is
+  // not acted on by index alone. A caller that leaves it out gets the checkbox written and the
+  // child left where it was — which is the parity this whole path exists to keep.
+  const sync = syncSubtaskClaim(
+    board,
+    path,
+    link === undefined ? { index } : { index, link },
+    done,
+  );
   if (sync) await repo.applyMove(sync);
 }
 

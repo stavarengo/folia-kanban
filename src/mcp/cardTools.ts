@@ -6,6 +6,7 @@ import { z } from "zod";
 import { columnOf, parseTodoPath } from "../model/board";
 import type { Board } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
+import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import {
   boardArg,
@@ -75,8 +76,23 @@ const dueDate = z
     "A due date must be written as YYYY-MM-DD, for example 2026-03-14.",
   );
 
-/** Refuse the keys a dedicated tool or field owns, naming the one that should have been used. */
-function refuseReservedKeys(properties: Record<string, unknown> | undefined): void {
+/**
+ * Refuse the keys a dedicated tool or field owns, naming the one that should have been used.
+ *
+ * The board's relationship keys are refused too, and those are not a fixed list: each board names
+ * its own in the board note, so they are read from its config rather than hardcoded. Written by
+ * hand, a relationship key looks like it worked — the board really does draw the link — while
+ * skipping the history line `addRelation` writes and the self-relation it refuses. There is no
+ * relationship tool yet to point at, so the error says so plainly instead of naming one.
+ */
+function refuseReservedKeys(board: Board, properties: Record<string, unknown> | undefined): void {
+  // Both ends of every type: a relationship is stored under its key on one card and its inverse on
+  // the other, so `blocked-by` written by hand is the same bypass as `blocks`. `BLOCKS` is in the
+  // set whether or not the board lists it — every board has it, including notes written before the
+  // vocabulary existed.
+  const relationKeys = new Set(
+    [BLOCKS, ...board.config.relations].flatMap((r) => [r.key, r.inverse]),
+  );
   for (const key of Object.keys(properties ?? {})) {
     // Own keys only, so a property named "toString" is an ordinary key rather than a match
     // against Object.prototype that reports native code back to the caller.
@@ -84,7 +100,30 @@ function refuseReservedKeys(properties: Record<string, unknown> | undefined): vo
       ? RESERVED_KEYS[key]
       : undefined;
     if (reserved) throw new ToolError(`"${key}" cannot be set through properties: ${reserved}.`);
+    if (relationKeys.has(key)) {
+      throw new ToolError(
+        `"${key}" is one of this board's relationship keys. Writing it here would add the link without the history line the board records for one, and without the check that stops a card relating to itself. This server has no relationship tool yet, so a relationship has to be made in Obsidian.`,
+      );
+    }
   }
+}
+
+/**
+ * A warning for a write that lands a card in a column with a filter rule, or `undefined` when there
+ * is nothing to warn about.
+ *
+ * Such a column is a lane: the board fills it from the rule, not from `status`. Setting a card's
+ * status to that column therefore does not put it in the lane, and because a card is only ever
+ * drawn in its own status column, one that does not match the rule is drawn nowhere at all. The
+ * board view has the same wart and accepts it, because a person dragging a card watches it happen;
+ * an agent gets no such feedback, so it is told. Refusing outright would be the other option, but
+ * the rule cannot be evaluated from here — it would refuse the moves that are perfectly fine along
+ * with the ones that are not.
+ */
+function laneWarning(board: Board, columnId: string): string | undefined {
+  const filter = board.config.columns.find((c) => c.id === columnId)?.filter;
+  if (!filter) return undefined;
+  return `Column "${columnId}" is filled by the rule \`${filter}\`, not by a card's status. This card now claims that column, but the board only draws it there if it matches the rule — check it with get_board, and set the fields the rule asks for if it has gone missing.`;
 }
 
 /**
@@ -100,6 +139,31 @@ async function writeField(
 ): Promise<void> {
   if (value === null) await repo.unsetFrontmatterKey(path, key);
   else await repo.setFrontmatter(path, { [key]: value });
+}
+
+/** The board really has that column, or an error naming the ones it does have. */
+function requireColumn(board: Board, columnId: string): void {
+  if (board.config.columns.some((c) => c.id === columnId)) return;
+  throw new ToolError(
+    `Board "${board.config.path}" has no column "${columnId}". Its columns are: ${board.config.columns.map((c) => c.id).join(", ")}.`,
+  );
+}
+
+/**
+ * A checklist line standing in a column of its own moves too — on its own line — so move_card is
+ * the one write that accepts a card with no note behind it. What it cannot do is take a slot: its
+ * position comes from where the line sits in its parent's checklist, which is not this tool's to
+ * rewrite. Saying so beats silently ignoring the argument.
+ */
+function refuseSlotForChecklistLine(
+  board: Board,
+  path: string,
+  args: { column: string; position?: number | undefined },
+): void {
+  if (!board.cards[path]?.todoRef || args.position === undefined) return;
+  throw new ToolError(
+    `"${path}" is a checklist line; it is ordered by its place in its parent's list, so move_card cannot give it a position. Drop the argument to move it to "${args.column}".`,
+  );
 }
 
 const createCard = tool({
@@ -122,11 +186,7 @@ const createCard = tool({
   }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
-    if (!board.config.columns.some((c) => c.id === args.column)) {
-      throw new ToolError(
-        `Board "${board.config.path}" has no column "${args.column}". Its columns are: ${board.config.columns.map((c) => c.id).join(", ")}.`,
-      );
-    }
+    requireColumn(board, args.column);
     const path = await repo.createCard(args.title, args.column);
     // The note exists from here on. A field write that fails afterwards must not be reported as
     // "create_card failed", because an agent hearing that creates the card again and the board
@@ -142,7 +202,8 @@ const createCard = tool({
         `Card "${path}" was created in "${args.column}", but filling in its fields failed: ${e instanceof Error ? e.message : String(e)}. The card is on the board — finish it with update_card rather than creating it again.`,
       );
     }
-    return { path, column: args.column };
+    const warning = laneWarning(board, args.column);
+    return { path, column: args.column, ...(warning === undefined ? {} : { warning }) };
   },
 });
 
@@ -164,21 +225,9 @@ const moveCard = tool({
   }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
-    if (!board.config.columns.some((c) => c.id === args.column)) {
-      throw new ToolError(
-        `Board "${board.config.path}" has no column "${args.column}". Its columns are: ${board.config.columns.map((c) => c.id).join(", ")}.`,
-      );
-    }
-    // A checklist line standing in a column of its own moves too — on its own line — so this is
-    // the one write that accepts a card without a note behind it. What it cannot do is take a slot:
-    // its position comes from where the line sits in its parent's checklist, which is not this
-    // tool's to rewrite. Saying so beats silently ignoring the argument.
+    requireColumn(board, args.column);
     const path = resolveCardPath(board, args.card);
-    if (board.cards[path]?.todoRef && args.position !== undefined) {
-      throw new ToolError(
-        `"${path}" is a checklist line; it is ordered by its place in its parent's list, so move_card cannot give it a position. Drop the argument to move it to "${args.column}".`,
-      );
-    }
+    refuseSlotForChecklistLine(board, path, args);
     const moved = await moveCardTo(repo, board, {
       path,
       columnId: args.column,
@@ -191,9 +240,11 @@ const moveCard = tool({
     }
     const after = await repo.loadBoard();
     const slot = (after.columns[args.column] ?? []).indexOf(path);
+    const warning = laneWarning(board, args.column);
     return {
       path,
       column: landedColumn(after, path),
+      ...(warning === undefined ? {} : { warning }),
       // Only a card with a tile of its own has a slot to report. One drawn inside its parent is
       // ordered by that parent, so a number here would be an invitation to move_card a position
       // this tool would refuse.
@@ -243,7 +294,7 @@ const updateCard = tool({
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
-    refuseReservedKeys(args.properties);
+    refuseReservedKeys(board, args.properties);
     if (args.description !== undefined) await repo.setDescription(path, args.description);
     if (args.priority !== undefined) {
       await setCardPriority(repo, { path, value: args.priority ?? "" }, board.config.priorities);
@@ -302,12 +353,21 @@ const setSubtask = tool({
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
     const subtasks = (await repo.readBody(path)).subtasks;
-    if (!subtasks.some((s) => s.index === args.index)) {
+    const line = subtasks.find((s) => s.index === args.index);
+    if (!line) {
       throw new ToolError(
         `"${path}" has no subtask ${args.index}. It has ${subtasks.length}, indexed ${subtasks.map((s) => s.index).join(", ") || "not at all"}.`,
       );
     }
-    await setSubtaskDone(repo, board, { path, index: args.index, done: args.done });
+    // The line's own `[[link]]` goes with it, exactly as the detail panel passes the subtask it
+    // drew. Without it a subcard line's checkbox is ticked and the child note is left where it was,
+    // which is the one thing this tool promises not to do.
+    await setSubtaskDone(repo, board, {
+      path,
+      index: args.index,
+      done: args.done,
+      ...(line.link === undefined ? {} : { link: line.link }),
+    });
     return { path, index: args.index, done: args.done };
   },
 });

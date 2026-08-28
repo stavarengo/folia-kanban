@@ -49,12 +49,14 @@ Every tool takes `board`, the vault path of the board note (`Work/Board.md`), ex
 | `get_card` | reads | One card in full: column, frontmatter, description, subtasks, comments, history, relationships. |
 | `create_card` | writes | Adds a card to a column, written into the board's card folder exactly as the add-card button writes it. Optional `description`, `priority`, `due`. |
 | `move_card` | writes | Moves a card to a `column`, optionally to a `position` in it (`0` is the top; omit to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist-line card takes no `position`: its order comes from where the line sits in its parent's list. The reply says which column the card landed in, and its `position` only when it has a tile of its own — a card drawn inside its parent is ordered by that parent, not by a slot. |
-| `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears a value; `""` sets an empty one. `due` is `YYYY-MM-DD` and is refused in any other shape, rather than written as prose the board cannot read. |
+| `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears any of them. `due` is `YYYY-MM-DD` and is refused in any other shape, rather than written as prose the board cannot read. |
 | `add_comment` | writes | Appends a comment to `## Comments`, timestamped and signed with the **Your name** setting. |
 | `add_subtask` | writes | Appends an unchecked line to `## Subtasks`. |
 | `set_subtask_done` | writes | Ticks or unticks one subtask by its `index`, as `get_card` reports it. A line claiming a column of its own is kept in step with its checkbox. |
 
 `update_card` refuses `status`, `order`, `priority`, `due`, `title` and `folia-board` inside `properties`, and says which tool or field owns each instead — so an agent cannot set a column by hand and skip the history line that move is owed, or retitle a card in the frontmatter while the file and every link to it keep the old name.
+
+An empty string is not a second way to clear a value, except for `priority`, where it always has been: clearing a priority is what the detail panel does when you empty the field, and the board treats the empty value as the absence of one. Everywhere else `""` is a value — `properties: { area: "" }` leaves an empty `area`, it does not remove it — and `due` refuses it outright, because an empty string is not a date. Use `null` when you mean remove.
 
 `update_card` also needs at least one field to change. That rule cannot be expressed in JSON Schema, so a client sees an all-optional object and meets the requirement as a tool error on the call.
 

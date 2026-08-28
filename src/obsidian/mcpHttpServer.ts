@@ -28,6 +28,10 @@ export const MCP_HOST = "127.0.0.1";
 /** A request body larger than this is refused unread: no board call needs a megabyte of JSON. */
 const MAX_BODY_BYTES = 1_000_000;
 
+/** How long a client gets to finish sending its headers, and then its whole request. */
+const HEADERS_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+
 const PARSE_ERROR = -32700;
 
 export interface McpServerOptions {
@@ -110,10 +114,12 @@ function readBody(req: IncomingMessage): Promise<string> {
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      // Stop reading, but leave the socket alive: the answer still has to reach the client, and a
-      // destroyed connection would reach it as a reset with nothing to learn from.
+      // Stop collecting, but leave the socket alive: the 413 still has to reach the client, and a
+      // destroyed connection would reach it as a reset with nothing to learn from. The rest of the
+      // body is drained rather than left unread, so what the client is still sending cannot be
+      // taken for the start of its next request on a kept-alive connection.
       if (size > MAX_BODY_BYTES) {
-        req.pause();
+        req.resume();
         reject(new BodyTooLarge(`Request body is larger than ${MAX_BODY_BYTES} bytes.`));
         return;
       }
@@ -144,6 +150,10 @@ function reject(
 }
 
 async function respond(req: IncomingMessage, res: ServerResponse, options: McpServerOptions) {
+  // Set before anything can go wrong, so a refusal identifies the protocol it is refusing under
+  // too. A client deciding whether it is talking to a server it understands should not have to
+  // guess from a 401.
+  res.setHeader("mcp-protocol-version", PROTOCOL_VERSION);
   const refusal = reject(req, options);
   if (refusal) {
     if (refusal.status === 401) res.setHeader("www-authenticate", "Bearer");
@@ -167,7 +177,6 @@ async function respond(req: IncomingMessage, res: ServerResponse, options: McpSe
     return;
   }
   const reply = await handleMessage(options.host, options.info, message);
-  res.setHeader("mcp-protocol-version", PROTOCOL_VERSION);
   // A notification is acknowledged and nothing more, which is what 202 is for.
   send(res, reply ? 200 : 202, reply);
 }
@@ -195,6 +204,13 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
       });
     turn = turn.then(answer, answer);
   });
+  // Because calls are answered one at a time, a request that stalls is not its own problem: it is
+  // everyone's, for as long as it lasts. Node's defaults would hold the queue for five minutes on
+  // a client that sends headers announcing a body and then goes quiet. These are generous for
+  // local file work measured in milliseconds and short enough that a dead client cannot wedge the
+  // server behind it.
+  server.headersTimeout = HEADERS_TIMEOUT_MS;
+  server.requestTimeout = REQUEST_TIMEOUT_MS;
   return await listen(server, options.port);
 }
 

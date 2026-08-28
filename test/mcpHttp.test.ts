@@ -195,6 +195,29 @@ describe("what the endpoint refuses before it means anything", () => {
     expect(res.status).toBe(413);
     expect((await res.json()) as { error: string }).toMatchObject({ error: /larger than/ });
   });
+
+  // The rest of an oversized body is drained rather than left sitting unread. On a kept-alive
+  // connection those bytes would otherwise be read as the start of whatever the client sent next,
+  // so the call after a 413 is the one that shows whether the socket was left usable.
+  it("leaves the connection able to carry the next call", async () => {
+    const big = await post({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ping",
+      params: "x".repeat(1_100_000),
+    });
+    expect(big.status).toBe(413);
+    const next = await rpc("ping");
+    expect(next.result).toEqual({});
+  });
+
+  // A client deciding whether it is talking to a protocol it understands should not have to infer
+  // it from a refusal.
+  it("names the protocol revision even when it refuses the request", async () => {
+    const res = await post({}, { headers: { authorization: "Bearer wrong" } });
+    expect(res.status).toBe(401);
+    expect(res.headers.get("mcp-protocol-version")).toBe("2025-06-18");
+  });
 });
 
 describe("two agents at once", () => {
