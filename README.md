@@ -91,7 +91,7 @@ A card's `## Subtasks` checklist holds two kinds of line, and both are *subitems
 
 But work does not always sit still with its ticket. A subitem can claim a column of its own, and then it leaves the group and stands in that column like any card: same tile, same drag, same place in the column's `sort`, `group`, `filter` and WIP count. In place of the nesting it carries a small **`↳ parent`** reference, so you can always see whose work it is (and click through to it).
 
-Search and the quick filters follow a nested subcard to any depth, not just what its parent shows: a checklist item or a subcard file that matches the search box or a token, but whose immediate parent does not, is lifted to the top level of the column it would otherwise inherit — with the same **`↳ parent`** reference — instead of staying invisible under a parent the filter skipped. A subcard whose parent also matches keeps its usual nested spot; one that matches nothing is hidden, wherever it sits.
+Search and the quick filters follow a nested subcard FILE to any depth, not just what its parent shows: one that matches the search box or a token, but whose immediate parent does not, is lifted to the top level of the column it would otherwise inherit — with the same **`↳ parent`** reference, though not draggable while it is showing there only because of the filter. A subcard whose parent also matches keeps its usual nested spot; one that matches nothing is hidden, wherever it sits. (A plain checklist item never needs this: it is either still inline on its card — reachable by whatever matches that card — or already standing in a column of its own, the case above.)
 
 **Where the claim is written** is the only difference between the two kinds, and it is the natural place for each:
 

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Board as BoardModel, ColumnDef } from "../model/types";
+import type { Board as BoardModel, Card, ColumnDef } from "../model/types";
 import {
   columnOf,
   findDoneColumn,
   moveCard,
   moveColumn,
   moveSubtask,
+  nestedCards,
   parseTodoPath,
   reassignColumn,
   relationCounts,
@@ -760,14 +761,24 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
+    const tally = (c: Card) => {
+      total++;
+      if (matchCard(c, filter, matchCtx)) match++;
+    };
     if (board) {
       for (const col of board.config.columns) {
         for (const p of board.columns[col.id] ?? []) {
           const c = board.cards[p];
-          if (!c) continue;
-          total++;
-          if (matchCard(c, filter, matchCtx)) match++;
+          if (c) tally(c);
         }
+      }
+      // A genuinely-nested, non-placed subcard has no column bucket of its own, but Column can now
+      // surface it — lifted to the top level of its inherited column — when it matches the filter
+      // on its own merits (see nestedCards). Leaving it out here would make the "N of M" count lie
+      // about what is actually on screen: a match the board is showing that the count denies.
+      for (const n of nestedCards(board)) {
+        const c = board.cards[n.path];
+        if (c) tally(c);
       }
     }
     return { total, match };

@@ -1914,7 +1914,11 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     // (Its title itself, not the "Part of Alpha" reference button Beta now carries.)
     expect(within(todoCol).queryByText("Alpha", { selector: ".folia-card-title" })).toBeNull();
     const beta = within(todoCol).getByText("Beta").closest(".folia-card") as HTMLElement;
-    expect(beta).not.toHaveClass("folia-card--nested");
+    // It is a top-level tile now — not inside a `.folia-subcard-group` — but not draggable either:
+    // it is not a member of any real column bucket while the filter narrows the view, so it renders
+    // without a drag affordance rather than risk a drop nothing can resolve.
+    expect(beta.closest(".folia-subcard-group")).toBeNull();
+    expect(beta.querySelector('[aria-roledescription="sortable"]')).toBeNull();
     expect(within(beta).getByRole("button", { name: /Part of Alpha/ })).toBeInTheDocument();
 
     // Clearing the filter restores the original nesting — nothing changes when no filter is active.
@@ -1947,7 +1951,8 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(within(todoCol).queryByText("Root", { selector: ".folia-card-title" })).toBeNull();
     expect(within(todoCol).queryByText("Mid", { selector: ".folia-card-title" })).toBeNull();
     const leaf = within(todoCol).getByText("Leaf").closest(".folia-card") as HTMLElement;
-    expect(leaf).not.toHaveClass("folia-card--nested");
+    expect(leaf.closest(".folia-subcard-group")).toBeNull();
+    expect(leaf.querySelector('[aria-roledescription="sortable"]')).toBeNull();
     // The reference names Leaf's IMMEDIATE parent, not the top-level ancestor.
     expect(within(leaf).getByRole("button", { name: /Part of Mid/ })).toBeInTheDocument();
   });
@@ -1977,6 +1982,41 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     );
     // ...while OtherChild does not match the filter and is hidden entirely, not lifted anywhere.
     expect(screen.queryByText("OtherChild")).toBeNull();
+  });
+
+  it("does not lift a nested card into a filter-lane column, even when it inherits the lane's id", async () => {
+    const user = userEvent.setup();
+    // "Research" is a filter-lane (pulls cards matching `area:research` cross-board). TopParent's
+    // own `status` happens to equal the lane's id, but its `area` does not match the lane's rule —
+    // so the lane's own display never pulls TopParent in. A nested child that inherits TopParent's
+    // column must not sneak into the lane just because it shares that column id: the lane's rule was
+    // never run against it.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/TopParent.md": {
+          fm: { type: "task", status: "research", area: "home" },
+          body: "\n# TopParent\n\n## Subtasks\n- [ ] [[Widget]]\n",
+        },
+        "Tasks/Widget.md": { fm: { type: "task" }, body: "\n# Widget\n" },
+      },
+    );
+    render_(repo);
+    await screen.findByText("Research");
+
+    await user.type(screen.getByLabelText("Search cards"), "widget");
+
+    const researchCol = screen.getByText("Research").closest("section") as HTMLElement;
+    expect(within(researchCol).queryByText("Widget")).toBeNull();
+    // Not shown anywhere else either — TopParent's own column never resolves to a lane rule it
+    // does not itself pass, and lifting into a lane is out of scope for this fix (see Column.tsx).
+    expect(screen.queryByText("Widget")).toBeNull();
   });
 });
 

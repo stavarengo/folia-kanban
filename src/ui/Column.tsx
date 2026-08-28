@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Board, ColumnDef } from "../model/types";
@@ -274,9 +274,19 @@ export function Column({
   // level of the column it would otherwise inherit, carrying a "part of <parent>" reference: the
   // same reference an explicitly-placed subitem already shows (`board.placedOf`). A parent that
   // DOES match keeps the child nested, filtered by SubcardGroup exactly as before.
+  //
+  // Scoped to a PLAIN column (`columnFilter == null`) on purpose: a filter-lane pulls its population
+  // by its own rule against top-level cards only (`topLevelPaths` above) — it has never reached into
+  // `childrenOf` — and lifting into it here would show a nested card the lane's own rule never
+  // vetted, just because it happens to inherit the lane's column id. That is a bigger feature (lanes
+  // reading nested cards) than this fix; a plain column's inherited-column lift is unaffected.
+  // `board` is the only input `nestedCards` reads — memoized here so a keystroke in the search box
+  // (which changes `filter`, not `board`) does not rebuild the whole-board column-index map on
+  // every column on every render; only a board reload does.
+  const boardNestedCards = useMemo(() => nestedCards(board), [board]);
   const liftedParentOf: Record<string, string> = {};
-  if (globalFiltering) {
-    for (const n of nestedCards(board)) {
+  if (globalFiltering && !columnFilter) {
+    for (const n of boardNestedCards) {
       if (n.column !== column.id) continue;
       const card = board.cards[n.path];
       if (!card || !matchCard(card, filter, matchCtx)) continue;
@@ -286,6 +296,7 @@ export function Column({
     }
     if (Object.keys(liftedParentOf).length > 0) paths = [...paths, ...Object.keys(liftedParentOf)];
   }
+  const liftedPaths = new Set(Object.keys(liftedParentOf));
 
   // A card's subitems toggle is only worth showing when expanding it would actually reveal
   // something — under an active filter that means at least one immediate child still matches
@@ -336,8 +347,15 @@ export function Column({
     path === relocActivePath && dragReloc ? dragReloc.activeId : makeCardDragId(column.id, path);
 
   // Flat list of rendered top-level cards' sortable ids in display order — the SortableContext item
-  // set (so dnd sortable identity matches what the user sees, even when grouped/sorted).
-  const orderedDragIds = groups.flatMap((g) => g.cards.map((c) => dragIdFor(c.path)));
+  // set (so dnd sortable identity matches what the user sees, even when grouped/sorted). A lifted
+  // card (see `liftedPaths` above) is excluded: it is not a member of ANY column's real bucket, so
+  // `resolveDrop`/`columnOf` cannot resolve a drop onto it, and a cross-column drag landing on it
+  // would apply `applyReloc` against a path `board.columns` does not hold. Rather than teach every
+  // drag-resolution helper a placement that only exists while a filter narrows the view, a lifted
+  // card renders non-draggable — the simplest behaviour that cannot silently fail or misfire.
+  const orderedDragIds = groups.flatMap((g) =>
+    g.cards.filter((c) => !liftedPaths.has(c.path)).map((c) => dragIdFor(c.path)),
+  );
 
   const count = countPaths.length;
   const overLimit = wipLimit != null && count > wipLimit;
@@ -482,22 +500,32 @@ export function Column({
             // the lane rule and the global search filter), so a filtered column only touches what
             // the user can see. The whole family, not just the top-level tiles: an "expand all"
             // that stopped there would leave a grandchild collapsed from an earlier individual
-            // toggle still hidden. Filtered to cards that actually have a toggle (subcard children
-            // OR an inline-todos preview) — a card with neither has no state to change, so giving
-            // it an override would just be a wasted `data.json` entry nothing ever reads.
+            // toggle still hidden. `subtreePaths` still walks the FULL board.childrenOf tree
+            // (it does not know about the filter), so under an active filter it is narrowed to
+            // cards that themselves match — the same test SubcardGroup applies to decide what it
+            // nests — so a non-matching, invisible descendant does not pick up a toggle override
+            // nothing on screen will ever read. Further filtered to cards that actually have a
+            // toggle (subcard children OR an inline-todos preview) — a card with neither has no
+            // state to change, so giving it an override would just be a wasted `data.json` entry.
             onCollapseAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths).filter((p) =>
-                  hasNestedSubitems(board, settings.cardNextTodos, p),
-                ),
+                subtreePaths(board, paths)
+                  .filter((p) => {
+                    const c = board.cards[p];
+                    return c != null && (!globalFiltering || matchCard(c, filter, matchCtx));
+                  })
+                  .filter((p) => hasNestedSubitems(board, settings.cardNextTodos, p)),
                 true,
               )
             }
             onExpandAll={() =>
               subitems.setMany(
-                subtreePaths(board, paths).filter((p) =>
-                  hasNestedSubitems(board, settings.cardNextTodos, p),
-                ),
+                subtreePaths(board, paths)
+                  .filter((p) => {
+                    const c = board.cards[p];
+                    return c != null && (!globalFiltering || matchCard(c, filter, matchCtx));
+                  })
+                  .filter((p) => hasNestedSubitems(board, settings.cardNextTodos, p)),
                 false,
               )
             }
@@ -516,9 +544,11 @@ export function Column({
                 <div key={c.path} className="folia-card-tree">
                   <CardItem
                     card={c}
-                    dragId={dragIdFor(c.path)}
+                    // A lifted card gets no dragId at all — see the note on `orderedDragIds` above.
+                    {...(liftedPaths.has(c.path) ? {} : { dragId: dragIdFor(c.path) })}
                     today={today}
                     selected={c.path === selectedPath}
+                    nested={liftedPaths.has(c.path)}
                     // Only a subitem standing in a column of its own is in `placedOf` (one still
                     // living with its card renders inside SubcardGroup below, where the nesting
                     // already says whose it is). So this doubles as "show the ↳ reference".

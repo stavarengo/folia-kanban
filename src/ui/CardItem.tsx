@@ -25,8 +25,10 @@ interface Props {
   dragId?: string;
   today: string;
   selected: boolean;
-  /** A nested subcard rendered inside its parent's `.folia-subcard-group`: not drag-reorderable,
-   *  rendered without a drag affordance, but keeps click/keyboard open and the context menu. */
+  /** A nested subcard rendered inside its parent's `.folia-subcard-group`, OR a subcard the active
+   *  filter lifted to a column's top level past a non-matching parent (Column): either way, not
+   *  drag-reorderable, rendered without a drag affordance, but keeps click/keyboard open and the
+   *  context menu. */
   nested?: boolean;
   /** Set when this tile is a SUBITEM sitting in a column of its own: the note it belongs to. Drives
    *  the `↳ parent` reference line that replaces the nesting as the visible sign of whose work it is. */
