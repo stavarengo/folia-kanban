@@ -154,6 +154,20 @@ export const MCP_TOKEN_COPY = {
   missing: "Turn agent access on first — the token is generated then.",
 } as const;
 
+/**
+ * The row that replaces the token. A password that cannot be changed is only a password until it
+ * leaks: pasted into the wrong window, committed with a config file, read off a shared screen.
+ * Switching agent access off and on again keeps the same token by design, so without this the only
+ * way out is hand-editing the plugin's data file.
+ */
+export const MCP_TOKEN_REGENERATE = {
+  name: "Agent access (MCP) — replace token",
+  desc: "Issue a new token and forget the old one. Every client configured with the old one stops being able to reach this vault until you paste the new one in.",
+  button: "Replace token",
+  done: "New token generated and copied to the clipboard.",
+  missing: "Turn agent access on first — the token is generated then.",
+} as const;
+
 /** Placeholder shown in the "Your name" field. */
 export const USER_NAME_PLACEHOLDER = "Alex";
 
@@ -225,7 +239,7 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
 export function settingDefinitions(
   read: () => KanbanSettings,
   version: string,
-  copyToken: () => void,
+  tokenActions: { copy: () => void; regenerate: () => void },
   desktop: boolean,
 ): SettingDefinitionItem[] {
   const dropdown = (key: DropdownKey, disabled?: () => boolean): SettingDefinitionItem => ({
@@ -290,7 +304,14 @@ export function settingDefinitions(
       name: MCP_TOKEN_COPY.name,
       desc: MCP_TOKEN_COPY.desc,
       visible: desktop,
-      action: copyToken,
+      action: tokenActions.copy,
+      disabled: () => !read().mcpEnabled,
+    },
+    {
+      name: MCP_TOKEN_REGENERATE.name,
+      desc: MCP_TOKEN_REGENERATE.desc,
+      visible: desktop,
+      action: tokenActions.regenerate,
       disabled: () => !read().mcpEnabled,
     },
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.

@@ -3,15 +3,17 @@
 // checkbox syncing and the fractional ordering it would have got from a person dragging it.
 
 import { z } from "zod";
-import { columnOf, parseTodoPath } from "../model/board";
+import { columnOf } from "../model/board";
 import type { Board } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
+import { descriptionRefusal } from "../model/card";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import {
   boardArg,
   cardArg,
   columnArg,
+  landedColumn,
   openBoard,
   resolveCardPath,
   resolveNotePath,
@@ -19,33 +21,6 @@ import {
   ToolError,
   type ToolDefinition,
 } from "./tool";
-
-/**
- * Which column a card ended up in, as the board draws it.
- *
- * `columnOf` answers from the column lists, and only a card with a tile of its own is in one. A
- * card nested under a parent that sits in the same column is drawn inside that parent instead, and
- * a checklist line that lands back in its parent's column stops being a card at all — the board
- * mints no tile for it. Asked about either, `columnOf` says `null`, which about a move that just
- * succeeded reads as failure and invites an agent to retry a write it already made. Both are in
- * their parent's column, so that is what to report.
- */
-function landedColumn(board: Board, path: string): string | null {
-  const seen = new Set<string>();
-  let at: string | undefined = path;
-  // Up the nesting until something has a tile: a child of a child drawn inside a grandparent is
-  // still in the grandparent's column. A cycle never gets walked at all — the board refuses to
-  // nest one and gives its members tiles of their own, so `columnOf` answers on the first look —
-  // but `parentOf` does link both ways across one, so `seen` keeps a board that changed underneath
-  // this from turning a wrong assumption into a hang.
-  while (at !== undefined && !seen.has(at)) {
-    const tiled = columnOf(board, at);
-    if (tiled !== null) return tiled;
-    seen.add(at);
-    at = board.placedOf[at] ?? board.parentOf[at] ?? parseTodoPath(at)?.parentPath;
-  }
-  return null;
-}
 
 /** Frontmatter this board owns through a dedicated tool or field; writing it by hand skips that. */
 const RESERVED_KEYS: Record<string, string> = {
@@ -141,6 +116,43 @@ async function writeField(
   else await repo.setFrontmatter(path, { [key]: value });
 }
 
+/**
+ * A description the plugin would read back as something other than a description is refused, using
+ * the same judgement the detail panel makes before it saves one.
+ *
+ * `setDescription` splices the text in verbatim, so a line reading `## History` inside it does not
+ * stay text: the note is parsed back and that heading starts the real History section. An agent
+ * could write its own audit trail, and sign a comment with the user's name, through the one tool
+ * whose whole purpose is that writes are accountable. The description also silently loses
+ * everything below the injected heading, so the call reports success over text that is largely
+ * gone. The panel refuses this and says why; so does this.
+ */
+function refuseUnsafeDescription(description: string): void {
+  const refusal = descriptionRefusal(description);
+  if (refusal === null) return;
+  throw new ToolError(
+    refusal.kind === "heading"
+      ? `That description contains "${refusal.line}", which starts a section the board owns. The note would read it as that section rather than as description, and everything after it would stop being description at all. Use add_comment for a comment; history is the board's to write.`
+      : `That description leaves a code fence open ("${refusal.line}"). Everything after it in the note, the board's own sections included, would be swallowed by the fence. Close it and try again.`,
+  );
+}
+
+/**
+ * Text that becomes one Markdown list item has to stay one line.
+ *
+ * A subtask and a comment are each written as a single `- …` line. A newline in the middle of one
+ * is not a longer entry — it is raw Markdown spliced into the note, which is enough to mint a
+ * second checklist line (with a `[status:: …]` claim, a whole card on the board) or to open a
+ * `## History` section and forge an entry in it. The panel's subtask control is a one-line input,
+ * so this is the first caller that could send a newline at all.
+ */
+function refuseMultilineEntry(what: "subtask" | "comment", text: string): void {
+  if (!/[\r\n]/.test(text)) return;
+  throw new ToolError(
+    `A ${what} is written as a single line, so its text cannot contain a line break — spliced into the note, the second line would be read as Markdown of its own rather than as part of what you wrote. Send it as one line${what === "comment" ? ", or as several comments" : ""}.`,
+  );
+}
+
 /** The board really has that column, or an error naming the ones it does have. */
 function requireColumn(board: Board, columnId: string): void {
   if (board.config.columns.some((c) => c.id === columnId)) return;
@@ -187,6 +199,8 @@ const createCard = tool({
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     requireColumn(board, args.column);
+    // Before the note exists, so a refused description does not leave an empty card behind.
+    if (args.description !== undefined) refuseUnsafeDescription(args.description);
     const path = await repo.createCard(args.title, args.column);
     // The note exists from here on. A field write that fails afterwards must not be reported as
     // "create_card failed", because an agent hearing that creates the card again and the board
@@ -295,7 +309,10 @@ const updateCard = tool({
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
     refuseReservedKeys(board, args.properties);
-    if (args.description !== undefined) await repo.setDescription(path, args.description);
+    if (args.description !== undefined) {
+      refuseUnsafeDescription(args.description);
+      await repo.setDescription(path, args.description);
+    }
     if (args.priority !== undefined) {
       await setCardPriority(repo, { path, value: args.priority ?? "" }, board.config.priorities);
     }
@@ -315,10 +332,15 @@ const addComment = tool({
   title: "Comment on a card",
   description:
     "Append a comment to a card's `## Comments` section, timestamped and signed with the name configured in the plugin's settings.",
-  input: z.object({ board: boardArg, card: cardArg, text: z.string().min(1) }),
+  input: z.object({
+    board: boardArg,
+    card: cardArg,
+    text: z.string().min(1).describe("The comment, as a single line."),
+  }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
+    refuseMultilineEntry("comment", args.text);
     await repo.addComment(path, args.text);
     return { path, comments: (await repo.readBody(path)).comments.length };
   },
@@ -328,13 +350,22 @@ const addSubtask = tool({
   name: "add_subtask",
   title: "Add a subtask",
   description: "Append an unchecked line to a card's `## Subtasks` checklist.",
-  input: z.object({ board: boardArg, card: cardArg, text: z.string().min(1) }),
+  input: z.object({
+    board: boardArg,
+    card: cardArg,
+    text: z.string().min(1).describe("The subtask, as a single line."),
+  }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
+    refuseMultilineEntry("subtask", args.text);
+    const before = (await repo.readBody(path)).subtasks.length;
     await repo.addTodo(path, args.text);
     const subtasks = (await repo.readBody(path)).subtasks;
-    return { path, index: subtasks.at(-1)?.index, subtasks: subtasks.length };
+    // The line this call added, which with one line written is the one after those already there.
+    // Reporting `at(-1)` would name whatever ended up last, and a follow-up set_subtask_done would
+    // tick that instead of the caller's own.
+    return { path, index: subtasks[before]?.index, subtasks: subtasks.length };
   },
 });
 

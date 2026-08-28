@@ -2,6 +2,7 @@
 // and the card it was asked about. The tools themselves live in boardTools.ts / cardTools.ts.
 
 import { z } from "zod";
+import { columnOf, parseTodoPath } from "../model/board";
 import type { Board } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { BoardHost } from "./host";
@@ -122,4 +123,31 @@ export function resolveNotePath(board: Board, ref: string): string {
   throw new ToolError(
     `"${path}" is a checklist line in "${todoRef.parentPath}", not a note of its own. Move it with move_card, or edit line ${todoRef.index} of that note with the subtask tools.`,
   );
+}
+
+/**
+ * Which column a card ended up in, as the board draws it.
+ *
+ * `columnOf` answers from the column lists, and only a card with a tile of its own is in one. A
+ * card nested under a parent that sits in the same column is drawn inside that parent instead, and
+ * a checklist line that lands back in its parent's column stops being a card at all — the board
+ * mints no tile for it. Asked about either, `columnOf` says `null`, which about a move that just
+ * succeeded reads as failure and invites an agent to retry a write it already made. Both are in
+ * their parent's column, so that is what to report.
+ */
+export function landedColumn(board: Board, path: string): string | null {
+  const seen = new Set<string>();
+  let at: string | undefined = path;
+  // Up the nesting until something has a tile: a child of a child drawn inside a grandparent is
+  // still in the grandparent's column. A cycle never gets walked at all — the board refuses to
+  // nest one and gives its members tiles of their own, so `columnOf` answers on the first look —
+  // but `parentOf` does link both ways across one, so `seen` keeps a board that changed underneath
+  // this from turning a wrong assumption into a hang.
+  while (at !== undefined && !seen.has(at)) {
+    const tiled = columnOf(board, at);
+    if (tiled !== null) return tiled;
+    seen.add(at);
+    at = board.placedOf[at] ?? board.parentOf[at] ?? parseTodoPath(at)?.parentPath;
+  }
+  return null;
 }

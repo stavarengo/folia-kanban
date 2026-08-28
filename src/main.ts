@@ -36,6 +36,7 @@ import {
 import {
   CARD_NEXT_TODOS_MAX,
   MCP_TOKEN_COPY,
+  MCP_TOKEN_REGENERATE,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
@@ -601,6 +602,23 @@ export default class FoliaKanbanPlugin extends Plugin {
     new Notice(MCP_TOKEN_COPY.copied, 3000);
   }
 
+  /**
+   * Replace the bearer token and put the new one on the clipboard, so the client that has to be
+   * reconfigured can be reconfigured in the same gesture. The running server restarts on the new
+   * token through the ordinary settings write, which means every client still holding the old one
+   * is locked out from that moment.
+   */
+  async regenerateMcpToken(): Promise<void> {
+    if (!this.settings.mcpEnabled) {
+      new Notice(MCP_TOKEN_REGENERATE.missing, 5000);
+      return;
+    }
+    const token = newMcpToken();
+    await this.updateSettings({ mcpToken: token });
+    await navigator.clipboard.writeText(token);
+    new Notice(MCP_TOKEN_REGENERATE.done, 5000);
+  }
+
   /** Re-render all open Folia Kanban views so settings changes reflect without a reload. */
   refreshViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_KANBAN)) {
@@ -674,7 +692,10 @@ class KanbanSettingTab extends PluginSettingTab {
     return settingDefinitions(
       () => this.plugin.settings,
       this.plugin.manifest.version,
-      () => void this.plugin.copyMcpToken(),
+      {
+        copy: () => void this.plugin.copyMcpToken(),
+        regenerate: () => void this.plugin.regenerateMcpToken(),
+      },
       Platform.isDesktop,
     );
   }
@@ -895,6 +916,17 @@ class KanbanSettingTab extends PluginSettingTab {
             .setButtonText(MCP_TOKEN_COPY.button)
             .setDisabled(!s.mcpEnabled)
             .onClick(() => void this.plugin.copyMcpToken()),
+        );
+
+      new Setting(containerEl)
+        .setName(MCP_TOKEN_REGENERATE.name)
+        .setDesc(MCP_TOKEN_REGENERATE.desc)
+        .setDisabled(!s.mcpEnabled)
+        .addButton((b) =>
+          b
+            .setButtonText(MCP_TOKEN_REGENERATE.button)
+            .setDisabled(!s.mcpEnabled)
+            .onClick(() => void this.plugin.regenerateMcpToken()),
         );
     }
 

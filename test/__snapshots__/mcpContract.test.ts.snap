@@ -247,6 +247,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "type": "string",
         },
         "text": {
+          "description": "The comment, as a single line.",
           "minLength": 1,
           "type": "string",
         },
@@ -279,6 +280,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "type": "string",
         },
         "text": {
+          "description": "The subtask, as a single line.",
           "minLength": 1,
           "type": "string",
         },
