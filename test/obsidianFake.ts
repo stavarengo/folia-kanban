@@ -76,6 +76,9 @@ interface PendingRender {
   finish: () => void;
 }
 
+/** Every suite runs on Node, which is the desktop as far as the plugin's platform check goes. */
+export const Platform = { isDesktop: true, isMobile: false };
+
 export const MarkdownRenderer = {
   /** Every render started and not yet finished, oldest first. */
   pending: [] as PendingRender[],

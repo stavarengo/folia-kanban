@@ -20,6 +20,7 @@ Columns, drag-and-drop, nested subcards, comments and an automatic history — b
 - [Unread comments](#unread-comments)
 - [Set up a board](#set-up-a-board)
 - [Settings](#settings)
+- [Agent access (MCP)](#agent-access-mcp)
 - [Keyboard & mouse](#keyboard--mouse)
 - [Your data stays yours](#your-data-stays-yours)
 - [Install](#install)
@@ -281,6 +282,18 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 - **Board setup — command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
 - **Board setup — file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
 - **Board setup — editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
+- **Agent access (MCP) — enable / port / token** — see [Agent access (MCP)](#agent-access-mcp).
+
+## Agent access (MCP)
+
+Off by default. Switch it on and the plugin hosts a [Model Context Protocol](https://modelcontextprotocol.io) server on `127.0.0.1`, so an AI agent can read and change your boards through the board's own rules rather than by editing the card files behind its back — which is the difference between a card that gets its history line and one that quietly does not. Desktop only, bearer-token authenticated, one server per vault, and the tools address boards by note path.
+
+```sh
+claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \
+  --header "Authorization: Bearer PASTE_YOUR_TOKEN_HERE"
+```
+
+The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/mcp.md).
 
 ## Keyboard & mouse
 
@@ -309,7 +322,7 @@ Edits are surgical: body changes splice only the section they touch, and frontma
 
 ## Install
 
-**Requirements:** Obsidian **1.7.2+**. Runs on desktop and mobile.
+**Requirements:** Obsidian **1.7.2+**. Runs on desktop and mobile ([agent access](#agent-access-mcp) is desktop only).
 
 ### From Community Plugins
 

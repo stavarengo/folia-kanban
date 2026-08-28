@@ -25,7 +25,7 @@
     "filesystem:check": "ls-lint",
     "architecture:check": "depcruise --config .dependency-cruiser.cjs src",
     "dead-code:check": "knip",
-    "contracts:check": "echo 'contracts:check — N/A: local Obsidian plugin, no REST/GraphQL/tRPC/network API to contract-check.'",
+    "contracts:check": "vitest run test/mcpContract.test.ts",
     "schema:check": "vitest run test/schema.test.ts",
     "docs:lint": "markdownlint-cli2",
     "docs:check": "pnpm docs:lint",

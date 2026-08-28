@@ -1,0 +1,337 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the MCP contract > publishes this exact tool surface, annotations and all 1`] = `
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "Every Folia Kanban board in the vault: a note carrying \`folia-board: true\`. Start here — every other tool addresses a board by the path this returns.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object",
+    },
+    "name": "list_boards",
+    "title": "List boards",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns. A column carrying a \`filter\` rule is an auto-populated lane whose drawn contents this server cannot resolve; it is marked with a \`lane\` note saying so.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+      ],
+      "type": "object",
+    },
+    "name": "get_board",
+    "title": "Read a board",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+    },
+    "description": "One card in full: its column, frontmatter, description, subtasks, comments, history and relationships.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+      ],
+      "type": "object",
+    },
+    "name": "get_card",
+    "title": "Read a card",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Add a card to a column. It is written into the board's card folder as a new note, exactly as the board's own add-card button writes it.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "column": {
+          "description": "Column id, as get_board reports it — not its title.",
+          "type": "string",
+        },
+        "description": {
+          "description": "Body text above the card's own sections.",
+          "type": "string",
+        },
+        "due": {
+          "description": "Due date, \`YYYY-MM-DD\`.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+        "priority": {
+          "description": "A priority value. One the board already uses is preferred; a new one is added to the board's vocabulary, exactly as typing one into the card's details does.",
+          "type": "string",
+        },
+        "title": {
+          "description": "The card's title; it also names the file.",
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+        "title",
+        "column",
+      ],
+      "type": "object",
+    },
+    "name": "create_card",
+    "title": "Create a card",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Move a card to a column, optionally to a given slot in it (0 is the top; leave it out to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+        "column": {
+          "description": "Column id, as get_board reports it — not its title.",
+          "type": "string",
+        },
+        "position": {
+          "description": "Slot in the target column, counted with this card taken out. Omit to append.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+        "column",
+      ],
+      "type": "object",
+    },
+    "name": "move_card",
+    "title": "Move a card",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Change a card's title, description, priority, due date or any other frontmatter property. Set a value to null to clear it. Use move_card for the column.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+        "description": {
+          "type": "string",
+        },
+        "due": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "description": "Due date \`YYYY-MM-DD\`, or null to clear it.",
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+          "description": "A priority value, or null to clear it. A value the board does not know yet is added to its vocabulary, exactly as typing one into the card's details does.",
+        },
+        "properties": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string",
+              },
+              {
+                "type": "number",
+              },
+              {
+                "type": "boolean",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "description": "Any other frontmatter keys to set, or null to remove.",
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "title": {
+          "description": "Retitles the card at whichever source its title comes from.",
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+      ],
+      "type": "object",
+    },
+    "name": "update_card",
+    "title": "Update a card",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Append a comment to a card's \`## Comments\` section, timestamped and signed with the name configured in the plugin's settings.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+        "text",
+      ],
+      "type": "object",
+    },
+    "name": "add_comment",
+    "title": "Comment on a card",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Append an unchecked line to a card's \`## Subtasks\` checklist.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+        "text": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+        "text",
+      ],
+      "type": "object",
+    },
+    "name": "add_subtask",
+    "title": "Add a subtask",
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+    },
+    "description": "Check or uncheck one \`## Subtasks\` line by its index, as get_card reports it. A line that claims a column of its own is kept in step with its checkbox.",
+    "inputSchema": {
+      "properties": {
+        "board": {
+          "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
+          "type": "string",
+        },
+        "card": {
+          "description": "Vault path of the card note, as get_board reports it. A card title also works.",
+          "type": "string",
+        },
+        "done": {
+          "type": "boolean",
+        },
+        "index": {
+          "description": "The subtask's \`index\`, as get_card reports it.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "board",
+        "card",
+        "index",
+        "done",
+      ],
+      "type": "object",
+    },
+    "name": "set_subtask_done",
+    "title": "Tick or untick a subtask",
+  },
+]
+`;
+
+exports[`the MCP contract > speaks a fixed protocol revision 1`] = `"2025-06-18"`;
