@@ -1896,6 +1896,90 @@ describe("search filter (single source of truth)", () => {
   });
 });
 
+describe("nested subcards under a filter (#20260826.10)", () => {
+  it("surfaces a matching subcard by search term, lifted to the top level with a parent reference", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    // Baseline (no filter): Beta renders nested under Alpha, not as a standalone top-level card.
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass(
+      "folia-card--nested",
+    );
+
+    await user.type(screen.getByLabelText("Search cards"), "beta");
+
+    // Alpha (Beta's parent) does not match "beta" itself, so it is not shown at all — and Beta is
+    // lifted to the column's top level instead of being hidden along with its non-matching parent.
+    // (Its title itself, not the "Part of Alpha" reference button Beta now carries.)
+    expect(within(todoCol).queryByText("Alpha", { selector: ".folia-card-title" })).toBeNull();
+    const beta = within(todoCol).getByText("Beta").closest(".folia-card") as HTMLElement;
+    expect(beta).not.toHaveClass("folia-card--nested");
+    expect(within(beta).getByRole("button", { name: /Part of Alpha/ })).toBeInTheDocument();
+
+    // Clearing the filter restores the original nesting — nothing changes when no filter is active.
+    await user.clear(screen.getByLabelText("Search cards"));
+    expect(await within(todoCol).findByText("Alpha")).toBeInTheDocument();
+    expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass(
+      "folia-card--nested",
+    );
+  });
+
+  it("lifts a matching grandchild past two non-matching ancestors, into its inherited column", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Mid]]\n",
+      },
+      "Tasks/Mid.md": {
+        fm: { type: "task" },
+        body: "\n# Mid\n\n## Subtasks\n- [ ] [[Leaf]]\n",
+      },
+      "Tasks/Leaf.md": { fm: { type: "task" }, body: "\n# Leaf\n" },
+    });
+    render_(repo);
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+
+    await user.type(screen.getByLabelText("Search cards"), "leaf");
+
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).queryByText("Root", { selector: ".folia-card-title" })).toBeNull();
+    expect(within(todoCol).queryByText("Mid", { selector: ".folia-card-title" })).toBeNull();
+    const leaf = within(todoCol).getByText("Leaf").closest(".folia-card") as HTMLElement;
+    expect(leaf).not.toHaveClass("folia-card--nested");
+    // The reference names Leaf's IMMEDIATE parent, not the top-level ancestor.
+    expect(within(leaf).getByRole("button", { name: /Part of Mid/ })).toBeInTheDocument();
+  });
+
+  it("keeps a matching child nested under a matching parent, and hides a non-matching sibling", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo", tags: ["urgent"] },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[MatchChild]]\n- [ ] [[OtherChild]]\n",
+      },
+      "Tasks/MatchChild.md": { fm: { type: "task", tags: ["urgent"] }, body: "\n# MatchChild\n" },
+      "Tasks/OtherChild.md": { fm: { type: "task" }, body: "\n# OtherChild\n" },
+    });
+    render_(repo);
+    await screen.findByText("Root", { selector: ".folia-card-title" });
+
+    await user.type(screen.getByLabelText("Search cards"), "urgent");
+
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    const rootTree = within(todoCol)
+      .getByText("Root", { selector: ".folia-card-title" })
+      .closest(".folia-card-tree") as HTMLElement;
+    // Root still matches, so MatchChild renders nested under it exactly as it does unfiltered...
+    expect(within(rootTree).getByText("MatchChild").closest(".folia-card")).toHaveClass(
+      "folia-card--nested",
+    );
+    // ...while OtherChild does not match the filter and is hidden entirely, not lifted anywhere.
+    expect(screen.queryByText("OtherChild")).toBeNull();
+  });
+});
+
 describe("settings context", () => {
   it("exposes the provided settings via useSettings()", () => {
     function Probe() {

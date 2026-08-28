@@ -603,6 +603,53 @@ export function subtreePaths(board: Board, roots: readonly string[]): string[] {
   return out;
 }
 
+/**
+ * Every card genuinely nested somewhere in the board that is NOT already surfacing as its own
+ * column entry — a real top-level card, or one already lifted into a column of its own via
+ * `placedOf` (see `buildBoard`). For each such subcard: the column it would render in if it stood
+ * at the top level (its own effective column, walking up through non-placed ancestors exactly as
+ * `buildBoard`'s own `effectiveColumnOf` does — `undefined` only for a board with no columns at
+ * all) and the parent it is nested directly under.
+ *
+ * Exists so a filtered view (Column) can lift a matching subcard to the top level of that column
+ * with a reference to its parent, instead of leaving it invisible under a parent that does not
+ * match. Cycle-safe: `buildBoard` already treats every member of a subcard cycle as a top-level
+ * card, so a cyclic chain always resolves through `columns` before this walk could loop — the
+ * `seen` guard only protects against that invariant ever slipping.
+ */
+export interface NestedCard {
+  path: string;
+  column: string | undefined;
+  parentPath: string;
+}
+
+export function nestedCards(board: Board): NestedCard[] {
+  const columnOfPath: Record<string, string> = {};
+  for (const [colId, paths] of Object.entries(board.columns)) {
+    for (const p of paths) columnOfPath[p] = colId;
+  }
+  const effectiveColumnOf = (path: string): string | undefined => {
+    let cur = path;
+    const seen = new Set<string>();
+    while (!(cur in columnOfPath)) {
+      if (seen.has(cur)) return undefined;
+      seen.add(cur);
+      const parent = board.parentOf[cur];
+      if (!parent) return undefined;
+      cur = parent;
+    }
+    return columnOfPath[cur];
+  };
+  const out: NestedCard[] = [];
+  for (const path of Object.keys(board.cards)) {
+    if (path in columnOfPath) continue;
+    const parentPath = board.parentOf[path];
+    if (!parentPath) continue;
+    out.push({ path, column: effectiveColumnOf(path), parentPath });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Drag reducer
 // ---------------------------------------------------------------------------

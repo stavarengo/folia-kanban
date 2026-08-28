@@ -18,6 +18,7 @@ import {
   makeCardDragId,
   moveCard,
   moveColumn,
+  nestedCards,
   planDrop,
   resolveDragReloc,
   resolveDrop,
@@ -204,6 +205,45 @@ describe("subtreePaths (§ collapse-all/expand-all root set)", () => {
   it("returns just the roots when none has children", () => {
     const b = buildBoard(config, [card("Solo", { status: "todo" })]);
     expect(subtreePaths(b, ["Tasks/Solo.md"])).toEqual(["Tasks/Solo.md"]);
+  });
+});
+
+describe("nestedCards (§ filters lift a matching subcard past a non-matching parent)", () => {
+  it("reports every genuinely-nested, non-placed card with its inherited column and parent", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", {}, ["Leaf"]),
+      card("Leaf", {}),
+    ]);
+    expect(nestedCards(b).sort((x, y) => x.path.localeCompare(y.path))).toEqual([
+      { path: "Tasks/Leaf.md", column: "todo", parentPath: "Tasks/Mid.md" },
+      { path: "Tasks/Mid.md", column: "todo", parentPath: "Tasks/Root.md" },
+    ]);
+  });
+
+  it("omits a placed subcard (already a column entry via its own status)", () => {
+    const b = buildBoard(config, [
+      card("Root", { status: "todo" }, ["Mid"]),
+      card("Mid", { status: "doing" }, ["Leaf"]),
+      card("Leaf", {}),
+    ]);
+    // Mid is placed (its own column), so it is not reported; Leaf inherits Mid's column.
+    expect(nestedCards(b)).toEqual([
+      { path: "Tasks/Leaf.md", column: "doing", parentPath: "Tasks/Mid.md" },
+    ]);
+  });
+
+  it("omits top-level cards, including cycle members", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo" }, ["B"]),
+      card("B", { status: "todo" }, ["A"]),
+    ]);
+    expect(nestedCards(b)).toEqual([]);
+  });
+
+  it("returns an empty list for a board with no nesting", () => {
+    const b = buildBoard(config, [card("Solo", { status: "todo" })]);
+    expect(nestedCards(b)).toEqual([]);
   });
 });
 
