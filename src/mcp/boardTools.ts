@@ -49,7 +49,7 @@ const getBoard = tool({
   name: "get_board",
   title: "Read a board",
   description:
-    "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns.",
+    "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns. A column carrying a `filter` rule is an auto-populated lane whose drawn contents this server cannot resolve; it is marked with a `lane` note saying so.",
   input: z.object({ board: boardArg }),
   readOnly: true,
   run: async (host, args) => {
@@ -68,10 +68,25 @@ const getBoard = tool({
         limit: col.limit,
         filter: col.filter,
         cards: (board.columns[col.id] ?? []).map((p) => cardSummary(board, p)),
+        ...(col.filter ? { lane: LANE_NOTE } : {}),
       })),
     };
   },
 });
+
+/**
+ * What a column with a `filter` rule is, said to the caller rather than left to be inferred.
+ *
+ * Such a column is an auto-populated lane: the board draws every top-level card matching the rule,
+ * from anywhere on the board, regardless of the card's own `status`. That matching happens in the
+ * board view, above the port this server is allowed to reach, so the tools cannot resolve the rule
+ * and `cards` here is the column's plain status bucket instead. The two are different sets, and a
+ * caller told only the bucket would conclude a lane was empty when the person looking at the board
+ * can see cards in it. Saying so is the honest answer until lane membership lives in the model
+ * where both callers can ask the same question — `docs/ai/backlog/20260828.01` tracks that.
+ */
+const LANE_NOTE =
+  "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card here may also appear in its own status column. `cards` below lists this column's status bucket, which is not the same set — resolve `filter` yourself if you need the lane as drawn.";
 
 /** A checklist line standing in a column of its own has no note; say where its text actually is. */
 function todoCard(board: Board, path: string, card: Card): Record<string, unknown> {
