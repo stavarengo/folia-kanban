@@ -119,6 +119,41 @@ describe("the server's lifetime", () => {
     expect(second.service.port).toBeNull();
     expect(second.states).toEqual(["failed"]);
   });
+
+  // Every settings write reaches `sync`, and collapsing a card is a settings write. Retrying a bind
+  // that is going to fail again would pop the same ten-second error banner on every such click.
+  it("does not retry a bind it already knows fails, or repeat the complaint", async () => {
+    const first = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
+    live = first.service;
+    await first.service.sync(first.settings());
+
+    const second = setup({
+      mcpEnabled: true,
+      mcpToken: newMcpToken(),
+      mcpPort: first.service.port ?? 0,
+    });
+    await second.service.sync(second.settings());
+    await second.set({ userName: "alex" });
+    await second.set({ userName: "sam" });
+    expect(second.states).toEqual(["failed"]);
+  });
+
+  it("tries again once the user changes the port", async () => {
+    const first = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
+    live = first.service;
+    await first.service.sync(first.settings());
+
+    const second = setup({
+      mcpEnabled: true,
+      mcpToken: newMcpToken(),
+      mcpPort: first.service.port ?? 0,
+    });
+    await second.service.sync(second.settings());
+    await second.set({ mcpPort: 0 });
+    expect(second.service.port).toBeGreaterThan(0);
+    expect(second.states).toEqual(["failed", "running"]);
+    await second.service.stop();
+  });
 });
 
 describe("the repository an agent writes through", () => {

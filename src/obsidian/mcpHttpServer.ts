@@ -41,14 +41,20 @@ export interface McpServerOptions {
 export interface RunningMcpServer {
   /** The port actually bound, which is what a `0` port resolves to. */
   port: number;
+  /** The interface actually bound. Always loopback; reported so a test can say so of the socket
+   *  rather than of the constant it was asked to use. */
+  address: string;
   close(): Promise<void>;
 }
 
-/** Compare two secrets without letting the time taken say how much of the guess was right. */
+/**
+ * Compare two secrets without letting the time taken say how much of the guess was right — or, by
+ * returning early on a length mismatch, how long the real one is.
+ */
 function secretsMatch(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  let diff = a.length ^ b.length;
+  const span = Math.max(a.length, b.length);
+  for (let i = 0; i < span; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return diff === 0;
 }
 
@@ -62,11 +68,12 @@ function bearerToken(req: IncomingMessage): string | null {
 /**
  * A browser page on any origin can post to a loopback server, so a request that carries an
  * `Origin` is only accepted when that origin is loopback too. Requests without one — every MCP
- * client — are unaffected.
+ * client — are unaffected. `null` is an origin, not the absence of one: it is what a sandboxed
+ * iframe and a `file://` page send, so it is refused rather than waved through.
  */
 function originAllowed(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
-  if (typeof origin !== "string" || origin === "" || origin === "null") return true;
+  if (typeof origin !== "string" || origin === "") return true;
   try {
     const host = new URL(origin).hostname;
     return host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1";
@@ -88,15 +95,21 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
+/** Raised when a request body runs past {@link MAX_BODY_BYTES}, so it is answered as its own thing
+ *  rather than as malformed JSON. */
+class BodyTooLarge extends Error {}
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
+      // Stop reading, but leave the socket alive: the answer still has to reach the client, and a
+      // destroyed connection would reach it as a reset with nothing to learn from.
       if (size > MAX_BODY_BYTES) {
-        reject(new Error("Request body too large."));
-        req.destroy();
+        req.pause();
+        reject(new BodyTooLarge(`Request body is larger than ${MAX_BODY_BYTES} bytes.`));
         return;
       }
       chunks.push(chunk);
@@ -137,6 +150,10 @@ async function respond(req: IncomingMessage, res: ServerResponse, options: McpSe
   try {
     message = JSON.parse(await readBody(req));
   } catch (e) {
+    if (e instanceof BodyTooLarge) {
+      send(res, 413, { error: e.message });
+      return;
+    }
     send(res, 400, jsonRpcError(null, PARSE_ERROR, e instanceof Error ? e.message : String(e)));
     return;
   }
@@ -158,11 +175,20 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
   if (!Platform.isDesktop) throw new Error("Agent access needs a desktop; mobile has no server.");
   if (!options.token) throw new Error("The MCP server needs a token before it can be started.");
   const { createServer } = await import("http");
+  // One request at a time. Every write tool reads the board, computes against what it read, and
+  // writes it back; two moves into the same column in flight together would each compute an order
+  // from the same snapshot and hand the two cards the same slot. The board view never had this
+  // shape — a person does one thing at a time — and an agent making six calls at once does not, so
+  // the transport imposes it. A board call is milliseconds of local file work; nothing is waiting
+  // long enough for the lost parallelism to matter.
+  let turn: Promise<void> = Promise.resolve();
   const server: Server = createServer((req, res) => {
-    void respond(req, res, options).catch(() => {
-      if (!res.headersSent) send(res, 500, { error: "The board plugin failed to answer." });
-      else res.end();
-    });
+    const answer = () =>
+      respond(req, res, options).catch(() => {
+        if (!res.headersSent) send(res, 500, { error: "The board plugin failed to answer." });
+        else res.end();
+      });
+    turn = turn.then(answer, answer);
   });
   return await listen(server, options.port);
 }
@@ -175,6 +201,7 @@ function listen(server: Server, port: number): Promise<RunningMcpServer> {
       const address = server.address();
       resolve({
         port: typeof address === "object" && address ? address.port : port,
+        address: typeof address === "object" && address ? address.address : MCP_HOST,
         close: () =>
           new Promise((done) => {
             server.closeAllConnections();

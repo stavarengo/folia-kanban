@@ -93,7 +93,12 @@ export async function openBoard(
 export function resolveCardPath(board: Board, ref: string): string {
   if (board.cards[ref]) return ref;
   const matches = Object.values(board.cards).filter(
-    (c) => c.title === ref || c.basename === ref || c.path === `${ref}.md`,
+    (c) =>
+      c.title === ref ||
+      // A checklist line standing in a column of its own carries its parent's file name, so
+      // matching on that would make every such line a rival of the note it lives in. Its own text
+      // is its title, which is matched above, and that is the only name it answers to.
+      (!c.todoRef && (c.basename === ref || c.path === `${ref}.md`)),
   );
   if (matches.length === 1) return matches[0]?.path ?? ref;
   if (matches.length > 1) {
