@@ -44,6 +44,10 @@ const context = await esbuild.context({
   ],
   format: "cjs",
   target: "es2018",
+  // Node builtins are loaded with a dynamic import so they never run on mobile (see
+  // mcpHttpServer.ts). Left native, `import("http")` reaches Electron's renderer, which cannot
+  // resolve a builtin that way; lowering it makes esbuild emit `require("http")` instead.
+  supported: { "dynamic-import": false },
   define: {
     "process.env.NODE_ENV": prod ? '"production"' : '"development"',
   },
