@@ -204,7 +204,9 @@ if (isMain) {
   }
 
   if (novel.length) {
-    console.error(`audit-raw-values: FAIL — ${novel.length} raw value(s) not in the allowlist:`);
+    console.error(
+      `audit-raw-values: FAIL — ${novel.length} value(s) exceed what the allowlist tolerates:`,
+    );
     for (const f of novel) {
       const allowed =
         allowlist.find((a) => a.file === f.file && a.snippet === f.snippet)?.count ?? 0;
@@ -218,5 +220,7 @@ if (isMain) {
     process.exit(1);
   }
 
-  console.log(`audit-raw-values: OK (${totalOccurrences(findings)} findings, all in allowlist)`);
+  console.log(
+    `audit-raw-values: OK (${totalOccurrences(findings)} occurrences, all within what the allowlist tolerates)`,
+  );
 }

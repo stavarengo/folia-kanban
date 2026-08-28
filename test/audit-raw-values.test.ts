@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -21,6 +21,41 @@ function makeFixture(cssContent: string): { root: string; srcDir: string } {
   mkdirSync(srcDir);
   writeFileSync(join(srcDir, "styles.css"), cssContent);
   return { root, srcDir };
+}
+
+const realScriptPath = join(__dirname, "..", "scripts", "audit-raw-values.mjs");
+
+/**
+ * A throwaway copy of the real, UNMODIFIED script deployed at `<root>/scripts/audit-raw-values.mjs`
+ * alongside a fixture `src/`, so the actual CLI (`root` computed from its own file location, same
+ * as in production) can be exercised end-to-end — including its exit code and stdout/stderr — with
+ * no env var, flag, or other override standing in for the real thing. This is deliberately more
+ * work than an override would be: the whole point of removing AUDIT_ROOT was that the shipped
+ * script takes no parameter that could redirect what it scans.
+ */
+function makeCliFixture(cssContent: string): { root: string; scriptPath: string } {
+  const { root } = makeFixture(cssContent);
+  const scriptsDir = join(root, "scripts");
+  mkdirSync(scriptsDir);
+  const scriptPath = join(scriptsDir, "audit-raw-values.mjs");
+  copyFileSync(realScriptPath, scriptPath);
+  return { root, scriptPath };
+}
+
+function runCli(
+  scriptPath: string,
+  args: string[] = [],
+): { status: number; stdout: string; stderr: string } {
+  try {
+    const stdout = execFileSync("node", [scriptPath, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { status: 0, stdout, stderr: "" };
+  } catch (e) {
+    const err = e as { status: number; stdout: string; stderr: string };
+    return { status: err.status, stdout: err.stdout, stderr: err.stderr };
+  }
 }
 
 describe("detect() counts occurrences per (file, snippet) pair", () => {
@@ -125,13 +160,59 @@ describe("--update produces a baseline that checks clean, by construction", () =
 });
 
 describe("the real CLI, run end-to-end against this repo's own tree", () => {
-  const scriptPath = join(__dirname, "..", "scripts", "audit-raw-values.mjs");
-
   it("exits 0 against this repo's committed allowlist", () => {
-    const output = execFileSync("node", [scriptPath], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    expect(output).toMatch(/^audit-raw-values: OK \(\d+ findings, all in allowlist\)/);
+    const { stdout, status } = runCli(realScriptPath);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(
+      /^audit-raw-values: OK \(\d+ occurrences, all within what the allowlist tolerates\)/,
+    );
+  });
+});
+
+describe("the real CLI, run end-to-end against a fixture tree (own copy of the script, no override)", () => {
+  it("exits 0 and reports OK when the allowlist covers every occurrence", () => {
+    const { root, scriptPath } = makeCliFixture("a { width: 320px; }");
+    writeFileSync(
+      join(root, "scripts", "raw-value-allowlist.json"),
+      JSON.stringify({ findings: [{ file: "src/styles.css", snippet: "320px", count: 1 }] }),
+    );
+    const { status, stdout } = runCli(scriptPath);
+    rmSync(root, { recursive: true, force: true });
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/^audit-raw-values: OK \(1 occurrences/);
+  });
+
+  it("exits 1 and names the offending value when a count is exceeded", () => {
+    const { root, scriptPath } = makeCliFixture("a { width: 320px; } b { height: 320px; }");
+    writeFileSync(
+      join(root, "scripts", "raw-value-allowlist.json"),
+      JSON.stringify({ findings: [{ file: "src/styles.css", snippet: "320px", count: 1 }] }),
+    );
+    const { status, stderr } = runCli(scriptPath);
+    rmSync(root, { recursive: true, force: true });
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/FAIL — 1 value\(s\) exceed what the allowlist tolerates/);
+    expect(stderr).toContain("320px (found 2, allowlisted 1)");
+  });
+
+  it("exits 1 with a clear message when the allowlist file is missing", () => {
+    const { root, scriptPath } = makeCliFixture("a { width: 320px; }");
+    const { status, stderr } = runCli(scriptPath);
+    rmSync(root, { recursive: true, force: true });
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/missing or invalid/);
+  });
+
+  it("--update writes a baseline to the fixture's own allowlist file, and a rerun then passes", () => {
+    const { root, scriptPath } = makeCliFixture("a { width: 320px; } b { width: 320px; }");
+    const allowlistPath = join(root, "scripts", "raw-value-allowlist.json");
+    const first = runCli(scriptPath, ["--update"]);
+    expect(first.status).toBe(0);
+    expect(first.stdout).toMatch(/wrote baseline with 1 entries \(2 occurrences\)/);
+    const written = JSON.parse(readFileSync(allowlistPath, "utf8"));
+    expect(written.findings).toEqual([{ file: "src/styles.css", snippet: "320px", count: 2 }]);
+    const second = runCli(scriptPath);
+    rmSync(root, { recursive: true, force: true });
+    expect(second.status).toBe(0);
   });
 });
