@@ -251,7 +251,11 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
       </div>
 
       <div className="folia-toolbar-filters" role="group" aria-label="Quick filters">
-        {canFilterMine && chip("assignee", "me", "user", "Mine")}
+        {/* Offered while there is a "me" to filter for — and, whatever the setting says now, while
+            the token is actually in the box: clearing your name with Mine switched on would
+            otherwise empty the board and take away the only button that could switch it off. */}
+        {(canFilterMine || hasToken(query, "assignee", "me")) &&
+          chip("assignee", "me", "user", "Mine")}
         {chip("due", "overdue", "alert", "Overdue")}
         {chip("due", "soon", "calendar", "Due soon")}
         {chip("is", "blocked", "ban", "Blocked")}

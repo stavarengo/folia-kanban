@@ -390,14 +390,17 @@ describe("assignment (20260827.03)", () => {
     expect(matchCard(c, parseFilter("rafa"), ctx)).toBe(true);
   });
 
-  it("adds or removes only the reader, and collapses the result to the smallest shape", () => {
+  it("adds or removes only the reader, and keeps the shape the note was written in", () => {
+    // A first assignment has no list to preserve, so it is written as the plain string the field
+    // would have written.
     expect(toggleAssignee([], "Rafa")).toBe("Rafa");
     expect(toggleAssignee(["Rafa"], "rafa")).toBe(null);
     expect(toggleAssignee(["alex"], "Rafa")).toEqual(["alex", "Rafa"]);
-    expect(toggleAssignee(["alex", "Rafa"], "@rafa")).toBe("alex");
     expect(toggleAssignee(["alex", "ana"], "Rafa")).toEqual(["alex", "ana", "Rafa"]);
+    // Leaving a card two people were on keeps it a list: the shape is somebody else's, not yours.
+    expect(toggleAssignee(["alex", "Rafa"], "@rafa")).toEqual(["alex"]);
     // A name spelled twice by hand goes away in one press, rather than needing one press each.
-    expect(toggleAssignee(["Rafa", "rafa", "alex"], "rafa")).toBe("alex");
+    expect(toggleAssignee(["Rafa", "rafa", "alex"], "rafa")).toEqual(["alex"]);
   });
 
   it("shows every assigned name on the tile, one chip each", () => {

@@ -199,7 +199,7 @@ export interface BoardActions {
    * rather than leave an empty one. The note stays the only place an assignment lives, so another
    * tool, or a hand edit, reads and writes it exactly the way this does.
    */
-  setAssignee(path: string, value: string | readonly string[] | null): void;
+  setAssignee(path: string, value: string | readonly string[] | null): Promise<void>;
   /**
    * Rename a card in place (#12): writes the title back to its source — the `.md` file name
    * (link-aware so inbound wikilinks follow), the heading line, or the `title` frontmatter key.

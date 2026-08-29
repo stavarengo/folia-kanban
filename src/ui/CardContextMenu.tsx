@@ -201,7 +201,7 @@ export function CardContextMenu({
             item(
               assignees.some((name) => sameAssignee(name, me)) ? "Unassign me" : "Assign to me",
               "user",
-              () => a.setAssignee(path, toggleAssignee(assignees, me)),
+              () => void a.setAssignee(path, toggleAssignee(assignees, me)),
             )}
           {item("Open note", "external-link", () => a.openNote(path))}
 

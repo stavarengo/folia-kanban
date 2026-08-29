@@ -1567,25 +1567,20 @@ export function CardDetail({
               }
             />
           </label>
+          {/* Both of these go through the shared action rather than `mutate`, for the reason the
+              priority field does: the context menu writes this key too, and one copy of "an empty
+              value removes the key" is the only way the two surfaces cannot drift apart. The action
+              reloads the board itself, so the panel only re-reads its own body afterwards. */}
           <AssigneeField
             names={curAssignees}
             options={assigneeOptions}
             me={settings.userName.trim()}
-            onCommit={(value) =>
-              void mutate(() =>
-                value === ""
-                  ? repo.unsetFrontmatterKey(path, "assignee")
-                  : repo.setFrontmatter(path, { assignee: value }),
-              )
+            onCommit={(value) => void actions.setAssignee(path, value).then(() => reload())}
+            onToggleMine={() =>
+              void actions
+                .setAssignee(path, toggleAssignee(curAssignees, settings.userName.trim()))
+                .then(() => reload())
             }
-            onToggleMine={() => {
-              const next = toggleAssignee(curAssignees, settings.userName.trim());
-              void mutate(() =>
-                next === null
-                  ? repo.unsetFrontmatterKey(path, "assignee")
-                  : repo.setFrontmatter(path, { assignee: next }),
-              );
-            }}
           />
         </div>
 
