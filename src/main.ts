@@ -718,7 +718,8 @@ class KanbanSettingTab extends PluginSettingTab {
   private pendingMcpFields: Partial<KanbanSettings> = {};
 
   /** The inputs those two fields are currently drawn as, so leaving one for the other can be told
-   *  apart from leaving them both. Replaced on every render, so they never point at a dead row. */
+   *  apart from leaving them both. Replaced on every render; {@link otherHeldInput} is what refuses
+   *  one that is no longer on screen. */
   private heldInputs: Partial<Record<HeldFieldKey, HTMLInputElement>> = {};
 
   /**
@@ -858,9 +859,12 @@ class KanbanSettingTab extends PluginSettingTab {
     });
   }
 
-  /** The input of the *other* held field, as it stands in the current rendering of the tab. */
+  /** The input of the *other* held field, as it stands in the current rendering of the tab, or
+   *  nothing when that row is not on screen — the settings search draws a subset of the rows, and a
+   *  remembered input from an earlier drawing is one nothing can move focus to. */
   private otherHeldInput(key: HeldFieldKey): HTMLInputElement | undefined {
-    return this.heldInputs[key === "mcpPort" ? "mcpBindAddress" : "mcpPort"];
+    const other = this.heldInputs[key === "mcpPort" ? "mcpBindAddress" : "mcpPort"];
+    return other?.isConnected === true ? other : undefined;
   }
 
   /** Hold what a field accepted, or let go of what it refused. */

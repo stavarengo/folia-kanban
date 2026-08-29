@@ -179,7 +179,8 @@ const HELD_FIELD_INVALID: Record<HeldFieldKey, string> = {
 
 /** What {@link heldFieldOutcome} decided. */
 export interface HeldFieldOutcome {
-  /** What the field must show once focus leaves it — always a value that is really stored. */
+  /** What the field must show once focus leaves it — never what was typed and refused, always a
+   *  value that is stored, or that leaving the pair of fields is about to store. */
   show: string;
   /** The patch to write, or `null` when the value was refused or is the one already stored. */
   commit: Partial<KanbanSettings> | null;
