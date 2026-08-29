@@ -38,6 +38,18 @@ describe("hydrateSettings", () => {
     expect(settings.collapsedCards).toEqual({});
   });
 
+  // It decides where a server listens, so a value the settings tab would never have produced must
+  // not reach `listen` — as a non-string it comes back as "could not start on address null".
+  it("falls back to loopback when the stored bind address is not an address", () => {
+    for (const stored of [null, 27125, "", "evil.example", "::ffff:0:0"]) {
+      const { settings } = hydrateSettings({ mcpBindAddress: stored }, NOW);
+      expect(settings.mcpBindAddress, String(stored)).toBe(DEFAULT_SETTINGS.mcpBindAddress);
+    }
+    expect(hydrateSettings({ mcpBindAddress: "0.0.0.0" }, NOW).settings.mcpBindAddress).toBe(
+      "0.0.0.0",
+    );
+  });
+
   it("keeps an existing baseline: it is when tracking started, not the last launch", () => {
     const { settings, stampedBaseline } = hydrateSettings(
       {

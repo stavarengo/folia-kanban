@@ -1,4 +1,4 @@
-import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress } from "./mcp/bindAddress";
 import type { FileOp } from "./model/pathOps";
 import { remapPathKeys } from "./model/pathOps";
 import type { HistoryScope } from "./model/types";
@@ -162,6 +162,10 @@ export function hydrateSettings(
   // A hand-edited data.json can carry `null` for a map; every tile reads these, so it must not.
   if (!settings.collapsedCards) settings.collapsedCards = {};
   if (!settings.commentsSeen) settings.commentsSeen = {};
+  // Same reason, and it decides where a server listens: `null` here would reach `listen` as a
+  // non-string and come back as "could not start on address null" with a TypeError attached.
+  if (typeof settings.mcpBindAddress !== "string" || !isBindAddress(settings.mcpBindAddress))
+    settings.mcpBindAddress = MCP_DEFAULT_BIND_ADDRESS;
   if (settings.commentsBaseline) return { settings, stampedBaseline: false };
   return { settings: { ...settings, commentsBaseline: now }, stampedBaseline: true };
 }
