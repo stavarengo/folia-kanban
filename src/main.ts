@@ -22,7 +22,7 @@ import {
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
 import type { FileOp } from "./model/pathOps";
 import { remapPath } from "./model/pathOps";
-import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
 import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
@@ -583,11 +583,23 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   private reportMcpState(state: McpState): void {
+    // A server that came up somewhere other than this computer says so every time it does, which
+    // includes every Obsidian start. The setting travels with the vault — synced, or copied to a
+    // laptop — so the machine now listening on a network may not be the one where that was chosen,
+    // and the address is not visible anywhere else until someone opens the settings tab.
+    if (state.kind === "running" && !isLoopbackBindAddress(state.bindAddress)) {
+      new Notice(
+        `Folia Kanban: agent access is reachable on ${state.bindAddress}, port ${state.port} — not just on this computer. Anything on that network holding the token can change every board in this vault.`,
+        10000,
+      );
+      return;
+    }
     if (state.kind !== "failed") return;
     // A toggle left on while nothing is listening is the one state the user cannot see, so the
-    // failure says both what broke and that the switch is now lying.
+    // failure says both what broke and that the switch is now lying. It names the address that was
+    // actually tried: the settings may have moved on while the start was queued.
     new Notice(
-      `Folia Kanban: agent access could not start on address ${this.settings.mcpBindAddress}, port ${this.settings.mcpPort}. ${state.message}`,
+      `Folia Kanban: agent access could not start on address ${state.bindAddress}, port ${state.port}. ${state.message}`,
       10000,
     );
   }
@@ -931,7 +943,7 @@ class KanbanSettingTab extends PluginSettingTab {
         .addToggle((t) =>
           t.setValue(s[key]).onChange((v) => {
             const saved = this.plugin.updateSettings({ [key]: v });
-            // Agent access gates the two rows below it, so switching it redraws the tab.
+            // Agent access gates every row below it, so switching it redraws the tab.
             if (key === "mcpEnabled") void saved.then(() => this.render());
           }),
         );

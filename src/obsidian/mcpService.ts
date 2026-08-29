@@ -28,8 +28,10 @@ export function newMcpToken(): string {
 /** How the running server is reported back to whoever asked for it. */
 export type McpState =
   | { kind: "off" }
-  | { kind: "running"; port: number }
-  | { kind: "failed"; message: string };
+  | { kind: "running"; port: number; bindAddress: string }
+  /** Carries what was tried, not just why it failed: syncs are serialised, so by the time a
+   *  failure is reported the settings may already name an address nobody attempted. */
+  | { kind: "failed"; message: string; port: number; bindAddress: string };
 
 /** The pieces of the plugin the service needs, so it can be built without one under test. */
 export interface McpServiceOptions {
@@ -154,13 +156,19 @@ export class McpService {
         bindAddress: target.bindAddress,
         token: target.token,
       });
-      this.options.onState?.({ kind: "running", port: this.running.port });
+      this.options.onState?.({
+        kind: "running",
+        port: this.running.port,
+        bindAddress: target.bindAddress,
+      });
     } catch (e) {
       this.wanted = null;
       this.refused = target;
       this.options.onState?.({
         kind: "failed",
         message: e instanceof Error ? e.message : String(e),
+        port: target.port,
+        bindAddress: target.bindAddress,
       });
     }
   }
