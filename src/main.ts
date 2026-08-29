@@ -27,8 +27,6 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
-  MCP_PORT_MAX,
-  MCP_PORT_MIN,
   applySettingsPatch,
   hydrateSettings,
   migratePathKeyedSettings,
@@ -719,6 +717,10 @@ class KanbanSettingTab extends PluginSettingTab {
    */
   private pendingMcpFields: Partial<KanbanSettings> = {};
 
+  /** The inputs those two fields are currently drawn as, so leaving one for the other can be told
+   *  apart from leaving them both. Replaced on every render, so they never point at a dead row. */
+  private heldInputs: Partial<Record<HeldFieldKey, HTMLInputElement>> = {};
+
   /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
@@ -784,12 +786,14 @@ class KanbanSettingTab extends PluginSettingTab {
   }
 
   /**
-   * Write everything the tab was holding, in one patch.
+   * Write everything the tab is holding at this moment, in one patch.
    *
-   * One and not three, because each write restarts the server: moving both the port and the address
-   * back to loopback would otherwise restart once on the old address with the new port — announcing
-   * "reachable on 0.0.0.0" at the moment the user fixed exactly that — before the second write moved
-   * it home.
+   * One and not three, because each write restarts the server: closing the tab on both a new port
+   * and a new address would otherwise restart once on the old address with the new port —
+   * announcing "reachable on 0.0.0.0" at the moment the user fixed exactly that — before the second
+   * write moved it home. What this cannot batch is fields left one at a time: leaving a field is
+   * what commits it, so tabbing from the port to the address does restart twice. That is the cost
+   * of the field telling the truth the moment it is left, and it is the cheaper of the two.
    */
   private commitHeldFields(): void {
     const patch = this.heldPatch();
@@ -818,15 +822,18 @@ class KanbanSettingTab extends PluginSettingTab {
   private renderHeldField(key: HeldFieldKey, setting: Setting): void {
     const disabled = !this.plugin.settings.mcpEnabled;
     setting.setDisabled(disabled).addText((t) => {
-      if (key === "mcpPort") {
-        t.inputEl.type = "number";
-        t.inputEl.min = String(MCP_PORT_MIN);
-        t.inputEl.max = String(MCP_PORT_MAX);
-      }
+      this.heldInputs[key] = t.inputEl;
+      // Deliberately not `type="number"` for the port, tempting as it is. A number input sanitises
+      // what it cannot parse away to the empty string, so the field could neither show back what
+      // was typed nor say why it was refused — the same silence this whole change is about. The
+      // range lives in the row's description, and `settingsPatchFor` is what enforces it.
+      if (key === "mcpPort") t.inputEl.inputMode = "numeric";
       t.setPlaceholder(
         key === "mcpPort" ? String(DEFAULT_SETTINGS.mcpPort) : MCP_DEFAULT_BIND_ADDRESS,
       )
-        .setValue(String(this.plugin.settings[key]))
+        // Held first, stored second: a redraw while a value is being typed (switching agent access
+        // off and on redraws the tab) must not put the field back to what the typing replaced.
+        .setValue(String(this.pendingMcpFields[key] ?? this.plugin.settings[key]))
         .setDisabled(disabled)
         .onChange((v) => {
           const outcome = heldFieldOutcome(key, v, this.plugin.settings);
@@ -836,15 +843,24 @@ class KanbanSettingTab extends PluginSettingTab {
       // Nothing is written until focus leaves, and leaving is also when the field is put back to
       // what is really stored: an emptied one showing a grey default, or a refused one still
       // showing what was typed, would both read as the server having moved there.
-      t.inputEl.addEventListener("blur", () => {
+      t.inputEl.addEventListener("blur", (event) => {
         const outcome = heldFieldOutcome(key, t.inputEl.value, this.plugin.settings);
         this.holdMcpField(key, outcome.commit);
         this.showFieldError(setting, null);
         t.setValue(outcome.show);
         if (outcome.notice !== null) new Notice(outcome.notice, 5000);
-        this.commitHeldFields();
+        // Tabbing from the port straight into the address is one edit, not two. Writing here would
+        // restart the server on the old address with the new port and announce "reachable on
+        // 0.0.0.0" at the moment the user is on their way to fixing exactly that. The other field's
+        // own blur writes both, and `hide()` catches focus that never lands there at all.
+        if (event.relatedTarget !== this.otherHeldInput(key)) this.commitHeldFields();
       });
     });
+  }
+
+  /** The input of the *other* held field, as it stands in the current rendering of the tab. */
+  private otherHeldInput(key: HeldFieldKey): HTMLInputElement | undefined {
+    return this.heldInputs[key === "mcpPort" ? "mcpBindAddress" : "mcpPort"];
   }
 
   /** Hold what a field accepted, or let go of what it refused. */
