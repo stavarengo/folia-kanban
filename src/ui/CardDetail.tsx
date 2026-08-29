@@ -225,6 +225,7 @@ function AssigneeField({
 }) {
   const listId = useId();
   const hintId = useId();
+  const meButton = useRef<HTMLButtonElement>(null);
   const value = names.join(", ");
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
   const mine = me !== "" && names.some((name) => sameAssignee(name, me));
@@ -240,7 +241,18 @@ function AssigneeField({
           placeholder="—"
           aria-describedby={me === "" ? hintId : undefined}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
+          // Leaving this field FOR the button beside it is not a save. That button means one
+          // specific write, and committing the half-typed text on the way to it would make two —
+          // each computed from the card as it was before the other, and whichever landed last
+          // would decide the answer. Reading `relatedTarget` catches both ways of getting there,
+          // the pointer and the Tab key, which is why it is here rather than on the press.
+          onBlur={(e) => {
+            if (e.relatedTarget === meButton.current) {
+              setDraft(value);
+              return;
+            }
+            commit();
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -251,6 +263,7 @@ function AssigneeField({
       </label>
       {me !== "" && (
         <button
+          ref={meButton}
           className="folia-btn folia-assignee-me"
           type="button"
           title={
@@ -258,17 +271,7 @@ function AssigneeField({
               ? "Take your name off this card, leaving anyone else on it"
               : `Add ${me} to this card`
           }
-          // Pressing this must be ONE write, not a race with the field's own. Without the
-          // preventDefault, a pointer press blurs the input first, which commits whatever is
-          // half-typed there — two writes in flight, each computed from the card as it was before
-          // the other, and which one lands last decides the answer. So the press keeps focus where
-          // it is, the draft is put back to what the note actually says, and only the toggle is
-          // written: clicking a button that names one person is not a way of saving another.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            setDraft(value);
-            onToggleMine();
-          }}
+          onClick={onToggleMine}
         >
           {mine ? "Unassign me" : "Assign to me"}
         </button>
