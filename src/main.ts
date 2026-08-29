@@ -717,11 +717,6 @@ class KanbanSettingTab extends PluginSettingTab {
    */
   private pendingMcpFields: Partial<KanbanSettings> = {};
 
-  /** The inputs those two fields are currently drawn as, so leaving one for the other can be told
-   *  apart from leaving them both. Replaced on every render; {@link otherHeldInput} is what refuses
-   *  one that is no longer on screen. */
-  private heldInputs: Partial<Record<HeldFieldKey, HTMLInputElement>> = {};
-
   /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
@@ -789,12 +784,16 @@ class KanbanSettingTab extends PluginSettingTab {
   /**
    * Write everything the tab is holding at this moment, in one patch.
    *
-   * One and not three, because each write restarts the server: closing the tab on both a new port
-   * and a new address would otherwise restart once on the old address with the new port —
-   * announcing "reachable on 0.0.0.0" at the moment the user fixed exactly that — before the second
-   * write moved it home. What this cannot batch is fields left one at a time: leaving a field is
-   * what commits it, so tabbing from the port to the address does restart twice. That is the cost
-   * of the field telling the truth the moment it is left, and it is the cheaper of the two.
+   * Every blur commits, so what is held is usually the one field focus has just left. It is still a
+   * patch and not a single write, because holding outlives a blur that never comes: a field still
+   * focused when the tab goes away gets none — Chrome fires no blur for an element leaving the
+   * document — nor does one whose row the settings search redraws out from under it, and the user
+   * name, held the same way, gets no blur of its own on the 1.13 path at all.
+   *
+   * Each write restarts the server, so editing the port and then the address restarts twice, the
+   * first time on the pair as it stands halfway through. That is the price of a field meaning what
+   * it says the moment it is left. Holding the first value back instead leaves the field showing a
+   * value the server is not on, which is the failure these two rows were rebuilt to end.
    */
   private commitHeldFields(): void {
     const patch = this.heldPatch();
@@ -823,7 +822,6 @@ class KanbanSettingTab extends PluginSettingTab {
   private renderHeldField(key: HeldFieldKey, setting: Setting): void {
     const disabled = !this.plugin.settings.mcpEnabled;
     setting.setDisabled(disabled).addText((t) => {
-      this.heldInputs[key] = t.inputEl;
       // Deliberately not `type="number"` for the port, tempting as it is. A number input sanitises
       // what it cannot parse away to the empty string, so the field could neither show back what
       // was typed nor say why it was refused — the same silence this whole change is about. The
@@ -844,27 +842,15 @@ class KanbanSettingTab extends PluginSettingTab {
       // Nothing is written until focus leaves, and leaving is also when the field is put back to
       // what is really stored: an emptied one showing a grey default, or a refused one still
       // showing what was typed, would both read as the server having moved there.
-      t.inputEl.addEventListener("blur", (event) => {
+      t.inputEl.addEventListener("blur", () => {
         const outcome = heldFieldOutcome(key, t.inputEl.value, this.plugin.settings);
         this.holdMcpField(key, outcome.commit);
         this.showFieldError(setting, null);
         t.setValue(outcome.show);
         if (outcome.notice !== null) new Notice(outcome.notice, 5000);
-        // Tabbing from the port straight into the address is one edit, not two. Writing here would
-        // restart the server on the old address with the new port and announce "reachable on
-        // 0.0.0.0" at the moment the user is on their way to fixing exactly that. The other field's
-        // own blur writes both, and `hide()` catches focus that never lands there at all.
-        if (event.relatedTarget !== this.otherHeldInput(key)) this.commitHeldFields();
+        this.commitHeldFields();
       });
     });
-  }
-
-  /** The input of the *other* held field, as it stands in the current rendering of the tab, or
-   *  nothing when that row is not on screen — the settings search draws a subset of the rows, and a
-   *  remembered input from an earlier drawing is one nothing can move focus to. */
-  private otherHeldInput(key: HeldFieldKey): HTMLInputElement | undefined {
-    const other = this.heldInputs[key === "mcpPort" ? "mcpBindAddress" : "mcpPort"];
-    return other?.isConnected === true ? other : undefined;
   }
 
   /** Hold what a field accepted, or let go of what it refused. */
