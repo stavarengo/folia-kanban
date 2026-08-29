@@ -71,6 +71,8 @@ describe("what counts as a bind address", () => {
     expect(normalizeBindAddress("  0.0.0.0 ")).toBe("0.0.0.0");
     expect(normalizeBindAddress("[::1]")).toBe("::1");
     expect(normalizeBindAddress("FE80::1")).toBe("fe80::1");
+    // The zone is an interface name, and `LAN0` and `lan0` are two different interfaces on Linux.
+    expect(normalizeBindAddress("FE80::1%LAN0")).toBe("fe80::1%LAN0");
   });
 
   // Asked of an origin's hostname as well as of a bind address, which is why `localhost` is

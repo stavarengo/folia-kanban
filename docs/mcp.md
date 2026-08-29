@@ -29,7 +29,7 @@ Understand what you are choosing. Bind to `0.0.0.0` and the server answers on **
 
 The address must be an IP literal — `0.0.0.0`, `192.168.1.5`, `::1`, `::`. A name is refused, `localhost` included: an address valid on this computer is a fact about its interfaces, a name that resolves here today may resolve elsewhere tomorrow, and `localhost` in particular lands on `127.0.0.1` or `::1` depending on a hosts file, so the setting and the socket would disagree about where the server is.
 
-An IPv6 address goes into the setting bare and into a URL in brackets: bind `::1` and the endpoint is `http://[::1]:27125/mcp`. A link-local one wants the interface it is local to (`fe80::1%eth0`); the bare `fe80::1` is accepted by the field but nothing can bind it, so it fails like any other address this computer does not have. An IPv4-mapped address (`::ffff:192.168.1.5`) is refused outright: it is a second spelling of an address that already has one, and `::ffff:0.0.0.0` would read as a single interface while binding every one of them.
+An IPv6 address goes into the setting bare and into a URL in brackets: bind `::1` and the endpoint is `http://[::1]:27125/mcp`. A link-local one wants the interface it is local to (`fe80::1%eth0`), and in a URL that `%` has to be percent-encoded — `http://[fe80::1%25eth0]:27125/mcp` — or the client will reject the address before it dials anything; the bare `fe80::1` is accepted by the field but nothing can bind it, so it fails like any other address this computer does not have. An IPv4-mapped address (`::ffff:192.168.1.5`) is refused outright: it is a second spelling of an address that already has one, and `::ffff:0.0.0.0` would read as a single interface while binding every one of them.
 
 Whether this computer actually has the address is settled by the bind, not by the field: an address it does not have fails, and the notice says so. And whenever the server does come up on something other than loopback it says so in a notice — every time, including on Obsidian start, because the setting travels with the vault and the computer now listening on a network may not be the one where that was chosen.
 
@@ -42,7 +42,7 @@ A page open in your browser can post to a server on your machine, or on your net
 - A DNS name — `https://evil.example` — is refused under every bind, wildcard included. That is what stops DNS rebinding specifically: the attack works by making a name its author controls resolve to your address, and the `Origin` it then sends is that name, never a literal.
 - `null` is an origin, not the absence of one — it is what a sandboxed iframe and a `file://` page send — so it is refused rather than waved through.
 
-Be clear about how much this buys. Under a wildcard bind any bare-IP origin is admitted, so a page served from an address rather than a name is not stopped by it at all. This check is not what keeps another host out; the token is, and always was — and a cross-origin call carrying an `Authorization` header has to survive a preflight this server answers `401` before the origin rule is even reached. It is a cheap extra lock on the one attack a token alone does invite, not a boundary to lean on.
+Be clear about how much this buys. Under a wildcard bind any bare-IP origin is admitted, so a page served from an address rather than a name is not stopped by it at all. This check is not what keeps another host out; the token is, and always was. A browser is held off twice over anyway: a cross-origin call carrying an `Authorization` header has to pass a preflight first, and this server answers no `OPTIONS` and returns no `Access-Control-Allow-Origin` at all, so the browser refuses the call whatever the origin rule said. Read the origin rule as a cheap extra lock on the one attack a token alone does invite, not as a boundary to lean on.
 
 There is one server per vault. Every tool addresses a board by the vault path of its board note, so several boards in one vault need no extra setup.
 
@@ -55,7 +55,7 @@ claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \
   --header "Authorization: Bearer PASTE_YOUR_TOKEN_HERE"
 ```
 
-Substitute the bind address for `127.0.0.1` if you have moved the server off this computer. Any other MCP client works the same way: **Streamable HTTP**, endpoint `http://<bind address>:<port>/mcp`, header `Authorization: Bearer <token>`. The server answers `POST` only — it never opens a stream of its own, so a client that also tries `GET` gets a `405` and carries on.
+Substitute the bind address for `127.0.0.1` if you have moved the server off this computer, in brackets if it is IPv6. Any other MCP client works the same way: **Streamable HTTP**, endpoint `http://<bind address>:<port>/mcp`, header `Authorization: Bearer <token>`. The server answers `POST` only — it never opens a stream of its own, so a client that also tries `GET` gets a `405` and carries on.
 
 Sanity check from a terminal:
 
