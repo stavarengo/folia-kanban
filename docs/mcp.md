@@ -96,7 +96,7 @@ A failure a caller can fix — an unknown board, an ambiguous card, a column tha
 
 ### How much history a write records
 
-The **History — what to record** setting applies to agent writes exactly as it applies to yours. On `all` (the default) every field edit, comment and subtask change writes its line; on `moves`, only moves do — for an agent as much as for you. That is the parity: not "agents always write history", but "agents write whatever you would have written".
+The **What history records** setting (Settings → Folia Kanban → **Comments and history**) applies to agent writes exactly as it applies to yours. On `all` (the default) every field edit, comment and subtask change writes its line; on `moves`, only moves do — for an agent as much as for you. That is the parity: not "agents always write history", but "agents write whatever you would have written".
 
 ## The contract
 
