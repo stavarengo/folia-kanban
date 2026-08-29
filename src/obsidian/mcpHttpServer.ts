@@ -1,5 +1,5 @@
-// The transport: MCP Streamable HTTP over Node's http server, bound to loopback and gated by a
-// bearer token.
+// The transport: MCP Streamable HTTP over Node's http server, bound to the address the user chose
+// (loopback unless they said otherwise) and gated by a bearer token.
 //
 // It lives in the adapter layer rather than beside the tools because Node is a platform detail. The
 // bundle marks Node builtins external, so a top-level import would become a `require` that runs
@@ -12,6 +12,7 @@
 // itself; this one never starts any, so a GET is refused rather than left hanging.
 
 import { Platform } from "obsidian";
+import { isBindAddress, originAllowed } from "../mcp/bindAddress";
 import type { BoardHost } from "../mcp/host";
 import {
   PROTOCOL_VERSION,
@@ -25,11 +26,8 @@ type IncomingMessage = import("http").IncomingMessage;
 type ServerResponse = import("http").ServerResponse;
 type Server = import("http").Server;
 
-/** The path clients post to, appended to `http://127.0.0.1:<port>`. */
+/** The path clients post to, appended to `http://<bind address>:<port>`. */
 export const MCP_PATH = "/mcp";
-
-/** Loopback is the only interface the server is ever bound to. */
-export const MCP_HOST = "127.0.0.1";
 
 /** A request body larger than this is refused unread: no board call needs a megabyte of JSON. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -53,6 +51,9 @@ export interface McpServerOptions {
   host: BoardHost;
   info: ServerInfo;
   port: number;
+  /** The address to bind to. Loopback by default; a wider one is the user's explicit choice, and
+   *  what {@link originAllowed} judges a browser origin against. */
+  bindAddress: string;
   /** The bearer token every request must carry. Never empty — the server refuses to start. */
   token: string;
   /** How long one call may take before the client is told it is still waiting. Tests set it low;
@@ -63,8 +64,8 @@ export interface McpServerOptions {
 export interface RunningMcpServer {
   /** The port actually bound, which is what a `0` port resolves to. */
   port: number;
-  /** The interface actually bound. Always loopback; reported so a test can say so of the socket
-   *  rather than of the constant it was asked to use. */
+  /** The interface actually bound, as the socket reports it — so a caller can say where the server
+   *  really is rather than repeat what it asked for. */
   address: string;
   close(): Promise<void>;
 }
@@ -90,23 +91,6 @@ function bearerToken(req: IncomingMessage): string | null {
   if (typeof header !== "string") return null;
   const match = /^Bearer[ \t]+(.+)$/i.exec(header.trim());
   return match?.[1]?.trim() ?? null;
-}
-
-/**
- * A browser page on any origin can post to a loopback server, so a request that carries an
- * `Origin` is only accepted when that origin is loopback too. Requests without one — every MCP
- * client — are unaffected. `null` is an origin, not the absence of one: it is what a sandboxed
- * iframe and a `file://` page send, so it is refused rather than waved through.
- */
-function originAllowed(req: IncomingMessage): boolean {
-  const origin = req.headers.origin;
-  if (typeof origin !== "string" || origin === "") return true;
-  try {
-    const host = new URL(origin).hostname;
-    return host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1";
-  } catch {
-    return false;
-  }
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -156,8 +140,13 @@ function reject(
   req: IncomingMessage,
   options: McpServerOptions,
 ): { status: number; body: unknown } | null {
-  if (!originAllowed(req)) {
-    return { status: 403, body: { error: "Only loopback origins may call this server." } };
+  if (!originAllowed(req.headers.origin, options.bindAddress)) {
+    return {
+      status: 403,
+      body: {
+        error: `Only loopback origins, or a page served from ${options.bindAddress} itself, may call this server.`,
+      },
+    };
   }
   if (!secretsMatch(bearerToken(req) ?? "", options.token)) {
     return { status: 401, body: { error: "Missing or wrong bearer token." } };
@@ -271,12 +260,18 @@ function answerLate(
 }
 
 /**
- * Start the server. Rejects when the platform has no server to give, the port is taken or the token
- * is empty, so a caller can say what went wrong instead of leaving a dead toggle switched on.
+ * Start the server. Rejects when the platform has no server to give, the token is empty, the bind
+ * address is not one this machine has, or the port is taken — so a caller can say what went wrong
+ * instead of leaving a dead toggle switched on.
  */
 export async function startMcpServer(options: McpServerOptions): Promise<RunningMcpServer> {
   if (!Platform.isDesktop) throw new Error("Agent access needs a desktop; mobile has no server.");
   if (!options.token) throw new Error("The MCP server needs a token before it can be started.");
+  // The settings tab refuses a value that is not an address, but a hand-edited `data.json` does
+  // not go through it, and `listen` would take a name and try to resolve it.
+  if (!isBindAddress(options.bindAddress)) {
+    throw new Error(`"${options.bindAddress}" is not an address this computer can listen on.`);
+  }
   const { createServer } = await import("http");
   // One request at a time. Every write tool reads the board, computes against what it read, and
   // writes it back; two moves into the same column in flight together would each compute an order
@@ -310,18 +305,20 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
   // server behind it.
   server.headersTimeout = HEADERS_TIMEOUT_MS;
   server.requestTimeout = REQUEST_TIMEOUT_MS;
-  return await listen(server, options.port);
+  return await listen(server, options.port, options.bindAddress);
 }
 
-function listen(server: Server, port: number): Promise<RunningMcpServer> {
+function listen(server: Server, port: number, bindAddress: string): Promise<RunningMcpServer> {
   return new Promise((resolve, rejectStart) => {
+    // An address this machine does not have fails here, as EADDRNOTAVAIL, exactly the way a taken
+    // port fails as EADDRINUSE — one path, so the caller has one failure to report.
     server.once("error", rejectStart);
-    server.listen(port, MCP_HOST, () => {
+    server.listen(port, bindAddress, () => {
       server.removeListener("error", rejectStart);
       const address = server.address();
       resolve({
         port: typeof address === "object" && address ? address.port : port,
-        address: typeof address === "object" && address ? address.address : MCP_HOST,
+        address: typeof address === "object" && address ? address.address : bindAddress,
         close: () =>
           new Promise((done) => {
             server.closeAllConnections();

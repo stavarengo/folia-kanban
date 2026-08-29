@@ -4,12 +4,8 @@
 // the way an MCP client exercises them.
 
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import {
-  MCP_HOST,
-  MCP_PATH,
-  startMcpServer,
-  type RunningMcpServer,
-} from "../src/obsidian/mcpHttpServer";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
+import { MCP_PATH, startMcpServer, type RunningMcpServer } from "../src/obsidian/mcpHttpServer";
 import type { BoardHost } from "../src/mcp/host";
 import type { JsonRpcResponse } from "../src/mcp/protocol";
 import type { BoardConfig } from "../src/model/types";
@@ -33,7 +29,7 @@ let server: RunningMcpServer;
 let repo: FakeRepo;
 
 function url(path = MCP_PATH): string {
-  return `http://${MCP_HOST}:${server.port}${path}`;
+  return `http://${MCP_DEFAULT_BIND_ADDRESS}:${server.port}${path}`;
 }
 
 async function post(body: unknown, init: RequestInit = {}): Promise<Response> {
@@ -67,6 +63,7 @@ beforeEach(async () => {
   };
   server = await startMcpServer({
     host,
+    bindAddress: MCP_DEFAULT_BIND_ADDRESS,
     info: { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" },
     port: 0,
     token: TOKEN,
@@ -78,9 +75,10 @@ afterEach(async () => {
 });
 
 describe("the MCP endpoint", () => {
-  // Asked of the socket, not of the constant it was handed: this is the property that keeps the
-  // board off the local network, and asserting `MCP_HOST === "127.0.0.1"` would prove nothing.
-  it("binds loopback only", () => {
+  // Asked of the socket, not of the address it was handed: with the default bind this is the
+  // property that keeps the board off the local network, and asserting
+  // `MCP_DEFAULT_BIND_ADDRESS === "127.0.0.1"` would prove nothing.
+  it("binds the address it was given, which by default is loopback", () => {
     expect(server.port).toBeGreaterThan(0);
     expect(server.address).toBe("127.0.0.1");
   });
@@ -163,9 +161,67 @@ describe("the MCP endpoint", () => {
         host: { listBoards: () => [], repoFor: () => null },
         info: { name: "n", title: "t", version: "0" },
         port: 0,
+        bindAddress: MCP_DEFAULT_BIND_ADDRESS,
         token: "",
       }),
     ).rejects.toThrow(/token/);
+  });
+
+  // The settings tab refuses one, but a hand-edited `data.json` never passes through the settings
+  // tab, and `listen` would take a name and go and resolve it.
+  it("refuses to start on something that is not an address", async () => {
+    await expect(
+      startMcpServer({
+        host: { listBoards: () => [], repoFor: () => null },
+        info: { name: "n", title: "t", version: "0" },
+        port: 0,
+        bindAddress: "board.example.com",
+        token: TOKEN,
+      }),
+    ).rejects.toThrow(/not an address/);
+  });
+});
+
+// The bind address the user chose is what the origin check is judged against, so the rule needs a
+// server that is not on loopback. `0.0.0.0` is the one non-loopback bind every machine can make.
+describe("the origin check under a wildcard bind", () => {
+  let wide: RunningMcpServer;
+
+  beforeEach(async () => {
+    wide = await startMcpServer({
+      host: { listBoards: () => [], repoFor: () => null },
+      info: { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" },
+      port: 0,
+      bindAddress: "0.0.0.0",
+      token: TOKEN,
+    });
+  });
+
+  afterEach(async () => {
+    await wide.close();
+  });
+
+  const ping = async (origin: string): Promise<number> => {
+    const res = await fetch(`http://127.0.0.1:${wide.port}${MCP_PATH}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${TOKEN}`,
+        origin,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    return res.status;
+  };
+
+  it("answers a page served from one of the addresses it is on", async () => {
+    expect(await ping("http://192.168.1.5:5173")).toBe(200);
+  });
+
+  // The whole of the protection: a rebinding attack arrives carrying the attacker's name, never a
+  // literal, and a wildcard bind does not change that.
+  it("still refuses a page on a name", async () => {
+    expect(await ping("https://evil.example")).toBe(403);
   });
 });
 
@@ -264,6 +320,7 @@ describe("a call that outruns the deadline", () => {
           },
           info: { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" },
           port: 0,
+          bindAddress: MCP_DEFAULT_BIND_ADDRESS,
           token: TOKEN,
           handlingTimeoutMs: deadline,
         }),
@@ -277,7 +334,7 @@ describe("a call that outruns the deadline", () => {
     const { events, start } = slowServer(200, 50);
     const slowSrv = await start();
     const call = (id: number) =>
-      fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+      fetch(`http://${MCP_DEFAULT_BIND_ADDRESS}:${slowSrv.port}${MCP_PATH}`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
         body: JSON.stringify({
@@ -302,7 +359,7 @@ describe("a call that outruns the deadline", () => {
   it("answers as JSON-RPC, keeping the call's id, and says the call may still be running", async () => {
     const { start } = slowServer(200, 50);
     const slowSrv = await start();
-    const res = await fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+    const res = await fetch(`http://${MCP_DEFAULT_BIND_ADDRESS}:${slowSrv.port}${MCP_PATH}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
       body: JSON.stringify({
@@ -323,7 +380,7 @@ describe("a call that outruns the deadline", () => {
   it("does not fire for a call that finishes in time", async () => {
     const { start } = slowServer(5, 5_000);
     const slowSrv = await start();
-    const res = await fetch(`http://${MCP_HOST}:${slowSrv.port}${MCP_PATH}`, {
+    const res = await fetch(`http://${MCP_DEFAULT_BIND_ADDRESS}:${slowSrv.port}${MCP_PATH}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),

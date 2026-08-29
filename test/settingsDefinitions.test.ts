@@ -19,6 +19,7 @@ import {
   MCP_PORT_MIN,
   type KanbanSettings,
 } from "../src/settings";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
 
 const noop = (): void => {};
 
@@ -148,6 +149,8 @@ describe("settingsPatchFor", () => {
     // Agent access opens a port; nothing should do that until the user asks for it.
     expect(DEFAULT_SETTINGS.mcpEnabled).toBe(false);
     expect(DEFAULT_SETTINGS.mcpToken).toBe("");
+    // And when it is turned on, it is on this machine only until the user says otherwise.
+    expect(DEFAULT_SETTINGS.mcpBindAddress).toBe(MCP_DEFAULT_BIND_ADDRESS);
   });
 
   it("holds the MCP port to the unprivileged range", () => {
@@ -155,6 +158,22 @@ describe("settingsPatchFor", () => {
     expect(settingsPatchFor("mcpPort", 80)).toEqual({ mcpPort: MCP_PORT_MIN });
     expect(settingsPatchFor("mcpPort", 999999)).toEqual({ mcpPort: MCP_PORT_MAX });
     expect(settingsPatchFor("mcpPort", "not a port")).toBeNull();
+  });
+
+  // Not clamped the way the port is: an address has no nearest allowed value, and half of one is
+  // not a request for anything, so a value that is not an address is refused outright.
+  it("takes a bind address only when it is one, and stores one spelling of it", () => {
+    expect(settingsPatchFor("mcpBindAddress", "0.0.0.0")).toEqual({ mcpBindAddress: "0.0.0.0" });
+    expect(settingsPatchFor("mcpBindAddress", " 192.168.1.5 ")).toEqual({
+      mcpBindAddress: "192.168.1.5",
+    });
+    expect(settingsPatchFor("mcpBindAddress", "[::1]")).toEqual({ mcpBindAddress: "::1" });
+    expect(settingsPatchFor("mcpBindAddress", "localhost")).toEqual({
+      mcpBindAddress: "localhost",
+    });
+    for (const bad of ["", "192.168.1", "999.1.1.1", "evil.example", 27125, null]) {
+      expect(settingsPatchFor("mcpBindAddress", bad), String(bad)).toBeNull();
+    }
   });
 
   it("trims the name comments are signed with", () => {
@@ -181,6 +200,7 @@ describe("agent access on a platform that cannot host it", () => {
     for (const name of [
       SETTING_COPY.mcpEnabled.name,
       SETTING_COPY.mcpPort.name,
+      SETTING_COPY.mcpBindAddress.name,
       MCP_TOKEN_COPY.name,
       MCP_TOKEN_REGENERATE.name,
     ]) {

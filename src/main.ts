@@ -22,6 +22,7 @@ import {
 import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
 import type { FileOp } from "./model/pathOps";
 import { remapPath } from "./model/pathOps";
+import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
 import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
@@ -586,7 +587,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     // A toggle left on while nothing is listening is the one state the user cannot see, so the
     // failure says both what broke and that the switch is now lying.
     new Notice(
-      `Folia Kanban: agent access could not start on port ${this.settings.mcpPort}. ${state.message}`,
+      `Folia Kanban: agent access could not start on ${this.settings.mcpBindAddress}:${this.settings.mcpPort}. ${state.message}`,
       10000,
     );
   }
@@ -700,6 +701,16 @@ class KanbanSettingTab extends PluginSettingTab {
   private pendingMcpPort: number | null = null;
 
   /**
+   * The bind address, held for the same reason and more of it. Every write restarts the server, and
+   * every prefix of an address the user is typing is either refused or — worse — a real address of
+   * its own: `0.0.0.0` passes through `0` (refused) but `192.168.1.5` passes through `192.168.1.55`
+   * if a digit is typed in the middle of it. Held until the field is left, so only the address the
+   * user actually meant is ever bound. A value that is not an address leaves this `null`, and
+   * leaving the field then keeps the address that was already stored.
+   */
+  private pendingMcpBindAddress: string | null = null;
+
+  /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
    * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
@@ -721,6 +732,8 @@ class KanbanSettingTab extends PluginSettingTab {
   override getControlValue(key: string): unknown {
     if (key === "userName") return this.pendingUserName ?? this.plugin.settings.userName;
     if (key === "mcpPort") return this.pendingMcpPort ?? this.plugin.settings.mcpPort;
+    if (key === "mcpBindAddress")
+      return this.pendingMcpBindAddress ?? this.plugin.settings.mcpBindAddress;
     const settings: KanbanSettings = this.plugin.settings;
     return Object.prototype.hasOwnProperty.call(settings, key)
       ? settings[key as keyof KanbanSettings]
@@ -741,6 +754,10 @@ class KanbanSettingTab extends PluginSettingTab {
       this.pendingMcpPort = patch.mcpPort;
       return;
     }
+    if (patch.mcpBindAddress !== undefined) {
+      this.pendingMcpBindAddress = patch.mcpBindAddress;
+      return;
+    }
     void this.plugin.updateSettings(patch).then(() => {
       // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
       // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
@@ -757,6 +774,7 @@ class KanbanSettingTab extends PluginSettingTab {
   override hide(): void {
     this.commitUserName();
     this.commitMcpPort();
+    this.commitMcpBindAddress();
     super.hide();
   }
 
@@ -772,6 +790,13 @@ class KanbanSettingTab extends PluginSettingTab {
     this.pendingMcpPort = null;
     if (port !== null && port !== this.plugin.settings.mcpPort)
       void this.plugin.updateSettings({ mcpPort: port });
+  }
+
+  private commitMcpBindAddress(): void {
+    const address = this.pendingMcpBindAddress;
+    this.pendingMcpBindAddress = null;
+    if (address !== null && address !== this.plugin.settings.mcpBindAddress)
+      void this.plugin.updateSettings({ mcpBindAddress: address });
   }
 
   /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
@@ -921,6 +946,21 @@ class KanbanSettingTab extends PluginSettingTab {
               this.pendingMcpPort = settingsPatchFor("mcpPort", v)?.mcpPort ?? null;
             });
           t.inputEl.addEventListener("blur", () => this.commitMcpPort());
+        });
+
+      new Setting(containerEl)
+        .setName(SETTING_COPY.mcpBindAddress.name)
+        .setDesc(SETTING_COPY.mcpBindAddress.desc)
+        .setDisabled(!s.mcpEnabled)
+        .addText((t) => {
+          t.setPlaceholder(MCP_DEFAULT_BIND_ADDRESS)
+            .setValue(s.mcpBindAddress)
+            .setDisabled(!s.mcpEnabled)
+            .onChange((v) => {
+              this.pendingMcpBindAddress =
+                settingsPatchFor("mcpBindAddress", v)?.mcpBindAddress ?? null;
+            });
+          t.inputEl.addEventListener("blur", () => this.commitMcpBindAddress());
         });
 
       new Setting(containerEl)

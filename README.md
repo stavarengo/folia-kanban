@@ -286,7 +286,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload):
 
 ## Agent access (MCP)
 
-Off by default. Switch it on and the plugin hosts a [Model Context Protocol](https://modelcontextprotocol.io) server on `127.0.0.1`, so an AI agent can read and change your boards through the board's own rules rather than by editing the card files behind its back — which is the difference between a card that gets its history line and one that quietly does not. Desktop only, bearer-token authenticated, one server per vault, and the tools address boards by note path.
+Off by default. Switch it on and the plugin hosts a [Model Context Protocol](https://modelcontextprotocol.io) server on `127.0.0.1`, so an AI agent can read and change your boards through the board's own rules rather than by editing the card files behind its back — which is the difference between a card that gets its history line and one that quietly does not. Desktop only, bearer-token authenticated, one server per vault, and the tools address boards by note path. A bind-address setting can move it off loopback when the client is not on this computer — [`docs/mcp.md`](./docs/mcp.md) says what you are agreeing to when you do.
 
 ```sh
 claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \
