@@ -87,8 +87,12 @@ function withoutZone(address: string): { address: string; zoned: boolean } | nul
  * and case. Not a validity check — {@link isBindAddress} is.
  */
 export function normalizeBindAddress(value: string): string {
-  const trimmed = value.trim().toLowerCase();
-  return trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1) : trimmed;
+  const trimmed = value.trim();
+  const bare = trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1) : trimmed;
+  // Case folds on the address, never on an IPv6 zone: that is an interface name, and on Linux
+  // `LAN0` and `lan0` are two different interfaces, so lowercasing it would bind the wrong one.
+  const at = bare.indexOf("%");
+  return at === -1 ? bare.toLowerCase() : bare.slice(0, at).toLowerCase() + bare.slice(at);
 }
 
 /** The address in a form two spellings of the same address share, or `null` when it is not an IP
@@ -146,9 +150,10 @@ export function isWildcardBindAddress(value: string): boolean {
  *
  * Be clear about how much this buys. Under a wildcard bind any bare-IP origin is admitted, so a page
  * served from an address rather than a name is not stopped here at all. The check is not what keeps
- * another host out — the token is, and always was, and a cross-origin call carrying an
- * `Authorization` header has to survive a preflight this server answers `401` before any of this is
- * reached. It is a cheap extra lock on the one attack that a token alone does invite.
+ * another host out — the token is, and always was, and a browser is held off before any of this
+ * anyway: a cross-origin call carrying an `Authorization` header needs a preflight, and this server
+ * answers no `OPTIONS` and sends no CORS headers. It is a cheap extra lock on the one attack that a
+ * token alone does invite.
  */
 export function originAllowed(origin: string | undefined, bindAddress: string): boolean {
   if (typeof origin !== "string" || origin === "") return true;

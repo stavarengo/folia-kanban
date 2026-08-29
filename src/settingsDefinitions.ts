@@ -152,7 +152,7 @@ export const SETTING_COPY = {
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
 
 /** What the bind-address field says when what is in it is not an address. */
-const MCP_BIND_ADDRESS_INVALID =
+export const MCP_BIND_ADDRESS_INVALID =
   "Not an address. Use an IP address such as 127.0.0.1, 0.0.0.0 or 192.168.1.5 — not a name.";
 
 /** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */

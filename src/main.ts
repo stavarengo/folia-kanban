@@ -36,6 +36,7 @@ import {
 } from "./settings";
 import {
   CARD_NEXT_TODOS_MAX,
+  MCP_BIND_ADDRESS_INVALID,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_COPY,
@@ -976,7 +977,17 @@ class KanbanSettingTab extends PluginSettingTab {
               this.pendingMcpBindAddress =
                 settingsPatchFor("mcpBindAddress", v)?.mcpBindAddress ?? null;
             });
-          t.inputEl.addEventListener("blur", () => this.commitMcpBindAddress());
+          // Obsidian 1.13 shows a refusal under the field; this rendering is what older versions
+          // get, and it has nowhere to put one. Saying nothing would leave the user looking at
+          // text that is not an address, believing the server had moved to it.
+          t.inputEl.addEventListener("blur", () => {
+            const typed = t.inputEl.value.trim();
+            if (typed !== "" && settingsPatchFor("mcpBindAddress", typed) === null) {
+              new Notice(MCP_BIND_ADDRESS_INVALID, 5000);
+              t.setValue(this.plugin.settings.mcpBindAddress);
+            }
+            this.commitMcpBindAddress();
+          });
         });
 
       new Setting(containerEl)
