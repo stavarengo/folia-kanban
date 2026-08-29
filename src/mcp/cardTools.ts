@@ -222,7 +222,7 @@ const createCard = tool({
     try {
       if (args.description !== undefined) await repo.setDescription(path, args.description);
       if (args.priority !== undefined) {
-        await setCardPriority(repo, { path, value: args.priority }, board.config.priorities);
+        await setCardPriority(repo, { path, value: args.priority });
       }
       if (args.due !== undefined) await writeField(repo, path, "due", args.due);
     } catch (e) {
@@ -328,7 +328,7 @@ const updateCard = tool({
       await repo.setDescription(path, args.description);
     }
     if (args.priority !== undefined) {
-      await setCardPriority(repo, { path, value: args.priority ?? "" }, board.config.priorities);
+      await setCardPriority(repo, { path, value: args.priority ?? "" });
     }
     if (args.due !== undefined) await writeField(repo, path, "due", args.due);
     for (const [key, value] of Object.entries(args.properties ?? {})) {

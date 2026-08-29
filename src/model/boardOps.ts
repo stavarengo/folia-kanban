@@ -8,7 +8,6 @@
 
 import type { Board } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
-import { dedupePriorities } from "./priorities";
 import type { CardRepository } from "./repo";
 
 /** Where a move lands: a column, and a slot in it. An absent `index` means the end of the column. */
@@ -85,16 +84,17 @@ export async function setSubtaskDone(
 /**
  * Set (or, with an empty value, clear) a card's priority and let the board note learn from it.
  *
- * `learn` is what the board should be told it uses once the write lands, and it is the caller's
- * to decide: the board view hands over every value its cards currently carry, so a priority
- * hand-written into a note outlives that note; a headless caller usually knows only the value it
- * just set. Either way the value being set is learned, and clearing one learns nothing — a removal
- * is not a statement about the board's vocabulary.
+ * What the note learns is the one value being set, and nothing else. The remembered list is a
+ * ranking — its order decides a badge's colour and how `sort: priority` breaks ties — so it may
+ * only ever grow by a word the user actually chose. Values the cards merely happen to carry are
+ * still offered as suggestions (`boardPriorities`), but they are ordered by a tone guess and a
+ * spelling tie-break, and writing that order into the note would hand the board a scale nobody
+ * authored. Clearing a priority learns nothing either: a removal is not a statement about the
+ * vocabulary.
  */
 export async function setCardPriority(
   repo: CardRepository,
   target: { path: string; value: string },
-  learn: readonly string[] = [],
 ): Promise<void> {
   const value = target.value.trim();
   // An empty value clears the key cleanly (the `priority:` line goes away) rather than writing a
@@ -104,5 +104,7 @@ export async function setCardPriority(
     return;
   }
   await repo.setFrontmatter(target.path, { priority: value });
-  await repo.rememberPriorities(dedupePriorities([...learn, value]));
+  // `rememberPriorities` merges against the note itself, so handing it the one new value is
+  // enough: whatever the note already holds keeps its place and its spelling.
+  await repo.rememberPriorities([value]);
 }

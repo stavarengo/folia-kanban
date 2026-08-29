@@ -222,11 +222,37 @@ describe("card detail — priority", () => {
     await user.clear(field);
     await user.type(field, "blocker{Enter}");
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.priority).toBe("blocker"));
-    // `A` is remembered too: it was the board's only known value until this edit replaced it.
-    await waitFor(() => expect(repo.config.priorities).toEqual(["A", "blocker"]));
+    // Only `blocker`. The `A` the card carried is not remembered by this edit: the note's list is
+    // a ranking, and nobody said `A` outranks `blocker` — it merely happened to be on a card.
+    await waitFor(() => expect(repo.config.priorities).toEqual(["blocker"]));
   });
 
-  it("never remembers the suggested A/B/C — only values the board really uses", async () => {
+  it("remembers only the value that was set, not the words the other cards carry", async () => {
+    // Three cards, three unranked words, no `priorities` on the note. Picking one of them must
+    // write that one word, not all three in an order decided by spelling.
+    const repo = new FakeRepo(config, {
+      "Tasks/Later.md": {
+        fm: { type: "task", status: "todo", priority: "later" },
+        body: "\n# Later\n",
+      },
+      "Tasks/Now.md": { fm: { type: "task", status: "todo", priority: "now" }, body: "\n# Now\n" },
+      "Tasks/Soon.md": {
+        fm: { type: "task", status: "todo", priority: "soon" },
+        body: "\n# Soon\n",
+      },
+    });
+    const user = userEvent.setup();
+    render_(repo);
+    await user.click(await screen.findByText("Later"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Priority") as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, "now{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Later.md")!.fm.priority).toBe("now"));
+    await waitFor(() => expect(repo.config.priorities).toEqual(["now"]));
+  });
+
+  it("remembers the value that was typed, not the A/B/C the field suggested", async () => {
     // A board with no priorities anywhere: the field suggests the todo.txt starting set, but
     // typing `blocker` must remember `blocker` alone, not the three values nobody chose.
     const repo = new FakeRepo(config, {
@@ -1405,8 +1431,9 @@ describe("card context menu", () => {
     const { repo, menu } = await openCardMenu("First");
     const user = userEvent.setup();
     await user.click(within(menu).getByRole("menuitemradio", { name: "urgent" }));
-    // Every value the board knows is written, including `low`, which only a card carried until now.
-    await waitFor(() => expect(repo.config.priorities).toEqual(["urgent", "low"]));
+    // Only the chosen value is written. `low`, which so far only a card carries, keeps being
+    // offered as a suggestion but is not ranked into the note by an edit that was not about it.
+    await waitFor(() => expect(repo.config.priorities).toEqual(["urgent"]));
   });
 
   it("Add subcard opens the card detail with its subcard input focused and adds the subcard", async () => {
