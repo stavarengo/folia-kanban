@@ -73,7 +73,7 @@ Every tool takes `board`, the vault path of the board note (`Work/Board.md`), ex
 | Tool | Reads or writes | What it does |
 | --- | --- | --- |
 | `list_boards` | reads | Every note in the vault carrying `folia-board: true`. Start here. |
-| `get_board` | reads | A board's columns and the cards in each, in the order the board shows them. A card nested under another one is in no column of its own, so it is listed under its parent's `children`. |
+| `get_board` | reads | A board's columns and the cards in each, in the order the board shows them, each with its priority, due date and `assignee`. A card nested under another one is in no column of its own, so it is listed under its parent's `children`. |
 | `get_card` | reads | One card in full: column, frontmatter, description, subtasks, comments, history, relationships. |
 | `create_card` | writes | Adds a card to a column, written into the board's card folder exactly as the add-card button writes it. Optional `description`, `priority`, `due`. |
 | `move_card` | writes | Moves a card to a `column`, optionally to a `position` in it (`0` is the top; omit to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist-line card takes no `position`: its order comes from where the line sits in its parent's list. The reply says which column the card landed in, and its `position` only when it has a tile of its own — a card drawn inside its parent is ordered by that parent, not by a slot. |
@@ -88,7 +88,7 @@ An empty string is not a second way to clear a value, except for `priority`, whe
 
 `update_card` also needs at least one field to change. That rule cannot be expressed in JSON Schema, so a client sees an all-optional object and meets the requirement as a tool error on the call.
 
-Assignment is one of those ordinary keys: `properties: { assignee: "alex" }` assigns a card and `properties: { assignee: null }` unassigns it, which is exactly what the board's own **Assignee** field writes. Nothing refuses it and no dedicated field exists for it, because a name is a plain string — there is no vocabulary the board has to learn from it, no history line owed, and no format the board could misread. `assignee:me` in a filter is the **Your name** setting, which is the user's, not the agent's, so a tool should write the name it means.
+Assignment is one of those ordinary keys, and `get_board` reports it per card so surveying who is on what costs one call: `properties: { assignee: "alex" }` assigns a card and `properties: { assignee: null }` unassigns it, which is exactly what the board's own **Assignee** field writes. Nothing refuses it and no dedicated field exists for it, because a name is a plain string — there is no vocabulary the board has to learn from it, no history line owed, and no format the board could misread. `assignee:me` in a filter is the **Your name** setting, which is the user's, not the agent's, so a tool should write the name it means.
 
 A `priority` the board has not seen before is accepted and added to the board's vocabulary, exactly as typing a new one into a card's details does. The board's scale is yours, not a fixed list — which also means an agent inventing one leaves it there for you to prune by hand.
 
