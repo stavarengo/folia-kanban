@@ -277,7 +277,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
 - **Card details**
   - **Show details in** — `side` (docked beside the board) or `modal` (centred dialog).
   - **Side panel layout** — `split` (shrinks the columns to the left) or `float` (overlays the columns); used when details open in the side panel.
-  - **Side panel width** — the docked panel's width; you can also drag its left border. Used when details open in the side panel.
+  - **Side panel width** — the docked panel's width, whenever a card's details open in a panel; you can also drag its left border.
 - **Cards on the board**
   - **Next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
   - **Subitems default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).

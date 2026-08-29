@@ -15,6 +15,7 @@ import {
   MCP_PORT_INVALID,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
+  SETTING_CONTROLS,
   SETTING_COPY,
   SETTING_GROUPS,
   SETTING_OPTIONS,
@@ -159,6 +160,15 @@ describe("settingDefinitions", () => {
     }
   });
 
+  // `renderRow` in src/main.ts casts a "held" row's key to `HeldFieldKey`. A third held row added
+  // to the controls without being added to that type would make the cast lie, silently.
+  it("holds exactly the two fields the held-field type names", () => {
+    const held = Object.entries(SETTING_CONTROLS)
+      .filter(([, spec]) => spec.kind === "held")
+      .map(([key]) => key);
+    expect(new Set(held)).toEqual(new Set(HELD_KEYS));
+  });
+
   it("keeps the name field's placeholder on the row that asks for a name", () => {
     const control = rows.find((d) => "control" in d && d.control?.key === "userName")?.control;
     expect(control && "placeholder" in control ? control.placeholder : null).toBe(
@@ -170,10 +180,9 @@ describe("settingDefinitions", () => {
   // or not the row is live, because a description Obsidian fixes at render time cannot appear only
   // when the dependency is unmet.
   it("says in words what every dependent row waits for", () => {
-    for (const key of ["sidePanelMode", "detailWidth"] as const)
-      expect(SETTING_COPY[key].desc, key).toContain(
-        "Only used when details open in the side panel",
-      );
+    expect(SETTING_COPY.sidePanelMode.desc).toContain(
+      "Only used when details open in the side panel",
+    );
     expect(SETTING_COPY.addCardOpenMode.desc).toContain(
       "Only used by the two flows that open them",
     );
@@ -183,17 +192,24 @@ describe("settingDefinitions", () => {
   it("reads a row's dependency the same way for whichever tab is asking", () => {
     const modal: KanbanSettings = { ...DEFAULT_SETTINGS, detailPresentation: "modal" };
     const side: KanbanSettings = { ...DEFAULT_SETTINGS, detailPresentation: "side" };
-    for (const key of ["sidePanelMode", "detailWidth"] as const) {
-      expect(isRowDisabled(key, modal), key).toBe(true);
-      expect(isRowDisabled(key, side), key).toBe(false);
-    }
+    expect(isRowDisabled("sidePanelMode", modal)).toBe(true);
+    expect(isRowDisabled("sidePanelMode", side)).toBe(false);
+    // `addCardOpenMode` set to a side value opens a panel even under a modal presentation, and the
+    // panel reads the width whichever way it opened, so the width row stays live.
+    for (const settings of [modal, side])
+      expect(isRowDisabled("detailWidth", settings)).toBe(false);
     expect(isRowDisabled("addCardOpenMode", { ...DEFAULT_SETTINGS, addCardFlow: "inline" })).toBe(
       true,
     );
     expect(isRowDisabled("mcpPort", DEFAULT_SETTINGS)).toBe(true);
     expect(isRowDisabled("mcpPort", { ...DEFAULT_SETTINGS, mcpEnabled: true })).toBe(false);
     // A row nothing gates is never greyed, whatever the settings say.
-    const ungated: EditableSettingKey[] = ["boardNoteDefaultView", "userName", "historyScope"];
+    const ungated: EditableSettingKey[] = [
+      "boardNoteDefaultView",
+      "userName",
+      "historyScope",
+      "detailWidth",
+    ];
     for (const key of ungated) expect(isRowDisabled(key, modal), key).toBe(false);
   });
 
@@ -228,12 +244,9 @@ describe("settingDefinitions", () => {
     expect(disabledOf("addCardOpenMode", { ...DEFAULT_SETTINGS, addCardFlow: "detail" })).toBe(
       false,
     );
-    // The width slider moves the side panel and nothing else, so a modal presentation leaves it
-    // just as inert as the layout dropdown above it.
+    // The width is never greyed: "Open the new card's details in" can open a side panel over a
+    // modal presentation, and the panel reads this width however it was opened.
     expect(disabledOf("detailWidth", { ...DEFAULT_SETTINGS, detailPresentation: "modal" })).toBe(
-      true,
-    );
-    expect(disabledOf("detailWidth", { ...DEFAULT_SETTINGS, detailPresentation: "side" })).toBe(
       false,
     );
   });

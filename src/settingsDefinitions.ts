@@ -101,7 +101,7 @@ export const SETTING_COPY = {
   },
   detailWidth: {
     name: "Side panel width",
-    desc: "How wide the docked panel is, in pixels. Dragging the panel's left border changes this too. Only used when details open in the side panel.",
+    desc: "How wide the docked panel is whenever a card's details open in one, in pixels — including when the add-card setting below opens a panel over a modal presentation. Dragging the panel's left border changes this too.",
   },
   addCardFlow: {
     name: "Add-card flow",
@@ -269,8 +269,11 @@ const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]>> = {
  *  is disabled rather than hidden: a setting that vanishes is a setting nobody can find again. The
  *  words that explain the dependency live in {@link SETTING_COPY}, always visible. */
 const ROW_DISABLED: Partial<Record<EditableSettingKey, (s: KanbanSettings) => boolean>> = {
+  // The layout dropdown goes inert under a modal presentation because the one other way a panel
+  // opens — "Open the new card's details in", set to a side value — names its own layout and never
+  // reads this. The width is deliberately NOT gated the same way: the panel reads it however it was
+  // opened, so greying it would be a lie the moment that override is used.
   sidePanelMode: (s) => s.detailPresentation === "modal",
-  detailWidth: (s) => s.detailPresentation === "modal",
   addCardOpenMode: (s) => s.addCardFlow === "inline",
   mcpPort: (s) => !s.mcpEnabled,
   mcpBindAddress: (s) => !s.mcpEnabled,
