@@ -44,10 +44,16 @@ class PropertyNameSuggest extends AbstractInputSuggest<PropertySuggestion> {
   }
 
   renderSuggestion(item: PropertySuggestion, el: HTMLElement): void {
-    el.createSpan({ text: item.key });
-    // Obsidian's own class, so the group reads as the muted aside every other suggestion list
-    // uses — no styling of ours reaches this popup, which lives outside the board's token scope.
-    el.createSpan({
+    // Obsidian's own structure and classes, title over note, so the row is laid out and themed by
+    // the same rules as every other suggestion list in the app. None of the plugin's styling
+    // reaches this popup: it hangs off the document body, outside the board's token scope. Written
+    // as spans rather than as one string, because a name and the list it came from are two things.
+    // The class that switches Obsidian's own two-line row on: without it the title and the note
+    // are laid out as plain inline spans and read as one run-on word ("dueedited in this panel").
+    el.classList.add("mod-complex");
+    const content = el.createSpan({ cls: "suggestion-content" });
+    content.createSpan({ cls: "suggestion-title", text: item.key });
+    content.createSpan({
       cls: "suggestion-note",
       text: item.editedInPanel ? "edited in this panel" : GROUP_NOTE[item.group],
     });
