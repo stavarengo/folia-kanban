@@ -26,7 +26,8 @@ describe("what counts as a bind address", () => {
       "::",
       "[::1]",
       "fe80::1",
-      "2001:db8::ffff:192.168.1.5",
+      // Link-local: only bindable with the interface it is local to, so the zone is part of it.
+      "fe80::1%eth0",
     ]) {
       expect(isBindAddress(value), value).toBe(true);
     }
@@ -47,6 +48,11 @@ describe("what counts as a bind address", () => {
       "127.0.0.1:27125",
       "http://127.0.0.1",
       ":::1",
+      // A second spelling of an IPv4 address, and `::ffff:0.0.0.0` is a trap: it reads as one
+      // interface and binds all of them.
+      "::ffff:192.168.1.5",
+      "::ffff:0.0.0.0",
+      "fe80::1%",
       "1:2:3:4:5:6:7",
       "1:2:3:4:5:6:7:8:9",
       "gggg::1",
@@ -76,6 +82,12 @@ describe("what counts as a bind address", () => {
     expect(isWildcardBindAddress("0:0:0:0:0:0:0:0")).toBe(true);
     expect(isWildcardBindAddress("127.0.0.1")).toBe(false);
     expect(isWildcardBindAddress("192.168.1.5")).toBe(false);
+  });
+
+  it("does not let a zone change what an address is", () => {
+    expect(isLoopbackBindAddress("::1%lo")).toBe(true);
+    expect(isLoopbackBindAddress("fe80::1%eth0")).toBe(false);
+    expect(isWildcardBindAddress("::%eth0")).toBe(true);
   });
 });
 
@@ -119,6 +131,13 @@ describe("which origins a bind lets in", () => {
   it("refuses an opaque origin rather than reading it as no origin at all", () => {
     expect(originAllowed("null", "0.0.0.0")).toBe(false);
     expect(originAllowed("not a url", "0.0.0.0")).toBe(false);
+  });
+
+  // The zone says which interface an address is local to. It is part of the address the machine
+  // binds and no part of any origin, so it must not stop the two matching.
+  it("matches a page on a link-local address against the zoned bind", () => {
+    expect(originAllowed("http://[fe80::1]:5173", "fe80::1%eth0")).toBe(true);
+    expect(originAllowed("http://[fe80::2]:5173", "fe80::1%eth0")).toBe(false);
   });
 
   it("compares two spellings of one IPv6 address as one address", () => {

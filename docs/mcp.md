@@ -27,7 +27,7 @@ Understand what you are choosing. Bind to `0.0.0.0` and the server answers on **
 - Move it only onto a network you actually trust, for as long as you need it, and put it back on `127.0.0.1` afterwards.
 - Treat the token as what it now is — a password reachable from other machines. **Replace token** after any run where it might have gone somewhere it should not have.
 
-The address must be an IP literal (`0.0.0.0`, `192.168.1.5`, `::1`, `::`) or `localhost`. A name that would have to be resolved is refused: an address valid on this computer is a fact about its interfaces, and a name that resolves here today may resolve elsewhere tomorrow. An address this computer does not have fails to bind, and the notice says so.
+The address must be an IP literal (`0.0.0.0`, `192.168.1.5`, `::1`, `::`) or `localhost`. An IPv6 address goes in the setting bare, and in a URL in brackets — bind `::1` and the endpoint is `http://[::1]:27125/mcp`. A link-local IPv6 address needs its interface with it (`fe80::1%eth0`), because that is the only form anything can bind. An IPv4-mapped address (`::ffff:192.168.1.5`) is refused: it is a second spelling of an address that already has one, and `::ffff:0.0.0.0` would read as one interface while binding all of them. A name that would have to be resolved is refused: an address valid on this computer is a fact about its interfaces, and a name that resolves here today may resolve elsewhere tomorrow. An address this computer does not have fails to bind, and the notice says so.
 
 ### Which browser pages the server will talk to
 
