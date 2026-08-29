@@ -34,6 +34,11 @@ function cardSummary(board: Board, path: string): Record<string, unknown> {
     order: card.frontmatter.order,
     priority: card.frontmatter.priority,
     due: card.frontmatter.due,
+    // Raw, exactly as its neighbours are: a card may name one person or several, and an agent that
+    // will write the key back should see the shape the note actually holds. Reported here and not
+    // only by get_card because "who is working on this" is a question about a board, and answering
+    // it otherwise costs one call per card.
+    assignee: card.frontmatter["assignee"],
     context: card.context,
     parent: board.placedOf[path],
     subtasks: stats?.checklist ? { total: stats.checklist, done: stats.checklistDone } : undefined,

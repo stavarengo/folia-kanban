@@ -76,6 +76,23 @@ describe("the tool surface", () => {
     ]);
   });
 
+  it("says on the board itself who each card is assigned to", async () => {
+    const { host, repo } = fixture();
+    repo.files.get("Tasks/Write docs.md")!.fm["assignee"] = "alex";
+    repo.files.get("Tasks/Ship it.md")!.fm["assignee"] = ["alex", "ana maria"];
+    const result = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { cards: { path: string; assignee?: unknown }[] }[];
+    };
+    // Reported raw, so an agent about to write the key back sees the shape the note holds.
+    expect(result.columns[0]?.cards.map((c) => c.assignee)).toEqual([
+      "alex",
+      ["alex", "ana maria"],
+    ]);
+    // A card nobody is on says nothing, the way it already says nothing about a priority it has
+    // not got — `undefined` drops out of the JSON the client actually receives.
+    expect(result.columns[2]?.cards[0]?.assignee).toBeUndefined();
+  });
+
   it("reads one card in full", async () => {
     const { host } = fixture();
     const card = (await call(host, "get_card", {
