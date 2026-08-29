@@ -1055,7 +1055,9 @@ describe("the suggester attached to a text input", () => {
 
     AbstractInputSuggest.instances.at(-1)!.renderSuggestion({ key: "status", group: "board" }, el);
 
-    expect(el.textContent).toBe("statuson this board");
+    // Obsidian lays a title-over-note row out only for an item marked complex.
+    expect(el.classList.contains("mod-complex")).toBe(true);
+    expect(el.querySelector(".suggestion-title")?.textContent).toBe("status");
     expect(el.querySelector(".suggestion-note")?.textContent).toBe("on this board");
   });
 
