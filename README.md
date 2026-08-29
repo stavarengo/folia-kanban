@@ -159,11 +159,13 @@ A card carries an `assignee` in its frontmatter, and that is the whole mechanism
 assignee: alex
 ```
 
-You set it from three places, whichever is nearest to hand. The detail panel has an **Assignee** field that suggests the names your board's cards already use and takes any other one you type; emptying it removes the key, so an unassigned card reads as one in its own note too. Beside the field, and in a card's right-click menu, sits the one-click case: **Assign to me**, which becomes **Unassign** once the card is yours. And the assigned name shows on the card's tile, next to its priority and due chips.
+You set it from three places, whichever is nearest to hand. The detail panel has an **Assignee** field that suggests the names your board's cards already use and takes any other one you type; emptying it removes the key, so an unassigned card reads as one in its own note too. Beside the field, and in a card's right-click menu, sits the one-click case: **Assign to me**, which becomes **Unassign me** once the card is yours. And the assigned name shows on the card's tile, next to its priority and due chips.
 
 "Me" is Settings → **Your name**, the same name the board signs your comments with. The plugin never guesses it, so until you have typed one there is nobody to assign a card to in one click: the field still takes a name typed by hand, and it says where the one-click version comes from. Once the name is set, the toolbar offers a **Mine** filter, which is the search token `assignee:me` — and `assignee:alex` narrows the board to one person, `assignee:none` to everything nobody has picked up. A name with a space in it goes in quotes: `assignee:"ana maria"`. Case, surrounding space and a leading `@` are all read as the same person; anything past that is a different name, since the plugin holds no list of who your people are. Typing a name straight into the search box, with no token, finds their cards too.
 
-Two things it deliberately does not do. It does not keep a roster: the names on offer are whoever the board's cards currently name, so a name appears when someone is assigned and is gone again when the last card carrying it is. And it writes one name at a time. A card assigned to several people — `assignee: [alex, ana]`, written by hand or by another tool — is read correctly everywhere: it shows a chip each, matches either name, and the panel shows the list as it is; the field just writes a single name when you next edit it.
+A card can name several people — `assignee: [alex, ana]`, written by hand or by another tool — and that is read everywhere: a chip each, either name matching, the list shown as it is in the panel's field. The two controls then differ on purpose. The field is a text box, so typing over it writes exactly what you typed, which for a list means replacing it. **Assign to me** and **Unassign me** only ever add or remove your own name, leaving anyone else on the card alone — the one gesture the board makes about somebody else's assignment is none.
+
+Two limits worth knowing. There is no roster: the names on offer are whoever the board's cards currently name, so a name appears when someone is assigned and is gone again when the last card carrying it is. And `me` and `none` are words the filter spends: a person actually called *none* is found by their cards, their chip and plain search, but `assignee:none` reads as "nobody" rather than as them, and `assignee:me` is always you. The same trade the grammar already makes for `due:none` and `unread:none`.
 
 ## Features
 
@@ -327,7 +329,7 @@ The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/m
 | Filter your own, overdue / due-soon, blocked or unread cards | One-click **Mine** / **Overdue** / **Due soon** / **Blocked** / **Unread** buttons |
 | Move or reorder a card | Drag with the pointer, or pick it up with the keyboard |
 | Scroll horizontally across columns | Hold **Shift** and drag the board background |
-| Card menu (open, mark done, assign to me, priority, move up/down, copy the card's path, add subcard, delete) | Right-click a card |
+| Card menu (open, mark done, assign it to yourself, priority, move up/down, copy the card's path, add subcard, delete) | Right-click a card |
 | Toggle or remove a surfaced checklist item | Right-click it on the card |
 | Column menu (rename, recolour, WIP limit, reorder, delete) | The column's `⋯` button |
 | Swap the tab between the board and the Markdown editor | The button in the tab header |

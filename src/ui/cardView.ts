@@ -170,6 +170,24 @@ export function sameAssignee(a: string, b: string): boolean {
 }
 
 /**
+ * The card's assignees with `me` added or taken away — whichever the one-click control means for a
+ * card that already names them. The result is the frontmatter value to write: `null` to remove the
+ * key, a plain string for a single name, a list for several.
+ *
+ * The list cases exist because a hand-written `assignee: [alex, ana]` is a card two people are on,
+ * and the one gesture the board offers about a card is "am I on it". Answering that by replacing
+ * both names with mine would delete a fact somebody wrote down, and answering it by refusing would
+ * leave the one card that most needs the button without it. So the button adds only me and removes
+ * only me; the panel's field remains where a name other than yours is written.
+ */
+export function toggleAssignee(names: readonly string[], me: string): string | string[] | null {
+  const rest = names.filter((name) => !sameAssignee(name, me));
+  const next = rest.length === names.length ? [...names, me.trim()] : rest;
+  if (next.length === 0) return null;
+  return next.length === 1 ? (next[0] as string) : next;
+}
+
+/**
  * The names a board's cards are actually assigned to, deduplicated case-insensitively (first
  * spelling wins) and sorted alphabetically — what an assignee picker offers.
  *

@@ -484,13 +484,13 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       setPriority: (path, value) => setPriorityAndReload(path, value),
       setAssignee: (path, value) => {
         void (async () => {
-          const name = value.trim();
+          const next = typeof value === "string" ? value.trim() : value;
           try {
-            // An empty name removes the key rather than leaving `assignee:` sitting there empty —
-            // an unassigned card should read as one in its note too, and `assignee:none` finds it
+            // Nobody removes the key rather than leaving `assignee:` sitting there empty — an
+            // unassigned card should read as one in its note too, and `assignee:none` finds it
             // either way.
-            if (name) await repo.setFrontmatter(path, { assignee: name });
-            else await repo.unsetFrontmatterKey(path, "assignee");
+            if (next === null || next === "") await repo.unsetFrontmatterKey(path, "assignee");
+            else await repo.setFrontmatter(path, { assignee: next });
           } catch (e) {
             reportError(e);
           } finally {

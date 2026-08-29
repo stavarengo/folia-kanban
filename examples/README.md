@@ -81,7 +81,7 @@ Open any of them: the panel has one editable list per type (**Blocks**, **A resu
 | `Decide the export format.md` | `ana maria` | a name with a space in it, which is what makes `assignee:"ana maria"` need its quotes |
 | `Review PR - accessibility.md` | a YAML list of both | two chips: the board reads a list although its own field writes one name |
 
-Set Settings → **Comments and history** → *Your name* to `alex` (the same setting the unread markers use, and who this vault pretends you are) and a **Mine** chip appears in the toolbar — the token `assignee:me`. Open any card and the panel's **Assignee** field suggests the names already on the board and takes any other one you type; beside it, **Assign to me** puts your name on the card in one click and turns into **Unassign**. The same pair is in a card's right-click menu. Empty the field and the key is removed from the note, not left sitting there blank.
+Set Settings → **Comments and history** → *Your name* to `alex` (the same setting the unread markers use, and who this vault pretends you are) and a **Mine** chip appears in the toolbar — the token `assignee:me`. Open any card and the panel's **Assignee** field suggests the names already on the board and takes any other one you type; beside it, **Assign to me** puts your name on the card in one click and turns into **Unassign me**. The same button is in a card's right-click menu. Empty the field and the key is removed from the note, not left sitting there blank. Try the button on `Review PR - accessibility`, the card with two names on it: it adds you as a third and takes only you off again, while typing over the field replaces the whole list with what you typed.
 
 ## Title modes, side by side
 

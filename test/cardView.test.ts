@@ -17,6 +17,7 @@ import {
   assigneeValues,
   boardAssignees,
   sameAssignee,
+  toggleAssignee,
   cardChips,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
@@ -381,6 +382,16 @@ describe("assignment (20260827.03)", () => {
   it("finds a card by its assignee's name typed as plain search text", () => {
     const c = card({ assignee: "Rafa" }, "Apply the mulch");
     expect(matchCard(c, parseFilter("rafa"), ctx)).toBe(true);
+  });
+
+  it("adds or removes only the reader, and collapses the result to the smallest shape", () => {
+    expect(toggleAssignee([], "Rafa")).toBe("Rafa");
+    expect(toggleAssignee(["Rafa"], "rafa")).toBe(null);
+    expect(toggleAssignee(["alex"], "Rafa")).toEqual(["alex", "Rafa"]);
+    expect(toggleAssignee(["alex", "Rafa"], "@rafa")).toBe("alex");
+    expect(toggleAssignee(["alex", "ana"], "Rafa")).toEqual(["alex", "ana", "Rafa"]);
+    // A name spelled twice by hand goes away in one press, rather than needing one press each.
+    expect(toggleAssignee(["Rafa", "rafa", "alex"], "rafa")).toBe("alex");
   });
 
   it("shows every assigned name on the tile, one chip each", () => {

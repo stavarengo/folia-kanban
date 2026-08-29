@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { samePriority } from "../model/priorities";
-import { priorityOptions, priorityTone, sameAssignee } from "./cardView";
+import { priorityOptions, priorityTone, sameAssignee, toggleAssignee } from "./cardView";
 import { useBoardActions, useSettings } from "./context";
 import { Icon, type IconName } from "./icons";
 
@@ -19,10 +19,11 @@ interface Props {
   /** The card's current priority frontmatter value (for the "Change priority" group). */
   priority: string;
   /**
-   * Who the card is assigned to right now, as its note spells it — `""` when nobody is. Decides
-   * whether the menu offers to take the card or to hand it back.
+   * Everyone the card is assigned to right now, as its note spells them. Decides whether the menu
+   * offers to take the card or to hand it back — and the whole list, not just the first name, so
+   * taking a card two people are already on adds you rather than replacing them.
    */
-  assignee: string;
+  assignees: readonly string[];
   /** Whether the card already sits in the board's "done" column (hides "Mark done"). */
   isDone: boolean;
   /** For a todo target: the column its line currently claims, `""` when it claims none. */
@@ -39,7 +40,7 @@ export function CardContextMenu({
   target,
   path,
   priority,
-  assignee,
+  assignees,
   isDone,
   todoColumn = "",
   canMoveUp,
@@ -197,9 +198,11 @@ export function CardContextMenu({
           {item("Override card title", "type", () => a.editTitleOverride(path))}
           {!isDone && item("Mark done", "check-circle", () => a.complete(path))}
           {me !== "" &&
-            (sameAssignee(assignee, me)
-              ? item("Unassign", "user", () => a.setAssignee(path, ""))
-              : item("Assign to me", "user", () => a.setAssignee(path, me)))}
+            item(
+              assignees.some((name) => sameAssignee(name, me)) ? "Unassign me" : "Assign to me",
+              "user",
+              () => a.setAssignee(path, toggleAssignee(assignees, me)),
+            )}
           {item("Open note", "external-link", () => a.openNote(path))}
 
           <div className="folia-menu-divider" />
