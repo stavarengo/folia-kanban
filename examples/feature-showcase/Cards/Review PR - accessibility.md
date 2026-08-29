@@ -2,6 +2,9 @@
 status: review
 priority: C
 due: 2026-06-20
+assignee:
+  - alex
+  - ana maria
 tags: [review, a11y]
 ---
 

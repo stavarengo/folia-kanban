@@ -1414,6 +1414,29 @@
   letter-spacing: normal;
 }
 
+/* The assignee field spans both columns: it carries a button beside its input, and half a row is
+   not enough for a name and "Assign to me" without either wrapping. */
+.folia-assignee-field {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+.folia-assignee-field label {
+  flex: 1;
+  min-width: 0;
+}
+.folia-assignee-me {
+  flex: none;
+  white-space: nowrap;
+}
+.folia-assignee-hint {
+  flex: 1 0 100%;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-muted);
+}
+
 .folia-props {
   display: flex;
   flex-direction: column;

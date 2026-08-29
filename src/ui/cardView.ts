@@ -134,6 +134,61 @@ export function priorityOptions(vocabulary: readonly string[], current: string):
     : [...vocabulary];
 }
 
+/**
+ * The people a card is assigned to, as its note spells them.
+ *
+ * Read tolerantly, written narrowly. The panel and the context menu write ONE name as a plain
+ * string, which is the shape the whole feature is designed around; but the key is hand-editable
+ * frontmatter, and a YAML list is what somebody writing two names by hand will naturally produce.
+ * A list read as a single mangled string would be a card that quietly stops matching its own
+ * `assignee:` filter, so both shapes are read the same way `context` already is.
+ *
+ * Values keep the case the note wrote them in — this is what a chip shows and what a picker
+ * offers — and comparison is left to {@link sameAssignee}.
+ */
+export function assigneeValues(card: Card): string[] {
+  const raw = card.frontmatter["assignee"];
+  const list = typeof raw === "string" ? [raw] : Array.isArray(raw) ? raw : [];
+  const out: string[] = [];
+  for (const v of list) {
+    if (typeof v !== "string") continue;
+    const name = v.trim();
+    if (name) out.push(name);
+  }
+  return out;
+}
+
+/**
+ * Two spellings of the same person: case and surrounding space are noise, and a leading `@` is
+ * how half the world writes a name. Anything past that — "Alex" and "Alex Smith" — is two
+ * different names, because the plugin holds no roster that could say otherwise.
+ */
+export function sameAssignee(a: string, b: string): boolean {
+  const key = (s: string) => s.trim().replace(/^@+/, "").toLowerCase();
+  const left = key(a);
+  return left !== "" && left === key(b);
+}
+
+/**
+ * The names a board's cards are actually assigned to, deduplicated case-insensitively (first
+ * spelling wins) and sorted alphabetically — what an assignee picker offers.
+ *
+ * Read off the cards and nowhere else. A board note listing its people would be new board
+ * vocabulary, and who a vault's people are is exactly the question left open elsewhere; a name
+ * that appears the moment someone is assigned needs no such answer, and disappears again when the
+ * last card carrying it does.
+ */
+export function boardAssignees(cards: readonly Card[]): string[] {
+  const seen = new Map<string, string>();
+  for (const card of cards) {
+    for (const name of assigneeValues(card)) {
+      const key = name.replace(/^@+/, "").toLowerCase();
+      if (!seen.has(key)) seen.set(key, name);
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
 /** Whole-day difference (target − today), both as YYYY-MM-DD. */
 function dayDelta(target: string, today: string): number | null {
   const t = Date.parse(target + "T00:00:00");
@@ -223,6 +278,7 @@ export type FilterKey =
   | "tag"
   | "due"
   | "context"
+  | "assignee"
   | "is"
   | "unread";
 
@@ -233,6 +289,7 @@ const FILTER_KEYS: readonly FilterKey[] = [
   "tag",
   "due",
   "context",
+  "assignee",
   "is",
   "unread",
 ];
@@ -266,6 +323,13 @@ export interface MatchContext {
   relations?: Record<string, RelationCount[]>;
   /** The reader's unread verdict on a card, for `unread:`. Reader-specific: see `unread.ts`. */
   unread?: (card: Card) => UnreadState;
+  /**
+   * Who "me" is, for `assignee:me` — the **Your name** setting and nothing else. The plugin never
+   * guesses it (inferring it is its own open question), so a caller that has no name in hand leaves
+   * this out and `assignee:me` then matches no card, which is the truthful answer to "which are
+   * mine" from a plugin that has not been told who you are.
+   */
+  me?: string;
 }
 
 export const EMPTY_FILTER: Filter = { text: [], tokens: [] };
@@ -323,7 +387,16 @@ export function isEmptyFilter(f: Filter): boolean {
 
 /** Lower-cased free-text haystack: title + basename + priority + tags (area + tags). */
 function freeTextHaystack(card: Card): string {
-  return [card.title, card.basename, String(card.frontmatter.priority ?? ""), ...tagValues(card)]
+  return [
+    card.title,
+    card.basename,
+    String(card.frontmatter.priority ?? ""),
+    ...tagValues(card),
+    // A person's name searched as plain text finds their cards, without anyone having to know the
+    // `assignee:` token exists. The token is still what says "only theirs": free text matches a
+    // name anywhere on the card, a title included.
+    ...assigneeValues(card),
+  ]
     .join(" ")
     .toLowerCase();
 }
@@ -397,6 +470,19 @@ function matchUnread(card: Card, value: string, ctx: MatchContext): boolean {
   }
 }
 
+/**
+ * `assignee:<name>` — that person and nobody else; `assignee:none` — nobody at all; `assignee:me`
+ * — whoever the **Your name** setting says you are, and no card when it says nothing, since a
+ * plugin that has not been told who you are cannot honestly answer "mine".
+ */
+function matchAssignee(card: Card, value: string, ctx: MatchContext): boolean {
+  const names = assigneeValues(card);
+  if (value === "none") return names.length === 0;
+  const want = value === "me" ? (ctx.me ?? "") : value;
+  if (want.trim() === "") return false;
+  return names.some((name) => sameAssignee(name, want));
+}
+
 function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean {
   const fm = card.frontmatter;
   switch (token.key) {
@@ -416,6 +502,8 @@ function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean 
         (typeof card.context === "string" && card.context.toLowerCase() === token.value) ||
         listValues(fm["context"]).includes(token.value)
       );
+    case "assignee":
+      return matchAssignee(card, token.value, ctx);
     case "due":
       return matchDue(card, token.value, ctx);
     case "is":
@@ -749,6 +837,18 @@ export function cardChips(
   }
   for (const [i, tag] of tagValues(card).entries()) {
     chips.push({ key: "tag-" + i, label: tag, tone: "muted", title: "Tag" });
+  }
+  for (const [i, name] of assigneeValues(card).entries()) {
+    chips.push({
+      key: "assignee-" + i,
+      label: name,
+      tone: "muted",
+      icon: "user",
+      // Deliberately the same chip whoever it names: telling "mine" apart at a glance is what the
+      // `assignee:me` filter and its "Mine" quick filter are for, and a tile that colours one name
+      // differently would need to know who is reading it to draw a single card.
+      title: "Assigned to " + name,
+    });
   }
   if (typeof fm.due === "string" && fm.due) {
     const done = fm.status === doneColumnId;

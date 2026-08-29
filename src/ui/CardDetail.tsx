@@ -33,7 +33,7 @@ import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
-import { priorityOptions } from "./cardView";
+import { assigneeValues, boardAssignees, priorityOptions, sameAssignee } from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
 import { Icon } from "./icons";
 import { Markdown } from "./Markdown";
@@ -184,6 +184,84 @@ function PriorityField({
         ))}
       </datalist>
     </label>
+  );
+}
+
+/**
+ * The ASSIGNEE field: who is working on this card, typed as a name.
+ *
+ * Same shape as the priority field, and for the same reason — a board's people are whoever its
+ * cards already name, so the `<datalist>` is a set of suggestions rather than a closed menu and a
+ * name nobody has used yet is simply typed. Emptying the field unassigns the card.
+ *
+ * Beside it sits the one-click case: assign this card to me. It appears only when the **Your name**
+ * setting holds a name, because that setting is the plugin's entire notion of who "I" am — it never
+ * guesses — and it flips to "Unassign" once the card is already mine, so the same key press both
+ * takes a card and puts it back. With no name set, the field still takes one typed by hand and the
+ * hint underneath says where the one-click version comes from.
+ */
+function AssigneeField({
+  value,
+  options,
+  me,
+  onCommit,
+}: {
+  value: string;
+  options: string[];
+  /** The **Your name** setting, already trimmed; `""` when nobody has typed one. */
+  me: string;
+  onCommit: (v: string) => void;
+}) {
+  const listId = useId();
+  const hintId = useId();
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
+  const mine = me !== "" && sameAssignee(value, me);
+  return (
+    // The button is a sibling of the label, not inside it: a label belongs to one control, and one
+    // wrapping both would name the button "Assignee" too.
+    <div className="folia-assignee-field">
+      <label>
+        Assignee
+        <input
+          list={listId}
+          value={draft}
+          placeholder="—"
+          aria-describedby={me === "" ? hintId : undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+        />
+      </label>
+      {me !== "" && (
+        <button
+          className="folia-btn folia-assignee-me"
+          type="button"
+          title={mine ? "Take your name off this card" : `Assign this card to ${me}`}
+          onClick={() => {
+            const next = mine ? "" : me;
+            setDraft(next);
+            onCommit(next);
+          }}
+        >
+          {mine ? "Unassign" : "Assign to me"}
+        </button>
+      )}
+      <datalist id={listId}>
+        {options.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+      {me === "" && (
+        <span className="folia-assignee-hint" id={hintId}>
+          Set “Your name” in the plugin settings to assign cards to yourself in one click.
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -1273,6 +1351,17 @@ export function CardDetail({
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? [];
   const curPriority = String(fm.priority ?? "");
+  // A note holding a list of names is shown as the list it holds; committing anything else writes
+  // the single name that was typed, which is what the field says it does.
+  const curAssignee = assigneeValues(card).join(", ");
+  // Everyone this board's cards already name, plus whoever this card names when the board has not
+  // caught up yet — the same courtesy `priorityOptions` does for a priority mid-reload. Computed
+  // plainly rather than memoized: this sits below the panel's early returns, where a hook cannot
+  // go, and it is a walk over cards the same render already has in hand.
+  const assigneeOptions = boardAssignees(Object.values(board.cards));
+  for (const name of assigneeValues(card)) {
+    if (!assigneeOptions.some((n) => sameAssignee(n, name))) assigneeOptions.unshift(name);
+  }
   // The note as the title rules read it — its H1 and whatever headings the description carries —
   // so the panel judges a title exactly the way the board does. Null until this card's body has
   // been read; the title preview shows the board's own answer until then.
@@ -1457,6 +1546,18 @@ export function CardDetail({
               }
             />
           </label>
+          <AssigneeField
+            value={curAssignee}
+            options={assigneeOptions}
+            me={settings.userName.trim()}
+            onCommit={(value) =>
+              void mutate(() =>
+                value === ""
+                  ? repo.unsetFrontmatterKey(path, "assignee")
+                  : repo.setFrontmatter(path, { assignee: value }),
+              )
+            }
+          />
         </div>
 
         <div className="folia-props">

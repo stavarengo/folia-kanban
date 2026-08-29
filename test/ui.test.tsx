@@ -683,6 +683,7 @@ describe("property names suggest themselves (20260827.08)", () => {
     expect(offered.map((s) => s.key)).toEqual([
       "order",
       "due",
+      "assignee",
       "title",
       "created",
       "tags",
@@ -692,11 +693,12 @@ describe("property names suggest themselves (20260827.08)", () => {
       "energy",
       "mood",
     ]);
-    // The four the panel edits itself are offered — a misspelling is answered with the right
+    // The ones the panel edits itself are offered — a misspelling is answered with the right
     // spelling — but marked, so the popup says where that name actually lives.
     expect(offered.filter((s) => s.editedInPanel).map((s) => s.key)).toEqual([
       "order",
       "due",
+      "assignee",
       "title",
       "created",
       "blocks",
@@ -4736,5 +4738,108 @@ describe("a title far wider than the panel (20260827.02)", () => {
     const openRule = rule(".folia-title-value.is-expanded .folia-title-value-text");
     expect(openRule).toContain("-webkit-line-clamp: none");
     expect(openRule).toContain("overflow: visible");
+  });
+});
+
+describe("assigning a card (20260827.03)", () => {
+  /** The board plus a reader who has told the plugin their name. */
+  const named = (name: string): KanbanSettings => ({ ...DEFAULT_SETTINGS, userName: name });
+
+  const openPanel = async (repo: FakeRepo, settings = DEFAULT_SETTINGS) => {
+    const user = userEvent.setup();
+    render_(repo, settings);
+    await user.click(await screen.findByText("Alpha"));
+    return { user, detail: await screen.findByTestId("card-detail") };
+  };
+
+  it("writes a typed name into the note's frontmatter, and clearing it removes the key", async () => {
+    const repo = makeRepo();
+    const { user, detail } = await openPanel(repo);
+    const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
+
+    await user.type(field, "Alex");
+    await user.tab();
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Alex"));
+
+    await user.clear(field);
+    await user.tab();
+    // Removed, not left as an empty string: an unassigned card reads as one in its own note.
+    await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+  });
+
+  it("assigns to the reader in one click, and the same button hands the card back", async () => {
+    const repo = makeRepo();
+    const { user, detail } = await openPanel(repo, named("Rafa"));
+
+    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa"));
+
+    const back = await within(await screen.findByTestId("card-detail")).findByRole("button", {
+      name: "Unassign",
+    });
+    await user.click(back);
+    await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+  });
+
+  it("offers the one-click case only once the reader has a name, and says where it comes from", async () => {
+    const { detail } = await openPanel(makeRepo());
+    expect(within(detail).queryByRole("button", { name: "Assign to me" })).toBeNull();
+    expect(within(detail).getByText(/Set “Your name” in the plugin settings/)).toBeInTheDocument();
+    // The field itself still takes a name typed by hand — nothing about assignment is gated.
+    expect(within(detail).getByLabelText("Assignee")).toBeEnabled();
+  });
+
+  it("offers the names the board already uses as suggestions", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Gamma.md")!.fm["assignee"] = "Zoe";
+    repo.files.get("Tasks/Beta.md")!.fm["assignee"] = "alex";
+    const { detail } = await openPanel(repo);
+    const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
+    const list = detail.querySelector(`#${CSS.escape(field.getAttribute("list")!)}`)!;
+    expect([...list.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual([
+      "alex",
+      "Zoe",
+    ]);
+  });
+
+  it("takes the card from the board itself, through the card's context menu", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo, named("Rafa"));
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const card = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
+
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    await user.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Assign to me" }),
+    );
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa"));
+
+    // Second time round the same menu offers the way back, not a second helping of the same name.
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: "Assign to me" })).toBeNull();
+    await user.click(within(menu).getByRole("menuitem", { name: "Unassign" }));
+    await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+  });
+
+  it("shows the assignment on the tile and filters the board down to it", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "Rafa";
+    render_(repo, named("Rafa"));
+    await screen.findByText("Alpha");
+    expect(screen.getByTitle("Assigned to Rafa")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Mine" }));
+    expect(screen.getByLabelText("Search cards")).toHaveValue("assignee:me");
+    await waitFor(() => expect(screen.queryByText("Gamma")).toBeNull());
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+  });
+
+  it("does not offer a “Mine” filter to a reader the plugin cannot name", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    expect(screen.queryByRole("button", { name: "Mine" })).toBeNull();
   });
 });

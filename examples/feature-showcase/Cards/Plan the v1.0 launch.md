@@ -3,6 +3,7 @@ status: todo
 order: 1
 priority: A
 due: 2026-06-19
+assignee: alex
 tags: [planning, launch]
 area: work
 energy: high

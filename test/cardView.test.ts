@@ -14,6 +14,10 @@ import {
   toggleToken,
   boardPriorities,
   priorityOptions,
+  assigneeValues,
+  boardAssignees,
+  sameAssignee,
+  cardChips,
 } from "../src/ui/cardView";
 import { dateOnly, stamp } from "../src/model/dates";
 import { BLOCKS } from "../src/model/relationships";
@@ -308,6 +312,85 @@ describe("matchCard", () => {
 
   it("matchQuery parses + matches in one call", () => {
     expect(matchQuery(card({ area: "research" }), "area:research", ctx)).toBe(true);
+  });
+});
+
+describe("assignment (20260827.03)", () => {
+  const ctx = { today: "2026-06-16", doneColumnId: "done" as string | null };
+
+  it("reads one name written as a string and several written as a list", () => {
+    expect(assigneeValues(card({ assignee: "Rafa" }))).toEqual(["Rafa"]);
+    expect(assigneeValues(card({ assignee: ["Rafa", "Alex"] }))).toEqual(["Rafa", "Alex"]);
+    // Blanks, non-strings and a missing key are all "nobody", never a name made of spaces.
+    expect(assigneeValues(card({ assignee: "  " }))).toEqual([]);
+    expect(assigneeValues(card({ assignee: ["Rafa", 7, ""] }))).toEqual(["Rafa"]);
+    expect(assigneeValues(card({}))).toEqual([]);
+    // Surrounding space is noise; the spelling itself is kept as the note wrote it.
+    expect(assigneeValues(card({ assignee: "  Rafa Stavarengo " }))).toEqual(["Rafa Stavarengo"]);
+  });
+
+  it("treats case, space and a leading @ as the same person, and nothing further", () => {
+    expect(sameAssignee("Rafa", "rafa")).toBe(true);
+    expect(sameAssignee("@rafa", " Rafa ")).toBe(true);
+    expect(sameAssignee("Alex", "Alex Smith")).toBe(false);
+    expect(sameAssignee("", "")).toBe(false);
+    expect(sameAssignee("  ", "rafa")).toBe(false);
+  });
+
+  it("collects the board's people from its cards, one spelling each, alphabetically", () => {
+    const cards = [
+      card({ assignee: "Zoe" }, "A"),
+      card({ assignee: "rafa" }, "B"),
+      card({ assignee: ["Rafa", "@alex"] }, "C"),
+      card({}, "D"),
+    ];
+    expect(boardAssignees(cards)).toEqual(["@alex", "rafa", "Zoe"]);
+  });
+
+  it("filters by name, by nobody, and by whoever the reader is", () => {
+    const rafa = card({ assignee: "Rafa" }, "Mine");
+    const alex = card({ assignee: ["Alex", "Rafa"] }, "Shared");
+    const nobody = card({}, "Loose");
+    const mine = { ...ctx, me: "rafa" };
+
+    expect(matchCard(rafa, parseFilter("assignee:rafa"), ctx)).toBe(true);
+    expect(matchCard(rafa, parseFilter("assignee:RAFA"), ctx)).toBe(true);
+    expect(matchCard(alex, parseFilter("assignee:rafa"), ctx)).toBe(true); // one of several
+    expect(matchCard(nobody, parseFilter("assignee:rafa"), ctx)).toBe(false);
+
+    expect(matchCard(nobody, parseFilter("assignee:none"), ctx)).toBe(true);
+    expect(matchCard(rafa, parseFilter("assignee:none"), ctx)).toBe(false);
+
+    expect(matchCard(rafa, parseFilter("assignee:me"), mine)).toBe(true);
+    expect(matchCard(alex, parseFilter("assignee:me"), mine)).toBe(true);
+    expect(matchCard(nobody, parseFilter("assignee:me"), mine)).toBe(false);
+  });
+
+  it("matches no card for `assignee:me` when nobody has said who they are", () => {
+    const rafa = card({ assignee: "Rafa" });
+    expect(matchCard(rafa, parseFilter("assignee:me"), ctx)).toBe(false);
+    expect(matchCard(rafa, parseFilter("assignee:me"), { ...ctx, me: "   " })).toBe(false);
+  });
+
+  it("keeps a name spelled with spaces addressable through quotes", () => {
+    const c = card({ assignee: "Rafa Stavarengo" });
+    expect(matchCard(c, parseFilter('assignee:"rafa stavarengo"'), ctx)).toBe(true);
+    expect(matchCard(c, parseFilter("assignee:rafa"), ctx)).toBe(false);
+  });
+
+  it("finds a card by its assignee's name typed as plain search text", () => {
+    const c = card({ assignee: "Rafa" }, "Apply the mulch");
+    expect(matchCard(c, parseFilter("rafa"), ctx)).toBe(true);
+  });
+
+  it("shows every assigned name on the tile, one chip each", () => {
+    const chips = cardChips(card({ assignee: ["Rafa", "Alex"] }), "2026-06-16", "done");
+    expect(chips.map((c) => [c.label, c.icon, c.tone])).toEqual([
+      ["Rafa", "user", "muted"],
+      ["Alex", "user", "muted"],
+    ]);
+    expect(chips[0]?.title).toBe("Assigned to Rafa");
+    expect(cardChips(card({}), "2026-06-16", "done")).toEqual([]);
   });
 });
 
