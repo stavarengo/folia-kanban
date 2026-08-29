@@ -33,7 +33,13 @@ import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
-import { assigneeValues, boardAssignees, priorityOptions, sameAssignee } from "./cardView";
+import {
+  assigneeValues,
+  boardAssignees,
+  priorityOptions,
+  sameAssignee,
+  toggleAssignee,
+} from "./cardView";
 import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
 import { Icon } from "./icons";
 import { Markdown } from "./Markdown";
@@ -201,21 +207,27 @@ function PriorityField({
  * hint underneath says where the one-click version comes from.
  */
 function AssigneeField({
-  value,
+  names,
   options,
   me,
   onCommit,
+  onToggleMine,
 }: {
-  value: string;
+  /** Everyone the card names right now, as its note spells them. */
+  names: readonly string[];
   options: string[];
   /** The **Your name** setting, already trimmed; `""` when nobody has typed one. */
   me: string;
+  /** The text that was typed, committed on blur/Enter: one name, or `""` to unassign. */
   onCommit: (v: string) => void;
+  /** Put your name on the card, or take only yours off — the one-click case. */
+  onToggleMine: () => void;
 }) {
   const listId = useId();
   const hintId = useId();
+  const value = names.join(", ");
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
-  const mine = me !== "" && sameAssignee(value, me);
+  const mine = me !== "" && names.some((name) => sameAssignee(name, me));
   return (
     // The button is a sibling of the label, not inside it: a label belongs to one control, and one
     // wrapping both would name the button "Assignee" too.
@@ -241,14 +253,14 @@ function AssigneeField({
         <button
           className="folia-btn folia-assignee-me"
           type="button"
-          title={mine ? "Take your name off this card" : `Assign this card to ${me}`}
-          onClick={() => {
-            const next = mine ? "" : me;
-            setDraft(next);
-            onCommit(next);
-          }}
+          title={
+            mine
+              ? "Take your name off this card, leaving anyone else on it"
+              : `Add ${me} to this card`
+          }
+          onClick={onToggleMine}
         >
-          {mine ? "Unassign" : "Assign to me"}
+          {mine ? "Unassign me" : "Assign to me"}
         </button>
       )}
       <datalist id={listId}>
@@ -1351,15 +1363,16 @@ export function CardDetail({
   // `buildBoard` always fills this in; the fallback only covers a Card built outside it.
   const relations = card.relations ?? [];
   const curPriority = String(fm.priority ?? "");
-  // A note holding a list of names is shown as the list it holds; committing anything else writes
-  // the single name that was typed, which is what the field says it does.
-  const curAssignee = assigneeValues(card).join(", ");
+  // A note holding a list of names is shown as the list it holds; typing over it writes the single
+  // name that was typed, which is what the field says it does — while the button beside it only
+  // ever adds or removes the reader.
+  const curAssignees = assigneeValues(card);
   // Everyone this board's cards already name, plus whoever this card names when the board has not
   // caught up yet — the same courtesy `priorityOptions` does for a priority mid-reload. Computed
   // plainly rather than memoized: this sits below the panel's early returns, where a hook cannot
   // go, and it is a walk over cards the same render already has in hand.
   const assigneeOptions = boardAssignees(Object.values(board.cards));
-  for (const name of assigneeValues(card)) {
+  for (const name of curAssignees) {
     if (!assigneeOptions.some((n) => sameAssignee(n, name))) assigneeOptions.unshift(name);
   }
   // The note as the title rules read it — its H1 and whatever headings the description carries —
@@ -1547,7 +1560,7 @@ export function CardDetail({
             />
           </label>
           <AssigneeField
-            value={curAssignee}
+            names={curAssignees}
             options={assigneeOptions}
             me={settings.userName.trim()}
             onCommit={(value) =>
@@ -1557,6 +1570,14 @@ export function CardDetail({
                   : repo.setFrontmatter(path, { assignee: value }),
               )
             }
+            onToggleMine={() => {
+              const next = toggleAssignee(curAssignees, settings.userName.trim());
+              void mutate(() =>
+                next === null
+                  ? repo.unsetFrontmatterKey(path, "assignee")
+                  : repo.setFrontmatter(path, { assignee: next }),
+              );
+            }}
           />
         </div>
 

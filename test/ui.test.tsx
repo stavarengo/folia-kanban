@@ -4775,7 +4775,7 @@ describe("assigning a card (20260827.03)", () => {
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa"));
 
     const back = await within(await screen.findByTestId("card-detail")).findByRole("button", {
-      name: "Unassign",
+      name: "Unassign me",
     });
     await user.click(back);
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
@@ -4819,8 +4819,44 @@ describe("assigning a card (20260827.03)", () => {
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByRole("menuitem", { name: "Assign to me" })).toBeNull();
-    await user.click(within(menu).getByRole("menuitem", { name: "Unassign" }));
+    await user.click(within(menu).getByRole("menuitem", { name: "Unassign me" }));
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+  });
+
+  it("adds and removes only the reader on a card two people are already on", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = ["alex", "ana maria"];
+    const { user, detail } = await openPanel(repo, named("Rafa"));
+    // The field shows the list the note holds, and the button is still an offer to join it.
+    expect(within(detail).getByLabelText("Assignee")).toHaveValue("alex, ana maria");
+
+    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual([
+        "alex",
+        "ana maria",
+        "Rafa",
+      ]),
+    );
+
+    // And leaving takes only your own name off — the other two were somebody's decision, not yours.
+    await user.click(
+      await within(await screen.findByTestId("card-detail")).findByRole("button", {
+        name: "Unassign me",
+      }),
+    );
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual(["alex", "ana maria"]),
+    );
+  });
+
+  it("collapses a one-name list back to a plain string, and an empty one to no key at all", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = ["alex", "Rafa"];
+    const { user, detail } = await openPanel(repo, named("Rafa"));
+
+    await user.click(within(detail).getByRole("button", { name: "Unassign me" }));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("alex"));
   });
 
   it("shows the assignment on the tile and filters the board down to it", async () => {

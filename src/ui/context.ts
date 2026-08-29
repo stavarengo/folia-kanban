@@ -195,12 +195,11 @@ export interface BoardActions {
    */
   setPriority(path: string, value: string): Promise<void>;
   /**
-   * Assign the card to `value`, or unassign it with an empty string (which removes the key rather
-   * than leaving an empty one). One name, written as a plain frontmatter string — the note stays
-   * the only place the assignment lives, so another tool, or a hand edit, reads and writes it the
-   * same way this does.
+   * Write the card's `assignee` frontmatter: a name, a list of them, or `null` to remove the key
+   * rather than leave an empty one. The note stays the only place an assignment lives, so another
+   * tool, or a hand edit, reads and writes it exactly the way this does.
    */
-  setAssignee(path: string, value: string): void;
+  setAssignee(path: string, value: string | readonly string[] | null): void;
   /**
    * Rename a card in place (#12): writes the title back to its source — the `.md` file name
    * (link-aware so inbound wikilinks follow), the heading line, or the `title` frontmatter key.
