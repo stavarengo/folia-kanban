@@ -95,7 +95,7 @@ export const SETTING_OPTIONS = {
 export const SETTING_COPY = {
   boardNoteDefaultView: {
     name: "Open board notes as",
-    desc: "Which view a note carrying `folia-board: true` opens in, wherever it is opened from. A single note overrides this with `folia-view: board` or `folia-view: markdown` of its own, and the button in the tab header swaps between the two at any time.",
+    desc: "Which view a note carrying `folia-board: true` opens in from the file explorer, a link, search or the quick switcher. A link that points at a heading or a line inside the note opens the markdown there instead, and so does a sidebar, where a board would have no room. A single note overrides this with `folia-view: board` or `folia-view: markdown` of its own, and the button in the tab header swaps between the two at any time.",
   },
   detailPresentation: {
     name: "Show details in",
