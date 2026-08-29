@@ -8,7 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, FileManager, MetadataCache, Vault } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DataCorruptionError } from "../src/model/schemas";
-import { CapacitorAdapter, FakeApp, MarkdownRenderer, TFolder } from "./obsidianFake";
+import {
+  AbstractInputSuggest,
+  CapacitorAdapter,
+  FakeApp,
+  MarkdownRenderer,
+  TFolder,
+} from "./obsidianFake";
 
 const DEFAULT_CONFIG = "folia-board: true\ncard-folder: ./Cards\ncolumns:\n  - todo\n  - done";
 
@@ -901,5 +907,168 @@ describe("applying a move", () => {
 
     // The checkbox is not the move's business: a status-only move must leave it exactly as it was.
     expect(app.vault.text("basic/Cards/One.md")).toContain("- [x] Write the docs\n");
+  });
+});
+
+describe("the property names the detail panel can suggest", () => {
+  it("reads the vault's keys from the metadata index, split at the card folder", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo\nenergy: high"));
+    app.vault.addFile("basic/Cards/Two.md", card("status: done\nsprint: 4"));
+    app.vault.addFile("Journal/Monday.md", note("mood: fine\nenergy: gone"));
+
+    const names = await repo.propertyNamesInUse();
+
+    expect(names.inCardFolder).toEqual(["energy", "sprint", "status"]);
+    // `energy` is used on both sides and belongs to the nearer list only; the board note's own
+    // keys (folia-board, card-folder, columns) are nobody's card properties.
+    expect(names.elsewhere).toEqual(["mood"]);
+  });
+
+  it("takes no key from a board note, this board's or any other", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    app.vault.addFile(
+      "elsewhere/Other Board.md",
+      note("folia-board: true\ncard-folder: Cards\ncolumns:\n  - todo"),
+    );
+
+    const names = await repo.propertyNamesInUse();
+
+    expect(names.elsewhere).toEqual([]);
+    expect(names.inCardFolder).toEqual(["status"]);
+  });
+
+  it("takes no key from a context note, which configures a folder rather than a card", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/Work/_context.md", note("context-name: Work", "\nDay job.\n"));
+
+    expect((await repo.propertyNamesInUse()).inCardFolder).toEqual(["status"]);
+  });
+
+  it("keeps its answer until the board reloads, so opening card after card costs one walk", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    const walks = vi.spyOn(app.vault, "getMarkdownFiles");
+
+    await repo.propertyNamesInUse();
+    await repo.propertyNamesInUse();
+    expect(walks).toHaveBeenCalledTimes(1);
+
+    // A reload follows every change the plugin sees, and a changed note may use a new key.
+    app.vault.addFile("basic/Cards/Two.md", card("status: todo\nenergy: high"));
+    await repo.loadBoard();
+
+    expect((await repo.propertyNamesInUse()).inCardFolder).toEqual(["energy", "status"]);
+  });
+
+  it("offers a name once, whichever side of the card folder spells it in capitals", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("Energy: high"));
+    app.vault.addFile("Journal/Monday.md", note("energy: gone"));
+
+    const names = await repo.propertyNamesInUse();
+
+    expect(names.inCardFolder).toEqual(["Energy"]);
+    expect(names.elsewhere).toEqual([]);
+  });
+
+  it("says nothing about a note the metadata index has no entry for", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("energy: high"));
+    app.metadataCache.setFrontmatter("basic/Cards/One.md", undefined);
+
+    expect((await repo.propertyNamesInUse()).inCardFolder).toEqual([]);
+  });
+});
+
+describe("the suggester attached to a text input", () => {
+  /** One suggestion source, and what it was asked and told. */
+  function source(keys: string[]) {
+    const picked: string[] = [];
+    /** Every open/close the popup reported, in order. */
+    const openness: boolean[] = [];
+    return {
+      picked,
+      openness,
+      suggestions: (query: string) =>
+        keys.filter((k) => k.includes(query)).map((key) => ({ key, group: "folia" as const })),
+      onPick: (key: string) => {
+        picked.push(key);
+      },
+      onOpenChange: (open: boolean) => {
+        openness.push(open);
+      },
+    };
+  }
+
+  it("offers what the source offers, and hands a pick back instead of writing it into the input", async () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    const src = source(["status", "priority"]);
+
+    repo.suggestProperties(input, src);
+    const suggest = AbstractInputSuggest.instances.at(-1)!;
+    const offered = (await suggest.suggestionsFor("stat")) as { key: string }[];
+
+    expect(offered.map((s) => s.key)).toEqual(["status"]);
+    suggest.selectSuggestion(offered[0], new MouseEvent("click"));
+    expect(src.picked).toEqual(["status"]);
+    // Picking closes the popup, and the panel is told so — Escape means something else once it is gone.
+    expect(src.openness.at(-1)).toBe(false);
+    // The field is React-controlled: writing the value here would be reverted by the next render.
+    expect(input.value).toBe("");
+  });
+
+  it("re-points the one suggester at the new source rather than binding a second to the same input", async () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    const before = AbstractInputSuggest.instances.length;
+
+    repo.suggestProperties(input, source(["status"]))();
+    const second = source(["energy"]);
+    repo.suggestProperties(input, second);
+
+    expect(AbstractInputSuggest.instances.length).toBe(before + 1);
+    const suggest = AbstractInputSuggest.instances.at(-1)!;
+    expect(((await suggest.suggestionsFor("")) as { key: string }[]).map((s) => s.key)).toEqual([
+      "energy",
+    ]);
+  });
+
+  it("offers nothing once the panel that attached it is gone", async () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+
+    repo.suggestProperties(input, source(["status"]))();
+
+    const suggest = AbstractInputSuggest.instances.at(-1)!;
+    expect(await suggest.suggestionsFor("")).toEqual([]);
+  });
+
+  it("renders a suggestion as its name plus the list it came from", () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    repo.suggestProperties(input, source(["status"]));
+    const el = document.createElement("div");
+
+    AbstractInputSuggest.instances.at(-1)!.renderSuggestion({ key: "status", group: "board" }, el);
+
+    expect(el.textContent).toBe("statuson this board");
+    expect(el.querySelector(".suggestion-note")?.textContent).toBe("on this board");
+  });
+
+  it("says where a name with a field of its own is really edited", () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    repo.suggestProperties(input, source(["status"]));
+    const el = document.createElement("div");
+
+    AbstractInputSuggest.instances
+      .at(-1)!
+      .renderSuggestion({ key: "status", group: "folia", editedInPanel: true }, el);
+
+    expect(el.querySelector(".suggestion-note")?.textContent).toBe("edited in this panel");
   });
 });

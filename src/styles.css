@@ -1457,6 +1457,12 @@
 .folia-prop-add .folia-btn {
   flex: 0 0 auto;
 }
+/* Why the Add button is refusing a property name that the panel already edits somewhere else. */
+.folia-prop-hint {
+  margin: 0;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-muted);
+}
 
 /* The title block at the top of the detail panel: the two inputs a card's title is made of (its
    file name and its `title:` override) and, under them, the title they produce. The result is

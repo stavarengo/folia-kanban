@@ -7,6 +7,7 @@ import { columnOf } from "../model/board";
 import type { Board } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
+import { TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import {
@@ -21,20 +22,6 @@ import {
   ToolError,
   type ToolDefinition,
 } from "./tool";
-
-/** Frontmatter this board owns through a dedicated tool or field; writing it by hand skips that. */
-const RESERVED_KEYS: Record<string, string> = {
-  status: "a card's column is set by move_card, which also records the move in its history",
-  order: "a card's position in its column is set by move_card",
-  priority: "use update_card's own `priority` field, so the board remembers the value",
-  due: "use update_card's own `due` field",
-  // Written by hand, this retitles the card in the frontmatter and nowhere else: the file keeps its
-  // old name and every `[[wikilink]]` pointing at it — a parent's checklist line included — still
-  // names the card that no longer exists under that title.
-  title: "use update_card's own `title` field, which renames the note and its inbound links",
-  "folia-board":
-    "that flag is what makes a note a board, not a card — setting it on a card would hand agents a second, broken board",
-};
 
 const propertyValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
@@ -71,8 +58,8 @@ function refuseReservedKeys(board: Board, properties: Record<string, unknown> | 
   for (const key of Object.keys(properties ?? {})) {
     // Own keys only, so a property named "toString" is an ordinary key rather than a match
     // against Object.prototype that reports native code back to the caller.
-    const reserved = Object.prototype.hasOwnProperty.call(RESERVED_KEYS, key)
-      ? RESERVED_KEYS[key]
+    const reserved = Object.prototype.hasOwnProperty.call(TOOL_REFUSALS, key)
+      ? TOOL_REFUSALS[key]
       : undefined;
     if (reserved) throw new ToolError(`"${key}" cannot be set through properties: ${reserved}.`);
     if (relationKeys.has(key)) {
