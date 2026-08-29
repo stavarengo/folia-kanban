@@ -4488,12 +4488,33 @@ describe("a title far wider than the panel (20260827.02)", () => {
     });
     expect(value).toHaveAttribute("title", HUGE);
     expect(value).toHaveAttribute("aria-expanded", "false");
-    expect(rule(".folia-title-value.folia-title-value")).toContain("-webkit-line-clamp: 3");
-    expect(rule(".folia-title-value.folia-title-value")).toContain("overflow-wrap: anywhere");
+    // Both of the things Obsidian's app.css does to every button have to be undone here, and
+    // neither is visible from jsdom: `white-space: nowrap` would hold the whole title on one line
+    // whatever the clamp says, and `height: var(--input-height)` would pin the box at one line's
+    // worth of height, so the clamped lines would spill over the text underneath.
+    const buttonRule = rule(".folia-title-value.folia-title-value");
+    expect(buttonRule).toContain("white-space: normal");
+    expect(buttonRule).toContain("height: auto");
+
+    // The clamp lives in a plain element inside the control rather than on the button, so that it
+    // needs no assumption about how a browser treats a button's inner display. On a current
+    // Obsidian both placements work; this is a precaution for the older engines still supported.
+    const text = value.querySelector(".folia-title-value-text") as HTMLElement;
+    expect(text).toHaveTextContent(HUGE);
+    expect(text.tagName).not.toBe("BUTTON");
+    expect(value.contains(text)).toBe(true);
+    expect(rule(".folia-title-value-text")).toContain("-webkit-line-clamp: 3");
+    expect(rule(".folia-title-value-text")).toContain("-webkit-box-orient: vertical");
+    expect(rule(".folia-title-value-text")).toContain("overflow-wrap: anywhere");
+    expect(rule(".folia-title-value-text")).toContain("white-space: normal");
 
     await user.click(value);
     expect(value).toHaveClass("is-expanded");
     expect(value).toHaveAttribute("aria-expanded", "true");
-    expect(rule(".folia-title-value.is-expanded")).toContain("-webkit-line-clamp: none");
+    // Expanding undoes every part of the clamp, the base rule's `overflow: hidden` included, so
+    // no future change to the collapsed rule can leave the open state half-clipped.
+    const openRule = rule(".folia-title-value.is-expanded .folia-title-value-text");
+    expect(openRule).toContain("-webkit-line-clamp: none");
+    expect(openRule).toContain("overflow: visible");
   });
 });
