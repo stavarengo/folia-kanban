@@ -1,4 +1,4 @@
-import type { Setting, SettingDefinitionItem } from "obsidian";
+import type { Setting, SettingDefinition, SettingDefinitionItem } from "obsidian";
 import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress, normalizeBindAddress } from "./mcp/bindAddress";
 import {
   DETAIL_WIDTH_MAX,
@@ -79,77 +79,212 @@ export const SETTING_OPTIONS = {
  * Name and description of every row of the settings tab. Both renderings read from here — the
  * imperative `display()` that Obsidian below 1.13 calls, and the declarative definitions 1.13 and
  * later index for the settings search — so their wording cannot drift apart.
+ *
+ * Names are short because {@link SETTING_GROUPS} puts each row under a heading that already says
+ * what it is about, and a description says what a choice *does* rather than listing the options the
+ * control is about to list anyway. What a row depends on is part of its description, in words, and
+ * stays there whether or not the row is disabled at that moment — a greyed row with no explanation
+ * is the thing this tab was rebuilt to stop doing.
  */
 export const SETTING_COPY = {
   boardNoteDefaultView: {
-    name: "Board notes — open as",
-    desc: "How a note with `folia-board: true` opens from the file explorer, a link, search or the quick switcher. A single note can override this with `folia-view: board` or `folia-view: markdown` in its own frontmatter, and the button in the tab header swaps between the two at any time.",
+    name: "Open board notes as",
+    desc: "Which view a note carrying `folia-board: true` opens in, wherever it is opened from. A single note overrides this with `folia-view: board` or `folia-view: markdown` of its own, and the button in the tab header swaps between the two at any time.",
   },
   detailPresentation: {
-    name: "Card details — presentation",
-    desc: "How the card detail view is shown.",
+    name: "Show details in",
+    desc: "Where a card's details open: a panel docked beside the board, or a dialog centred over it.",
   },
   sidePanelMode: {
-    name: "Side panel — layout",
-    desc: "Split shrinks the board to make room; float overlays the columns.",
+    name: "Side panel layout",
+    desc: "Split shrinks the board to make room for the panel; float lets the panel overlay the columns. Only used when details open in the side panel.",
   },
   detailWidth: {
-    name: "Side panel — width (px)",
-    desc: "Width of the side detail panel.",
+    name: "Side panel width",
+    desc: "How wide the docked panel is, in pixels. Dragging the panel's left border changes this too. Only used when details open in the side panel.",
   },
   addCardFlow: {
-    name: "Add-card button — flow",
-    desc: "Inline adds a card in place; inline-edit then opens the new card's details; detail opens the details to create.",
+    name: "Add-card flow",
+    desc: "What the add-card button does: add a card in place, add it and open its details, or open the details and create the card from there.",
   },
   addCardOpenMode: {
-    name: "Add-card — open new card's details as",
-    desc: "How the new card's details open (only used when the flow opens details).",
+    name: "Open the new card's details in",
+    desc: "Where a newly added card's details open. Only used by the two flows that open them.",
   },
   cardNextTodos: {
-    name: "Card — next todos shown",
-    desc: "How many of the next undone todos to preview on each card (0 = none).",
+    name: "Next todos shown",
+    desc: "How many of a card's next undone todos to preview on its tile. Zero shows none.",
   },
   subitemsDefault: {
-    name: "Subitems — default state",
-    desc: "Whether a card's nested subitems (inline todos preview + subcard files) start expanded or collapsed. Toggling a card, or a column's collapse/expand-all, overrides this per card.",
+    name: "Subitems default state",
+    desc: "Whether a card's nested subitems (its inline todos preview and its subcard files) start expanded or collapsed. Toggling a card, or a column's collapse/expand-all, overrides this for that card from then on.",
   },
   userName: {
     name: "Your name",
     desc: "Signs the comments you write from the board (e.g. “alex” → “- _2026-08-21 11:49 @alex:_ …”), so your own comments never show as unread and a comment landing after one of yours reads as a reply. Leave empty to write comments unsigned.",
   },
   historyScope: {
-    name: "History — what to record",
-    desc: "Moves = card moves/reorders only; structural = also priority/status/due/order changes; all = also comments + subtasks (the default).",
+    name: "What history records",
+    desc: "Moves records card moves and reorders only; structural adds priority, status, due-date and order changes; everything adds comments and subtasks on top.",
   },
   boardPan: {
-    name: "Board — horizontal drag",
-    desc: "How to pan the board sideways. Shift+drag pans from anywhere (incl. over cards); click and drag pans only from empty board space, leaving cards and columns free. Middle-button drag always pans.",
+    name: "Horizontal drag",
+    desc: "How to pan the board sideways. Shift+drag pans from anywhere, including over cards; click and drag pans only from empty board space, leaving cards and columns free to be dragged themselves. Middle-button drag always pans.",
   },
   boardSetupCommands: {
-    name: "Board setup — command palette",
-    desc: "Offer the two board-setup actions in the command palette: one makes a new note that is already a board, the other adds the board properties to the note you have open.",
+    name: "Board setup in the command palette",
+    desc: "Offer the two board-setup actions there: make a new note that is already a board, or add the board properties to the note you have open.",
   },
   boardSetupFileMenu: {
-    name: "Board setup — file menu",
+    name: "Board setup in the file menu",
     desc: "Offer them wherever Obsidian gives a file or folder a menu — the file explorer, a tab header, a note's “More options”: on a folder, to make a board inside it; on a note, to turn that note into one.",
   },
   boardSetupEditorMenu: {
-    name: "Board setup — editor menu",
+    name: "Board setup in the editor menu",
     desc: "Offer turning the note into a board from the right-click menu inside its editor.",
   },
   mcpEnabled: {
-    name: "Agent access (MCP) — enable",
+    name: "Enable agent access",
     desc: "Let AI agents read and change the boards in this vault through an MCP server the plugin hosts on this computer. Every change an agent makes goes through the board's own rules, so cards get the same history lines they get when you edit them by hand. It listens on this computer only (127.0.0.1) unless you change the bind address below. Desktop only; off until you turn it on. See docs/mcp.md for how to connect a client.",
   },
   mcpPort: {
-    name: "Agent access (MCP) — port",
+    name: "Server port",
     desc: `The port the server listens on (${MCP_PORT_MIN}–${MCP_PORT_MAX}). Change it if something else on this computer already holds it.`,
   },
   mcpBindAddress: {
-    name: "Agent access (MCP) — bind address",
+    name: "Bind address",
     desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start.`,
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
+
+/**
+ * The control a row is drawn with, so both renderings build the same row from one description
+ * instead of each spelling every row out. A dropdown's options are not repeated here: they live in
+ * {@link SETTING_OPTIONS}, which is what `settingsPatchFor` validates against.
+ */
+export type RowControlSpec =
+  | { kind: "dropdown"; options: Record<string, string> }
+  | { kind: "toggle" }
+  | { kind: "slider"; min: number; max: number; step: number }
+  | { kind: "text"; placeholder: string }
+  | { kind: "held" };
+
+/** Placeholder shown in the "Your name" field. */
+export const USER_NAME_PLACEHOLDER = "Alex";
+
+/** Upper bound of the next-todos preview: more than a handful stops being a preview. */
+export const CARD_NEXT_TODOS_MAX = 5;
+
+/** What each row is drawn with. `held` means the row draws itself — see {@link heldFieldOutcome}. */
+export const SETTING_CONTROLS = {
+  boardNoteDefaultView: { kind: "dropdown", options: SETTING_OPTIONS.boardNoteDefaultView },
+  detailPresentation: { kind: "dropdown", options: SETTING_OPTIONS.detailPresentation },
+  sidePanelMode: { kind: "dropdown", options: SETTING_OPTIONS.sidePanelMode },
+  detailWidth: { kind: "slider", min: DETAIL_WIDTH_MIN, max: DETAIL_WIDTH_MAX, step: 10 },
+  addCardFlow: { kind: "dropdown", options: SETTING_OPTIONS.addCardFlow },
+  addCardOpenMode: { kind: "dropdown", options: SETTING_OPTIONS.addCardOpenMode },
+  cardNextTodos: { kind: "slider", min: 0, max: CARD_NEXT_TODOS_MAX, step: 1 },
+  subitemsDefault: { kind: "dropdown", options: SETTING_OPTIONS.subitemsDefault },
+  userName: { kind: "text", placeholder: USER_NAME_PLACEHOLDER },
+  historyScope: { kind: "dropdown", options: SETTING_OPTIONS.historyScope },
+  boardPan: { kind: "dropdown", options: SETTING_OPTIONS.boardPan },
+  boardSetupCommands: { kind: "toggle" },
+  boardSetupFileMenu: { kind: "toggle" },
+  boardSetupEditorMenu: { kind: "toggle" },
+  mcpEnabled: { kind: "toggle" },
+  mcpPort: { kind: "held" },
+  mcpBindAddress: { kind: "held" },
+} as const satisfies Record<EditableSettingKey, RowControlSpec>;
+
+/**
+ * A section of the tab: a heading and the rows under it, in the order they are shown. This is the
+ * whole shape of the settings tab, and both renderings walk it — so the grouping and the order are
+ * one thing, not two that drift.
+ *
+ * The order runs from what a user changes to make the plugin fit their vault down to what most
+ * vaults never touch: how board notes open, then what a card's details look like, then the cards
+ * themselves, then adding one, then who is writing and what gets recorded, then agent access.
+ */
+export interface SettingGroupSpec {
+  /** Identifies the group in code — the agent-access one is desktop-only and carries token rows. */
+  id: "boards" | "cardDetails" | "cards" | "addingCards" | "identity" | "agentAccess";
+  heading: string;
+  keys: readonly EditableSettingKey[];
+}
+
+export const SETTING_GROUPS = [
+  {
+    id: "boards",
+    heading: "Boards and board notes",
+    keys: [
+      "boardNoteDefaultView",
+      "boardPan",
+      "boardSetupCommands",
+      "boardSetupFileMenu",
+      "boardSetupEditorMenu",
+    ],
+  },
+  {
+    id: "cardDetails",
+    heading: "Card details",
+    keys: ["detailPresentation", "sidePanelMode", "detailWidth"],
+  },
+  { id: "cards", heading: "Cards on the board", keys: ["cardNextTodos", "subitemsDefault"] },
+  { id: "addingCards", heading: "Adding cards", keys: ["addCardFlow", "addCardOpenMode"] },
+  { id: "identity", heading: "Comments and history", keys: ["userName", "historyScope"] },
+  {
+    id: "agentAccess",
+    heading: "Agent access (MCP)",
+    keys: ["mcpEnabled", "mcpPort", "mcpBindAddress"],
+  },
+] as const satisfies readonly SettingGroupSpec[];
+
+/**
+ * Extra words the 1.13 settings search should find a row by. Short names read better under a
+ * heading but they take words with them — a row called "Side panel layout" no longer contains
+ * "card details", and the heading above it is not indexed. Each row therefore carries its own
+ * heading plus whatever it used to be called, so a search that used to land on it still does.
+ */
+const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]>> = {
+  boardNoteDefaultView: ["default view", "folia-view", "markdown editor"],
+  detailPresentation: ["presentation", "modal", "side panel"],
+  sidePanelMode: ["split", "float", "overlay"],
+  detailWidth: ["panel width", "pixels", "resize"],
+  addCardFlow: ["add card button", "new card", "inline"],
+  addCardOpenMode: ["add card", "new card", "modal"],
+  cardNextTodos: ["todos", "checklist", "preview"],
+  subitemsDefault: ["subcards", "collapse", "expand"],
+  userName: ["comments", "author", "signature", "unread"],
+  historyScope: ["history scope", "log", "audit"],
+  boardPan: ["pan", "scroll sideways", "shift"],
+  boardSetupCommands: ["board setup", "create board", "convert to board"],
+  boardSetupFileMenu: ["board setup", "create board", "convert to board", "file explorer"],
+  boardSetupEditorMenu: ["board setup", "convert to board", "right-click"],
+  mcpEnabled: ["mcp", "agent", "server"],
+  mcpPort: ["mcp", "port", "27125"],
+  mcpBindAddress: ["mcp", "bind", "127.0.0.1", "loopback", "network"],
+};
+
+/** What a row needs the settings to say before it means anything. A row whose dependency is not met
+ *  is disabled rather than hidden: a setting that vanishes is a setting nobody can find again. The
+ *  words that explain the dependency live in {@link SETTING_COPY}, always visible. */
+const ROW_DISABLED: Partial<Record<EditableSettingKey, (s: KanbanSettings) => boolean>> = {
+  sidePanelMode: (s) => s.detailPresentation === "modal",
+  detailWidth: (s) => s.detailPresentation === "modal",
+  addCardOpenMode: (s) => s.addCardFlow === "inline",
+  mcpPort: (s) => !s.mcpEnabled,
+  mcpBindAddress: (s) => !s.mcpEnabled,
+};
+
+/** Whether a row is inert as the settings currently stand. Both renderings ask this, so a row
+ *  cannot be live on one path and greyed on the other. */
+export function isRowDisabled(key: EditableSettingKey, settings: KanbanSettings): boolean {
+  return ROW_DISABLED[key]?.(settings) ?? false;
+}
+
+/** The rows whose new value changes which *other* rows exist or are live, so the imperative tab has
+ *  to be drawn again rather than left as it is. */
+export const TAB_REDRAW_KEYS = ["detailPresentation", "addCardFlow", "mcpEnabled"] as const;
 
 /** What the settings tab can do that is not writing a setting. `renderHeldField` draws the port
  *  and the bind address itself, on a row Obsidian has already given a name and a description:
@@ -239,7 +374,7 @@ export function heldFieldOutcome(
 
 /** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */
 export const MCP_TOKEN_COPY = {
-  name: "Agent access (MCP) — token",
+  name: "Agent token",
   desc: "The bearer token an agent must send. Copy it into your MCP client's configuration. Treat it as a password: anything holding it can change every board in this vault.",
   button: "Copy token",
   copied: "Token copied to the clipboard.",
@@ -253,7 +388,7 @@ export const MCP_TOKEN_COPY = {
  * way out is hand-editing the plugin's data file.
  */
 export const MCP_TOKEN_REGENERATE = {
-  name: "Agent access (MCP) — replace token",
+  name: "Replace the token",
   desc: "Issue a new token and forget the old one. Every client configured with the old one stops being able to reach this vault until you paste the new one in.",
   button: "Replace token",
   done: "New token generated and copied to the clipboard.",
@@ -264,14 +399,8 @@ export const MCP_TOKEN_REGENERATE = {
   missing: "Turn agent access on first — the token is generated then.",
 } as const;
 
-/** Placeholder shown in the "Your name" field. */
-export const USER_NAME_PLACEHOLDER = "Alex";
-
 /** Label of the row that reports the installed version. */
 export const VERSION_SETTING_NAME = "Version";
-
-/** Upper bound of the next-todos preview: more than a handful stops being a preview. */
-export const CARD_NEXT_TODOS_MAX = 5;
 
 /** `Object.hasOwn` needs a newer lib target than this build sets; the prototype chain must stay out
  *  of these lookups, so a key like "toString" cannot pass for a setting. */
@@ -338,38 +467,72 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
   return { [key]: value };
 }
 
-/**
- * The agent-access rows below the enable toggle: where the server answers, and the token to reach
- * it with. Split out because they share one shape — none of them exists on a platform that cannot
- * host a server, and all of them are dead until agent access is on.
- */
-function mcpRows(
+/** One declarative row: the shared copy, the search words the short name gave up, and the control
+ *  {@link SETTING_CONTROLS} says it is drawn with. */
+function rowDefinition(
+  key: EditableSettingKey,
+  heading: string,
   read: () => KanbanSettings,
   actions: SettingTabActions,
-  desktop: boolean,
-): SettingDefinitionItem[] {
-  const off = (): boolean => !read().mcpEnabled;
-  const held = (key: HeldFieldKey): SettingDefinitionItem => ({
+): SettingDefinition {
+  const spec: RowControlSpec = SETTING_CONTROLS[key];
+  const base = {
     ...SETTING_COPY[key],
-    visible: desktop,
-    render: (setting) => {
-      actions.renderHeldField(key, setting);
-    },
-  });
+    aliases: [heading, ...(EXTRA_ALIASES[key] ?? [])],
+  };
+  // A held field is not a control at all: it draws itself and writes on blur, and its disabled
+  // state is applied there, from `isRowDisabled`, on both rendering paths.
+  if (spec.kind === "held") {
+    const held = key as HeldFieldKey;
+    return {
+      ...base,
+      render: (setting) => {
+        actions.renderHeldField(held, setting);
+      },
+    };
+  }
+  const disabled = (): boolean => isRowDisabled(key, read());
+  switch (spec.kind) {
+    case "dropdown":
+      return {
+        ...base,
+        control: { type: "dropdown", key, options: spec.options, disabled },
+      };
+    case "toggle":
+      return { ...base, control: { type: "toggle", key, disabled } };
+    case "slider":
+      return {
+        ...base,
+        control: { type: "slider", key, min: spec.min, max: spec.max, step: spec.step, disabled },
+      };
+    case "text":
+      return {
+        ...base,
+        control: { type: "text", key, placeholder: spec.placeholder, disabled },
+      };
+  }
+}
+
+/** The two token rows that close the agent-access group. Neither is a setting: one hands the token
+ *  over, the other throws it away, and both are dead until agent access is on. */
+function tokenRows(
+  heading: string,
+  read: () => KanbanSettings,
+  actions: SettingTabActions,
+): SettingDefinition[] {
+  const off = (): boolean => !read().mcpEnabled;
   return [
-    held("mcpPort"),
-    held("mcpBindAddress"),
     {
       name: MCP_TOKEN_COPY.name,
       desc: MCP_TOKEN_COPY.desc,
-      visible: desktop,
+      aliases: [heading, "mcp", "token", "bearer"],
       action: actions.copy,
       disabled: off,
     },
     {
       name: MCP_TOKEN_REGENERATE.name,
       desc: MCP_TOKEN_REGENERATE.desc,
-      visible: desktop,
+      aliases: [heading, "mcp", "token", "regenerate", "revoke"],
       action: actions.regenerate,
       disabled: off,
     },
@@ -381,6 +544,10 @@ function mcpRows(
  * them for the settings search. A `disabled` predicate reads the settings as they are when it runs,
  * which is on each render and on each `refreshDomState()` — that is how a row depending on another
  * setting catches up without the tab being redrawn.
+ *
+ * The shape is {@link SETTING_GROUPS} turned into Obsidian's own groups, so the tab reads as a few
+ * headed sections rather than one flat list, and `src/main.ts` walks the same groups to build the
+ * imperative tab Obsidian below 1.13 gets.
  */
 export function settingDefinitions(
   read: () => KanbanSettings,
@@ -388,53 +555,18 @@ export function settingDefinitions(
   actions: SettingTabActions,
   desktop: boolean,
 ): SettingDefinitionItem[] {
-  const dropdown = (key: DropdownKey, disabled?: () => boolean): SettingDefinitionItem => ({
-    ...SETTING_COPY[key],
-    control: {
-      type: "dropdown",
-      key,
-      options: SETTING_OPTIONS[key],
-      ...(disabled ? { disabled } : {}),
-    },
-  });
-
-  const toggle = (key: ToggleKey): SettingDefinitionItem => ({
-    ...SETTING_COPY[key],
-    control: { type: "toggle", key },
-    // A phone cannot listen for connections, so the row that promises it can does not appear —
-    // rather than switching on, minting a token and quietly doing nothing.
-    ...(key === "mcpEnabled" ? { visible: desktop } : {}),
-  });
-
   return [
-    dropdown("boardNoteDefaultView"),
-    dropdown("detailPresentation"),
-    dropdown("sidePanelMode", () => read().detailPresentation === "modal"),
-    {
-      ...SETTING_COPY.detailWidth,
-      control: {
-        type: "slider",
-        key: "detailWidth",
-        min: DETAIL_WIDTH_MIN,
-        max: DETAIL_WIDTH_MAX,
-        step: 10,
-      },
-    },
-    dropdown("addCardFlow"),
-    dropdown("addCardOpenMode", () => read().addCardFlow === "inline"),
-    {
-      ...SETTING_COPY.cardNextTodos,
-      control: { type: "slider", key: "cardNextTodos", min: 0, max: CARD_NEXT_TODOS_MAX, step: 1 },
-    },
-    dropdown("subitemsDefault"),
-    {
-      ...SETTING_COPY.userName,
-      control: { type: "text", key: "userName", placeholder: USER_NAME_PLACEHOLDER },
-    },
-    dropdown("historyScope"),
-    dropdown("boardPan"),
-    ...TOGGLE_SETTING_KEYS.map(toggle),
-    ...mcpRows(read, actions, desktop),
+    ...SETTING_GROUPS.map((group) => ({
+      type: "group" as const,
+      heading: group.heading,
+      items: [
+        ...group.keys.map((key) => rowDefinition(key, group.heading, read, actions)),
+        ...(group.id === "agentAccess" ? tokenRows(group.heading, read, actions) : []),
+      ],
+      // A phone cannot listen for connections, so the group that promises it can does not appear —
+      // rather than switching on, minting a token and quietly doing nothing.
+      ...(group.id === "agentAccess" ? { visible: desktop } : {}),
+    })),
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     { name: VERSION_SETTING_NAME, desc: version },
   ];
