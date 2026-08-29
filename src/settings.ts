@@ -1,3 +1,4 @@
+import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
 import type { FileOp } from "./model/pathOps";
 import { remapPathKeys } from "./model/pathOps";
 import type { HistoryScope } from "./model/types";
@@ -72,11 +73,19 @@ export interface KanbanSettings {
   commentsBaseline: string;
   /**
    * Whether the plugin hosts an MCP server so agents can drive the boards in this vault. Off until
-   * the user turns it on, desktop only, and bound to loopback — see `docs/mcp.md`.
+   * the user turns it on, desktop only, and bound to loopback unless `mcpBindAddress` says
+   * otherwise — see `docs/mcp.md`.
    */
   mcpEnabled: boolean;
-  /** The loopback port that server listens on. */
+  /** The port that server listens on. */
   mcpPort: number;
+  /**
+   * The address that server binds to. `127.0.0.1` (the default) keeps it reachable from this
+   * machine only; anything else — `0.0.0.0` for every address this machine has, or one particular
+   * interface — puts it on that network, where any host that has the token can drive every board
+   * in this vault. See `docs/mcp.md`.
+   */
+  mcpBindAddress: string;
   /**
    * The bearer token every MCP request must carry, generated on this install the first time the
    * server is switched on and kept afterwards — a token that changed on each load would break the
@@ -122,6 +131,7 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   commentsBaseline: "",
   mcpEnabled: false,
   mcpPort: MCP_DEFAULT_PORT,
+  mcpBindAddress: MCP_DEFAULT_BIND_ADDRESS,
   mcpToken: "",
 };
 

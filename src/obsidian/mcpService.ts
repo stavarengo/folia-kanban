@@ -70,18 +70,19 @@ export function vaultBoardHost(options: McpServiceOptions): BoardHost {
  * The server's lifetime, kept in step with the settings.
  *
  * `sync` is the only entry point: call it after every settings change and it starts, stops or
- * restarts to match. Restarting on a port change is deliberate — a running server on the old port
- * would leave the settings tab describing an address nothing answers on.
+ * restarts to match. Restarting on a port or bind-address change is deliberate — a running server
+ * on the old one would leave the settings tab describing an address nothing answers on.
  */
 /** What the settings currently ask the server to be. */
 interface Target {
   port: number;
+  bindAddress: string;
   token: string;
 }
 
 function same(a: Target | null, b: Target | null): boolean {
   if (a === null || b === null) return false;
-  return a.port === b.port && a.token === b.token;
+  return a.port === b.port && a.bindAddress === b.bindAddress && a.token === b.token;
 }
 
 export class McpService {
@@ -103,7 +104,11 @@ export class McpService {
   sync(settings: KanbanSettings): Promise<void> {
     const target =
       settings.mcpEnabled && settings.mcpToken
-        ? { port: settings.mcpPort, token: settings.mcpToken }
+        ? {
+            port: settings.mcpPort,
+            bindAddress: settings.mcpBindAddress,
+            token: settings.mcpToken,
+          }
         : null;
     return this.enqueue(() => this.reconcile(target));
   }
@@ -146,6 +151,7 @@ export class McpService {
         host: vaultBoardHost(this.options),
         info: this.options.info,
         port: target.port,
+        bindAddress: target.bindAddress,
         token: target.token,
       });
       this.options.onState?.({ kind: "running", port: this.running.port });

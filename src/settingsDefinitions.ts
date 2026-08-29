@@ -1,4 +1,5 @@
 import type { SettingDefinitionItem } from "obsidian";
+import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress, normalizeBindAddress } from "./mcp/bindAddress";
 import {
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
@@ -27,7 +28,8 @@ export type EditableSettingKey =
   | "boardSetupFileMenu"
   | "boardSetupEditorMenu"
   | "mcpEnabled"
-  | "mcpPort";
+  | "mcpPort"
+  | "mcpBindAddress";
 
 /** The settings that are a plain on/off. Kept as a value, not only a type, so `settingsPatchFor`
  *  can recognise one at runtime — a boolean reaching the dropdown branch would be refused. */
@@ -45,7 +47,7 @@ const isToggleKey = (key: string): key is ToggleKey =>
 
 type DropdownKey = Exclude<
   EditableSettingKey,
-  "detailWidth" | "cardNextTodos" | "userName" | "mcpPort" | ToggleKey
+  "detailWidth" | "cardNextTodos" | "userName" | "mcpPort" | "mcpBindAddress" | ToggleKey
 >;
 
 /**
@@ -137,11 +139,15 @@ export const SETTING_COPY = {
   },
   mcpEnabled: {
     name: "Agent access (MCP) — enable",
-    desc: "Let AI agents read and change the boards in this vault through an MCP server the plugin hosts on this computer only (127.0.0.1). Every change an agent makes goes through the board's own rules, so cards get the same history lines they get when you edit them by hand. Desktop only; off until you turn it on. See docs/mcp.md for how to connect a client.",
+    desc: "Let AI agents read and change the boards in this vault through an MCP server the plugin hosts on this computer. Every change an agent makes goes through the board's own rules, so cards get the same history lines they get when you edit them by hand. It listens on this computer only (127.0.0.1) unless you change the bind address below. Desktop only; off until you turn it on. See docs/mcp.md for how to connect a client.",
   },
   mcpPort: {
     name: "Agent access (MCP) — port",
-    desc: `The loopback port the server listens on (${MCP_PORT_MIN}–${MCP_PORT_MAX}). Change it if something else on this computer already holds it.`,
+    desc: `The port the server listens on (${MCP_PORT_MIN}–${MCP_PORT_MAX}). Change it if something else on this computer already holds it.`,
+  },
+  mcpBindAddress: {
+    name: "Agent access (MCP) — bind address",
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every address this computer has, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. Must be an address this computer actually has, or the server will not start.`,
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
 
@@ -206,7 +212,19 @@ const toNumber = (value: unknown): number | null => {
 export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSettings> | null {
   if (isToggleKey(key)) return typeof value === "boolean" ? { [key]: value } : null;
   if (key === "userName") return typeof value === "string" ? { userName: value.trim() } : null;
+  if (key === "mcpBindAddress") return bindAddressPatchFor(value);
   return numberPatchFor(key, value) ?? dropdownPatchFor(key, value);
+}
+
+/**
+ * The patch a bind address means, or `null` when it is not one the server could bind to. Refused
+ * rather than corrected: an address is not a range with a nearest allowed value, and half of one
+ * ("192.168.1") is not a request for anything. What is stored is the normalised form, so the
+ * `Origin` check compares the same spelling the transport binds.
+ */
+function bindAddressPatchFor(value: unknown): Partial<KanbanSettings> | null {
+  if (typeof value !== "string" || !isBindAddress(value)) return null;
+  return { mcpBindAddress: normalizeBindAddress(value) };
 }
 
 /** The bounds of every setting that is a number, so a value out of range is pulled in, not refused. */
@@ -232,6 +250,57 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
   // `key` is a DropdownKey and `value` one of the option keys `SETTING_OPTIONS` types against that
   // setting's own union, which is what makes this a valid patch for it.
   return { [key]: value };
+}
+
+/**
+ * The agent-access rows below the enable toggle: where the server answers, and the token to reach
+ * it with. Split out because they share one shape — none of them exists on a platform that cannot
+ * host a server, and all of them are dead until agent access is on.
+ */
+function mcpRows(
+  read: () => KanbanSettings,
+  tokenActions: { copy: () => void; regenerate: () => void },
+  desktop: boolean,
+): SettingDefinitionItem[] {
+  const off = (): boolean => !read().mcpEnabled;
+  return [
+    {
+      ...SETTING_COPY.mcpPort,
+      visible: desktop,
+      control: {
+        type: "number",
+        key: "mcpPort",
+        min: MCP_PORT_MIN,
+        max: MCP_PORT_MAX,
+        step: 1,
+        disabled: off,
+      },
+    },
+    {
+      ...SETTING_COPY.mcpBindAddress,
+      visible: desktop,
+      control: {
+        type: "text",
+        key: "mcpBindAddress",
+        placeholder: MCP_DEFAULT_BIND_ADDRESS,
+        disabled: off,
+      },
+    },
+    {
+      name: MCP_TOKEN_COPY.name,
+      desc: MCP_TOKEN_COPY.desc,
+      visible: desktop,
+      action: tokenActions.copy,
+      disabled: off,
+    },
+    {
+      name: MCP_TOKEN_REGENERATE.name,
+      desc: MCP_TOKEN_REGENERATE.desc,
+      visible: desktop,
+      action: tokenActions.regenerate,
+      disabled: off,
+    },
+  ];
 }
 
 /**
@@ -292,32 +361,7 @@ export function settingDefinitions(
     dropdown("historyScope"),
     dropdown("boardPan"),
     ...TOGGLE_SETTING_KEYS.map(toggle),
-    {
-      ...SETTING_COPY.mcpPort,
-      visible: desktop,
-      control: {
-        type: "number",
-        key: "mcpPort",
-        min: MCP_PORT_MIN,
-        max: MCP_PORT_MAX,
-        step: 1,
-        disabled: () => !read().mcpEnabled,
-      },
-    },
-    {
-      name: MCP_TOKEN_COPY.name,
-      desc: MCP_TOKEN_COPY.desc,
-      visible: desktop,
-      action: tokenActions.copy,
-      disabled: () => !read().mcpEnabled,
-    },
-    {
-      name: MCP_TOKEN_REGENERATE.name,
-      desc: MCP_TOKEN_REGENERATE.desc,
-      visible: desktop,
-      action: tokenActions.regenerate,
-      disabled: () => !read().mcpEnabled,
-    },
+    ...mcpRows(read, tokenActions, desktop),
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     { name: VERSION_SETTING_NAME, desc: version },
   ];

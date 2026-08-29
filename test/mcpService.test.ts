@@ -7,7 +7,8 @@ import { McpService, newMcpToken, vaultBoardHost } from "../src/obsidian/mcpServ
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
 import type { ServerInfo } from "../src/mcp/protocol";
-import { MCP_HOST, MCP_PATH } from "../src/obsidian/mcpHttpServer";
+import { MCP_PATH } from "../src/obsidian/mcpHttpServer";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
 import { FakeApp } from "./obsidianFake";
 
 const INFO: ServerInfo = { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" };
@@ -58,19 +59,22 @@ describe("the board host the plugin builds", () => {
     const s = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
     live = s.service;
     await s.service.sync(s.settings());
-    const res = await fetch(`http://${MCP_HOST}:${s.service.port ?? 0}${MCP_PATH}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${s.settings().mcpToken}`,
+    const res = await fetch(
+      `http://${MCP_DEFAULT_BIND_ADDRESS}:${s.service.port ?? 0}${MCP_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${s.settings().mcpToken}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "list_boards", arguments: {} },
+        }),
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: { name: "list_boards", arguments: {} },
-      }),
-    });
+    );
     const reply = (await res.json()) as { result: { content: { text: string }[] } };
     expect(JSON.parse(reply.result.content[0]?.text ?? "")).toEqual({
       boards: [{ path: "Work/Board.md", name: "Board" }],
@@ -155,6 +159,56 @@ describe("the server's lifetime", () => {
     await second.service.stop();
   });
 
+  // The address is the other half of where the server answers, so it has to restart on a change the
+  // same way the port does — a server still on the old address would leave the settings tab
+  // describing somewhere nothing is listening.
+  it("moves the server when the bind address changes", async () => {
+    const s = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
+    live = s.service;
+    await s.service.sync(s.settings());
+    const before = s.service.port;
+    expect(before).toBeGreaterThan(0);
+
+    await s.set({ mcpBindAddress: "0.0.0.0" });
+    expect(s.states).toEqual(["running", "off", "running"]);
+    const port = s.service.port ?? 0;
+    // Reachable on loopback still, but now because loopback is one of the addresses it is on.
+    const res = await fetch(`http://127.0.0.1:${port}${MCP_PATH}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${s.settings().mcpToken}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  // TEST-NET-3: reserved for documentation, so no machine running this has it. That is the
+  // EADDRNOTAVAIL path — a real address, just not one of this computer's — and it has to surface
+  // the way a taken port does rather than leave the toggle on above nothing.
+  it("reports an address this machine does not have, and retries once it changes", async () => {
+    const s = setup({
+      mcpEnabled: true,
+      mcpToken: newMcpToken(),
+      mcpPort: 0,
+      mcpBindAddress: "203.0.113.1",
+    });
+    live = s.service;
+    await s.service.sync(s.settings());
+    expect(s.service.port).toBeNull();
+    expect(s.states).toEqual(["failed"]);
+
+    // Same reason the port does it: an unrelated settings write must not retry a bind already
+    // known to fail and pop the same notice again.
+    await s.set({ userName: "alex" });
+    expect(s.states).toEqual(["failed"]);
+
+    await s.set({ mcpBindAddress: "127.0.0.1" });
+    expect(s.service.port).toBeGreaterThan(0);
+    expect(s.states).toEqual(["failed", "running"]);
+  });
+
   // Replacing the token is a security control, so the claim that matters is not that the setting
   // changed but that the old bearer stops opening the door. Nothing asserted that until now.
   it("stops accepting the old token once it is replaced", async () => {
@@ -163,7 +217,7 @@ describe("the server's lifetime", () => {
     live = s.service;
     await s.service.sync(s.settings());
     const call = (token: string) =>
-      fetch(`http://${MCP_HOST}:${s.service.port ?? 0}${MCP_PATH}`, {
+      fetch(`http://${MCP_DEFAULT_BIND_ADDRESS}:${s.service.port ?? 0}${MCP_PATH}`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
