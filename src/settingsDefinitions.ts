@@ -1,4 +1,4 @@
-import type { SettingDefinitionItem } from "obsidian";
+import type { Setting, SettingDefinitionItem } from "obsidian";
 import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress, normalizeBindAddress } from "./mcp/bindAddress";
 import {
   DETAIL_WIDTH_MAX,
@@ -151,18 +151,81 @@ export const SETTING_COPY = {
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
 
-/** What the settings tab can do that is not writing a setting. `holdBindAddress` is how the tab
- *  keeps the address a text field is showing without restarting the server on every keystroke:
- *  `null` when what is in the field is not an address. */
+/** What the settings tab can do that is not writing a setting. `renderHeldField` draws the port
+ *  and the bind address itself, on a row Obsidian has already given a name and a description:
+ *  see {@link heldFieldOutcome} for why neither can be a declarative control. */
 export interface SettingTabActions {
   copy: () => void;
   regenerate: () => void;
-  holdBindAddress: (address: string | null) => void;
+  renderHeldField: (key: HeldFieldKey, setting: Setting) => void;
 }
+
+/** The two fields that are held while they are being typed into rather than written through. */
+export type HeldFieldKey = "mcpPort" | "mcpBindAddress";
 
 /** What the bind-address field says when what is in it is not an address. */
 export const MCP_BIND_ADDRESS_INVALID =
   "Not an address. Use an IP address such as 127.0.0.1, 0.0.0.0 or 192.168.1.5 — not a name.";
+
+/** What the port field says when what is in it is not a number. Out of range is not refused —
+ *  `settingsPatchFor` pulls it into the allowed range — so only text that is not a port lands here. */
+export const MCP_PORT_INVALID = `Not a port. Use a number between ${MCP_PORT_MIN} and ${MCP_PORT_MAX}.`;
+
+/** What a field says about a value it refused, when the refusal is worth naming. */
+const HELD_FIELD_INVALID: Record<HeldFieldKey, string> = {
+  mcpPort: MCP_PORT_INVALID,
+  mcpBindAddress: MCP_BIND_ADDRESS_INVALID,
+};
+
+/** What {@link heldFieldOutcome} decided. */
+export interface HeldFieldOutcome {
+  /** What the field must show once focus leaves it — always a value that is really stored. */
+  show: string;
+  /** The patch to write, or `null` when the value was refused or is the one already stored. */
+  commit: Partial<KanbanSettings> | null;
+  /** The message shown under the field while it holds something that is not a value, or `null`. */
+  error: string | null;
+  /** The same message where there is no room for an inline one, or `null` when it is not worth a
+   *  notice — which is what an emptied field is. */
+  notice: string | null;
+}
+
+/**
+ * What leaving one of the held fields means: what it must show, what to store, and what to say.
+ *
+ * Both fields are drawn imperatively on both rendering paths, and this is why. Obsidian 1.13 runs a
+ * declarative control's `validate` on every keystroke and writes every accepted one straight
+ * through, with no blur to hold it back: typing `192.168.1.55` would bind `192.168.1.5` on the way,
+ * restarting the server and announcing it, and every prefix of a port is a port of its own. Holding
+ * the field until focus leaves is the only way either setting can be typed at all — and leaving it
+ * is then also the only moment the field can be put back to what the server is actually on, which
+ * an emptied field showing a grey default otherwise lies about.
+ */
+export function heldFieldOutcome(
+  key: HeldFieldKey,
+  typed: string,
+  stored: KanbanSettings,
+): HeldFieldOutcome {
+  const patch = settingsPatchFor(key, typed);
+  const accepted = patch?.[key];
+  if (accepted === undefined) {
+    // An emptied field is someone reaching for the default, not a mistake worth interrupting for;
+    // it still gets the inline message while the field is being typed into.
+    const error = HELD_FIELD_INVALID[key];
+    return {
+      show: String(stored[key]),
+      commit: null,
+      error,
+      notice: typed.trim() === "" ? null : error,
+    };
+  }
+  return {
+    show: String(accepted),
+    commit: accepted === stored[key] ? null : patch,
+    error: null,
+    notice: null,
+  };
+}
 
 /** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */
 export const MCP_TOKEN_COPY = {
@@ -276,40 +339,16 @@ function mcpRows(
   desktop: boolean,
 ): SettingDefinitionItem[] {
   const off = (): boolean => !read().mcpEnabled;
+  const held = (key: HeldFieldKey): SettingDefinitionItem => ({
+    ...SETTING_COPY[key],
+    visible: desktop,
+    render: (setting) => {
+      actions.renderHeldField(key, setting);
+    },
+  });
   return [
-    {
-      ...SETTING_COPY.mcpPort,
-      visible: desktop,
-      control: {
-        type: "number",
-        key: "mcpPort",
-        min: MCP_PORT_MIN,
-        max: MCP_PORT_MAX,
-        step: 1,
-        disabled: off,
-      },
-    },
-    {
-      ...SETTING_COPY.mcpBindAddress,
-      visible: desktop,
-      control: {
-        type: "text",
-        key: "mcpBindAddress",
-        placeholder: MCP_DEFAULT_BIND_ADDRESS,
-        disabled: off,
-        // Two jobs, and the second is the load-bearing one. Without this the field says nothing
-        // about a value it refused, and the user leaves the tab believing the server moved. And it
-        // is the only hook Obsidian runs for *every* candidate value: a rejected one may never
-        // reach `setControlValue`, so this is where the held address has to be cleared, or closing
-        // the tab would commit the last address that happened to parse rather than the one on
-        // screen — silently moving the server somewhere the user had typed over.
-        validate: (value) => {
-          const patch = settingsPatchFor("mcpBindAddress", value);
-          actions.holdBindAddress(patch?.mcpBindAddress ?? null);
-          return patch ? undefined : MCP_BIND_ADDRESS_INVALID;
-        },
-      },
-    },
+    held("mcpPort"),
+    held("mcpBindAddress"),
     {
       name: MCP_TOKEN_COPY.name,
       desc: MCP_TOKEN_COPY.desc,

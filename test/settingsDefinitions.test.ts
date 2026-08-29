@@ -1,15 +1,20 @@
+import type { Setting, SettingGroup } from "obsidian";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CARD_NEXT_TODOS_MAX,
+  MCP_BIND_ADDRESS_INVALID,
+  MCP_PORT_INVALID,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_COPY,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
+  heldFieldOutcome,
   settingDefinitions,
   settingsPatchFor,
+  type HeldFieldKey,
 } from "../src/settingsDefinitions";
 import {
   DEFAULT_SETTINGS,
@@ -26,7 +31,7 @@ const noop = (): void => {};
 const definitions = settingDefinitions(
   () => DEFAULT_SETTINGS,
   "1.2.3",
-  { copy: noop, regenerate: noop, holdBindAddress: noop },
+  { copy: noop, regenerate: noop, renderHeldField: noop },
   true,
 );
 
@@ -35,15 +40,27 @@ const controlKeys = definitions.flatMap((d) =>
   "control" in d && d.control ? [d.control.key] : [],
 );
 
+/** The port and the bind address are not controls: they draw themselves, because Obsidian's
+ *  declarative controls write on every keystroke and offer no blur to hold that back. */
+const HELD_KEYS = ["mcpPort", "mcpBindAddress"] as const satisfies readonly HeldFieldKey[];
+
+const heldRow = (key: HeldFieldKey) =>
+  definitions.find((d) => "name" in d && d.name === SETTING_COPY[key].name);
+
+/** Every setting the tab offers, however the row that offers it is built. */
+const editableKeys = [...controlKeys, ...HELD_KEYS];
+
 describe("settingDefinitions", () => {
   it("exposes every editable setting, and nothing the plugin only keeps for itself", () => {
-    expect(new Set(controlKeys)).toEqual(new Set(Object.keys(SETTING_COPY)));
-    for (const key of controlKeys) expect(DEFAULT_SETTINGS).toHaveProperty(key);
+    expect(new Set(editableKeys)).toEqual(new Set(Object.keys(SETTING_COPY)));
+    for (const key of editableKeys) expect(DEFAULT_SETTINGS).toHaveProperty(key);
   });
 
   it("takes its wording from the shared copy", () => {
     for (const [key, copy] of Object.entries(SETTING_COPY)) {
-      const def = definitions.find((d) => "control" in d && d.control?.key === key);
+      const def = definitions.find(
+        (d) => ("control" in d && d.control?.key === key) || ("name" in d && d.name === copy.name),
+      );
       expect(def).toMatchObject({ name: copy.name, desc: copy.desc });
     }
   });
@@ -69,7 +86,7 @@ describe("settingDefinitions", () => {
       const def = settingDefinitions(
         () => settings,
         "1.2.3",
-        { copy: noop, regenerate: noop, holdBindAddress: noop },
+        { copy: noop, regenerate: noop, renderHeldField: noop },
         true,
       ).find((d) => "control" in d && d.control?.key === key);
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
@@ -183,38 +200,98 @@ describe("settingsPatchFor", () => {
     }
   });
 
-  // Refusing a value silently would let the user leave the tab believing they had changed where
-  // the server is. Obsidian 1.13 shows this under the field.
-  it("says so in the field when what is in it is not an address", () => {
-    const row = definitions.find((d) => "name" in d && d.name === SETTING_COPY.mcpBindAddress.name);
-    const control = row && "control" in row ? row.control : undefined;
-    const validate = control?.type === "text" ? control.validate : undefined;
-    expect(validate).toBeTypeOf("function");
-    expect(validate?.("0.0.0.0")).toBeUndefined();
-    expect(validate?.("evil.example")).toMatch(/not an address/i);
+  // The declarative control is what could not be used here: Obsidian runs its `validate` on every
+  // keystroke and writes every accepted one through, so typing 192.168.1.55 would bind
+  // 192.168.1.5 on the way, and there is no blur to hold that back.
+  it("draws the port and the bind address itself rather than as a control", () => {
+    for (const key of HELD_KEYS) {
+      const row = heldRow(key);
+      expect(row, key).toBeDefined();
+      expect(row && "render" in row && typeof row.render, key).toBe("function");
+      expect(row && "control" in row && row.control, key).toBeFalsy();
+    }
   });
 
-  // A rejected value may never reach `setControlValue`, so this is the only hook that sees every
-  // candidate. If it did not clear the held address, closing the tab would commit the last one
-  // that happened to parse rather than the one on screen.
-  it("holds what the field shows, and lets go of it when that is not an address", () => {
-    const held: (string | null)[] = [];
+  it("hands the row it is asked to draw to the tab, with the key it belongs to", () => {
+    const drawn: HeldFieldKey[] = [];
     const rows = settingDefinitions(
       () => DEFAULT_SETTINGS,
       "1.2.3",
       {
         copy: noop,
         regenerate: noop,
-        holdBindAddress: (a) => held.push(a),
+        renderHeldField: (key) => drawn.push(key),
       },
       true,
     );
-    const row = rows.find((d) => "name" in d && d.name === SETTING_COPY.mcpBindAddress.name);
-    const control = row && "control" in row ? row.control : undefined;
-    const validate = control?.type === "text" ? control.validate : undefined;
-    validate?.(" 0.0.0.0 ");
-    validate?.("0.0.0.0.");
-    expect(held).toEqual(["0.0.0.0", null]);
+    for (const key of HELD_KEYS) {
+      const row = rows.find((d) => "name" in d && d.name === SETTING_COPY[key].name);
+      // The row hands both straight on and reads neither, so nothing has to stand in for them.
+      if (row && "render" in row) row.render({} as Setting, {} as SettingGroup);
+    }
+    expect(drawn).toEqual([...HELD_KEYS]);
+  });
+
+  // What the field must show once focus leaves it is the whole point: an emptied one showing a
+  // grey 127.0.0.1 while the server is on 0.0.0.0 is the field lying about where the server is.
+  it("puts a refused field back to what is really stored, and says why", () => {
+    const stored = { ...DEFAULT_SETTINGS, mcpBindAddress: "0.0.0.0", mcpPort: 8080 };
+    expect(heldFieldOutcome("mcpBindAddress", "localhost", stored)).toEqual({
+      show: "0.0.0.0",
+      commit: null,
+      error: MCP_BIND_ADDRESS_INVALID,
+      notice: MCP_BIND_ADDRESS_INVALID,
+    });
+    expect(heldFieldOutcome("mcpPort", "not a port", stored)).toEqual({
+      show: "8080",
+      commit: null,
+      error: MCP_PORT_INVALID,
+      notice: MCP_PORT_INVALID,
+    });
+  });
+
+  // Emptying the field is how someone reaches for the default, not a mistake to be told about —
+  // but the field still goes back to the truth rather than showing the placeholder.
+  it("puts an emptied field back without interrupting", () => {
+    const stored = { ...DEFAULT_SETTINGS, mcpBindAddress: "0.0.0.0" };
+    for (const typed of ["", "   "]) {
+      expect(heldFieldOutcome("mcpBindAddress", typed, stored), JSON.stringify(typed)).toEqual({
+        show: "0.0.0.0",
+        commit: null,
+        error: MCP_BIND_ADDRESS_INVALID,
+        notice: null,
+      });
+    }
+  });
+
+  it("commits a value that was meant, in the spelling that gets stored", () => {
+    expect(heldFieldOutcome("mcpBindAddress", " [::1] ", DEFAULT_SETTINGS)).toEqual({
+      show: "::1",
+      commit: { mcpBindAddress: "::1" },
+      error: null,
+      notice: null,
+    });
+    // Out of range is pulled into it, and the field then shows where it landed rather than what
+    // was typed.
+    expect(heldFieldOutcome("mcpPort", "80", DEFAULT_SETTINGS)).toEqual({
+      show: String(MCP_PORT_MIN),
+      commit: { mcpPort: MCP_PORT_MIN },
+      error: null,
+      notice: null,
+    });
+  });
+
+  // Every write restarts the server. Re-typing the address it is already on must not.
+  it("writes nothing when the value is the one already stored", () => {
+    expect(heldFieldOutcome("mcpBindAddress", MCP_DEFAULT_BIND_ADDRESS, DEFAULT_SETTINGS)).toEqual({
+      show: MCP_DEFAULT_BIND_ADDRESS,
+      commit: null,
+      error: null,
+      notice: null,
+    });
+    expect(
+      heldFieldOutcome("mcpPort", String(DEFAULT_SETTINGS.mcpPort), DEFAULT_SETTINGS).commit,
+    ).toBeNull();
   });
 
   it("trims the name comments are signed with", () => {
@@ -227,7 +304,7 @@ describe("agent access on a platform that cannot host it", () => {
     settingDefinitions(
       () => DEFAULT_SETTINGS,
       "1.2.3",
-      { copy: noop, regenerate: noop, holdBindAddress: noop },
+      { copy: noop, regenerate: noop, renderHeldField: noop },
       desktop,
     );
 
@@ -269,7 +346,7 @@ describe("agent access on a platform that cannot host it", () => {
     const on = settingDefinitions(
       () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
       "1.2.3",
-      { copy: noop, regenerate: noop, holdBindAddress: noop },
+      { copy: noop, regenerate: noop, renderHeldField: noop },
       true,
     ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
     const onDisabled = on && "disabled" in on ? on.disabled : undefined;
@@ -286,7 +363,7 @@ describe("agent access on a platform that cannot host it", () => {
         regenerate: () => {
           called += 1;
         },
-        holdBindAddress: noop,
+        renderHeldField: noop,
       },
       true,
     ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
