@@ -744,6 +744,14 @@ class KanbanSettingTab extends PluginSettingTab {
    *  re-render, exactly as the imperative rows below do. */
   override setControlValue(key: string, value: unknown): void {
     const patch = settingsPatchFor(key, value);
+    // Above the refusal, unlike the two below it: this path has no blur to clear a held value, so a
+    // value that is not an address has to clear it here. Otherwise typing 192.168.1.5 and then one
+    // character too many would leave the earlier address held, and closing the tab would commit an
+    // address the user had already typed over.
+    if (key === "mcpBindAddress") {
+      this.pendingMcpBindAddress = patch?.mcpBindAddress ?? null;
+      return;
+    }
     if (!patch) return;
     // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
     if (patch.userName !== undefined) {
@@ -752,10 +760,6 @@ class KanbanSettingTab extends PluginSettingTab {
     }
     if (patch.mcpPort !== undefined) {
       this.pendingMcpPort = patch.mcpPort;
-      return;
-    }
-    if (patch.mcpBindAddress !== undefined) {
-      this.pendingMcpBindAddress = patch.mcpBindAddress;
       return;
     }
     void this.plugin.updateSettings(patch).then(() => {
