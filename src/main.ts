@@ -27,6 +27,8 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
+  MCP_PORT_MAX,
+  MCP_PORT_MIN,
   applySettingsPatch,
   hydrateSettings,
   migratePathKeyedSettings,
@@ -36,7 +38,6 @@ import {
 } from "./settings";
 import {
   CARD_NEXT_TODOS_MAX,
-  MCP_BIND_ADDRESS_INVALID,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_COPY,
@@ -44,8 +45,10 @@ import {
   TOGGLE_SETTING_KEYS,
   USER_NAME_PLACEHOLDER,
   VERSION_SETTING_NAME,
+  heldFieldOutcome,
   settingDefinitions,
   settingsPatchFor,
+  type HeldFieldKey,
 } from "./settingsDefinitions";
 import {
   NEW_BOARD_BASENAME,
@@ -706,22 +709,15 @@ class KanbanSettingTab extends PluginSettingTab {
   private pendingUserName: string | null = null;
 
   /**
-   * The port, held the same way and for a sharper reason. Every write restarts the server, and a
-   * half-typed port is a real number: typing 8080 over 27125 passes through 8, 80 and 808, each of
-   * which is pulled up to the lowest allowed port and each of which would bind, fail, or both. Held
-   * until the field is left, only the port the user actually meant is ever bound.
+   * The port and the bind address, held the same way and for a sharper reason. Every write restarts
+   * the server, and every prefix of what is being typed is either refused or — worse — a real value
+   * of its own: typing 8080 over 27125 passes through 8, 80 and 808, each pulled up to the lowest
+   * allowed port and each of which would bind, fail, or both, and `192.168.1.5` passes through
+   * `192.168.1.55` if a digit is typed in the middle of it. Held until the field is left, so only
+   * the value the user actually meant is ever bound. A field holding something that is not a value
+   * holds nothing here, and leaving it then keeps what was already stored.
    */
-  private pendingMcpPort: number | null = null;
-
-  /**
-   * The bind address, held for the same reason and more of it. Every write restarts the server, and
-   * every prefix of an address the user is typing is either refused or — worse — a real address of
-   * its own: `0.0.0.0` passes through `0` (refused) but `192.168.1.5` passes through `192.168.1.55`
-   * if a digit is typed in the middle of it. Held until the field is left, so only the address the
-   * user actually meant is ever bound. A value that is not an address leaves this `null`, and
-   * leaving the field then keeps the address that was already stored.
-   */
-  private pendingMcpBindAddress: string | null = null;
+  private pendingMcpFields: Partial<KanbanSettings> = {};
 
   /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
@@ -735,8 +731,8 @@ class KanbanSettingTab extends PluginSettingTab {
       {
         copy: () => void this.plugin.copyMcpToken(),
         regenerate: () => void this.plugin.regenerateMcpToken(),
-        holdBindAddress: (address) => {
-          this.pendingMcpBindAddress = address;
+        renderHeldField: (key, setting) => {
+          this.renderHeldField(key, setting);
         },
       },
       Platform.isDesktop,
@@ -747,9 +743,6 @@ class KanbanSettingTab extends PluginSettingTab {
    *  the vault config the base implementation would reach for. */
   override getControlValue(key: string): unknown {
     if (key === "userName") return this.pendingUserName ?? this.plugin.settings.userName;
-    if (key === "mcpPort") return this.pendingMcpPort ?? this.plugin.settings.mcpPort;
-    if (key === "mcpBindAddress")
-      return this.pendingMcpBindAddress ?? this.plugin.settings.mcpBindAddress;
     const settings: KanbanSettings = this.plugin.settings;
     return Object.prototype.hasOwnProperty.call(settings, key)
       ? settings[key as keyof KanbanSettings]
@@ -760,30 +753,24 @@ class KanbanSettingTab extends PluginSettingTab {
    *  re-render, exactly as the imperative rows below do. */
   override setControlValue(key: string, value: unknown): void {
     const patch = settingsPatchFor(key, value);
-    // Above the refusal, unlike the two below it: this path has no blur to clear a held value, so a
-    // value that is not an address has to clear it here. Otherwise typing 192.168.1.5 and then one
-    // character too many would leave the earlier address held, and closing the tab would commit an
-    // address the user had already typed over.
-    if (key === "mcpBindAddress") {
-      this.pendingMcpBindAddress = patch?.mcpBindAddress ?? null;
-      return;
-    }
     if (!patch) return;
     // Same deal as the imperative text field: hold the name until focus leaves or the tab closes.
     if (patch.userName !== undefined) {
       this.pendingUserName = patch.userName;
       return;
     }
-    if (patch.mcpPort !== undefined) {
-      this.pendingMcpPort = patch.mcpPort;
-      return;
-    }
     void this.plugin.updateSettings(patch).then(() => {
-      // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
-      // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
-      // later reaches this method at all, but the version is asked anyway: the API is @since 1.13.0
-      // and minAppVersion is 1.7.2, so an unguarded call is a promise the manifest does not make.
-      if (requireApiVersion("1.13.0")) this.refreshDomState();
+      // Only 1.13 and later reaches this method at all, but the version is asked anyway: both APIs
+      // are @since 1.13.0 and minAppVersion is 1.7.2, so an unguarded call is a promise the
+      // manifest does not make.
+      // Agent access gates the port and bind-address rows, and those two draw themselves from a
+      // `render` callback — which carries no `disabled` predicate for `refreshDomState` to
+      // re-evaluate. Only redrawing the tab reaches them. Every other row does disable from a
+      // predicate (side-panel layout, add-card open mode), and gets the cheap path.
+      if (requireApiVersion("1.13.0")) {
+        if (key === "mcpEnabled") this.update();
+        else this.refreshDomState();
+      }
     });
   }
 
@@ -815,16 +802,61 @@ class KanbanSettingTab extends PluginSettingTab {
    *  passes through addresses that are real and bindable, and switching a toggle in the middle of
    *  that must not be what decides where the server listens. */
   private heldPatch(): Partial<KanbanSettings> {
-    const patch: Partial<KanbanSettings> = {};
-    const { pendingUserName: name, pendingMcpPort: port, pendingMcpBindAddress: address } = this;
+    const patch: Partial<KanbanSettings> = { ...this.pendingMcpFields };
+    const { pendingUserName: name } = this;
     this.pendingUserName = null;
-    this.pendingMcpPort = null;
-    this.pendingMcpBindAddress = null;
+    this.pendingMcpFields = {};
     if (name !== null && name !== this.plugin.settings.userName) patch.userName = name;
-    if (port !== null && port !== this.plugin.settings.mcpPort) patch.mcpPort = port;
-    if (address !== null && address !== this.plugin.settings.mcpBindAddress)
-      patch.mcpBindAddress = address;
     return patch;
+  }
+
+  /**
+   * The port and the bind-address fields, drawn the same way on both rendering paths: Obsidian 1.13
+   * calls this from the row's `render`, and {@link render} calls it on a row it built itself. See
+   * {@link heldFieldOutcome} for why neither field can be a declarative control.
+   */
+  private renderHeldField(key: HeldFieldKey, setting: Setting): void {
+    const disabled = !this.plugin.settings.mcpEnabled;
+    setting.setDisabled(disabled).addText((t) => {
+      if (key === "mcpPort") {
+        t.inputEl.type = "number";
+        t.inputEl.min = String(MCP_PORT_MIN);
+        t.inputEl.max = String(MCP_PORT_MAX);
+      }
+      t.setPlaceholder(
+        key === "mcpPort" ? String(DEFAULT_SETTINGS.mcpPort) : MCP_DEFAULT_BIND_ADDRESS,
+      )
+        .setValue(String(this.plugin.settings[key]))
+        .setDisabled(disabled)
+        .onChange((v) => {
+          const outcome = heldFieldOutcome(key, v, this.plugin.settings);
+          this.holdMcpField(key, outcome.commit);
+          this.showFieldError(setting, outcome.error);
+        });
+      // Nothing is written until focus leaves, and leaving is also when the field is put back to
+      // what is really stored: an emptied one showing a grey default, or a refused one still
+      // showing what was typed, would both read as the server having moved there.
+      t.inputEl.addEventListener("blur", () => {
+        const outcome = heldFieldOutcome(key, t.inputEl.value, this.plugin.settings);
+        this.holdMcpField(key, outcome.commit);
+        this.showFieldError(setting, null);
+        t.setValue(outcome.show);
+        if (outcome.notice !== null) new Notice(outcome.notice, 5000);
+        this.commitHeldFields();
+      });
+    });
+  }
+
+  /** Hold what a field accepted, or let go of what it refused. */
+  private holdMcpField(key: HeldFieldKey, commit: Partial<KanbanSettings> | null): void {
+    if (commit) Object.assign(this.pendingMcpFields, commit);
+    else delete this.pendingMcpFields[key];
+  }
+
+  /** Say under the field that what is in it is not a value. Obsidian below 1.13 has nowhere to put
+   *  one, and there the notice raised when focus leaves is the whole of the telling. */
+  private showFieldError(setting: Setting, message: string | null): void {
+    if (requireApiVersion("1.13.0")) setting.setErrorMessage(message);
   }
 
   /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
@@ -962,48 +994,12 @@ class KanbanSettingTab extends PluginSettingTab {
     }
 
     if (Platform.isDesktop) {
-      new Setting(containerEl)
-        .setName(SETTING_COPY.mcpPort.name)
-        .setDesc(SETTING_COPY.mcpPort.desc)
-        .setDisabled(!s.mcpEnabled)
-        .addText((t) => {
-          t.inputEl.type = "number";
-          t.setValue(String(s.mcpPort))
-            .setDisabled(!s.mcpEnabled)
-            .onChange((v) => {
-              this.pendingMcpPort = settingsPatchFor("mcpPort", v)?.mcpPort ?? null;
-            });
-          t.inputEl.addEventListener("blur", () => this.commitHeldFields());
-        });
-
-      new Setting(containerEl)
-        .setName(SETTING_COPY.mcpBindAddress.name)
-        .setDesc(SETTING_COPY.mcpBindAddress.desc)
-        .setDisabled(!s.mcpEnabled)
-        .addText((t) => {
-          t.setPlaceholder(MCP_DEFAULT_BIND_ADDRESS)
-            .setValue(s.mcpBindAddress)
-            .setDisabled(!s.mcpEnabled)
-            .onChange((v) => {
-              this.pendingMcpBindAddress =
-                settingsPatchFor("mcpBindAddress", v)?.mcpBindAddress ?? null;
-            });
-          // Obsidian 1.13 shows a refusal under the field; this rendering is what older versions
-          // get, and it has nowhere to put one. Saying nothing would leave the user looking at
-          // text that is not an address, believing the server had moved to it.
-          t.inputEl.addEventListener("blur", () => {
-            const typed = t.inputEl.value.trim();
-            if (settingsPatchFor("mcpBindAddress", typed) === null) {
-              // Emptying the field is how someone tries to put the address back, and the
-              // placeholder then shows 127.0.0.1 in grey — which would read as having done it
-              // while the server was still on every interface. So the field is always put back to
-              // where the server actually is, and only a value that was meant says why it went.
-              if (typed !== "") new Notice(MCP_BIND_ADDRESS_INVALID, 5000);
-              t.setValue(this.plugin.settings.mcpBindAddress);
-            }
-            this.commitHeldFields();
-          });
-        });
+      for (const key of ["mcpPort", "mcpBindAddress"] as const) {
+        this.renderHeldField(
+          key,
+          new Setting(containerEl).setName(SETTING_COPY[key].name).setDesc(SETTING_COPY[key].desc),
+        );
+      }
 
       new Setting(containerEl)
         .setName(MCP_TOKEN_COPY.name)
