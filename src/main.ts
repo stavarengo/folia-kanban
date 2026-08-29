@@ -42,6 +42,7 @@ import {
   type HeldFieldKey,
 } from "./settingsDefinitions";
 import {
+  ABOUT_HEADING,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_CONTROLS,
@@ -923,7 +924,9 @@ class KanbanSettingTab extends PluginSettingTab {
       if (group.id === "agentAccess") this.renderTokenRows(containerEl);
     }
 
-    // Read from the manifest so it always reflects the installed build, never a hardcoded value.
+    // Under its own heading, so it does not read as the last row of the section above it — see
+    // ABOUT_HEADING. Read from the manifest so it always reflects the installed build.
+    new Setting(containerEl).setName(ABOUT_HEADING).setHeading();
     new Setting(containerEl).setName(VERSION_SETTING_NAME).setDesc(this.plugin.manifest.version);
   }
 

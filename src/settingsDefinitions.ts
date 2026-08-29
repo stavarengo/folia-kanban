@@ -10,6 +10,7 @@ import {
   SETTING_GROUPS,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
+  ABOUT_HEADING,
   VERSION_SETTING_NAME,
   isRowDisabled,
   type DropdownKey,
@@ -305,7 +306,11 @@ export function settingDefinitions(
         ...(desktopOnly ? { visible: desktop } : {}),
       };
     }),
-    // Read from the manifest so it always reflects the installed build, never a hardcoded value.
-    { name: VERSION_SETTING_NAME, desc: version },
+    {
+      type: "group" as const,
+      heading: ABOUT_HEADING,
+      // Read from the manifest so it always reflects the installed build, never a hardcoded value.
+      items: [{ name: VERSION_SETTING_NAME, desc: version, aliases: [ABOUT_HEADING] }],
+    },
   ];
 }
