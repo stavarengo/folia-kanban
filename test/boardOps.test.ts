@@ -148,7 +148,7 @@ describe("setCardPriority", () => {
 
   it("sets the value and teaches it to the board", async () => {
     const repo = repoWithOneCard();
-    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" }, ["high"]);
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" });
     expect((await repo.loadBoard()).cards["Tasks/A.md"]?.frontmatter.priority).toBe("urgent");
     expect(repo.config.priorities).toEqual(["high", "urgent"]);
   });
@@ -157,15 +157,40 @@ describe("setCardPriority", () => {
   // reads as having no priority and its history gets no `Priority → ` line about nothing.
   it("clears the key on an empty value, and teaches the board nothing", async () => {
     const repo = repoWithOneCard();
-    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" }, ["high"]);
-    await setCardPriority(repo, { path: "Tasks/A.md", value: "" }, ["high"]);
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" });
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "" });
     expect((await repo.loadBoard()).cards["Tasks/A.md"]?.frontmatter.priority).toBeUndefined();
     expect(repo.config.priorities).toEqual(["high", "urgent"]);
   });
 
-  it("does not lose a value the board already knew", async () => {
+  it("does not lose a value the note already remembered", async () => {
     const repo = repoWithOneCard();
-    await setCardPriority(repo, { path: "Tasks/A.md", value: "later" }, ["high", "hand-written"]);
-    expect(repo.config.priorities).toEqual(["high", "hand-written", "later"]);
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "later" });
+    expect(repo.config.priorities).toEqual(["high", "later"]);
+  });
+
+  // The deliberate cost of the rule above, pinned so it is a choice and not a surprise: a word
+  // that was only ever hand-written into a card is not written into the note by the edit that
+  // takes it off that card. Remembering it there would mean ranking it against the word that just
+  // replaced it, which is a scale nobody authored — and the user has just removed the word from
+  // the board. Anything ever set through the UI is already in the note and is untouched by this.
+  it("does not write down a hand-written word the edit is taking off the card", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/A.md": { fm: { status: "todo", order: 1, priority: "blocker" }, body: "" },
+    });
+    await setCardPriority(repo, { path: "Tasks/A.md", value: "urgent" });
+    expect(repo.config.priorities).toEqual(["urgent"]);
+  });
+
+  // The point of the whole change: the note's order is a ranking, so one edit may only ever add
+  // the word that was chosen. The values the other cards happen to carry stay suggestions until
+  // someone picks them — writing them in would rank `later` above `soon` on spelling alone.
+  it("learns only the value being set, never what the other cards happen to carry", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/A.md": { fm: { status: "todo", order: 1, priority: "later" }, body: "" },
+      "Tasks/B.md": { fm: { status: "todo", order: 2, priority: "soon" }, body: "" },
+    });
+    await setCardPriority(repo, { path: "Tasks/B.md", value: "now" });
+    expect(repo.config.priorities).toEqual(["now"]);
   });
 });

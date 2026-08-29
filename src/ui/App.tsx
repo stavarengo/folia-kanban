@@ -314,22 +314,20 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
    * Set a card's priority and let the board note learn from it.
    *
    * The note only ever learns when the user sets a priority — never while loading — and what it
-   * learns is everything the board knows at that moment, so a value hand-written straight into a
-   * card gets remembered too and outlives that card. Clearing a priority learns nothing: it is a
-   * removal, and the point of remembering is that the vocabulary survives its last card.
+   * learns is that one value, appended to the list it already holds. The rest of the vocabulary
+   * above stays a suggestion: those values are ordered by a tone guess and a spelling tie-break,
+   * and the note's order is a ranking, so writing them in would rank words nobody ranked. A value
+   * only a card carries therefore joins the note the first time someone actually picks it, and no
+   * more of the suggested `A`/`B`/`C` starting set is ever written than the one a user picks.
+   * Clearing a priority learns nothing: it is a removal, and the point of remembering is that the
+   * vocabulary survives its last card.
    */
   const setPriorityAndReload = useCallback(
     async (path: string, raw: string) => {
       // Whitespace-only is no priority at all, the way every other priority path reads it.
       const value = raw.trim();
-      // Read what the board knows BEFORE the write. Afterwards the card no longer carries the
-      // value it is replacing, so learning from the post-write board would drop the outgoing
-      // value — the very thing remembering is supposed to prevent. Only real values are learned:
-      // the `A`/`B`/`C` starting set is a suggestion, never something the board is told it uses.
-      const b = boardRef.current;
-      const learn = b ? boardPriorities(b.config.priorities, Object.values(b.cards)) : [];
       try {
-        await setCardPriority(repo, { path, value }, learn);
+        await setCardPriority(repo, { path, value });
       } catch (e) {
         reportError(e);
       } finally {

@@ -274,9 +274,11 @@ export interface BoardConfig {
   /**
    * The priority values this board remembers (`priorities` in the board note), in the order the
    * board note lists them. This is the board's own vocabulary, not a fixed scale the plugin
-   * imposes: it is what the priority field offers as suggestions, and it outlives the cards that
-   * introduced each value. Empty for a board that has never had a priority set through the UI —
-   * the values its cards currently carry are still offered, they are just not remembered yet.
+   * imposes: it is what the priority field offers as suggestions, and a value that got here by
+   * being set outlives the cards that carried it. Empty for a board that has never had a priority
+   * set through the UI — the values its cards currently carry are still offered, they are just not
+   * remembered yet, and a word only ever hand-written into a card is forgotten once no card spells
+   * it: writing it down would mean ranking a word nobody ranked (see `setCardPriority`).
    */
   priorities: string[];
   /**

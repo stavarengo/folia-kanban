@@ -92,8 +92,9 @@ export interface CardRepository {
   setColumns(columns: ColumnDef[]): Promise<void>;
 
   /**
-   * Fold priority values into the board note's remembered vocabulary, so each one survives the
-   * last card that used it. Additive on purpose: the note's current list wins on order and is
+   * Fold priority values into the board note's remembered vocabulary, so a value set through the
+   * UI survives the last card that used it. Additive on purpose: the note's current list wins on
+   * order and is
    * never shrunk, so two edits in flight at once cannot drop each other's value. Writes nothing
    * when every value is already remembered. Pruning the list stays a hand edit of the note.
    */
