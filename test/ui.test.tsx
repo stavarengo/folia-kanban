@@ -633,6 +633,199 @@ describe("card detail", () => {
   });
 });
 
+// The popup itself is Obsidian's and has no stand-in here (see test/obsidianFake.ts): what these
+// cover is everything the panel decides — which names it offers, in which order, and what a pick
+// does to the field.
+describe("property names suggest themselves (20260827.08)", () => {
+  /** A board whose cards, and whose vault, already use property names of their own. */
+  const suggestingRepo = () => {
+    const repo = makeRepo();
+    repo.propertyNames = { inCardFolder: ["area", "energy"], elsewhere: ["mood"] };
+    return repo;
+  };
+
+  /**
+   * Open Alpha's panel. What the vault uses is asked for as the panel opens, not on focus: the
+   * popup can be opened by the very click that lands in the field, and a list still waiting for
+   * its answer would show only Folia's own names at the moment someone is looking at it.
+   */
+  const openAlpha = async (repo: FakeRepo) => {
+    const user = userEvent.setup();
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("New property name") as HTMLInputElement;
+    await waitFor(() => expect(repo.attachedSuggest).not.toBeNull());
+    await waitFor(() =>
+      expect(repo.attachedSuggest!.source.suggestions("").some((s) => s.group !== "folia")).toBe(
+        true,
+      ),
+    );
+    return { user, detail, input };
+  };
+
+  it("asks the vault once for the panel, not once per keystroke", async () => {
+    const repo = suggestingRepo();
+    const { user, input } = await openAlpha(repo);
+
+    await user.type(input, "ene");
+
+    expect(repo.propertyNamesAsked).toBe(1);
+  });
+
+  it("offers Folia's own names first, then the board's, then the vault's", async () => {
+    const repo = suggestingRepo();
+    const { input } = await openAlpha(repo);
+
+    expect(repo.attachedSuggest!.input).toBe(input);
+    const offered = repo.attachedSuggest!.source.suggestions("");
+    // Alpha already carries status, priority, area and type, so none of those is offered again.
+    expect(offered.map((s) => s.key)).toEqual([
+      "order",
+      "due",
+      "title",
+      "created",
+      "tags",
+      "context",
+      "blocks",
+      "blocked-by",
+      "energy",
+      "mood",
+    ]);
+    // The four the panel edits itself are offered — a misspelling is answered with the right
+    // spelling — but marked, so the popup says where that name actually lives.
+    expect(offered.filter((s) => s.editedInPanel).map((s) => s.key)).toEqual([
+      "order",
+      "due",
+      "title",
+      "created",
+      "blocks",
+      "blocked-by",
+    ]);
+    expect(offered.filter((s) => s.group === "board").map((s) => s.key)).toEqual(["energy"]);
+    expect(offered.filter((s) => s.group === "vault").map((s) => s.key)).toEqual(["mood"]);
+  });
+
+  it("narrows to what is typed, whatever case it is typed in", async () => {
+    const repo = suggestingRepo();
+    const { user, input } = await openAlpha(repo);
+
+    await user.type(input, "MOO");
+
+    expect(repo.attachedSuggest!.source.suggestions(input.value).map((s) => s.key)).toEqual([
+      "mood",
+    ]);
+  });
+
+  it("puts a picked name in the field, and it stays there through the next render", async () => {
+    const repo = suggestingRepo();
+    const { user, detail, input } = await openAlpha(repo);
+
+    act(() => repo.attachedSuggest!.source.onPick("energy"));
+
+    expect(input.value).toBe("energy");
+    // The value field re-renders the form; a name written behind React's back would vanish here.
+    await user.type(within(detail).getByLabelText("New property value"), "high");
+    expect(input.value).toBe("energy");
+    await user.click(within(detail).getByLabelText("Add property"));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["energy"]).toBe("high"));
+  });
+
+  it("says why a name with a field of its own cannot be added here", async () => {
+    const repo = suggestingRepo();
+    const { user, detail, input } = await openAlpha(repo);
+
+    await user.type(input, "due");
+
+    expect(
+      within(detail).getByText(
+        "“due” has a field of its own in this panel, so it is not added as a property here.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Add property")).toBeDisabled();
+    expect(input.getAttribute("aria-describedby")).toBeTruthy();
+  });
+
+  it("refuses a name that only differs in case from one the card already has", async () => {
+    const repo = suggestingRepo();
+    const { user, detail, input } = await openAlpha(repo);
+
+    // Alpha carries `area: home`; YAML would keep `Area` beside it and the board would read neither.
+    await user.type(input, "Area");
+
+    expect(
+      within(detail).getByText(
+        "This card already has “area”, so “Area” would be a second property the board ignores.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Add property")).toBeDisabled();
+  });
+
+  it("refuses a panel field however it is spelled, and names the spelling that counts", async () => {
+    const repo = suggestingRepo();
+    const { user, detail, input } = await openAlpha(repo);
+
+    await user.type(input, "DUE");
+
+    expect(
+      within(detail).getByText(
+        "“due” has a field of its own in this panel, so it is not added as a property here.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Add property")).toBeDisabled();
+  });
+
+  it("stays open when a click lands in the suggestion popup, which hangs off the body", async () => {
+    const repo = suggestingRepo();
+    // A side panel is the mode that closes on a click outside itself.
+    const user = userEvent.setup();
+    render_(repo, { ...DEFAULT_SETTINGS, detailPresentation: "side" });
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+
+    // Obsidian's popup, as it really sits in the DOM: a body child, outside the panel.
+    const popup = document.createElement("div");
+    popup.className = "suggestion-container";
+    const item = document.createElement("div");
+    item.className = "suggestion-item";
+    popup.appendChild(item);
+    document.body.appendChild(popup);
+    try {
+      fireEvent.pointerDown(item);
+      expect(detail).toBeInTheDocument();
+    } finally {
+      popup.remove();
+    }
+  });
+
+  it("gives the first Escape to the suggestions and the next one to the panel", async () => {
+    const repo = suggestingRepo();
+    const { user, detail } = await openAlpha(repo);
+
+    act(() => repo.attachedSuggest!.source.onOpenChange(true));
+    await user.keyboard("{Escape}");
+    expect(detail).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+  });
+
+  it("still offers Folia's own names when the vault cannot say what it uses", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.propertyNamesFails = true;
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("New property name");
+    await waitFor(() => expect(repo.propertyNamesAsked).toBe(1));
+
+    expect(input).toBeInTheDocument();
+    expect(repo.attachedSuggest!.source.suggestions("mood")).toEqual([]);
+    expect(repo.attachedSuggest!.source.suggestions("due").map((s) => s.key)).toEqual(["due"]);
+  });
+});
+
 describe("detail presentation", () => {
   const open = async (settings = DEFAULT_SETTINGS) => {
     const user = userEvent.setup();

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -26,7 +27,9 @@ import {
   type LinkResolver,
 } from "../model/board";
 import { descriptionRefusal } from "../model/card";
+import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
+import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model/properties";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -290,10 +293,11 @@ function subtaskColumn(
 }
 
 // The frontmatter keys the panel edits through a dedicated control, so the generic property rows
-// never offer a second, conflicting way to write them. The board's relationship keys join these
-// per board (see `editedKeys`) for the add-property form: an array value is already excluded from
-// the rows themselves.
-const EDITED_KEYS = ["status", "priority", "due", "order", "type", "created", TITLE_KEY];
+// never offer a second, conflicting way to write them — read from `properties.ts`, the one place
+// that says what keys Folia Kanban knows. The board's relationship keys join these per board (see
+// `editedKeys`) for the add-property form: an array value is already excluded from the rows
+// themselves.
+const EDITED_KEYS = PANEL_FIELD_KEYS;
 
 /**
  * The two inputs a card's title is actually made of, and the title they add up to.
@@ -748,11 +752,75 @@ export function CardDetail({
 
   // One datalist for every relationship field: they all offer the same cards.
   const relationListId = useId();
+  // Ties the "…has a field of its own" note under the add-property row to the name input it is about.
+  const ownFieldHintId = useId();
   // Rebuilt only when the board or the open card changes — not on every keystroke in any field.
   const relationChoicesValue = useMemo(() => relationChoices(board, path), [board, path]);
   const editedKeys = useMemo(
     () => new Set([...EDITED_KEYS, ...relationKeys(board.config.relations)]),
     [board.config.relations],
+  );
+
+  // What the "New property name" field suggests, in the three groups the entry asks for: the keys
+  // Folia Kanban defines (this board's relationship keys among them), then the keys the notes in
+  // this board's card folder use, then everything else the vault uses. The vault half is read once
+  // when the panel opens, because the popup that shows it can be opened by the very click that
+  // puts the cursor in the field — asking then would show a list still missing its two larger
+  // halves. The adapter remembers the answer until the board reloads, so opening card after card
+  // does not re-walk the vault. The keys the card already carries are left out: adding one would
+  // overwrite the row above.
+  const [namesInUse, setNamesInUse] = useState<PropertyNamesInUse>({
+    inCardFolder: [],
+    elsewhere: [],
+  });
+  useEffect(() => {
+    if (isCreate) return;
+    void repo
+      .propertyNamesInUse()
+      .then((names) => {
+        if (stillHere()) setNamesInUse(names);
+      })
+      // A vault that cannot answer costs the field the vault's half of the list and nothing else:
+      // Folia's own keys are known here and are still offered. Nothing worth a toast.
+      .catch(() => {});
+  }, [repo, isCreate]);
+  const suggestLists = useMemo(
+    () => ({
+      folia: [...FOLIA_CARD_KEYS, ...relationKeys(board.config.relations)],
+      board: namesInUse.inCardFolder,
+      vault: namesInUse.elsewhere,
+      exclude: new Set(Object.keys(card?.frontmatter ?? {})),
+      editedInPanel: editedKeys,
+    }),
+    [board.config.relations, namesInUse, card?.frontmatter, editedKeys],
+  );
+  // The suggester is attached to the input element ONCE and reads through this ref, because
+  // Obsidian's type-ahead binds to an element for good and has no teardown: re-attaching per
+  // render would stack popups on one field.
+  const suggestListsRef = useRef(suggestLists);
+  useEffect(() => {
+    suggestListsRef.current = suggestLists;
+  }, [suggestLists]);
+  const suggestSource = useRef<PropertySuggestSource>({
+    suggestions: (query) => propertySuggestions(query, suggestListsRef.current),
+    // The picked key goes into React state, never straight into the input: this field is
+    // controlled, so a value written behind React's back is gone at the next render.
+    onPick: (key) => setNewProp((cur) => ({ ...cur, key })),
+    onOpenChange: (open) => {
+      suggestOpen.current = open;
+    },
+  });
+  /** Whether a suggestion popup is on screen, which decides who Escape belongs to (see `onKeyDown`). */
+  const suggestOpen = useRef(false);
+  const suggestOff = useRef<(() => void) | null>(null);
+  // A callback ref rather than an effect: the panel's create form has no property field at all,
+  // so attachment has to follow the element itself appearing and disappearing.
+  const propKeyRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      suggestOff.current?.();
+      suggestOff.current = el ? repo.suggestProperties(el, suggestSource.current) : null;
+    },
+    [repo],
   );
   // The same reading of a `[[wikilink]]` the board used to nest subcards, so a link the board bound
   // is never shown here as missing, and one the board refused (an ambiguous name) is never bound.
@@ -1000,13 +1068,22 @@ export function CardDetail({
   }, [focusSeq]);
 
   // Side modes: a pointerdown outside the panel closes it — but not when it lands on another
-  // card (that card's own open handler switches the detail), nor on a menu/context surface.
+  // card (that card's own open handler switches the detail), nor on a menu/context surface, nor
+  // on a suggestion popup: Obsidian hangs `.suggestion-container` off the document body, so a
+  // popup this panel's own field opened is outside the panel in the DOM while being part of it on
+  // screen. Without it, clicking a property-name suggestion would close the panel out from under
+  // the pick instead of making it.
   // Modal mode closes via its backdrop instead (handled by App).
   useEffect(() => {
     if (!isSide) return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest?.(".folia-detail, .folia-card, .folia-menu, .folia-card-context")) return;
+      if (
+        t?.closest?.(
+          ".folia-detail, .folia-card, .folia-menu, .folia-card-context, .suggestion-container",
+        )
+      )
+        return;
       // Commit any in-progress edit before closing: blurring fires the focused field's onBlur,
       // which initiates its repo write synchronously — so clicking away saves instead of discarding.
       const ae = activeDocument.activeElement as HTMLElement | null;
@@ -1061,6 +1138,15 @@ export function CardDetail({
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
+      // While a suggestion popup is open the keystroke belongs to it, and the popup is Obsidian's:
+      // its own keymap listens on the document, BELOW this handler in the bubble path, so stopping
+      // propagation here is what would strand the popup open. Let this one through instead, and
+      // let the next Escape — with no popup left — close the panel. The flag is cleared rather
+      // than waited on, so a popup that went away without saying so cannot trap the panel.
+      if (suggestOpen.current) {
+        suggestOpen.current = false;
+        return;
+      }
       e.stopPropagation();
       onClose();
     }
@@ -1197,6 +1283,25 @@ export function CardDetail({
   // the note.
   const titleRowIsGeneric =
     TITLE_KEY in fm && (typeof fm[TITLE_KEY] !== "string" || fm[TITLE_KEY] === "");
+  // What the typed name is really about. A property name differing from an existing one only in
+  // case is the mistake this whole field exists to catch: YAML would keep both, and the board
+  // reads neither `Priority` nor a second `Area` — so a name that collides with a key the panel
+  // edits elsewhere, or with one the card already carries under another spelling, is refused here
+  // and told why rather than left as a dead button. Typing a key the card already has, spelled
+  // exactly as it has it, still writes it: that overwrites the row above, which is what it looks
+  // like it does.
+  const typedKey = newProp.key.trim();
+  const sameName = (key: string) => key.toLowerCase() === typedKey.toLowerCase();
+  const ownField = typedKey === "" ? undefined : [...editedKeys].find(sameName);
+  const alreadyHere = typedKey === "" ? undefined : Object.keys(fm).find(sameName);
+  const refuseKey =
+    ownField !== undefined || (alreadyHere !== undefined && alreadyHere !== typedKey);
+  const ownFieldHint =
+    ownField !== undefined
+      ? `“${ownField}” has a field of its own in this panel, so it is not added as a property here.`
+      : refuseKey
+        ? `This card already has “${alreadyHere}”, so “${typedKey}” would be a second property the board ignores.`
+        : null;
   const extraProps = Object.entries(fm).filter(
     ([k, v]) =>
       (!editedKeys.has(k) || (k === TITLE_KEY && titleRowIsGeneric)) &&
@@ -1366,10 +1471,12 @@ export function CardDetail({
           ))}
           <div className="folia-prop-add">
             <input
+              ref={propKeyRef}
               className="folia-prop-input"
               value={newProp.key}
               placeholder="property"
               aria-label="New property name"
+              aria-describedby={ownFieldHint ? ownFieldHintId : undefined}
               onChange={(e) => setNewProp({ ...newProp, key: e.target.value })}
             />
             <input
@@ -1382,10 +1489,10 @@ export function CardDetail({
             <button
               className="folia-btn"
               aria-label="Add property"
-              disabled={!newProp.key.trim() || editedKeys.has(newProp.key.trim())}
+              disabled={!typedKey || refuseKey}
               onClick={() => {
-                const key = newProp.key.trim();
-                if (!key || editedKeys.has(key)) return;
+                const key = typedKey;
+                if (!key || refuseKey) return;
                 const val = newProp.val;
                 setNewProp({ key: "", val: "" });
                 void mutate(() => repo.setFrontmatter(path, { [key]: val })).then((ok) => {
@@ -1398,6 +1505,11 @@ export function CardDetail({
               Add
             </button>
           </div>
+          {ownFieldHint && (
+            <p className="folia-prop-hint" id={ownFieldHintId}>
+              {ownFieldHint}
+            </p>
+          )}
         </div>
 
         <section className="folia-section">

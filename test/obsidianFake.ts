@@ -102,6 +102,46 @@ export const MarkdownRenderer = {
   },
 };
 
+/**
+ * Obsidian's type-ahead, as much of it as a test can hold: the popup, its keyboard scope and its
+ * placement are the real thing's and have no stand-in here. What a test CAN ask is what the
+ * suggester would offer for a query and what happens when one is picked, which is the whole of
+ * what the plugin decides — see `suggestionsFor` and `selectSuggestion`.
+ */
+export abstract class AbstractInputSuggest<T> {
+  /** Every suggester ever attached, so a test can catch a second one binding to the same input. */
+  static readonly instances: AbstractInputSuggest<unknown>[] = [];
+  limit = 100;
+
+  constructor(
+    readonly app: unknown,
+    readonly textInputEl: HTMLInputElement,
+  ) {
+    AbstractInputSuggest.instances.push(this as AbstractInputSuggest<unknown>);
+  }
+
+  protected abstract getSuggestions(query: string): T[] | Promise<T[]>;
+  abstract renderSuggestion(value: T, el: HTMLElement): void;
+  abstract selectSuggestion(value: T, evt: MouseEvent | KeyboardEvent): void;
+
+  /** What the popup would show for what has been typed so far. */
+  suggestionsFor(query: string): T[] | Promise<T[]> {
+    return this.getSuggestions(query);
+  }
+
+  open(): void {}
+  close(): void {}
+  setValue(value: string): void {
+    this.textInputEl.value = value;
+  }
+  getValue(): string {
+    return this.textInputEl.value;
+  }
+  onSelect(): this {
+    return this;
+  }
+}
+
 export interface EventRef {
   name: string;
   fn: (...args: never[]) => void;

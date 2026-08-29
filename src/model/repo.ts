@@ -12,6 +12,31 @@ import type {
 } from "./types";
 import type { CardMutation } from "./board";
 import type { FileOp } from "./pathOps";
+import type { PropertySuggestion } from "./properties";
+
+/** Frontmatter keys already in use, split by where the notes carrying them live. */
+export interface PropertyNamesInUse {
+  /** Keys used by notes inside this board's card folder, alphabetically. */
+  inCardFolder: string[];
+  /** Keys used anywhere else in the vault, alphabetically, minus the ones above. */
+  elsewhere: string[];
+}
+
+/**
+ * What a suggesting input offers and what it does with the answer. The host owns the popup; this
+ * owns the words in it, so the ordering rules stay in the model where they can be tested.
+ */
+export interface PropertySuggestSource {
+  /** The suggestions for what has been typed so far, in the order they should be shown. */
+  suggestions(query: string): readonly PropertySuggestion[];
+  /** The user picked one, by pointer or by keyboard. */
+  onPick(key: string): void;
+  /**
+   * The popup opened or closed. The panel needs to know because Escape means two different things
+   * depending on it: dismiss the suggestions, or close the panel.
+   */
+  onOpenChange(open: boolean): void;
+}
 
 export interface CardRepository {
   /**
@@ -116,6 +141,26 @@ export interface CardRepository {
    * Returns a cleanup function the caller runs on unmount / before re-rendering.
    */
   renderMarkdown(el: HTMLElement, markdown: string, sourcePath: string): () => void;
+
+  /**
+   * The frontmatter keys notes already use, read from the host's metadata index rather than by
+   * parsing files here, split by whether the note lives in this board's card folder. Only the
+   * adapter knows where that folder resolves to, which is why the split is made there and not by
+   * the caller. Keys the board note itself carries are left out: they configure the board, and a
+   * card is not a board.
+   *
+   * Read when the detail panel opens, not per keystroke — a large vault has thousands of notes,
+   * and the answer only moves when notes do, which is also when the board reloads.
+   */
+  propertyNamesInUse(): Promise<PropertyNamesInUse>;
+
+  /**
+   * Attach the host's own type-ahead to a text input (Obsidian's `AbstractInputSuggest` in the
+   * vault adapter; nothing at all in tests, which have no popup to show). `source` stays live for
+   * as long as the attachment does, so the caller feeds fresh suggestions through it instead of
+   * re-attaching. Returns a cleanup function the caller runs on unmount.
+   */
+  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void;
 
   /** Subscribe to external changes; returns an unsubscribe function. */
   onChange(cb: () => void): () => void;

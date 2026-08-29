@@ -3,6 +3,7 @@
 // only; resolving a target to a card on the board happens in `buildBoard`, the one place that
 // already knows how a `[[wikilink]]` binds.
 
+import { FOLIA_CARD_KEYS } from "./properties";
 import { RelationTypeEntrySchema } from "./schemas";
 import type { RelationType, RelationTypeDef } from "./types";
 
@@ -22,20 +23,10 @@ export const BLOCKS: RelationTypeDef = {
 /**
  * Card frontmatter keys the plugin already reads or writes with a meaning of their own, so a type
  * cannot take them over. Any other key is the user's to declare — and declaring one does turn
- * whatever that key already holds into links, which the README says in as many words.
+ * whatever that key already holds into links, which the README says in as many words. The list
+ * itself lives in `properties.ts`, the one place that says what keys Folia Kanban knows.
  */
-const RESERVED_KEYS = new Set([
-  "status",
-  "order",
-  "priority",
-  "area",
-  "due",
-  "tags",
-  "title",
-  "context",
-  "type",
-  "created",
-]);
+const RESERVED_KEYS = new Set<string>(FOLIA_CARD_KEYS);
 
 /** How a frontmatter key reads as a heading: `a-result-of` → `A result of`. */
 export function relationLabel(key: string): string {

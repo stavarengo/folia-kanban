@@ -19,6 +19,9 @@ import type {
   RelationType,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
+import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
+import { isBoardFrontmatter } from "../viewMode";
+import { attachPropertySuggest } from "./propertySuggest";
 import { buildBoard, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
 import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
@@ -143,6 +146,12 @@ export class VaultRepository implements CardRepository {
   }
 
   /** Pick the vault path a `card-folder` property names, against the vault as it is right now. */
+  /**
+   * What {@link propertyNamesInUse} last answered, kept for as long as the board it belongs to is
+   * unchanged (see `loadBoard`). Without it, every card opened would walk the whole vault again.
+   */
+  private propertyNames: PropertyNamesInUse | null = null;
+
   private cardFolderFor(raw: string): { path: string; existing: string[] } {
     // `normalizePath` only tidies separators (it leaves `.` and `..` alone and turns an empty
     // value into "/"), so the `.`/`..` resolution and the two readings live in the pure helper.
@@ -193,6 +202,10 @@ export class VaultRepository implements CardRepository {
   }
 
   async loadBoard(): Promise<Board> {
+    // Every load follows something changing in the vault, which is also when the keys its notes use
+    // can have changed. Dropping the memo here is what keeps the panel's suggestions current
+    // without re-walking the vault each time a card is opened.
+    this.propertyNames = null;
     const config = await this.readConfig();
     const folderPath = config.cardFolder;
     // A card folder that isn't there matches zero files, which looks exactly like an empty
@@ -668,6 +681,48 @@ export class VaultRepository implements CardRepository {
       c.unload();
       el.innerHTML = "";
     };
+  }
+
+  /**
+   * Every frontmatter key the vault's notes already carry, from the metadata index — Obsidian has
+   * parsed every note once already, so parsing them again here would be both slower and a second
+   * reading of the same bytes. Split at this board's card folder, since only this class knows
+   * where that folder resolved to.
+   *
+   * Only notes that could be cards are read. EVERY board note is skipped, not only this board's,
+   * and so is every `_context.md`: their keys (`folia-board`, `columns`, `context-name`, …)
+   * configure a board or a folder and mean nothing on a card, so offering them on a card is
+   * offering a mistake — and a vault holding several boards would otherwise hand each one's
+   * configuration to the others as vault-wide vocabulary. It is the same "this is not a card"
+   * rule `loadBoard` applies when it picks the notes to draw.
+   */
+  async propertyNamesInUse(): Promise<PropertyNamesInUse> {
+    if (this.propertyNames) return this.propertyNames;
+    const config = await this.readConfig();
+    const prefix = config.cardFolder + "/";
+    const inCardFolder = new Set<string>();
+    const elsewhere = new Set<string>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (file.path === this.boardPath || file.name === CONTEXT_NOTE) continue;
+      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!fm || isBoardFrontmatter(fm)) continue;
+      const into = file.path.startsWith(prefix) ? inCardFolder : elsewhere;
+      for (const key of Object.keys(fm)) into.add(key);
+    }
+    const sorted = (keys: Set<string>): string[] => [...keys].sort((a, b) => a.localeCompare(b));
+    // A key used both inside and outside the folder belongs to the board: it is the nearer answer,
+    // and a name must never be offered twice. Matched without regard to case, since `Energy` and
+    // `energy` are the same answer to "what do notes here call this".
+    const near = new Set([...inCardFolder].map((k) => k.toLowerCase()));
+    this.propertyNames = {
+      inCardFolder: sorted(inCardFolder),
+      elsewhere: sorted(elsewhere).filter((k) => !near.has(k.toLowerCase())),
+    };
+    return this.propertyNames;
+  }
+
+  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void {
+    return attachPropertySuggest(this.app, input, source);
   }
 
   absolutePath(path: string): string | null {

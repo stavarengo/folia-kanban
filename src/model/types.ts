@@ -1,6 +1,7 @@
 // Domain types for the Folia Kanban model. Everything here is plain data so the
 // model layer stays pure and unit-testable with no Obsidian dependency.
 
+import type { FoliaPropertyKey } from "./properties";
 import type { CommentMark } from "./unread";
 
 /** The board-level `card-title` property. `auto` = guess per card from the file name's shape. */
@@ -15,15 +16,35 @@ export type TitleMode = "auto" | "filename" | "heading";
  */
 export type TitleSource = "filename" | "heading" | "frontmatter" | "subtask";
 
-export interface CardFrontmatter {
+/**
+ * The card keys this type spells out. Split from `CardFrontmatter` because the index signature
+ * below swallows `keyof`, and without it there is nothing for the compiler to check the names
+ * against — a typed field here that `properties.ts` does not declare is exactly the drift the
+ * check under this block catches.
+ */
+interface TypedCardFrontmatter {
   status?: string;
   /** Position within its column / parent. Fractional ranks allow single-card moves. */
   order?: number;
   priority?: string;
   area?: string;
   due?: string;
+}
+
+export interface CardFrontmatter extends TypedCardFrontmatter {
   [key: string]: unknown;
 }
+
+/**
+ * Every field typed above is a key Folia Kanban declares in `properties.ts`. Naming one this
+ * type spells out but that list does not know is a compile error here rather than a key the
+ * panel, the relationship parser and the MCP tools each judge differently.
+ */
+const undeclaredTypedKey: never = undefined as unknown as Exclude<
+  keyof TypedCardFrontmatter,
+  FoliaPropertyKey
+>;
+void undeclaredTypedKey;
 
 type SubItemKind = "todo" | "card";
 

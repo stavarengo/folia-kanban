@@ -2,7 +2,7 @@
 // the real adapter treats them) and runs the REAL model functions on the body, so UI tests
 // exercise genuine parse/mutate logic without Obsidian.
 
-import type { CardRepository } from "../src/model/repo";
+import type { CardRepository, PropertyNamesInUse, PropertySuggestSource } from "../src/model/repo";
 import type { FileOp } from "../src/model/pathOps";
 import type {
   Board,
@@ -394,6 +394,34 @@ export class FakeRepo implements CardRepository {
 
   async openCard(path: string): Promise<void> {
     this.opened.push(path);
+  }
+
+  /**
+   * What the vault's notes already use. Free for a test to set; the real adapter reads it from
+   * Obsidian's metadata index.
+   */
+  propertyNames: PropertyNamesInUse = { inCardFolder: [], elsewhere: [] };
+  /** The suggester the panel attached, so a test can ask it what it would offer and pick one. */
+  attachedSuggest: { input: HTMLInputElement; source: PropertySuggestSource } | null = null;
+
+  /** Set by a test that wants the vault to refuse the question. */
+  propertyNamesFails = false;
+
+  /** How many times the panel asked what the vault uses. */
+  propertyNamesAsked = 0;
+
+  propertyNamesInUse(): Promise<PropertyNamesInUse> {
+    this.propertyNamesAsked++;
+    return this.propertyNamesFails
+      ? Promise.reject(new Error("no metadata"))
+      : Promise.resolve(this.propertyNames);
+  }
+
+  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void {
+    this.attachedSuggest = { input, source };
+    return () => {
+      if (this.attachedSuggest?.source === source) this.attachedSuggest = null;
+    };
   }
 
   renderMarkdown(el: HTMLElement, markdown: string): () => void {
