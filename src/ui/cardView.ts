@@ -184,7 +184,11 @@ export function toggleAssignee(names: readonly string[], me: string): string | s
   const rest = names.filter((name) => !sameAssignee(name, me));
   const next = rest.length === names.length ? [...names, me.trim()] : rest;
   if (next.length === 0) return null;
-  return next.length === 1 ? (next[0] as string) : next;
+  // A card that already named more than one person keeps its list even when leaving it empties down
+  // to one name. Collapsing that to a scalar would rewrite the shape somebody else authored, which
+  // is the one thing these two buttons promise not to do; a first assignment, where there was no
+  // list to preserve, is written as the plain string the field would have written.
+  return next.length === 1 && names.length <= 1 ? (next[0] as string) : next;
 }
 
 /**
@@ -287,9 +291,9 @@ export interface BoardFilters {
 // (#9) and area-scoped / auto-populated columns (#1).
 //
 // A query is a space-separated list of terms. A term is either a `key:value` token
-// (area:, status:, priority:, tag:, due:, context:, is:, unread:) or free text. Free text is matched
-// case-insensitively against a card's title + basename + priority + tags (a Card has no body
-// text at board level, so "free text" means title/priority/tags). Use "double quotes"
+// (area:, status:, priority:, tag:, due:, context:, assignee:, is:, unread:) or free text. Free text
+// is matched case-insensitively against a card's title + basename + priority + tags + assignees (a
+// Card has no body text at board level). Use "double quotes"
 // to allow spaces in a value or a free-text phrase. All terms AND together; an empty
 // query matches every card. The grammar never throws — unknown keys fall back to free text.
 // ---------------------------------------------------------------------------
@@ -409,7 +413,7 @@ export function isEmptyFilter(f: Filter): boolean {
   return f.text.length === 0 && f.tokens.length === 0;
 }
 
-/** Lower-cased free-text haystack: title + basename + priority + tags (area + tags). */
+/** Lower-cased free-text haystack: title + basename + priority + tags (area + tags) + assignees. */
 function freeTextHaystack(card: Card): string {
   return [
     card.title,

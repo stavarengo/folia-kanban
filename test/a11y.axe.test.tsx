@@ -6,7 +6,7 @@
 // rule disabled here. Everything else (landmarks, roles, prohibited attrs, names, ...) is enforced.
 
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { App } from "../src/ui/App";
@@ -62,6 +62,35 @@ const summarize = (violations: Awaited<ReturnType<typeof axe>>["violations"]) =>
   }));
 
 describe("a11y axe gate (no violations)", () => {
+  /**
+   * A board someone has told their name to, with a card already assigned. Without both, axe only
+   * ever audits the half of the assignment UI where the button is absent — the "Assign to me"
+   * control and the assignee chip on a tile would never be looked at.
+   */
+  const assignedRepo = () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = ["alex", "Rafa"];
+    return repo;
+  };
+  const NAMED = { ...DEFAULT_SETTINGS, userName: "Rafa" };
+
+  it("board view with an assigned card has no axe violations", async () => {
+    render_(assignedRepo(), NAMED);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
+
+  it("the assign controls in an open panel have no axe violations", async () => {
+    const user = userEvent.setup();
+    render_(assignedRepo(), NAMED);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByRole("button", { name: "Unassign me" });
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
+
   it("board view (columns + cards) has no axe violations", async () => {
     render_(makeRepo());
     // "Alpha" also appears on each placed subitem's `↳ parent` button, so anchor on the card title.

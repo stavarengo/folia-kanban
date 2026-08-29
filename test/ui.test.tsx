@@ -4850,13 +4850,21 @@ describe("assigning a card (20260827.03)", () => {
     );
   });
 
-  it("collapses a one-name list back to a plain string, and an empty one to no key at all", async () => {
+  it("keeps a list a list when leaving it, and removes the key when it empties", async () => {
     const repo = makeRepo();
     repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = ["alex", "Rafa"];
+    repo.files.get("Tasks/Gamma.md")!.fm["assignee"] = ["Rafa"];
     const { user, detail } = await openPanel(repo, named("Rafa"));
 
+    // A shape somebody else authored stays the shape they authored, even down to one name.
     await user.click(within(detail).getByRole("button", { name: "Unassign me" }));
-    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("alex"));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual(["alex"]));
+
+    // And a list that empties leaves no key behind, rather than an empty one.
+    await user.click(await screen.findByText("Gamma"));
+    const gamma = await screen.findByTestId("card-detail");
+    await user.click(await within(gamma).findByRole("button", { name: "Unassign me" }));
+    await waitFor(() => expect("assignee" in repo.files.get("Tasks/Gamma.md")!.fm).toBe(false));
   });
 
   it("does not let a half-typed name race the button pressed instead of it", async () => {

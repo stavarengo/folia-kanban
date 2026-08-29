@@ -482,21 +482,19 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           };
         }),
       setPriority: (path, value) => setPriorityAndReload(path, value),
-      setAssignee: (path, value) => {
-        void (async () => {
-          const next = typeof value === "string" ? value.trim() : value;
-          try {
-            // Nobody removes the key rather than leaving `assignee:` sitting there empty — an
-            // unassigned card should read as one in its note too, and `assignee:none` finds it
-            // either way.
-            if (next === null || next === "") await repo.unsetFrontmatterKey(path, "assignee");
-            else await repo.setFrontmatter(path, { assignee: next });
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
+      setAssignee: async (path, value) => {
+        const next = typeof value === "string" ? value.trim() : value;
+        try {
+          // Nobody removes the key rather than leaving `assignee:` sitting there empty — an
+          // unassigned card should read as one in its note too, and `assignee:none` finds it
+          // either way.
+          if (next === null || next === "") await repo.unsetFrontmatterKey(path, "assignee");
+          else await repo.setFrontmatter(path, { assignee: next });
+        } catch (e) {
+          reportError(e);
+        } finally {
+          await load();
+        }
       },
       renameCard: (path, title) => {
         const t = title.trim();
