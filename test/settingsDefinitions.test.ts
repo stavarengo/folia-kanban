@@ -10,9 +10,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  CARD_NEXT_TODOS_MAX,
   MCP_BIND_ADDRESS_INVALID,
   MCP_PORT_INVALID,
+  heldFieldOutcome,
+  settingDefinitions,
+  settingsPatchFor,
+  type HeldFieldKey,
+} from "../src/settingsDefinitions";
+import {
+  CARD_NEXT_TODOS_MAX,
+  DEPENDENT_SETTING_KEYS,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_CONTROLS,
@@ -21,13 +28,9 @@ import {
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
   USER_NAME_PLACEHOLDER,
-  heldFieldOutcome,
   isRowDisabled,
-  settingDefinitions,
-  settingsPatchFor,
   type EditableSettingKey,
-  type HeldFieldKey,
-} from "../src/settingsDefinitions";
+} from "../src/settingsLayout";
 import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
@@ -180,12 +183,19 @@ describe("settingDefinitions", () => {
   // or not the row is live, because a description Obsidian fixes at render time cannot appear only
   // when the dependency is unmet.
   it("says in words what every dependent row waits for", () => {
+    // Iterated, not listed: a row gated later must earn its explanation too, and a hand-written
+    // list is exactly how the two agent-access fields came to be greyed with nothing saying why.
+    for (const key of DEPENDENT_SETTING_KEYS)
+      expect(SETTING_COPY[key].desc, key).toMatch(/\bOnly used\b/);
     expect(SETTING_COPY.sidePanelMode.desc).toContain(
       "Only used when details open in the side panel",
     );
     expect(SETTING_COPY.addCardOpenMode.desc).toContain(
       "Only used by the two flows that open them",
     );
+    // The token rows are gated the same way without being settings, so they are named here.
+    for (const copy of [MCP_TOKEN_COPY, MCP_TOKEN_REGENERATE])
+      expect(copy.desc, copy.name).toContain("until agent access is on");
   });
 
   // Both tabs ask this one question, so a row cannot be live on one path and greyed on the other.
@@ -480,6 +490,15 @@ describe("agent access on a platform that cannot host it", () => {
     return found.groupShown && truth("visible" in found.row ? found.row.visible : undefined);
   };
 
+  /** A row's own flag, ignoring its group's. Obsidian documents only this one as also taking the
+   *  row out of the settings search, which is the difference between a row a phone cannot see and
+   *  one a phone can still find, tap, and use to mint a token for a server it cannot host. */
+  const rowsOwnVisible = (found: ReturnType<typeof named>): boolean | undefined => {
+    if (!found || !("visible" in found.row)) return undefined;
+    const { visible } = found.row;
+    return typeof visible === "function" ? visible() : visible;
+  };
+
   // Toggling it on used to persist the setting and mint a token for a server the phone can never
   // run, and say nothing about it. Now the three rows simply are not there.
   it("hides every agent-access row on mobile and shows them on desktop", () => {
@@ -493,6 +512,24 @@ describe("agent access on a platform that cannot host it", () => {
       expect(visibleOf(named(false, name)), `${name} on mobile`).toBe(false);
       expect(visibleOf(named(true, name)), `${name} on desktop`).toBe(true);
     }
+  });
+
+  // The group's own `visible` hides the heading and its rows, but Obsidian documents only a row's
+  // own `visible` as excluding it from the settings search too. Both are set, and this is the half
+  // a refactor to group-level visibility would quietly drop.
+  it("marks each agent-access row invisible in its own right, not only its group", () => {
+    for (const name of [
+      SETTING_COPY.mcpEnabled.name,
+      SETTING_COPY.mcpPort.name,
+      SETTING_COPY.mcpBindAddress.name,
+      MCP_TOKEN_COPY.name,
+      MCP_TOKEN_REGENERATE.name,
+    ]) {
+      expect(rowsOwnVisible(named(false, name)), `${name} on mobile`).toBe(false);
+      expect(rowsOwnVisible(named(true, name)), `${name} on desktop`).toBe(true);
+    }
+    // And nothing else carries a flag it does not need.
+    expect(rowsOwnVisible(named(false, SETTING_COPY.historyScope.name))).toBeUndefined();
   });
 
   it("leaves every other row alone on mobile", () => {
