@@ -123,7 +123,7 @@ Every card tile that has nested subitems — a next-todos preview, a group of su
 
 The toggle is per card, and it nests: collapsing a card also hides its subcards' own toggles (and their children), and a subcard keeps its own collapsed/expanded state when its parent is expanded again — so a big subtree can be folded down to just its top level. A column's **⋯** menu adds **Collapse all subitems** / **Expand all subitems**, which reaches every card currently shown in that column and its full nested subtree, not just the top level.
 
-Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems — default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again.
+Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again.
 
 ## Unread comments
 
@@ -208,7 +208,7 @@ The properties must be the **first** thing in the file — that is Obsidian's ru
 
 A board note is still a note, and sometimes you want to see the raw Markdown — to fix a `columns` entry by hand, say. The tab header carries one button for that: on the board it says **Edit as markdown**, in the editor it says **Open as Folia Kanban board**. It swaps the tab in place, keeping the same file and the same tab; unsaved edits are written out before the editor goes away. Neither direction is recorded in the navigation history, so **Back** still means the note you were on before, not the other rendering of this one.
 
-Which view a board note *starts* in is Settings → **Board notes — open as**. Any single note overrides it with `folia-view: board` or `folia-view: markdown` in its own frontmatter, so a vault-wide preference can coexist with one board you always want to hand-edit. Notes without `folia-board: true` are never touched by any of this: no button, no swap.
+Which view a board note *starts* in is Settings → **Open board notes as**. Any single note overrides it with `folia-view: board` or `folia-view: markdown` in its own frontmatter, so a vault-wide preference can coexist with one board you always want to hand-edit. Notes without `folia-board: true` are never touched by any of this: no button, no swap.
 
 A board wants width, so the sidebars are left out of all of this: a board note opened in the left or right dock stays Markdown there, and its button opens the board in a real tab rather than squeezing columns into a dock. Opening the board from the command or the ribbon skips sidebar tabs for the same reason.
 
@@ -266,23 +266,30 @@ The file name is still the card's identity: `[[wikilinks]]` between cards, and t
 
 ## Settings
 
-Under **Settings → Folia Kanban** (changes apply live, no reload):
+Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is a handful of headed sections, and a row that only applies under another setting says so in its own description and greys out until that setting says otherwise.
 
-- **Board notes — open as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
-- **Card details — presentation** — `side` (docked beside the board) or `modal` (centred dialog).
-- **Side panel — layout** — `split` (shrinks the columns to the left) or `float` (overlays the columns); used when presentation is `side`.
-- **Side panel — width** — the docked panel's width; you can also drag its left border.
-- **Add-card button — flow** — `inline` (add in the column), `inline-edit` (add, then open the new card's details), or `detail` (open a details form to create).
-- **Add-card — open new card's details as** — which presentation to use for the two detail-opening add flows.
-- **Card — next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
-- **Your name** — signs the comments you write from the board, and tells the board which comments are yours for [unread marking](#unread-comments). Empty (the default) writes them unsigned.
-- **Subitems — default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).
-- **History — what to record** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
-- **Board — horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
-- **Board setup — command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
-- **Board setup — file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
-- **Board setup — editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
-- **Agent access (MCP) — enable / port / token** — see [Agent access (MCP)](#agent-access-mcp).
+- **Boards and board notes**
+  - **Open board notes as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
+  - **Horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
+  - **Board setup in the command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
+  - **Board setup in the file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
+  - **Board setup in the editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
+- **Card details**
+  - **Show details in** — `side` (docked beside the board) or `modal` (centred dialog).
+  - **Side panel layout** — `split` (shrinks the columns to the left) or `float` (overlays the columns); used when details open in the side panel.
+  - **Side panel width** — the docked panel's width; you can also drag its left border. Used when details open in the side panel.
+- **Cards on the board**
+  - **Next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
+  - **Subitems default state** — `expanded` or `collapsed`: whether a card's nested subitems start open before it (or a column's collapse/expand-all) has been toggled at least once (see [Collapse/expand subitems](#collapseexpand-subitems)).
+- **Adding cards**
+  - **Add-card flow** — `inline` (add in the column), `inline-edit` (add, then open the new card's details), or `detail` (open a details form to create).
+  - **Open the new card's details in** — which presentation the two detail-opening add flows use.
+- **Comments and history**
+  - **Your name** — signs the comments you write from the board, and tells the board which comments are yours for [unread marking](#unread-comments). Empty (the default) writes them unsigned.
+  - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
+- **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp). Desktop only: the whole section is absent on mobile.
+
+The version the vault is running is the last row, below the sections.
 
 ## Agent access (MCP)
 

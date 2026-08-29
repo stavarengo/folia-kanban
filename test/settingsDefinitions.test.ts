@@ -1,4 +1,11 @@
-import type { Setting, SettingGroup } from "obsidian";
+import type {
+  Setting,
+  SettingDefinition,
+  SettingDefinitionGroup,
+  SettingDefinitionItem,
+  SettingGroup,
+  SettingGroupItem,
+} from "obsidian";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -9,11 +16,15 @@ import {
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_COPY,
+  SETTING_GROUPS,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
+  USER_NAME_PLACEHOLDER,
   heldFieldOutcome,
+  isRowDisabled,
   settingDefinitions,
   settingsPatchFor,
+  type EditableSettingKey,
   type HeldFieldKey,
 } from "../src/settingsDefinitions";
 import {
@@ -35,17 +46,54 @@ const definitions = settingDefinitions(
   true,
 );
 
+/**
+ * Every string, and every template literal, spelled out in `src/main.ts` — comments stripped first,
+ * so prose about a setting is not mistaken for the setting's own wording.
+ */
+const mainStringLiterals = (): string[] => {
+  const source = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  const literal = /"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
+  return [...source.matchAll(literal)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
+};
+
+const truth = (v: boolean | (() => boolean) | undefined): boolean =>
+  typeof v === "function" ? v() : (v ?? true);
+
+/** A headed section of the tab. */
+const isGroup = (item: SettingDefinitionItem): item is SettingDefinitionGroup =>
+  "type" in item && item.type === "group";
+
+/** A plain row, as opposed to the group that holds it or a sub-page (which this tab never makes). */
+const isRow = (item: SettingDefinitionItem | SettingGroupItem): item is SettingDefinition =>
+  !("type" in item);
+
+/**
+ * Every row of the tab, in the order it renders them, each carrying the heading it sits under and
+ * whether that whole group is shown. The tab is a list of groups now, so anything asking "is this
+ * row there, and is it live" has to walk into them.
+ */
+const rowsOf = (
+  items: SettingDefinitionItem[],
+): { row: SettingDefinition; heading: string | null; groupShown: boolean }[] =>
+  items.flatMap((item) => {
+    if (!isGroup(item)) return isRow(item) ? [{ row: item, heading: null, groupShown: true }] : [];
+    const groupShown = truth(item.visible);
+    const heading = item.heading ?? null;
+    return (item.items ?? []).filter(isRow).map((row) => ({ row, heading, groupShown }));
+  });
+
+const rows = rowsOf(definitions).map((r) => r.row);
+
 /** The keys of every `control` row of the declarative tab, in the order it renders them. */
-const controlKeys = definitions.flatMap((d) =>
-  "control" in d && d.control ? [d.control.key] : [],
-);
+const controlKeys = rows.flatMap((d) => ("control" in d && d.control ? [d.control.key] : []));
 
 /** The port and the bind address are not controls: they draw themselves, because Obsidian's
  *  declarative controls write on every keystroke and offer no blur to hold that back. */
 const HELD_KEYS = ["mcpPort", "mcpBindAddress"] as const satisfies readonly HeldFieldKey[];
 
-const heldRow = (key: HeldFieldKey) =>
-  definitions.find((d) => "name" in d && d.name === SETTING_COPY[key].name);
+const heldRow = (key: HeldFieldKey) => rows.find((d) => d.name === SETTING_COPY[key].name);
 
 /** Every setting the tab offers, however the row that offers it is built. */
 const editableKeys = [...controlKeys, ...HELD_KEYS];
@@ -58,8 +106,8 @@ describe("settingDefinitions", () => {
 
   it("takes its wording from the shared copy", () => {
     for (const [key, copy] of Object.entries(SETTING_COPY)) {
-      const def = definitions.find(
-        (d) => ("control" in d && d.control?.key === key) || ("name" in d && d.name === copy.name),
+      const def = rows.find(
+        (d) => ("control" in d && d.control?.key === key) || d.name === copy.name,
       );
       expect(def).toMatchObject({ name: copy.name, desc: copy.desc });
     }
@@ -67,28 +115,100 @@ describe("settingDefinitions", () => {
 
   // The other rendering of the tab lives in src/main.ts, which cannot be imported here (it pulls in
   // the obsidian runtime, which only exists inside the app). Reading it as text is what is left: a
-  // name or description spelled out there again is a second source of truth, and the two would
-  // drift the first time one of them is reworded.
-  it("is the only place the imperative tab can get a setting's wording from", () => {
-    const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
-    for (const copy of [...Object.values(SETTING_COPY), MCP_TOKEN_COPY]) {
-      expect(main).not.toContain(JSON.stringify(copy.name).slice(1, -1));
-      expect(main).not.toContain(JSON.stringify(copy.desc).slice(1, -1));
-    }
+  // name, description or heading spelled out there again is a second source of truth, and the two
+  // would drift the first time one of them is reworded. What is read is every string literal that
+  // file holds, with its comments taken out first — wording duplicated for real is always a
+  // literal, while a whole-file search would trip over any word that also lives in an identifier.
+  it("is the only place the imperative tab can get the tab's wording from", () => {
+    const literals = mainStringLiterals();
+    const wording = [
+      ...SETTING_GROUPS.map((g) => g.heading),
+      ...Object.values(SETTING_COPY).flatMap((c) => [c.name, c.desc]),
+      ...[MCP_TOKEN_COPY, MCP_TOKEN_REGENERATE].flatMap((c) => [c.name, c.desc, c.button]),
+    ];
+    for (const text of wording)
+      expect(
+        literals.filter((l) => l.includes(text)),
+        text,
+      ).toEqual([]);
   });
 
   it("reports the version it is given", () => {
     expect(definitions.at(-1)).toMatchObject({ name: "Version", desc: "1.2.3" });
   });
 
+  // The tab used to be one flat list of fourteen rows whose only grouping was a naming convention
+  // inside the row names ("Side panel — ..."). The groups are the structure now, and this is what
+  // stops a row from being added to the copy and forgotten by the layout, or listed twice.
+  it("lays the tab out as the groups it declares, with every setting under exactly one heading", () => {
+    expect(definitions.filter(isGroup).map((g) => g.heading)).toEqual(
+      SETTING_GROUPS.map((g) => g.heading),
+    );
+    const laidOut = SETTING_GROUPS.flatMap((g) => [...g.keys]);
+    expect(new Set(laidOut)).toEqual(new Set(Object.keys(SETTING_COPY)));
+    expect(laidOut).toHaveLength(new Set(laidOut).size);
+  });
+
+  // A short name reads better under a heading but takes words with it: "Side panel layout" no
+  // longer contains "card details", and Obsidian does not index the heading above it. Every row
+  // carries its own heading as a search term so a search that used to land on it still does.
+  it("gives every row the heading it sits under as a search term", () => {
+    for (const { row, heading } of rowsOf(definitions)) {
+      if (heading === null) continue;
+      expect(row.aliases ?? [], row.name).toContain(heading);
+    }
+  });
+
+  it("keeps the name field's placeholder on the row that asks for a name", () => {
+    const control = rows.find((d) => "control" in d && d.control?.key === "userName")?.control;
+    expect(control && "placeholder" in control ? control.placeholder : null).toBe(
+      USER_NAME_PLACEHOLDER,
+    );
+  });
+
+  // Greying a row without saying why is what made the old tab hard to read. The words stay whether
+  // or not the row is live, because a description Obsidian fixes at render time cannot appear only
+  // when the dependency is unmet.
+  it("says in words what every dependent row waits for", () => {
+    for (const key of ["sidePanelMode", "detailWidth"] as const)
+      expect(SETTING_COPY[key].desc, key).toContain(
+        "Only used when details open in the side panel",
+      );
+    expect(SETTING_COPY.addCardOpenMode.desc).toContain(
+      "Only used by the two flows that open them",
+    );
+  });
+
+  // Both tabs ask this one question, so a row cannot be live on one path and greyed on the other.
+  it("reads a row's dependency the same way for whichever tab is asking", () => {
+    const modal: KanbanSettings = { ...DEFAULT_SETTINGS, detailPresentation: "modal" };
+    const side: KanbanSettings = { ...DEFAULT_SETTINGS, detailPresentation: "side" };
+    for (const key of ["sidePanelMode", "detailWidth"] as const) {
+      expect(isRowDisabled(key, modal), key).toBe(true);
+      expect(isRowDisabled(key, side), key).toBe(false);
+    }
+    expect(isRowDisabled("addCardOpenMode", { ...DEFAULT_SETTINGS, addCardFlow: "inline" })).toBe(
+      true,
+    );
+    expect(isRowDisabled("mcpPort", DEFAULT_SETTINGS)).toBe(true);
+    expect(isRowDisabled("mcpPort", { ...DEFAULT_SETTINGS, mcpEnabled: true })).toBe(false);
+    // A row nothing gates is never greyed, whatever the settings say.
+    const ungated: EditableSettingKey[] = ["boardNoteDefaultView", "userName", "historyScope"];
+    for (const key of ungated) expect(isRowDisabled(key, modal), key).toBe(false);
+  });
+
   it("disables the rows that depend on another setting only while that setting says so", () => {
     const disabledOf = (key: string, settings: KanbanSettings): boolean => {
-      const def = settingDefinitions(
-        () => settings,
-        "1.2.3",
-        { copy: noop, regenerate: noop, renderHeldField: noop },
-        true,
-      ).find((d) => "control" in d && d.control?.key === key);
+      const def = rowsOf(
+        settingDefinitions(
+          () => settings,
+          "1.2.3",
+          { copy: noop, regenerate: noop, renderHeldField: noop },
+          true,
+        ),
+      )
+        .map((r) => r.row)
+        .find((d) => "control" in d && d.control?.key === key);
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
       // for the wrong reason: no definition found, so nothing to be disabled.
       if (!def || !("control" in def) || !def.control) throw new Error(`no control for ${key}`);
@@ -106,6 +226,14 @@ describe("settingDefinitions", () => {
       true,
     );
     expect(disabledOf("addCardOpenMode", { ...DEFAULT_SETTINGS, addCardFlow: "detail" })).toBe(
+      false,
+    );
+    // The width slider moves the side panel and nothing else, so a modal presentation leaves it
+    // just as inert as the layout dropdown above it.
+    expect(disabledOf("detailWidth", { ...DEFAULT_SETTINGS, detailPresentation: "modal" })).toBe(
+      true,
+    );
+    expect(disabledOf("detailWidth", { ...DEFAULT_SETTINGS, detailPresentation: "side" })).toBe(
       false,
     );
   });
@@ -214,7 +342,7 @@ describe("settingsPatchFor", () => {
 
   it("hands the row it is asked to draw to the tab, with the key it belongs to", () => {
     const drawn: HeldFieldKey[] = [];
-    const rows = settingDefinitions(
+    const defs = settingDefinitions(
       () => DEFAULT_SETTINGS,
       "1.2.3",
       {
@@ -225,7 +353,9 @@ describe("settingsPatchFor", () => {
       true,
     );
     for (const key of HELD_KEYS) {
-      const row = rows.find((d) => "name" in d && d.name === SETTING_COPY[key].name);
+      const row = rowsOf(defs)
+        .map((r) => r.row)
+        .find((d) => d.name === SETTING_COPY[key].name);
       // The row hands both straight on and reads neither, so nothing has to stand in for them.
       if (row && "render" in row) row.render({} as Setting, {} as SettingGroup);
     }
@@ -317,21 +447,24 @@ describe("settingsPatchFor", () => {
 });
 
 describe("agent access on a platform that cannot host it", () => {
-  const rows = (desktop: boolean) =>
-    settingDefinitions(
-      () => DEFAULT_SETTINGS,
-      "1.2.3",
-      { copy: noop, regenerate: noop, renderHeldField: noop },
-      desktop,
+  const tabRows = (desktop: boolean) =>
+    rowsOf(
+      settingDefinitions(
+        () => DEFAULT_SETTINGS,
+        "1.2.3",
+        { copy: noop, regenerate: noop, renderHeldField: noop },
+        desktop,
+      ),
     );
 
   const named = (desktop: boolean, name: string) =>
-    rows(desktop).find((d) => "name" in d && d.name === name);
+    tabRows(desktop).find((r) => r.row.name === name);
 
-  const visibleOf = (item: ReturnType<typeof named>): boolean => {
-    if (!item || !("visible" in item)) return true;
-    const { visible } = item;
-    return typeof visible === "function" ? visible() : (visible ?? true);
+  /** A row is shown only if its group is: hiding the group is what takes the agent-access rows off
+   *  a platform that cannot host a server, heading and all. */
+  const visibleOf = (found: ReturnType<typeof named>): boolean => {
+    if (!found) return false;
+    return found.groupShown && truth("visible" in found.row ? found.row.visible : undefined);
   };
 
   // Toggling it on used to persist the setting and mint a token for a server the phone can never
@@ -356,34 +489,38 @@ describe("agent access on a platform that cannot host it", () => {
   // A token that cannot be replaced is a password only until it leaks. The row is there, and it is
   // dead until there is a token to replace.
   it("offers replacing the token, disabled until agent access is on", () => {
-    const row = named(true, MCP_TOKEN_REGENERATE.name);
-    expect(row).toBeDefined();
-    const disabled = row && "disabled" in row ? row.disabled : undefined;
+    const found = named(true, MCP_TOKEN_REGENERATE.name);
+    expect(found).toBeDefined();
+    const disabled = found && "disabled" in found.row ? found.row.disabled : undefined;
     expect(typeof disabled === "function" ? disabled() : false).toBe(true);
-    const on = settingDefinitions(
-      () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
-      "1.2.3",
-      { copy: noop, regenerate: noop, renderHeldField: noop },
-      true,
-    ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
+    const on = rowsOf(
+      settingDefinitions(
+        () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
+        "1.2.3",
+        { copy: noop, regenerate: noop, renderHeldField: noop },
+        true,
+      ),
+    ).find((r) => r.row.name === MCP_TOKEN_REGENERATE.name)?.row;
     const onDisabled = on && "disabled" in on ? on.disabled : undefined;
     expect(typeof onDisabled === "function" ? onDisabled() : false).toBe(false);
   });
 
   it("runs the action it was given", () => {
     let called = 0;
-    const row = settingDefinitions(
-      () => DEFAULT_SETTINGS,
-      "1.2.3",
-      {
-        copy: noop,
-        regenerate: () => {
-          called += 1;
+    const row = rowsOf(
+      settingDefinitions(
+        () => DEFAULT_SETTINGS,
+        "1.2.3",
+        {
+          copy: noop,
+          regenerate: () => {
+            called += 1;
+          },
+          renderHeldField: noop,
         },
-        renderHeldField: noop,
-      },
-      true,
-    ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
+        true,
+      ),
+    ).find((r) => r.row.name === MCP_TOKEN_REGENERATE.name)?.row;
     const action = row && "action" in row ? row.action : undefined;
     // Obsidian hands the row element and its index; neither is read here.
     action?.(document.createElement("div"), 0);

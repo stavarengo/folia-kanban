@@ -25,8 +25,6 @@ import { remapPath } from "./model/pathOps";
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
 import {
   DEFAULT_SETTINGS,
-  DETAIL_WIDTH_MAX,
-  DETAIL_WIDTH_MIN,
   hydrateSettings,
   mcpTokenPatch,
   migratePathKeyedSettings,
@@ -38,17 +36,18 @@ import {
   type StoredSettings,
 } from "./settings";
 import {
-  CARD_NEXT_TODOS_MAX,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
+  SETTING_CONTROLS,
   SETTING_COPY,
-  SETTING_OPTIONS,
-  TOGGLE_SETTING_KEYS,
-  USER_NAME_PLACEHOLDER,
+  SETTING_GROUPS,
+  TAB_REDRAW_KEYS,
   VERSION_SETTING_NAME,
   heldFieldOutcome,
+  isRowDisabled,
   settingDefinitions,
   settingsPatchFor,
+  type EditableSettingKey,
   type HeldFieldKey,
 } from "./settingsDefinitions";
 import {
@@ -850,7 +849,7 @@ class KanbanSettingTab extends PluginSettingTab {
    * {@link heldFieldOutcome} for why neither field can be a declarative control.
    */
   private renderHeldField(key: HeldFieldKey, setting: Setting): void {
-    const disabled = !this.plugin.settings.mcpEnabled;
+    const disabled = isRowDisabled(key, this.plugin.settings);
     setting.setDisabled(disabled).addText((t) => {
       // Deliberately not `type="number"` for the port, tempting as it is. A number input sanitises
       // what it cannot parse away to the empty string, so the field could neither show back what
@@ -900,172 +899,117 @@ class KanbanSettingTab extends PluginSettingTab {
     if (requireApiVersion("1.13.0")) setting.setErrorMessage(message);
   }
 
-  /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
-   *  renders `getSettingDefinitions()` instead. */
+  /**
+   * The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
+   * renders `getSettingDefinitions()` instead.
+   *
+   * Both walk the same `SETTING_GROUPS`, so the two tabs are one tab drawn by whichever API is
+   * there: same sections in the same order, same rows under them, same wording, same rules about
+   * which row is live. What Obsidian 1.13 gets from a group definition, this builds from a heading
+   * row (`Setting.setHeading()`, there since 0.9.16) and the rows that follow it.
+   */
   private render(): void {
     const { containerEl } = this;
-    const s = this.plugin.settings;
     containerEl.empty();
 
-    const dropdownRow = (
-      key: keyof typeof SETTING_OPTIONS,
-      value: string,
-      onChange: (v: string) => void,
-      disabled = false,
-    ): void => {
-      new Setting(containerEl)
-        .setName(SETTING_COPY[key].name)
-        .setDesc(SETTING_COPY[key].desc)
-        .setDisabled(disabled)
-        .addDropdown((d) =>
-          d
-            .addOptions(SETTING_OPTIONS[key])
-            .setValue(value)
-            .setDisabled(disabled)
-            .onChange(onChange),
-        );
-    };
-
-    dropdownRow(
-      "boardNoteDefaultView",
-      s.boardNoteDefaultView,
-      (v) =>
-        void this.plugin.updateSettings({
-          boardNoteDefaultView: v as KanbanSettings["boardNoteDefaultView"],
-        }),
-    );
-
-    dropdownRow("detailPresentation", s.detailPresentation, (v) => {
-      // Re-render the tab so the side-panel layout row enables/disables to match.
-      void this.plugin
-        .updateSettings({ detailPresentation: v as KanbanSettings["detailPresentation"] })
-        .then(() => this.render());
-    });
-
-    dropdownRow(
-      "sidePanelMode",
-      s.sidePanelMode,
-      (v) =>
-        void this.plugin.updateSettings({ sidePanelMode: v as KanbanSettings["sidePanelMode"] }),
-      s.detailPresentation === "modal",
-    );
-
-    new Setting(containerEl)
-      .setName(SETTING_COPY.detailWidth.name)
-      .setDesc(SETTING_COPY.detailWidth.desc)
-      .addSlider((sl) =>
-        sl
-          .setLimits(DETAIL_WIDTH_MIN, DETAIL_WIDTH_MAX, 10)
-          .setValue(s.detailWidth)
-          .onChange((v) => void this.plugin.updateSettings({ detailWidth: v })),
-      );
-
-    dropdownRow("addCardFlow", s.addCardFlow, (v) => {
-      // Re-render so the "open new card's details as" row enables/disables to match.
-      void this.plugin
-        .updateSettings({ addCardFlow: v as KanbanSettings["addCardFlow"] })
-        .then(() => this.render());
-    });
-
-    dropdownRow(
-      "addCardOpenMode",
-      s.addCardOpenMode,
-      (v) =>
-        void this.plugin.updateSettings({
-          addCardOpenMode: v as KanbanSettings["addCardOpenMode"],
-        }),
-      s.addCardFlow === "inline",
-    );
-
-    new Setting(containerEl)
-      .setName(SETTING_COPY.cardNextTodos.name)
-      .setDesc(SETTING_COPY.cardNextTodos.desc)
-      .addSlider((sl) =>
-        sl
-          .setLimits(0, CARD_NEXT_TODOS_MAX, 1)
-          .setValue(s.cardNextTodos)
-          .onChange((v) => void this.plugin.updateSettings({ cardNextTodos: v })),
-      );
-
-    dropdownRow(
-      "subitemsDefault",
-      s.subitemsDefault,
-      (v) =>
-        void this.plugin.updateSettings({
-          subitemsDefault: v as KanbanSettings["subitemsDefault"],
-        }),
-    );
-
-    new Setting(containerEl)
-      .setName(SETTING_COPY.userName.name)
-      .setDesc(SETTING_COPY.userName.desc)
-      .addText((t) => {
-        t.setPlaceholder(USER_NAME_PLACEHOLDER)
-          .setValue(this.plugin.settings.userName)
-          .onChange((v) => {
-            this.pendingUserName = v.trim();
-          });
-        t.inputEl.addEventListener("blur", () => this.commitHeldFields());
-      });
-
-    dropdownRow(
-      "historyScope",
-      s.historyScope,
-      (v) => void this.plugin.updateSettings({ historyScope: v as KanbanSettings["historyScope"] }),
-    );
-
-    dropdownRow(
-      "boardPan",
-      s.boardPan,
-      (v) => void this.plugin.updateSettings({ boardPan: v as KanbanSettings["boardPan"] }),
-    );
-
-    for (const key of TOGGLE_SETTING_KEYS) {
-      if (key === "mcpEnabled" && !Platform.isDesktop) continue;
-      new Setting(containerEl)
-        .setName(SETTING_COPY[key].name)
-        .setDesc(SETTING_COPY[key].desc)
-        .addToggle((t) =>
-          t.setValue(s[key]).onChange((v) => {
-            const saved = this.plugin.updateSettings({ [key]: v });
-            // Agent access gates every row below it, so switching it redraws the tab.
-            if (key === "mcpEnabled") void saved.then(() => this.render());
-          }),
-        );
-    }
-
-    if (Platform.isDesktop) {
-      for (const key of ["mcpPort", "mcpBindAddress"] as const) {
-        this.renderHeldField(
-          key,
-          new Setting(containerEl).setName(SETTING_COPY[key].name).setDesc(SETTING_COPY[key].desc),
-        );
-      }
-
-      new Setting(containerEl)
-        .setName(MCP_TOKEN_COPY.name)
-        .setDesc(MCP_TOKEN_COPY.desc)
-        .setDisabled(!s.mcpEnabled)
-        .addButton((b) =>
-          b
-            .setButtonText(MCP_TOKEN_COPY.button)
-            .setDisabled(!s.mcpEnabled)
-            .onClick(() => void this.plugin.copyMcpToken()),
-        );
-
-      new Setting(containerEl)
-        .setName(MCP_TOKEN_REGENERATE.name)
-        .setDesc(MCP_TOKEN_REGENERATE.desc)
-        .setDisabled(!s.mcpEnabled)
-        .addButton((b) =>
-          b
-            .setButtonText(MCP_TOKEN_REGENERATE.button)
-            .setDisabled(!s.mcpEnabled)
-            .onClick(() => void this.plugin.regenerateMcpToken()),
-        );
+    for (const group of SETTING_GROUPS) {
+      // A phone cannot listen for connections, so the whole agent-access section stays away —
+      // heading included, rather than a heading standing over nothing.
+      if (group.id === "agentAccess" && !Platform.isDesktop) continue;
+      new Setting(containerEl).setName(group.heading).setHeading();
+      for (const key of group.keys) this.renderRow(key, containerEl);
+      if (group.id === "agentAccess") this.renderTokenRows(containerEl);
     }
 
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     new Setting(containerEl).setName(VERSION_SETTING_NAME).setDesc(this.plugin.manifest.version);
+  }
+
+  /** One row, built from the control `SETTING_CONTROLS` says it wears and the copy both tabs share. */
+  private renderRow(key: EditableSettingKey, containerEl: HTMLElement): void {
+    const settings = this.plugin.settings;
+    const value = settings[key];
+    const spec = SETTING_CONTROLS[key];
+    const disabled = isRowDisabled(key, settings);
+    const setting = new Setting(containerEl)
+      .setName(SETTING_COPY[key].name)
+      .setDesc(SETTING_COPY[key].desc)
+      .setDisabled(disabled);
+
+    switch (spec.kind) {
+      // The port and the bind address draw themselves, and apply their own disabled state.
+      case "held":
+        this.renderHeldField(key as HeldFieldKey, setting);
+        return;
+      case "dropdown":
+        setting.addDropdown((d) =>
+          d
+            .addOptions(spec.options)
+            .setValue(String(value))
+            .setDisabled(disabled)
+            .onChange((v) => this.writeRow(key, v)),
+        );
+        return;
+      case "toggle":
+        setting.addToggle((t) =>
+          t
+            .setValue(value === true)
+            .setDisabled(disabled)
+            .onChange((v) => this.writeRow(key, v)),
+        );
+        return;
+      case "slider":
+        setting.addSlider((sl) =>
+          sl
+            .setLimits(spec.min, spec.max, spec.step)
+            .setValue(typeof value === "number" ? value : spec.min)
+            .setDisabled(disabled)
+            .onChange((v) => this.writeRow(key, v)),
+        );
+        return;
+      case "text":
+        setting.addText((t) => {
+          t.setPlaceholder(spec.placeholder)
+            .setValue(String(value))
+            .setDisabled(disabled)
+            .onChange((v) => this.writeRow(key, v));
+          // The name is held, so leaving the field is what lands it — see `pendingUserName`.
+          t.inputEl.addEventListener("blur", () => this.commitHeldFields());
+        });
+        return;
+    }
+  }
+
+  /** What a row's new value means. Deliberately the same three steps `setControlValue` takes on the
+   *  declarative tab — validate, hold the name, write — so neither tab can decide differently. */
+  private writeRow(key: EditableSettingKey, value: unknown): void {
+    const patch = settingsPatchFor(key, value);
+    if (!patch) return;
+    if (patch.userName !== undefined) {
+      this.pendingUserName = patch.userName;
+      return;
+    }
+    const saved = this.plugin.updateSettings(patch);
+    // A row that decides whether other rows exist or are live needs the tab drawn again: nothing
+    // here re-evaluates a disabled state on its own the way `refreshDomState()` does on 1.13.
+    if ((TAB_REDRAW_KEYS as readonly string[]).includes(key)) void saved.then(() => this.render());
+  }
+
+  /** The two rows that close the agent-access section: neither is a setting, both are dead until
+   *  agent access is on. */
+  private renderTokenRows(containerEl: HTMLElement): void {
+    const off = !this.plugin.settings.mcpEnabled;
+    const row = (
+      copy: { name: string; desc: string; button: string },
+      onClick: () => void,
+    ): void => {
+      new Setting(containerEl)
+        .setName(copy.name)
+        .setDesc(copy.desc)
+        .setDisabled(off)
+        .addButton((b) => b.setButtonText(copy.button).setDisabled(off).onClick(onClick));
+    };
+    row(MCP_TOKEN_COPY, () => void this.plugin.copyMcpToken());
+    row(MCP_TOKEN_REGENERATE, () => void this.plugin.regenerateMcpToken());
   }
 }

@@ -6,15 +6,15 @@ It is off until you turn it on, it listens on `127.0.0.1` — this computer and 
 
 ## Turning it on
 
-**Settings → Folia Kanban**:
+**Settings → Folia Kanban**, under the **Agent access (MCP)** heading:
 
 | Setting | What it is |
 | --- | --- |
-| **Agent access (MCP) — enable** | Off by default. Switching it on generates the token (once, kept afterwards) and starts the server. Desktop only: on mobile these three rows are not shown at all, because the plugin has no way to listen for connections there. |
-| **Agent access (MCP) — port** | `27125` by default; any port from 1024 to 65535. Change it if something else already holds it. |
-| **Agent access (MCP) — bind address** | `127.0.0.1` by default, which keeps the server on this computer. `0.0.0.0` is every IPv4 address it has, `::` every address; any address other than loopback puts it on a network — see [Moving it off this computer](#moving-it-off-this-computer) before you do. |
-| **Agent access (MCP) — token** | A **Copy token** button. The token is a password for every board in this vault — paste it into your client's configuration and nowhere else. |
-| **Agent access (MCP) — replace token** | A **Replace token** button, for when the old one has been somewhere it should not have been. It issues a new token, copies it, and locks out every client still holding the old one until you paste the new one in. Switching agent access off and on again does *not* change the token: a client configured once should keep working. |
+| **Enable agent access** | Off by default. Switching it on generates the token (once, kept afterwards) and starts the server. Desktop only: on mobile the whole **Agent access (MCP)** section is absent, heading included, because the plugin has no way to listen for connections there. |
+| **Server port** | `27125` by default; any port from 1024 to 65535. Change it if something else already holds it. |
+| **Bind address** | `127.0.0.1` by default, which keeps the server on this computer. `0.0.0.0` is every IPv4 address it has, `::` every address; any address other than loopback puts it on a network — see [Moving it off this computer](#moving-it-off-this-computer) before you do. |
+| **Agent token** | A **Copy token** button. The token is a password for every board in this vault — paste it into your client's configuration and nowhere else. |
+| **Replace the token** | A **Replace token** button, for when the old one has been somewhere it should not have been. It issues a new token, copies it, and locks out every client still holding the old one until you paste the new one in. Switching agent access off and on again does *not* change the token: a client configured once should keep working. |
 
 If the port is already taken, or the bind address is not one this computer actually has, the plugin says so in a notice naming the address, the port and the reason. The toggle stays on — it is what you asked for, and the fix is usually a different port rather than giving up — but nothing is listening until you change it, and the plugin will not keep retrying a bind it already knows fails.
 
