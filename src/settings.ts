@@ -104,10 +104,19 @@ export type SettingsPatch =
   | Partial<KanbanSettings>
   | ((current: KanbanSettings) => Partial<KanbanSettings>);
 
+/** The plain patch a write means: the function form resolved against the settings as they are at
+ *  the moment of writing. Empty when the write changes nothing. */
+export function resolveSettingsPatch(
+  current: KanbanSettings,
+  patch: SettingsPatch,
+): Partial<KanbanSettings> {
+  return typeof patch === "function" ? patch(current) : patch;
+}
+
 /** Returns `current` itself (same reference) when the patch has nothing in it, so callers can skip
  *  the refresh and the disk write an empty patch would otherwise cost. */
 export function applySettingsPatch(current: KanbanSettings, patch: SettingsPatch): KanbanSettings {
-  const p = typeof patch === "function" ? patch(current) : patch;
+  const p = resolveSettingsPatch(current, patch);
   return Object.keys(p).length === 0 ? current : { ...current, ...p };
 }
 
@@ -136,38 +145,138 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
 };
 
 /**
- * Agent access switched on for the first time is when its token comes into existence. `mint` is
- * called only then: the token is generated once and kept, because a token that changed on each
- * load would break the client configured against it. `desktop` is what keeps a phone from minting
- * a secret for a server it can never run.
+ * Agent access switched on for the first time is when its token comes into existence: this is the
+ * patch that mints it, or nothing at all. `mint` is called only then — a token that changed on each
+ * load would break the client configured against it — and `desktop` is what keeps a phone from
+ * minting a secret for a server it can never run. A patch rather than whole settings because the
+ * token has to reach {@link StoredSettings}: minted into the running copy alone it would be
+ * re-minted on every launch, silently breaking the client already configured with the old one.
  */
-export function withMcpToken(
+export function mcpTokenPatch(
   settings: KanbanSettings,
   mint: () => string,
   desktop: boolean,
-): KanbanSettings {
-  if (!settings.mcpEnabled || settings.mcpToken || !desktop) return settings;
-  return { ...settings, mcpToken: mint() };
+): Partial<KanbanSettings> {
+  if (!settings.mcpEnabled || settings.mcpToken || !desktop) return {};
+  return { mcpToken: mint() };
 }
 
 /**
- * Settings as loaded from plugin data: defaults filled in, and the comments baseline stamped with
- * `now` when the stored data carries none. `stampedBaseline` tells the caller to persist that.
+ * What `data.json` holds: only the settings someone actually set — the user in the settings tab, or
+ * the plugin writing its own bookkeeping (`collapsedCards`, `commentsSeen`, `commentsBaseline`,
+ * `mcpToken`). Everything absent is answered by `DEFAULT_SETTINGS` at read time, which is what lets
+ * a later release change a default and have it reach installs that never chose one, and what lets a
+ * feature tell "never set" from a deliberate choice that happens to equal the default. Keys this
+ * build does not know about are carried through untouched, so a file written by a newer one
+ * survives being opened by an older one.
  */
-export function hydrateSettings(
-  loaded: unknown,
-  now: string,
-): { settings: KanbanSettings; stampedBaseline: boolean } {
-  const settings: KanbanSettings = Object.assign({}, DEFAULT_SETTINGS, loaded);
-  // A hand-edited data.json can carry `null` for a map; every tile reads these, so it must not.
-  if (!settings.collapsedCards) settings.collapsedCards = {};
-  if (!settings.commentsSeen) settings.commentsSeen = {};
+export type StoredSettings = Partial<KanbanSettings>;
+
+/** The key that says a stored file is already sparse, and the shape this build writes under it. Its
+ *  *absence* is the whole test — a file carrying any format was written by a build that recorded
+ *  what was set, and pruning one written by a later build would delete choices this build has no
+ *  way to recognise. The number says which build wrote the file, not which builds may read it. */
+export const SETTINGS_FORMAT_KEY = "settingsFormat";
+export const SETTINGS_FORMAT = 2;
+
+/** What is actually written to `data.json`: the sparse settings, marked with the shape they are in
+ *  so the next load knows not to prune them again. */
+export function settingsForDisk(stored: StoredSettings): Record<string, unknown> {
+  return { [SETTINGS_FORMAT_KEY]: SETTINGS_FORMAT, ...stored };
+}
+
+/** The settings to run on: what someone set, with every other setting answered by its default. */
+export function resolveSettings(stored: StoredSettings): KanbanSettings {
+  return { ...DEFAULT_SETTINGS, ...stored };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Whether a stored value is indistinguishable from the setting's default. Only ever asked of a
+ *  legacy file, where every key is present and nothing says which of them were chosen. */
+function equalsDefault(key: keyof KanbanSettings, value: unknown): boolean {
+  return JSON.stringify(value) === JSON.stringify(DEFAULT_SETTINGS[key]);
+}
+
+/** What a load produced: the settings to run on, the sparse set to keep on disk, and whether that
+ *  set differs from the file it came from and so has to be written back. */
+export interface HydratedSettings {
+  settings: KanbanSettings;
+  stored: StoredSettings;
+  needsSave: boolean;
+}
+
+/**
+ * Settings as loaded from plugin data.
+ *
+ * A file carrying {@link SETTINGS_FORMAT_KEY} is taken at its word: every key in it was set on
+ * purpose, including one whose value happens to equal the default, and every key missing from it
+ * was never set. A file without the marker was written by a build that saved the whole merged
+ * object on first launch, so it cannot say which of its values anyone chose. **The stated rule for
+ * those:** a value equal to that setting's default is read as never set and dropped, once, and the
+ * pruned file is marked. Nothing changes for the user — the setting still resolves to the same
+ * value — but a later release is then free to move that default, and a value the user had
+ * deliberately picked while it equalled the default would move with it. That trade is the price of
+ * a file that never recorded the difference. It weighs most on `mcpPort` and `mcpBindAddress`,
+ * where a moved default would move where a server listens, so a release that ever moves one of
+ * those owes its own answer here.
+ *
+ * One install can also end up marked and frozen at once, and it is worth naming rather than
+ * discovering: a `data.json` shared with a build that predates the marker — a synced vault, a
+ * second machine on an older version — is rewritten whole by that build, defaults and marker
+ * together, and this one then takes all of it at its word. Nothing breaks and nothing is lost; that
+ * install simply keeps the frozen file it had, which is where every install started. The same holds
+ * for a deliberate downgrade, and neither re-prunes, because the marker survives.
+ *
+ * Stored values that are not values at all are dropped rather than repaired in memory, so the file
+ * heals instead of carrying the garbage forever, and the comments baseline is stamped with `now`
+ * when nothing carries one.
+ */
+export function hydrateSettings(loaded: unknown, now: string): HydratedSettings {
+  const stored: StoredSettings = isRecord(loaded) ? { ...loaded } : {};
+  const legacy = !(SETTINGS_FORMAT_KEY in stored);
+  delete (stored as Record<string, unknown>)[SETTINGS_FORMAT_KEY];
+  let needsSave = legacy;
+  if (dropUnusable(stored)) needsSave = true;
+  if (legacy) pruneFrozenDefaults(stored);
+  // Truthiness, not presence: an empty baseline is not a value anyone can have chosen — it is what
+  // `DEFAULT_SETTINGS` carries to mean "no baseline at all", and `seenMarkerFor` reads it as absent
+  // — so a stored "" is a file to repair, not a decision to respect.
+  if (!stored.commentsBaseline) {
+    stored.commentsBaseline = now;
+    needsSave = true;
+  }
+  return { settings: resolveSettings(stored), stored, needsSave };
+}
+
+/** Drops what a hand-edited (or hand-corrupted) file carries where a value belongs. Dropped rather
+ *  than repaired in the copy in memory, so the file heals on the next write instead of carrying the
+ *  same garbage forever. Returns whether anything went. */
+function dropUnusable(stored: StoredSettings): boolean {
+  let dropped = false;
+  const drop = (key: keyof KanbanSettings): void => {
+    delete stored[key];
+    dropped = true;
+  };
+  // Every tile reads these, so `null` for a map must not reach them.
+  for (const key of ["collapsedCards", "commentsSeen"] as const)
+    if (key in stored && !isRecord(stored[key])) drop(key);
   // Same reason, and it decides where a server listens: `null` here would reach `listen` as a
   // non-string and come back as "could not start on address null" with a TypeError attached.
-  if (typeof settings.mcpBindAddress !== "string" || !isBindAddress(settings.mcpBindAddress))
-    settings.mcpBindAddress = MCP_DEFAULT_BIND_ADDRESS;
-  if (settings.commentsBaseline) return { settings, stampedBaseline: false };
-  return { settings: { ...settings, commentsBaseline: now }, stampedBaseline: true };
+  if (
+    "mcpBindAddress" in stored &&
+    !(typeof stored.mcpBindAddress === "string" && isBindAddress(stored.mcpBindAddress))
+  )
+    drop("mcpBindAddress");
+  return dropped;
+}
+
+/** The one-time reading of a file that predates the marker: a value equal to its default is read as
+ *  never set. See {@link hydrateSettings} for what that costs and why it is the rule. */
+function pruneFrozenDefaults(stored: StoredSettings): void {
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof KanbanSettings)[])
+    if (key in stored && equalsDefault(key, stored[key])) delete stored[key];
 }
 
 /**

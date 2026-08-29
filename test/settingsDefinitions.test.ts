@@ -236,13 +236,13 @@ describe("settingsPatchFor", () => {
   // grey 127.0.0.1 while the server is on 0.0.0.0 is the field lying about where the server is.
   it("puts a refused field back to what is really stored, and says why", () => {
     const stored = { ...DEFAULT_SETTINGS, mcpBindAddress: "0.0.0.0", mcpPort: 8080 };
-    expect(heldFieldOutcome("mcpBindAddress", "localhost", stored)).toEqual({
+    expect(heldFieldOutcome("mcpBindAddress", "localhost", stored, true)).toEqual({
       show: "0.0.0.0",
       commit: null,
       error: MCP_BIND_ADDRESS_INVALID,
       notice: MCP_BIND_ADDRESS_INVALID,
     });
-    expect(heldFieldOutcome("mcpPort", "not a port", stored)).toEqual({
+    expect(heldFieldOutcome("mcpPort", "not a port", stored, true)).toEqual({
       show: "8080",
       commit: null,
       error: MCP_PORT_INVALID,
@@ -255,7 +255,10 @@ describe("settingsPatchFor", () => {
   it("puts an emptied field back without interrupting", () => {
     const stored = { ...DEFAULT_SETTINGS, mcpBindAddress: "0.0.0.0" };
     for (const typed of ["", "   "]) {
-      expect(heldFieldOutcome("mcpBindAddress", typed, stored), JSON.stringify(typed)).toEqual({
+      expect(
+        heldFieldOutcome("mcpBindAddress", typed, stored, true),
+        JSON.stringify(typed),
+      ).toEqual({
         show: "0.0.0.0",
         commit: null,
         error: MCP_BIND_ADDRESS_INVALID,
@@ -265,7 +268,7 @@ describe("settingsPatchFor", () => {
   });
 
   it("commits a value that was meant, in the spelling that gets stored", () => {
-    expect(heldFieldOutcome("mcpBindAddress", " [::1] ", DEFAULT_SETTINGS)).toEqual({
+    expect(heldFieldOutcome("mcpBindAddress", " [::1] ", DEFAULT_SETTINGS, false)).toEqual({
       show: "::1",
       commit: { mcpBindAddress: "::1" },
       error: null,
@@ -273,7 +276,7 @@ describe("settingsPatchFor", () => {
     });
     // Out of range is pulled into it, and the field then shows where it landed rather than what
     // was typed.
-    expect(heldFieldOutcome("mcpPort", "80", DEFAULT_SETTINGS)).toEqual({
+    expect(heldFieldOutcome("mcpPort", "80", DEFAULT_SETTINGS, false)).toEqual({
       show: String(MCP_PORT_MIN),
       commit: { mcpPort: MCP_PORT_MIN },
       error: null,
@@ -283,15 +286,29 @@ describe("settingsPatchFor", () => {
 
   // Every write restarts the server. Re-typing the address it is already on must not.
   it("writes nothing when the value is the one already stored", () => {
-    expect(heldFieldOutcome("mcpBindAddress", MCP_DEFAULT_BIND_ADDRESS, DEFAULT_SETTINGS)).toEqual({
+    expect(
+      heldFieldOutcome("mcpBindAddress", MCP_DEFAULT_BIND_ADDRESS, DEFAULT_SETTINGS, true),
+    ).toEqual({
       show: MCP_DEFAULT_BIND_ADDRESS,
       commit: null,
       error: null,
       notice: null,
     });
     expect(
-      heldFieldOutcome("mcpPort", String(DEFAULT_SETTINGS.mcpPort), DEFAULT_SETTINGS).commit,
+      heldFieldOutcome("mcpPort", String(DEFAULT_SETTINGS.mcpPort), DEFAULT_SETTINGS, true).commit,
     ).toBeNull();
+  });
+
+  // Settings are stored only where someone set them, so a field showing a default is showing a
+  // value nobody chose. Typing that value is the choice, and dropping the write as a no-op would
+  // throw it away — leaving a later release free to move the server the user deliberately put here.
+  it("commits a value equal to the default when the default is all that was showing", () => {
+    expect(
+      heldFieldOutcome("mcpBindAddress", MCP_DEFAULT_BIND_ADDRESS, DEFAULT_SETTINGS, false).commit,
+    ).toEqual({ mcpBindAddress: MCP_DEFAULT_BIND_ADDRESS });
+    expect(
+      heldFieldOutcome("mcpPort", String(DEFAULT_SETTINGS.mcpPort), DEFAULT_SETTINGS, false).commit,
+    ).toEqual({ mcpPort: DEFAULT_SETTINGS.mcpPort });
   });
 
   it("trims the name comments are signed with", () => {

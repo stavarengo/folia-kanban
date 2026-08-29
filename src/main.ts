@@ -27,12 +27,15 @@ import {
   DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
-  applySettingsPatch,
   hydrateSettings,
+  mcpTokenPatch,
   migratePathKeyedSettings,
-  withMcpToken,
+  resolveSettings,
+  resolveSettingsPatch,
+  settingsForDisk,
   type KanbanSettings,
   type SettingsPatch,
+  type StoredSettings,
 } from "./settings";
 import {
   CARD_NEXT_TODOS_MAX,
@@ -89,6 +92,11 @@ function targetsAPlaceInTheText(eState: unknown): boolean {
 
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
+
+  /** What is kept on disk: only the settings someone actually set. `settings` above is this
+   *  resolved against `DEFAULT_SETTINGS`, and every write goes through {@link applyToStored} so the
+   *  two cannot drift. */
+  private stored: StoredSettings = {};
 
   /** Tabs the user sent to the Markdown editor with the button, and the note they did it for.
    *  Nothing else ever writes to this: it records a decision a person made, never a guess about
@@ -526,24 +534,47 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const loaded: unknown = await this.loadData();
-    const { settings, stampedBaseline } = hydrateSettings(loaded, stamp());
+    const { settings, stored, needsSave } = hydrateSettings(loaded, stamp());
+    this.stored = stored;
+    this.settings = settings;
     // Agent access switched on but carrying no token — data.json hand-edited, or synced from an
     // install that could not mint one — would leave the toggle reading on with nothing listening
     // and nothing said about it, because a server that is never asked to start never fails. Mint
     // the token the enabled state implies, here, where the settings arrive.
-    this.settings = withMcpToken(settings, newMcpToken, Platform.isDesktop);
+    const minted = this.applyToStored(
+      mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop),
+    );
     // Persisted right away: the baseline is "when tracking started", and it must not drift to a
-    // later launch if nothing else happens to save the settings before then.
-    if (stampedBaseline || this.settings !== settings) await this.saveSettings();
+    // later launch if nothing else happens to save the settings before then. A file the load had to
+    // prune, repair or mint into is written for the same reason — so the next load reads what this
+    // one decided rather than deciding it again.
+    if (needsSave || minted) await this.saveSettings();
+  }
+
+  /** Records a patch as something that was actually set: it joins what is kept on disk, and the
+   *  settings the plugin runs on are resolved from that again. False when the patch was empty, so
+   *  callers can skip the refresh and the write it would otherwise cost. */
+  /** Whether a setting is one someone actually set, rather than one `DEFAULT_SETTINGS` is
+   *  answering. A field showing a default is showing a value nobody chose, so typing that same
+   *  value is still a choice worth writing — see `alreadySet` on {@link heldFieldOutcome}. */
+  isSet(key: keyof KanbanSettings): boolean {
+    return key in this.stored;
+  }
+
+  private applyToStored(patch: Partial<KanbanSettings>): boolean {
+    if (Object.keys(patch).length === 0) return false;
+    this.stored = { ...this.stored, ...patch };
+    this.settings = resolveSettings(this.stored);
+    return true;
   }
 
   /** Serializes the writes: two `saveData` calls in flight at once can land on disk in either
    *  order, and what survives is whatever the slower one carried — an older snapshot than the one
    *  already applied in memory. A rename chain done quickly in the file explorer is exactly that
-   *  case. Chained, each write also reads `this.settings` at the moment it runs, so the last one
+   *  case. Chained, each write also reads `this.stored` at the moment it runs, so the last one
    *  writes the newest state rather than the state as of when it was queued. */
   async saveSettings(): Promise<void> {
-    const write = this.pendingWrite.then(() => this.saveData(this.settings));
+    const write = this.pendingWrite.then(() => this.saveData(settingsForDisk(this.stored)));
     // A failed write must not break the chain for every write after it.
     this.pendingWrite = write.catch(() => {});
     await write;
@@ -555,11 +586,10 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  toggle does this on every click (§ collapse) — because waiting on the write first would let a
    *  second update land before the first was visible anywhere, and silently lose it. */
   async updateSettings(patch: SettingsPatch): Promise<void> {
-    const next = applySettingsPatch(this.settings, patch);
-    if (next === this.settings) return;
+    if (!this.applyToStored(resolveSettingsPatch(this.settings, patch))) return;
     // Switching agent access on for the first time is when its token comes into existence: it is
     // generated once and kept, so the client configured against it keeps working across restarts.
-    this.settings = withMcpToken(next, newMcpToken, Platform.isDesktop);
+    this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop));
     this.refreshViews();
     void this.mcp?.sync(this.settings);
     await this.saveSettings();
@@ -835,7 +865,7 @@ class KanbanSettingTab extends PluginSettingTab {
         .setValue(String(this.pendingMcpFields[key] ?? this.plugin.settings[key]))
         .setDisabled(disabled)
         .onChange((v) => {
-          const outcome = heldFieldOutcome(key, v, this.plugin.settings);
+          const outcome = heldFieldOutcome(key, v, this.plugin.settings, this.plugin.isSet(key));
           this.holdMcpField(key, outcome.commit);
           this.showFieldError(setting, outcome.error);
         });
@@ -843,7 +873,12 @@ class KanbanSettingTab extends PluginSettingTab {
       // what is really stored: an emptied one showing a grey default, or a refused one still
       // showing what was typed, would both read as the server having moved there.
       t.inputEl.addEventListener("blur", () => {
-        const outcome = heldFieldOutcome(key, t.inputEl.value, this.plugin.settings);
+        const outcome = heldFieldOutcome(
+          key,
+          t.inputEl.value,
+          this.plugin.settings,
+          this.plugin.isSet(key),
+        );
         this.holdMcpField(key, outcome.commit);
         this.showFieldError(setting, null);
         t.setValue(outcome.show);
