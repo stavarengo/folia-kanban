@@ -26,7 +26,7 @@ const noop = (): void => {};
 const definitions = settingDefinitions(
   () => DEFAULT_SETTINGS,
   "1.2.3",
-  { copy: noop, regenerate: noop },
+  { copy: noop, regenerate: noop, holdBindAddress: noop },
   true,
 );
 
@@ -69,7 +69,7 @@ describe("settingDefinitions", () => {
       const def = settingDefinitions(
         () => settings,
         "1.2.3",
-        { copy: noop, regenerate: noop },
+        { copy: noop, regenerate: noop, holdBindAddress: noop },
         true,
       ).find((d) => "control" in d && d.control?.key === key);
       // Without this, a renamed or dropped setting would make every "not disabled" case below pass
@@ -194,6 +194,29 @@ describe("settingsPatchFor", () => {
     expect(validate?.("evil.example")).toMatch(/not an address/i);
   });
 
+  // A rejected value may never reach `setControlValue`, so this is the only hook that sees every
+  // candidate. If it did not clear the held address, closing the tab would commit the last one
+  // that happened to parse rather than the one on screen.
+  it("holds what the field shows, and lets go of it when that is not an address", () => {
+    const held: (string | null)[] = [];
+    const rows = settingDefinitions(
+      () => DEFAULT_SETTINGS,
+      "1.2.3",
+      {
+        copy: noop,
+        regenerate: noop,
+        holdBindAddress: (a) => held.push(a),
+      },
+      true,
+    );
+    const row = rows.find((d) => "name" in d && d.name === SETTING_COPY.mcpBindAddress.name);
+    const control = row && "control" in row ? row.control : undefined;
+    const validate = control?.type === "text" ? control.validate : undefined;
+    validate?.(" 0.0.0.0 ");
+    validate?.("0.0.0.0.");
+    expect(held).toEqual(["0.0.0.0", null]);
+  });
+
   it("trims the name comments are signed with", () => {
     expect(settingsPatchFor("userName", "  alex  ")).toEqual({ userName: "alex" });
   });
@@ -201,7 +224,12 @@ describe("settingsPatchFor", () => {
 
 describe("agent access on a platform that cannot host it", () => {
   const rows = (desktop: boolean) =>
-    settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", { copy: noop, regenerate: noop }, desktop);
+    settingDefinitions(
+      () => DEFAULT_SETTINGS,
+      "1.2.3",
+      { copy: noop, regenerate: noop, holdBindAddress: noop },
+      desktop,
+    );
 
   const named = (desktop: boolean, name: string) =>
     rows(desktop).find((d) => "name" in d && d.name === name);
@@ -241,7 +269,7 @@ describe("agent access on a platform that cannot host it", () => {
     const on = settingDefinitions(
       () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
       "1.2.3",
-      { copy: noop, regenerate: noop },
+      { copy: noop, regenerate: noop, holdBindAddress: noop },
       true,
     ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
     const onDisabled = on && "disabled" in on ? on.disabled : undefined;
@@ -253,7 +281,13 @@ describe("agent access on a platform that cannot host it", () => {
     const row = settingDefinitions(
       () => DEFAULT_SETTINGS,
       "1.2.3",
-      { copy: noop, regenerate: () => (called += 1) },
+      {
+        copy: noop,
+        regenerate: () => {
+          called += 1;
+        },
+        holdBindAddress: noop,
+      },
       true,
     ).find((d) => "name" in d && d.name === MCP_TOKEN_REGENERATE.name);
     const action = row && "action" in row ? row.action : undefined;

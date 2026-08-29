@@ -147,9 +147,18 @@ export const SETTING_COPY = {
   },
   mcpBindAddress: {
     name: "Agent access (MCP) — bind address",
-    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every address this computer has, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for all of them, anything else has to be one this computer actually has, or the server will not start.`,
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every address this computer has, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 (or :: for IPv6) asks for every address this computer has, and anything else has to be one it actually has, or the server will not start.`,
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
+
+/** What the settings tab can do that is not writing a setting. `holdBindAddress` is how the tab
+ *  keeps the address a text field is showing without restarting the server on every keystroke:
+ *  `null` when what is in the field is not an address. */
+export interface SettingTabActions {
+  copy: () => void;
+  regenerate: () => void;
+  holdBindAddress: (address: string | null) => void;
+}
 
 /** What the bind-address field says when what is in it is not an address. */
 export const MCP_BIND_ADDRESS_INVALID =
@@ -263,7 +272,7 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
  */
 function mcpRows(
   read: () => KanbanSettings,
-  tokenActions: { copy: () => void; regenerate: () => void },
+  actions: SettingTabActions,
   desktop: boolean,
 ): SettingDefinitionItem[] {
   const off = (): boolean => !read().mcpEnabled;
@@ -288,23 +297,31 @@ function mcpRows(
         key: "mcpBindAddress",
         placeholder: MCP_DEFAULT_BIND_ADDRESS,
         disabled: off,
-        // Without this, a value the validation refuses is simply not stored, and the field says
-        // nothing about it — the user leaves the tab believing they changed where the server is.
-        validate: (value) => (isBindAddress(String(value)) ? undefined : MCP_BIND_ADDRESS_INVALID),
+        // Two jobs, and the second is the load-bearing one. Without this the field says nothing
+        // about a value it refused, and the user leaves the tab believing the server moved. And it
+        // is the only hook Obsidian runs for *every* candidate value: a rejected one may never
+        // reach `setControlValue`, so this is where the held address has to be cleared, or closing
+        // the tab would commit the last address that happened to parse rather than the one on
+        // screen — silently moving the server somewhere the user had typed over.
+        validate: (value) => {
+          const patch = settingsPatchFor("mcpBindAddress", value);
+          actions.holdBindAddress(patch?.mcpBindAddress ?? null);
+          return patch ? undefined : MCP_BIND_ADDRESS_INVALID;
+        },
       },
     },
     {
       name: MCP_TOKEN_COPY.name,
       desc: MCP_TOKEN_COPY.desc,
       visible: desktop,
-      action: tokenActions.copy,
+      action: actions.copy,
       disabled: off,
     },
     {
       name: MCP_TOKEN_REGENERATE.name,
       desc: MCP_TOKEN_REGENERATE.desc,
       visible: desktop,
-      action: tokenActions.regenerate,
+      action: actions.regenerate,
       disabled: off,
     },
   ];
@@ -319,7 +336,7 @@ function mcpRows(
 export function settingDefinitions(
   read: () => KanbanSettings,
   version: string,
-  tokenActions: { copy: () => void; regenerate: () => void },
+  actions: SettingTabActions,
   desktop: boolean,
 ): SettingDefinitionItem[] {
   const dropdown = (key: DropdownKey, disabled?: () => boolean): SettingDefinitionItem => ({
@@ -368,7 +385,7 @@ export function settingDefinitions(
     dropdown("historyScope"),
     dropdown("boardPan"),
     ...TOGGLE_SETTING_KEYS.map(toggle),
-    ...mcpRows(read, tokenActions, desktop),
+    ...mcpRows(read, actions, desktop),
     // Read from the manifest so it always reflects the installed build, never a hardcoded value.
     { name: VERSION_SETTING_NAME, desc: version },
   ];

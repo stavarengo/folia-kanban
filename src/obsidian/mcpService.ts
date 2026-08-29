@@ -159,7 +159,9 @@ export class McpService {
       this.options.onState?.({
         kind: "running",
         port: this.running.port,
-        bindAddress: target.bindAddress,
+        // The socket's own address, not the one asked for: what the user is told they are exposed
+        // on has to be where the server actually is.
+        bindAddress: this.running.address,
       });
     } catch (e) {
       this.wanted = null;

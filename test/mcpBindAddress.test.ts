@@ -27,6 +27,8 @@ describe("what counts as a bind address", () => {
       "fe80::1",
       // Link-local: only bindable with the interface it is local to, so the zone is part of it.
       "fe80::1%eth0",
+      // An interface name keeps its case: udev renames make `LAN0` a real one.
+      "fe80::1%LAN0",
     ]) {
       expect(isBindAddress(value), value).toBe(true);
     }
@@ -54,6 +56,11 @@ describe("what counts as a bind address", () => {
       // interface and binds all of them.
       "::ffff:192.168.1.5",
       "::ffff:0.0.0.0",
+      // The same two addresses spelled as plain hex groups, which is the spelling that would
+      // otherwise pass as eight ordinary groups. `::ffff:0:0` binds every IPv4 interface.
+      "::ffff:c0a8:105",
+      "::ffff:0:0",
+      "0:0:0:0:0:ffff:7f00:1",
       "fe80::1%",
       // The zone is an IPv6 thing. Accepted, it would reach `listen` and be looked up as a name.
       "192.168.1.5%eth0",
@@ -98,6 +105,7 @@ describe("what counts as a bind address", () => {
     expect(isLoopbackBindAddress("::1%lo")).toBe(true);
     expect(isLoopbackBindAddress("fe80::1%eth0")).toBe(false);
     expect(isWildcardBindAddress("::%eth0")).toBe(true);
+    expect(isBindAddress("fe80::1%LAN0")).toBe(true);
     // …and does not turn an IPv4 address into something only a resolver could make sense of.
     expect(isWildcardBindAddress("0.0.0.0%eth0")).toBe(false);
     expect(isLoopbackBindAddress("127.0.0.1%lo")).toBe(false);

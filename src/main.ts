@@ -735,6 +735,9 @@ class KanbanSettingTab extends PluginSettingTab {
       {
         copy: () => void this.plugin.copyMcpToken(),
         regenerate: () => void this.plugin.regenerateMcpToken(),
+        holdBindAddress: (address) => {
+          this.pendingMcpBindAddress = address;
+        },
       },
       Platform.isDesktop,
     );
@@ -789,31 +792,29 @@ class KanbanSettingTab extends PluginSettingTab {
   }
 
   override hide(): void {
-    this.commitUserName();
-    this.commitMcpPort();
-    this.commitMcpBindAddress();
+    this.commitHeldFields();
     super.hide();
   }
 
-  private commitUserName(): void {
-    const name = this.pendingUserName;
+  /**
+   * Write everything the tab was holding, in one patch.
+   *
+   * One and not three, because each write restarts the server: moving both the port and the address
+   * back to loopback would otherwise restart once on the old address with the new port — announcing
+   * "reachable on 0.0.0.0" at the moment the user fixed exactly that — before the second write moved
+   * it home.
+   */
+  private commitHeldFields(): void {
+    const patch: Partial<KanbanSettings> = {};
+    const { pendingUserName: name, pendingMcpPort: port, pendingMcpBindAddress: address } = this;
     this.pendingUserName = null;
-    if (name !== null && name !== this.plugin.settings.userName)
-      void this.plugin.updateSettings({ userName: name });
-  }
-
-  private commitMcpPort(): void {
-    const port = this.pendingMcpPort;
     this.pendingMcpPort = null;
-    if (port !== null && port !== this.plugin.settings.mcpPort)
-      void this.plugin.updateSettings({ mcpPort: port });
-  }
-
-  private commitMcpBindAddress(): void {
-    const address = this.pendingMcpBindAddress;
     this.pendingMcpBindAddress = null;
+    if (name !== null && name !== this.plugin.settings.userName) patch.userName = name;
+    if (port !== null && port !== this.plugin.settings.mcpPort) patch.mcpPort = port;
     if (address !== null && address !== this.plugin.settings.mcpBindAddress)
-      void this.plugin.updateSettings({ mcpBindAddress: address });
+      patch.mcpBindAddress = address;
+    if (Object.keys(patch).length > 0) void this.plugin.updateSettings(patch);
   }
 
   /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
@@ -921,7 +922,7 @@ class KanbanSettingTab extends PluginSettingTab {
           .onChange((v) => {
             this.pendingUserName = v.trim();
           });
-        t.inputEl.addEventListener("blur", () => this.commitUserName());
+        t.inputEl.addEventListener("blur", () => this.commitHeldFields());
       });
 
     dropdownRow(
@@ -962,7 +963,7 @@ class KanbanSettingTab extends PluginSettingTab {
             .onChange((v) => {
               this.pendingMcpPort = settingsPatchFor("mcpPort", v)?.mcpPort ?? null;
             });
-          t.inputEl.addEventListener("blur", () => this.commitMcpPort());
+          t.inputEl.addEventListener("blur", () => this.commitHeldFields());
         });
 
       new Setting(containerEl)
@@ -986,7 +987,7 @@ class KanbanSettingTab extends PluginSettingTab {
               new Notice(MCP_BIND_ADDRESS_INVALID, 5000);
               t.setValue(this.plugin.settings.mcpBindAddress);
             }
-            this.commitMcpBindAddress();
+            this.commitHeldFields();
           });
         });
 

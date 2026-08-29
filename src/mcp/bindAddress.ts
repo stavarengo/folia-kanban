@@ -27,12 +27,8 @@ function isIpv4(value: string): boolean {
   return octets.every((o) => IPV4_OCTET.test(o) && Number(o) <= 255);
 }
 
-/** One IPv6 address as canonical hex groups, or `null` when any group is not one.
- *
- *  An embedded IPv4 tail (`::ffff:192.168.1.5`) is refused rather than parsed. It is a second
- *  spelling of an address that already has one, and one of its spellings is a trap: `::ffff:0.0.0.0`
- *  reads as a specific address here while Node binds it as the IPv4 wildcard, which would put the
- *  vault on every interface while the setting, the warning and the origin rule all said otherwise. */
+/** One IPv6 address as canonical hex groups, or `null` when any group is not one. An embedded IPv4
+ *  tail (`::ffff:192.168.1.5`) is not a group; {@link canonicalIpv6} refuses the whole family. */
 function ipv6Groups(parts: string[]): string[] | null {
   const groups: string[] = [];
   for (const part of parts) {
@@ -63,16 +59,35 @@ function compressedIpv6(head: string, tail: string): string | null {
 function canonicalIpv6(value: string): string | null {
   const halves = value.split("::");
   if (halves.length > 2) return null;
-  if (halves.length === 2) return compressedIpv6(halves[0] ?? "", halves[1] ?? "");
-  const groups = ipv6Groups(value.split(":"));
-  return groups?.length === 8 ? groups.join(":") : null;
+  const written = halves.length === 2 ? null : ipv6Groups(value.split(":"));
+  const canonical =
+    halves.length === 2
+      ? compressedIpv6(halves[0] ?? "", halves[1] ?? "")
+      : written?.length === 8
+        ? written.join(":")
+        : null;
+  if (canonical === null) return null;
+  return isIpv4Mapped(canonical.split(":")) ? null : canonical;
+}
+
+/** The IPv4-mapped range, `::ffff:0:0/96`. Refused whichever way it is spelled — dotted
+ *  (`::ffff:192.168.1.5`) or as plain hex groups (`::ffff:c0a8:105`), which is the same address and
+ *  would otherwise pass as eight ordinary groups.
+ *
+ *  It is a second spelling of an address that already has one, and its spellings are traps: Node
+ *  binds `::ffff:0.0.0.0` as the IPv4 wildcard, putting the vault on every interface while nothing
+ *  here would call the bind a wildcard, and `::ffff:7f00:1` binds plain loopback while nothing here
+ *  would call it loopback — so the warning that fires for a non-loopback bind would fire on a bind
+ *  that is not exposed at all. One spelling per address is what keeps every such judgement honest. */
+function isIpv4Mapped(groups: string[]): boolean {
+  return groups.slice(0, 5).every((g) => g === "0") && groups[5] === "ffff";
 }
 
 /** A link-local IPv6 address is only bindable with the interface it is local to (`fe80::1%eth0`),
  *  so the zone is part of the address the user stores — and no part of any origin, which is why it
  *  comes off before anything is compared. IPv6 only: `192.168.1.5%eth0` is not an address anything
  *  can bind, and accepting it would leave the socket asking a resolver about it. */
-const ZONE = /^[0-9a-z._-]+$/;
+const ZONE = /^[0-9A-Za-z._-]+$/;
 
 function withoutZone(address: string): { address: string; zoned: boolean } | null {
   const at = address.indexOf("%");
