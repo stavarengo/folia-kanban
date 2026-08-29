@@ -4859,6 +4859,33 @@ describe("assigning a card (20260827.03)", () => {
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("alex"));
   });
 
+  it("does not let a half-typed name race the button pressed instead of it", async () => {
+    const repo = makeRepo();
+    // Every assignee written, in order — the point is how MANY there were, not only the last one.
+    const written: unknown[] = [];
+    const setFrontmatter = repo.setFrontmatter.bind(repo);
+    repo.setFrontmatter = async (path, patch) => {
+      if ("assignee" in patch) written.push(patch["assignee"]);
+      await setFrontmatter(path, patch);
+    };
+    const { user, detail } = await openPanel(repo, named("Rafa"));
+    const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
+
+    await user.type(field, "Alex");
+    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+
+    // One write, and it is the one the pressed button names. Two would mean the blur committed
+    // "Alex" first and the toggle then computed its answer from a card it had already changed.
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa"));
+    expect(written).toEqual(["Rafa"]);
+    // And the field says what the note says, rather than keeping text that was never saved.
+    await waitFor(() =>
+      expect(within(screen.getByTestId("card-detail")).getByLabelText("Assignee")).toHaveValue(
+        "Rafa",
+      ),
+    );
+  });
+
   it("shows the assignment on the tile and filters the board down to it", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
