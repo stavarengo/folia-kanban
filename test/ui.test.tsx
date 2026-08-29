@@ -4867,7 +4867,20 @@ describe("assigning a card (20260827.03)", () => {
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Gamma.md")!.fm).toBe(false));
   });
 
-  it("does not let a half-typed name race the button pressed instead of it", async () => {
+  it.each([
+    [
+      "clicked",
+      async (user: ReturnType<typeof userEvent.setup>, btn: HTMLElement) => user.click(btn),
+    ],
+    // Tabbing to the button blurs the field, which is the other way the same two writes collide.
+    [
+      "tabbed to",
+      async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.tab();
+        await user.keyboard("{Enter}");
+      },
+    ],
+  ])("does not let a half-typed name race the button %s instead of it", async (_how, press) => {
     const repo = makeRepo();
     // Every assignee written, in order — the point is how MANY there were, not only the last one.
     const written: unknown[] = [];
@@ -4880,7 +4893,7 @@ describe("assigning a card (20260827.03)", () => {
     const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
 
     await user.type(field, "Alex");
-    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+    await press(user, within(detail).getByRole("button", { name: "Assign to me" }));
 
     // One write, and it is the one the pressed button names. Two would mean the blur committed
     // "Alex" first and the toggle then computed its answer from a card it had already changed.
