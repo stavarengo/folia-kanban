@@ -147,9 +147,13 @@ export const SETTING_COPY = {
   },
   mcpBindAddress: {
     name: "Agent access (MCP) — bind address",
-    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every address this computer has, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. Must be an address this computer actually has, or the server will not start.`,
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every address this computer has, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for all of them, anything else has to be one this computer actually has, or the server will not start.`,
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
+
+/** What the bind-address field says when what is in it is not an address. */
+const MCP_BIND_ADDRESS_INVALID =
+  "Not an address. Use an IP address such as 127.0.0.1, 0.0.0.0 or 192.168.1.5 — not a name.";
 
 /** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */
 export const MCP_TOKEN_COPY = {
@@ -284,6 +288,9 @@ function mcpRows(
         key: "mcpBindAddress",
         placeholder: MCP_DEFAULT_BIND_ADDRESS,
         disabled: off,
+        // Without this, a value the validation refuses is simply not stored, and the field says
+        // nothing about it — the user leaves the tab believing they changed where the server is.
+        validate: (value) => (isBindAddress(String(value)) ? undefined : MCP_BIND_ADDRESS_INVALID),
       },
     },
     {

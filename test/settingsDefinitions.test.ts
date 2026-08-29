@@ -168,12 +168,30 @@ describe("settingsPatchFor", () => {
       mcpBindAddress: "192.168.1.5",
     });
     expect(settingsPatchFor("mcpBindAddress", "[::1]")).toEqual({ mcpBindAddress: "::1" });
-    expect(settingsPatchFor("mcpBindAddress", "localhost")).toEqual({
-      mcpBindAddress: "localhost",
-    });
-    for (const bad of ["", "192.168.1", "999.1.1.1", "evil.example", 27125, null]) {
+    for (const bad of [
+      "",
+      "192.168.1",
+      "999.1.1.1",
+      "evil.example",
+      // A name, however special: it lands on 127.0.0.1 or ::1 depending on a hosts file.
+      "localhost",
+      "192.168.1.5%eth0",
+      27125,
+      null,
+    ]) {
       expect(settingsPatchFor("mcpBindAddress", bad), String(bad)).toBeNull();
     }
+  });
+
+  // Refusing a value silently would let the user leave the tab believing they had changed where
+  // the server is. Obsidian 1.13 shows this under the field.
+  it("says so in the field when what is in it is not an address", () => {
+    const row = definitions.find((d) => "name" in d && d.name === SETTING_COPY.mcpBindAddress.name);
+    const control = row && "control" in row ? row.control : undefined;
+    const validate = control?.type === "text" ? control.validate : undefined;
+    expect(validate).toBeTypeOf("function");
+    expect(validate?.("0.0.0.0")).toBeUndefined();
+    expect(validate?.("evil.example")).toMatch(/not an address/i);
   });
 
   it("trims the name comments are signed with", () => {

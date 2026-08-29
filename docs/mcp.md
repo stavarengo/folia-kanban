@@ -27,7 +27,11 @@ Understand what you are choosing. Bind to `0.0.0.0` and the server answers on **
 - Move it only onto a network you actually trust, for as long as you need it, and put it back on `127.0.0.1` afterwards.
 - Treat the token as what it now is — a password reachable from other machines. **Replace token** after any run where it might have gone somewhere it should not have.
 
-The address must be an IP literal (`0.0.0.0`, `192.168.1.5`, `::1`, `::`) or `localhost`. An IPv6 address goes in the setting bare, and in a URL in brackets — bind `::1` and the endpoint is `http://[::1]:27125/mcp`. A link-local IPv6 address needs its interface with it (`fe80::1%eth0`), because that is the only form anything can bind. An IPv4-mapped address (`::ffff:192.168.1.5`) is refused: it is a second spelling of an address that already has one, and `::ffff:0.0.0.0` would read as one interface while binding all of them. A name that would have to be resolved is refused: an address valid on this computer is a fact about its interfaces, and a name that resolves here today may resolve elsewhere tomorrow. An address this computer does not have fails to bind, and the notice says so.
+The address must be an IP literal — `0.0.0.0`, `192.168.1.5`, `::1`, `::`. A name is refused, `localhost` included: an address valid on this computer is a fact about its interfaces, a name that resolves here today may resolve elsewhere tomorrow, and `localhost` in particular lands on `127.0.0.1` or `::1` depending on a hosts file, so the setting and the socket would disagree about where the server is.
+
+An IPv6 address goes into the setting bare and into a URL in brackets: bind `::1` and the endpoint is `http://[::1]:27125/mcp`. A link-local one wants the interface it is local to (`fe80::1%eth0`); the bare `fe80::1` is accepted by the field but nothing can bind it, so it fails like any other address this computer does not have. An IPv4-mapped address (`::ffff:192.168.1.5`) is refused outright: it is a second spelling of an address that already has one, and `::ffff:0.0.0.0` would read as a single interface while binding every one of them.
+
+Whether this computer actually has the address is settled by the bind, not by the field: an address it does not have fails, and the notice says so. And whenever the server does come up on something other than loopback it says so in a notice — every time, including on Obsidian start, because the setting travels with the vault and the computer now listening on a network may not be the one where that was chosen.
 
 ### Which browser pages the server will talk to
 
@@ -35,10 +39,10 @@ A page open in your browser can post to a server on your machine, or on your net
 
 - A loopback origin is always allowed, whatever the bind is: a page served from this computer is as trusted as this computer.
 - Any other origin must be an **IP literal**, and must be the address the server was bound to — or any literal, when the bind is `0.0.0.0` or `::`, since the server was deliberately put on every address the machine has and cannot tell which of them a legitimate page came in on.
-- A DNS name — `https://evil.example` — is refused under every bind, wildcard included. That is the whole of the protection: a page reaches a server on your network by making a name its author controls resolve to your address, and the `Origin` it then sends is that name, never a literal. Requiring a literal defeats that without narrowing what a bind you consciously chose can be reached from.
+- A DNS name — `https://evil.example` — is refused under every bind, wildcard included. That is what stops DNS rebinding specifically: the attack works by making a name its author controls resolve to your address, and the `Origin` it then sends is that name, never a literal.
 - `null` is an origin, not the absence of one — it is what a sandboxed iframe and a `file://` page send — so it is refused rather than waved through.
 
-This check is not what keeps another host out; the token is, and always was. It only stops a page in somebody's browser spending that host's access on your behalf.
+Be clear about how much this buys. Under a wildcard bind any bare-IP origin is admitted, so a page served from an address rather than a name is not stopped by it at all. This check is not what keeps another host out; the token is, and always was — and a cross-origin call carrying an `Authorization` header has to survive a preflight this server answers `401` before the origin rule is even reached. It is a cheap extra lock on the one attack a token alone does invite, not a boundary to lean on.
 
 There is one server per vault. Every tool addresses a board by the vault path of its board note, so several boards in one vault need no extra setup.
 

@@ -141,12 +141,7 @@ function reject(
   options: McpServerOptions,
 ): { status: number; body: unknown } | null {
   if (!originAllowed(req.headers.origin, options.bindAddress)) {
-    return {
-      status: 403,
-      body: {
-        error: `Only loopback origins, or a page served from ${options.bindAddress} itself, may call this server.`,
-      },
-    };
+    return { status: 403, body: { error: "This origin may not call this server." } };
   }
   if (!secretsMatch(bearerToken(req) ?? "", options.token)) {
     return { status: 401, body: { error: "Missing or wrong bearer token." } };

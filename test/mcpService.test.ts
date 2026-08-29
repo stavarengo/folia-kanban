@@ -3,7 +3,7 @@
 
 import type { App } from "obsidian";
 import { afterEach, describe, expect, it } from "vitest";
-import { McpService, newMcpToken, vaultBoardHost } from "../src/obsidian/mcpService";
+import { McpService, newMcpToken, vaultBoardHost, type McpState } from "../src/obsidian/mcpService";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
 import type { ServerInfo } from "../src/mcp/protocol";
@@ -22,15 +22,20 @@ function setup(settings: Partial<KanbanSettings> = {}) {
   app.vault.addFile("Notes/Plain.md", PLAIN);
   let current: KanbanSettings = { ...DEFAULT_SETTINGS, ...settings };
   const states: string[] = [];
+  const reported: McpState[] = [];
   const service = new McpService({
     app: app as unknown as App,
     getSettings: () => current,
     info: INFO,
-    onState: (s) => states.push(s.kind === "running" ? "running" : s.kind),
+    onState: (s) => {
+      reported.push(s);
+      states.push(s.kind === "running" ? "running" : s.kind);
+    },
   });
   return {
     service,
     states,
+    reported,
     settings: () => current,
     set: (patch: Partial<KanbanSettings>) => {
       current = { ...current, ...patch };
@@ -207,6 +212,27 @@ describe("the server's lifetime", () => {
     await s.set({ mcpBindAddress: "127.0.0.1" });
     expect(s.service.port).toBeGreaterThan(0);
     expect(s.states).toEqual(["failed", "running"]);
+  });
+
+  // The notice the user reads is built from this, and syncs are serialised: by the time a failure
+  // is reported the settings can already name an address nobody ever tried.
+  it("reports the address that was actually tried, not the one now in the settings", async () => {
+    const s = setup({
+      mcpEnabled: true,
+      mcpToken: newMcpToken(),
+      mcpPort: 0,
+      mcpBindAddress: "203.0.113.1",
+    });
+    live = s.service;
+    const failing = s.service.sync(s.settings());
+    // Queued behind the failing start, so the settings have moved on before it is reported.
+    const recovery = s.set({ mcpBindAddress: "127.0.0.1" });
+    await Promise.all([failing, recovery]);
+
+    const failed = s.reported.find((r) => r.kind === "failed");
+    expect(failed).toMatchObject({ kind: "failed", bindAddress: "203.0.113.1" });
+    // And the one that came up says where, so the plugin can say so out loud.
+    expect(s.reported.at(-1)).toMatchObject({ kind: "running", bindAddress: "127.0.0.1" });
   });
 
   // Replacing the token is a security control, so the claim that matters is not that the setting

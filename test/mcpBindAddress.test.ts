@@ -13,7 +13,7 @@ import {
 } from "../src/mcp/bindAddress";
 
 describe("what counts as a bind address", () => {
-  it("takes loopback, the wildcards, an ordinary interface address and localhost", () => {
+  it("takes loopback, the wildcards and an ordinary interface address", () => {
     for (const value of [
       MCP_DEFAULT_BIND_ADDRESS,
       "127.0.0.1",
@@ -21,7 +21,6 @@ describe("what counts as a bind address", () => {
       "0.0.0.0",
       "192.168.1.5",
       "172.17.0.1",
-      "localhost",
       "::1",
       "::",
       "[::1]",
@@ -45,6 +44,9 @@ describe("what counts as a bind address", () => {
       "010.0.0.1",
       "evil.example",
       "board.local",
+      // A name is a name: it lands on 127.0.0.1 or ::1 depending on a hosts file, so the setting
+      // and the socket would disagree about where the server is.
+      "localhost",
       "127.0.0.1:27125",
       "http://127.0.0.1",
       ":::1",
@@ -53,6 +55,10 @@ describe("what counts as a bind address", () => {
       "::ffff:192.168.1.5",
       "::ffff:0.0.0.0",
       "fe80::1%",
+      // The zone is an IPv6 thing. Accepted, it would reach `listen` and be looked up as a name.
+      "192.168.1.5%eth0",
+      "127.0.0.1%lo",
+      "0.0.0.0%eth0",
       "1:2:3:4:5:6:7",
       "1:2:3:4:5:6:7:8:9",
       "gggg::1",
@@ -67,6 +73,8 @@ describe("what counts as a bind address", () => {
     expect(normalizeBindAddress("FE80::1")).toBe("fe80::1");
   });
 
+  // Asked of an origin's hostname as well as of a bind address, which is why `localhost` is
+  // loopback here although the setting will not take it: a browser resolves it to loopback.
   it("knows which addresses keep the server on this machine", () => {
     for (const value of ["127.0.0.1", "127.0.0.53", "localhost", "::1", "[::1]"]) {
       expect(isLoopbackBindAddress(value), value).toBe(true);
@@ -84,10 +92,13 @@ describe("what counts as a bind address", () => {
     expect(isWildcardBindAddress("192.168.1.5")).toBe(false);
   });
 
-  it("does not let a zone change what an address is", () => {
+  it("does not let an IPv6 zone change what the address is", () => {
     expect(isLoopbackBindAddress("::1%lo")).toBe(true);
     expect(isLoopbackBindAddress("fe80::1%eth0")).toBe(false);
     expect(isWildcardBindAddress("::%eth0")).toBe(true);
+    // …and does not turn an IPv4 address into something only a resolver could make sense of.
+    expect(isWildcardBindAddress("0.0.0.0%eth0")).toBe(false);
+    expect(isLoopbackBindAddress("127.0.0.1%lo")).toBe(false);
   });
 });
 
@@ -114,9 +125,13 @@ describe("which origins a bind lets in", () => {
     expect(originAllowed("http://192.168.1.6:5173", "192.168.1.5")).toBe(false);
   });
 
+  // Including addresses that have nothing to do with this machine: under a wildcard the server
+  // cannot tell which of its addresses a legitimate page came in on. Stated as a test because it
+  // is the limit of what the rule buys, and the docs say so rather than claiming more.
   it("lets any address through under a wildcard bind, since the server is on all of them", () => {
     expect(originAllowed("http://192.168.1.5:5173", "0.0.0.0")).toBe(true);
     expect(originAllowed("http://172.17.0.1:5173", "0.0.0.0")).toBe(true);
+    expect(originAllowed("http://203.0.113.9", "0.0.0.0")).toBe(true);
   });
 
   // The rule that does the work: a page cannot get an IP literal into `Origin` for an address it
@@ -133,11 +148,14 @@ describe("which origins a bind lets in", () => {
     expect(originAllowed("not a url", "0.0.0.0")).toBe(false);
   });
 
-  // The zone says which interface an address is local to. It is part of the address the machine
-  // binds and no part of any origin, so it must not stop the two matching.
+  // The zone is part of the address the machine binds and no part of an origin, so it must not
+  // stop the two matching. A browser cannot actually produce this — a `%` inside an IPv6 host
+  // makes `new URL` throw, and such a page is refused — but the bind side still has to be
+  // compared by its address rather than by the string the user stored.
   it("matches a page on a link-local address against the zoned bind", () => {
     expect(originAllowed("http://[fe80::1]:5173", "fe80::1%eth0")).toBe(true);
     expect(originAllowed("http://[fe80::2]:5173", "fe80::1%eth0")).toBe(false);
+    expect(originAllowed("http://[fe80::1%25eth0]:5173", "fe80::1%eth0")).toBe(false);
   });
 
   it("compares two spellings of one IPv6 address as one address", () => {

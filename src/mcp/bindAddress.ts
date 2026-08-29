@@ -3,10 +3,12 @@
 // user typed and the transport can police an `Origin` header against the same rules.
 //
 // The address is a user-facing choice: `127.0.0.1` keeps the server on this machine, `0.0.0.0`
-// puts it on every network this machine is on. Only literals and `localhost` are accepted. A name
-// that has to be resolved is refused, because "an address valid on this machine" is a fact about
-// the machine's interfaces, and a name that resolves elsewhere today may resolve somewhere else
-// tomorrow.
+// puts it on every network this machine is on. Only IP literals are accepted. Anything that has to
+// be resolved is refused, `localhost` included — "an address valid on this machine" is a fact about
+// the machine's interfaces, a name that resolves here today may resolve elsewhere tomorrow, and
+// `localhost` in particular lands on `::1` or `127.0.0.1` depending on a hosts file, so the setting
+// and the socket would disagree about where the server is. An origin is a different question, and
+// there `localhost` is still loopback: see {@link originAllowed}.
 //
 // Accepted here means "the user could have meant this", not "this machine has it". The bind itself
 // is what settles that, and it says so in a notice — the same path a taken port already takes.
@@ -68,14 +70,15 @@ function canonicalIpv6(value: string): string | null {
 
 /** A link-local IPv6 address is only bindable with the interface it is local to (`fe80::1%eth0`),
  *  so the zone is part of the address the user stores — and no part of any origin, which is why it
- *  comes off before anything is compared. */
+ *  comes off before anything is compared. IPv6 only: `192.168.1.5%eth0` is not an address anything
+ *  can bind, and accepting it would leave the socket asking a resolver about it. */
 const ZONE = /^[0-9a-z._-]+$/;
 
-function withoutZone(address: string): string | null {
+function withoutZone(address: string): { address: string; zoned: boolean } | null {
   const at = address.indexOf("%");
-  if (at === -1) return address;
+  if (at === -1) return { address, zoned: false };
   const zone = address.slice(at + 1);
-  return ZONE.test(zone) ? address.slice(0, at) : null;
+  return ZONE.test(zone) ? { address: address.slice(0, at), zoned: true } : null;
 }
 
 /**
@@ -91,20 +94,22 @@ export function normalizeBindAddress(value: string): string {
 /** The address in a form two spellings of the same address share, or `null` when it is not an IP
  *  literal (`localhost` included: it is a name, however special a one). */
 function canonicalIp(value: string): string | null {
-  const address = withoutZone(normalizeBindAddress(value));
-  if (address === null) return null;
-  if (isIpv4(address)) return address;
-  return canonicalIpv6(address);
+  const bare = withoutZone(normalizeBindAddress(value));
+  if (bare === null) return null;
+  if (isIpv4(bare.address)) return bare.zoned ? null : bare.address;
+  return canonicalIpv6(bare.address);
 }
 
-/** Whether the user could plausibly have meant this as a bind address: an IP literal, or the one
- *  name that is guaranteed to be this machine. */
+/** Whether the user could plausibly have meant this as a bind address. Plausibly, not truthfully:
+ *  whether this machine actually has the address is what the bind itself settles, and says so in a
+ *  notice — the same path a taken port already takes. */
 export function isBindAddress(value: string): boolean {
-  const address = normalizeBindAddress(value);
-  return address === "localhost" || canonicalIp(address) !== null;
+  return canonicalIp(value) !== null;
 }
 
-/** Whether binding here keeps the server reachable from this machine only. */
+/** Whether binding here keeps the server reachable from this machine only. Also asked of an
+ *  origin's hostname, which is why `localhost` answers true although it is not a bind address the
+ *  setting accepts: a browser resolves it to loopback and nothing else. */
 export function isLoopbackBindAddress(value: string): boolean {
   if (normalizeBindAddress(value) === "localhost") return true;
   const address = canonicalIp(value);
@@ -128,19 +133,22 @@ export function isWildcardBindAddress(value: string): boolean {
  *
  * - No `Origin` at all is allowed. That is every MCP client; only browsers send one.
  * - A loopback origin is always allowed, whatever the bind is — a page served from this machine is
- *   as trusted as the machine.
+ *   as trusted as the machine, and `localhost` counts, because a browser resolves it to loopback
+ *   whatever a bind address would have meant by it.
  * - Any other origin must be an **IP literal**, and must be the address the server was bound to —
  *   or any literal at all when the bind is a wildcard, since the server was deliberately put on
  *   every address the machine has and cannot know which of them a legitimate page came in on.
- * - A DNS name is refused. This is the whole of the protection and it is worth stating plainly: an
- *   attacker's page reaches a server on your network by making a name they control resolve to your
- *   address, and the `Origin` it then sends is that name, never a literal. Requiring a literal
- *   defeats that without narrowing what a bind the user consciously chose can be reached from.
+ * - A DNS name is refused, which is what stops DNS rebinding specifically: that attack works by
+ *   making a name its author controls resolve to the user's address, and the `Origin` it then sends
+ *   is that name, never a literal.
  * - `null` is an origin, not the absence of one: it is what a sandboxed iframe and a `file://` page
  *   send, so it is refused rather than waved through.
  *
- * The check is not what keeps another host out — the token is, and always was. It only keeps a page
- * in someone's browser from spending that host's access on the user's behalf.
+ * Be clear about how much this buys. Under a wildcard bind any bare-IP origin is admitted, so a page
+ * served from an address rather than a name is not stopped here at all. The check is not what keeps
+ * another host out — the token is, and always was, and a cross-origin call carrying an
+ * `Authorization` header has to survive a preflight this server answers `401` before any of this is
+ * reached. It is a cheap extra lock on the one attack that a token alone does invite.
  */
 export function originAllowed(origin: string | undefined, bindAddress: string): boolean {
   if (typeof origin !== "string" || origin === "") return true;
