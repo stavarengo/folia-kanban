@@ -397,7 +397,10 @@ function TitleFields({
         <span className="folia-prop-key">Resulting display title</span>
         <div className="folia-title-outcome">
           {/* Where a long title stays readable: it wraps mid-word if it has to, so no title can
-              widen the panel, and three lines in it clamps — one click opens the rest. */}
+              widen the panel, and three lines in it clamps — one click opens the rest. The text
+              sits in its own span so the clamp needs no assumption about how a browser treats a
+              button's inner display — belt and braces for older engines, not a fix for this
+              one. */}
           <button
             className={"folia-link folia-title-value" + (expanded ? " is-expanded" : "")}
             title={shown}
@@ -405,7 +408,7 @@ function TitleFields({
             aria-label={expanded ? "Show less of the title" : "Show the whole title"}
             onClick={() => setExpanded((v) => !v)}
           >
-            {shown}
+            <span className="folia-title-value-text">{shown}</span>
           </button>
           {winner && <p className="folia-title-reason folia-muted">{winner.reason}</p>}
           {resolved && (

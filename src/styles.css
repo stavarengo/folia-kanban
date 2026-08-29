@@ -1476,21 +1476,39 @@
   gap: 2px;
 }
 /* Named twice so it out-specifies Obsidian's own `button:not(.clickable-icon)` colouring — this
-   reads as text, not as a control, and the theme's raised face would say otherwise. */
+   reads as text, not as a control, and the theme's raised face would say otherwise.
+
+   The `white-space` and the `height` are the two things Obsidian's app.css does to every button
+   that a wrapping title cannot survive: `white-space: nowrap` means the text never wraps at all,
+   and `height: var(--input-height)` pins the box to one text input's worth of height, so whatever
+   does not fit the first line is clipped. Neither is visible from jsdom, where no Obsidian
+   stylesheet is loaded. */
 .folia-title-value.folia-title-value {
+  display: block;
+  height: auto;
+  white-space: normal;
   text-align: left;
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   color: var(--text-normal);
-  overflow-wrap: anywhere;
+}
+/* The clamp is written on the title's own element rather than on the button. On the engine a
+   current Obsidian ships it makes no difference — measured, both placements clamp. It is a
+   precaution for the older engines this plugin still supports, where a button's inner display is
+   a long-standing source of trouble for `-webkit-line-clamp` and which cannot be measured from
+   here. A plain element needs no assumption either way. */
+.folia-title-value-text {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.folia-title-value.is-expanded {
+.folia-title-value.is-expanded .folia-title-value-text {
   display: block;
   -webkit-line-clamp: none;
+  overflow: visible;
 }
 .folia-title-reason {
   margin: 0;
