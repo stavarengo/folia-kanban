@@ -9,6 +9,13 @@ interface Props {
   onChange: (query: string) => void;
   matchCount: number;
   totalCount: number;
+  /**
+   * Whether the **Your name** setting holds a name. The "Mine" quick filter is `assignee:me`, and
+   * with no name to be, it would be a button that quietly empties the board — so it is not offered
+   * until there is a "me" to filter for. Passed in rather than read from settings here: this
+   * component is presentational, and everything else it draws arrives the same way.
+   */
+  canFilterMine: boolean;
 }
 
 /** The §1 keys, with a one-line hint each, surfaced as autocomplete suggestions. */
@@ -19,6 +26,7 @@ const KEY_HINTS: ReadonlyArray<{ key: FilterKey; hint: string }> = [
   { key: "tag", hint: "area or any tag" },
   { key: "due", hint: "overdue · soon · today · none · YYYY-MM-DD" },
   { key: "context", hint: "context value" },
+  { key: "assignee", hint: "a name · me · none" },
   { key: "is", hint: "blocked · unblocked · blocking" },
   { key: "unread", hint: "comments · replies · none" },
 ];
@@ -26,6 +34,10 @@ const KEY_HINTS: ReadonlyArray<{ key: FilterKey; hint: string }> = [
 /** The closed value sets, offered once the user is typing that key's token. */
 const KEY_VALUES: Partial<Record<FilterKey, readonly string[]>> = {
   due: ["overdue", "soon", "today", "none"],
+  // Not the names on the board: those are the open half of this key, and offering a closed list of
+  // them would read as the only answers it takes. `me` and `none` are the two values that mean
+  // something the typed name cannot say.
+  assignee: ["me", "none"],
   is: ["blocked", "unblocked", "blocking"],
   unread: ["comments", "replies", "none"],
 };
@@ -82,7 +94,7 @@ function applySuggestion(
 }
 
 export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
-  { query, onChange, matchCount, totalCount },
+  { query, onChange, matchCount, totalCount, canFilterMine },
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -239,6 +251,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
       </div>
 
       <div className="folia-toolbar-filters" role="group" aria-label="Quick filters">
+        {canFilterMine && chip("assignee", "me", "user", "Mine")}
         {chip("due", "overdue", "alert", "Overdue")}
         {chip("due", "soon", "calendar", "Due soon")}
         {chip("is", "blocked", "ban", "Blocked")}

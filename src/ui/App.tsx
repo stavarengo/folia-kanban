@@ -482,6 +482,22 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           };
         }),
       setPriority: (path, value) => setPriorityAndReload(path, value),
+      setAssignee: (path, value) => {
+        void (async () => {
+          const name = value.trim();
+          try {
+            // An empty name removes the key rather than leaving `assignee:` sitting there empty —
+            // an unassigned card should read as one in its note too, and `assignee:none` finds it
+            // either way.
+            if (name) await repo.setFrontmatter(path, { assignee: name });
+            else await repo.unsetFrontmatterKey(path, "assignee");
+          } catch (e) {
+            reportError(e);
+          } finally {
+            await load();
+          }
+        })();
+      },
       renameCard: (path, title) => {
         const t = title.trim();
         if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
@@ -732,6 +748,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
       doneColumnId,
       relations: relationCountsValue,
       unread: unreadStateOf(settings, pinnedSeen),
+      me: settings.userName,
     }),
     [todayValue, doneColumnId, relationCountsValue, settings, pinnedSeen],
   );
@@ -874,6 +891,7 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
                     onChange={setQuery}
                     matchCount={counts.match}
                     totalCount={counts.total}
+                    canFilterMine={settings.userName.trim() !== ""}
                   />
                   {board.cardFolderWarning && (
                     <div className="folia-card-folder-notice" role="status">

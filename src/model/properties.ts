@@ -58,6 +58,14 @@ const FOLIA_PROPERTIES = [
     toolRefusal: "use update_card's own `due` field",
   },
   {
+    key: "assignee",
+    scope: "card",
+    panelField: true,
+    // No `toolRefusal`: a name is a plain string with nothing behind it — no vocabulary the board
+    // has to learn, no history line owed, no format the board would misread — so an agent writing
+    // it through `properties` gets exactly what the panel's own field writes.
+  },
+  {
     key: "title",
     scope: "card",
     panelField: true,

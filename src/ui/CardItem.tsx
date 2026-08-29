@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
 import type { UnreadState } from "../model/unread";
-import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
+import { assigneeValues, cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
 import {
   useBoardActions,
@@ -462,6 +462,10 @@ function CardItemInner({
                   : (card.subItems?.find((i) => i.index === menu.todoIndex)?.status ?? "")
               }
               priority={typeof fm.priority === "string" ? fm.priority : ""}
+              // The first name only: the menu's one-click item asks "is this mine", and a card
+              // naming several people is answered by the panel's field, not by a menu entry that
+              // would have to pick one of them to remove.
+              assignee={assigneeValues(card)[0] ?? ""}
               isDone={!canComplete}
               canMoveUp={edges.canMoveUp}
               canMoveDown={edges.canMoveDown}

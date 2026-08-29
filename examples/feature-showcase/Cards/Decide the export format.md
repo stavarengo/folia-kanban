@@ -3,6 +3,7 @@ status: todo
 order: 4
 priority: C
 area: docs
+assignee: ana maria
 blocks:
   - "[[Draft the announcement post]]"
 a-result-of:

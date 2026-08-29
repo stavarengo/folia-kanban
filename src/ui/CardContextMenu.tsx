@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { samePriority } from "../model/priorities";
-import { priorityOptions, priorityTone } from "./cardView";
-import { useBoardActions } from "./context";
+import { priorityOptions, priorityTone, sameAssignee } from "./cardView";
+import { useBoardActions, useSettings } from "./context";
 import { Icon, type IconName } from "./icons";
 
 export interface ContextTarget {
@@ -18,6 +18,11 @@ interface Props {
   path: string;
   /** The card's current priority frontmatter value (for the "Change priority" group). */
   priority: string;
+  /**
+   * Who the card is assigned to right now, as its note spells it — `""` when nobody is. Decides
+   * whether the menu offers to take the card or to hand it back.
+   */
+  assignee: string;
   /** Whether the card already sits in the board's "done" column (hides "Mark done"). */
   isDone: boolean;
   /** For a todo target: the column its line currently claims, `""` when it claims none. */
@@ -34,6 +39,7 @@ export function CardContextMenu({
   target,
   path,
   priority,
+  assignee,
   isDone,
   todoColumn = "",
   canMoveUp,
@@ -42,6 +48,10 @@ export function CardContextMenu({
   onClose,
 }: Props) {
   const a = useBoardActions();
+  // The **Your name** setting is the plugin's whole notion of who "I" am, so with none set there is
+  // nobody to assign the card to in one click and the item is not offered — the detail panel's own
+  // field, which takes a typed name, is where an unnamed user assigns anything.
+  const me = useSettings().userName.trim();
   const ref = useRef<HTMLDivElement>(null);
   // True once an item was activated. On dismissal (Escape / outside-click) we restore focus to the
   // opener; when an action ran we must NOT, since the action may have moved focus elsewhere on
@@ -186,6 +196,10 @@ export function CardContextMenu({
           {item("Rename", "pencil", onRename)}
           {item("Override card title", "type", () => a.editTitleOverride(path))}
           {!isDone && item("Mark done", "check-circle", () => a.complete(path))}
+          {me !== "" &&
+            (sameAssignee(assignee, me)
+              ? item("Unassign", "user", () => a.setAssignee(path, ""))
+              : item("Assign to me", "user", () => a.setAssignee(path, me)))}
           {item("Open note", "external-link", () => a.openNote(path))}
 
           <div className="folia-menu-divider" />
