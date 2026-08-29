@@ -258,7 +258,17 @@ function AssigneeField({
               ? "Take your name off this card, leaving anyone else on it"
               : `Add ${me} to this card`
           }
-          onClick={onToggleMine}
+          // Pressing this must be ONE write, not a race with the field's own. Without the
+          // preventDefault, a pointer press blurs the input first, which commits whatever is
+          // half-typed there — two writes in flight, each computed from the card as it was before
+          // the other, and which one lands last decides the answer. So the press keeps focus where
+          // it is, the draft is put back to what the note actually says, and only the toggle is
+          // written: clicking a button that names one person is not a way of saving another.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setDraft(value);
+            onToggleMine();
+          }}
         >
           {mine ? "Unassign me" : "Assign to me"}
         </button>
