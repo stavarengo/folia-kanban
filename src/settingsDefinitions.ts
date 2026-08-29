@@ -187,7 +187,7 @@ export const MCP_TOKEN_REGENERATE = {
   replacedNotCopied:
     "New token generated, but it could not be copied to the clipboard. Use Copy token to get it.",
   replacedButDown:
-    "New token generated, but the server did not come back up on it. Check the port setting.",
+    "New token generated, but the server did not come back up on it. Check the port and bind-address settings.",
   missing: "Turn agent access on first — the token is generated then.",
 } as const;
 

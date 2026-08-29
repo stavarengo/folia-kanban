@@ -778,11 +778,7 @@ class KanbanSettingTab extends PluginSettingTab {
       this.pendingMcpPort = patch.mcpPort;
       return;
     }
-    // Carrying whatever the text fields were still holding: any other settings write restarts the
-    // server, and it must not restart on an address the user has already typed over. Switching
-    // agent access on with a new address in the field is the case that matters — without this the
-    // server would come up on the stored address and move again when the tab closed.
-    void this.plugin.updateSettings({ ...this.heldPatch(), ...patch }).then(() => {
+    void this.plugin.updateSettings(patch).then(() => {
       // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
       // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
       // later reaches this method at all, but the version is asked anyway: the API is @since 1.13.0
@@ -814,7 +810,10 @@ class KanbanSettingTab extends PluginSettingTab {
   }
 
   /** Everything the text fields are holding that differs from what is stored, taken out of their
-   *  hands: whoever calls this owns writing it. */
+   *  hands. Only {@link commitHeldFields} calls it: a held value is deliberately not visible to any
+   *  other write, because every keystroke passes through it. Editing 192.168.1.5 into 192.168.1.55
+   *  passes through addresses that are real and bindable, and switching a toggle in the middle of
+   *  that must not be what decides where the server listens. */
   private heldPatch(): Partial<KanbanSettings> {
     const patch: Partial<KanbanSettings> = {};
     const { pendingUserName: name, pendingMcpPort: port, pendingMcpBindAddress: address } = this;
@@ -955,9 +954,7 @@ class KanbanSettingTab extends PluginSettingTab {
         .setDesc(SETTING_COPY[key].desc)
         .addToggle((t) =>
           t.setValue(s[key]).onChange((v) => {
-            // Same as the declarative path: a toggle restarts the server, so it must carry what the
-            // address and port fields are still holding rather than restart on the stored ones.
-            const saved = this.plugin.updateSettings({ ...this.heldPatch(), [key]: v });
+            const saved = this.plugin.updateSettings({ [key]: v });
             // Agent access gates every row below it, so switching it redraws the tab.
             if (key === "mcpEnabled") void saved.then(() => this.render());
           }),
@@ -996,8 +993,12 @@ class KanbanSettingTab extends PluginSettingTab {
           // text that is not an address, believing the server had moved to it.
           t.inputEl.addEventListener("blur", () => {
             const typed = t.inputEl.value.trim();
-            if (typed !== "" && settingsPatchFor("mcpBindAddress", typed) === null) {
-              new Notice(MCP_BIND_ADDRESS_INVALID, 5000);
+            if (settingsPatchFor("mcpBindAddress", typed) === null) {
+              // Emptying the field is how someone tries to put the address back, and the
+              // placeholder then shows 127.0.0.1 in grey — which would read as having done it
+              // while the server was still on every interface. So the field is always put back to
+              // where the server actually is, and only a value that was meant says why it went.
+              if (typed !== "") new Notice(MCP_BIND_ADDRESS_INVALID, 5000);
               t.setValue(this.plugin.settings.mcpBindAddress);
             }
             this.commitHeldFields();
