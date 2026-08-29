@@ -1367,14 +1367,12 @@ export function CardDetail({
   // name that was typed, which is what the field says it does — while the button beside it only
   // ever adds or removes the reader.
   const curAssignees = assigneeValues(card);
-  // Everyone this board's cards already name, plus whoever this card names when the board has not
-  // caught up yet — the same courtesy `priorityOptions` does for a priority mid-reload. Computed
-  // plainly rather than memoized: this sits below the panel's early returns, where a hook cannot
-  // go, and it is a walk over cards the same render already has in hand.
+  // Everyone this board's cards already name. This card's own names need no special case: it is
+  // one of those cards, so they are in the list by construction — and the list is only a set of
+  // suggestions for a field that takes any name typed into it. Computed plainly rather than
+  // memoized: this sits below the panel's early returns, where a hook cannot go, and it is a walk
+  // over cards the same render already has in hand.
   const assigneeOptions = boardAssignees(Object.values(board.cards));
-  for (const name of curAssignees) {
-    if (!assigneeOptions.some((n) => sameAssignee(n, name))) assigneeOptions.unshift(name);
-  }
   // The note as the title rules read it — its H1 and whatever headings the description carries —
   // so the panel judges a title exactly the way the board does. Null until this card's body has
   // been read; the title preview shows the board's own answer until then.

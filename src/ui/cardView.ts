@@ -204,7 +204,13 @@ export function boardAssignees(cards: readonly Card[]): string[] {
       if (!seen.has(key)) seen.set(key, name);
     }
   }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  // Sorted by the same key the deduplication used, so `@alex` sits under "a" beside a plain `alex`
+  // rather than ahead of every name because of a character the plugin has already agreed to ignore.
+  return [...seen.entries()]
+    .sort(
+      ([a], [b]) => a.localeCompare(b, undefined, { sensitivity: "base" }) || a.localeCompare(b),
+    )
+    .map(([, name]) => name);
 }
 
 /** Whole-day difference (target − today), both as YYYY-MM-DD. */
