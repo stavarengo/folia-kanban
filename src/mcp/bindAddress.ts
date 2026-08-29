@@ -137,8 +137,9 @@ export function isLoopbackBindAddress(value: string): boolean {
   return address.startsWith("127.") || address === "0:0:0:0:0:0:0:1";
 }
 
-/** Whether binding here means "every address this machine has", which is what `0.0.0.0` and `::`
- *  ask for — including the ones the machine picks up later, on a network it joins tomorrow. */
+/** Whether binding here means "every address of its family this machine has" — `0.0.0.0` for IPv4,
+ *  `::` for IPv6 and, on a dual-stack machine, IPv4 with it — including the ones the machine picks
+ *  up later, on a network it joins tomorrow. */
 export function isWildcardBindAddress(value: string): boolean {
   const address = canonicalIp(value);
   return address === "0.0.0.0" || address === "0:0:0:0:0:0:0:0";

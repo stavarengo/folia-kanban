@@ -778,7 +778,11 @@ class KanbanSettingTab extends PluginSettingTab {
       this.pendingMcpPort = patch.mcpPort;
       return;
     }
-    void this.plugin.updateSettings(patch).then(() => {
+    // Carrying whatever the text fields were still holding: any other settings write restarts the
+    // server, and it must not restart on an address the user has already typed over. Switching
+    // agent access on with a new address in the field is the case that matters — without this the
+    // server would come up on the stored address and move again when the tab closed.
+    void this.plugin.updateSettings({ ...this.heldPatch(), ...patch }).then(() => {
       // The rows that depend on this one (side-panel layout, add-card open mode) enable or disable
       // from a predicate; this is what re-evaluates them without redrawing the tab. Only 1.13 and
       // later reaches this method at all, but the version is asked anyway: the API is @since 1.13.0
@@ -805,6 +809,13 @@ class KanbanSettingTab extends PluginSettingTab {
    * it home.
    */
   private commitHeldFields(): void {
+    const patch = this.heldPatch();
+    if (Object.keys(patch).length > 0) void this.plugin.updateSettings(patch);
+  }
+
+  /** Everything the text fields are holding that differs from what is stored, taken out of their
+   *  hands: whoever calls this owns writing it. */
+  private heldPatch(): Partial<KanbanSettings> {
     const patch: Partial<KanbanSettings> = {};
     const { pendingUserName: name, pendingMcpPort: port, pendingMcpBindAddress: address } = this;
     this.pendingUserName = null;
@@ -814,7 +825,7 @@ class KanbanSettingTab extends PluginSettingTab {
     if (port !== null && port !== this.plugin.settings.mcpPort) patch.mcpPort = port;
     if (address !== null && address !== this.plugin.settings.mcpBindAddress)
       patch.mcpBindAddress = address;
-    if (Object.keys(patch).length > 0) void this.plugin.updateSettings(patch);
+    return patch;
   }
 
   /** The imperative tab, for Obsidian below 1.13. Obsidian 1.13 and later never calls this: it
@@ -944,7 +955,9 @@ class KanbanSettingTab extends PluginSettingTab {
         .setDesc(SETTING_COPY[key].desc)
         .addToggle((t) =>
           t.setValue(s[key]).onChange((v) => {
-            const saved = this.plugin.updateSettings({ [key]: v });
+            // Same as the declarative path: a toggle restarts the server, so it must carry what the
+            // address and port fields are still holding rather than restart on the stored ones.
+            const saved = this.plugin.updateSettings({ ...this.heldPatch(), [key]: v });
             // Agent access gates every row below it, so switching it redraws the tab.
             if (key === "mcpEnabled") void saved.then(() => this.render());
           }),
