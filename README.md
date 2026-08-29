@@ -286,7 +286,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
   - **Open the new card's details in** — which presentation the two detail-opening add flows use.
 - **Comments and history**
   - **Your name** — signs the comments you write from the board, and tells the board which comments are yours for [unread marking](#unread-comments). Empty (the default) writes them unsigned.
-  - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due/order changes), or `all` (also comments, subtasks and blocking links).
+  - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due changes), or `all` (also comments, subtasks and blocking links).
 - **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp). Desktop only: the whole section is absent on mobile.
 
 The version the vault is running is the last row, below the sections.
