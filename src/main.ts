@@ -36,6 +36,12 @@ import {
   type StoredSettings,
 } from "./settings";
 import {
+  heldFieldOutcome,
+  settingDefinitions,
+  settingsPatchFor,
+  type HeldFieldKey,
+} from "./settingsDefinitions";
+import {
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_CONTROLS,
@@ -43,13 +49,9 @@ import {
   SETTING_GROUPS,
   TAB_REDRAW_KEYS,
   VERSION_SETTING_NAME,
-  heldFieldOutcome,
   isRowDisabled,
-  settingDefinitions,
-  settingsPatchFor,
   type EditableSettingKey,
-  type HeldFieldKey,
-} from "./settingsDefinitions";
+} from "./settingsLayout";
 import {
   NEW_BOARD_BASENAME,
   applyBoardFrontmatter,
