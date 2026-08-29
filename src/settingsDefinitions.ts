@@ -182,7 +182,8 @@ export interface HeldFieldOutcome {
   /** What the field must show once focus leaves it — never what was typed and refused, always a
    *  value that is stored, or that leaving the field is about to store. */
   show: string;
-  /** The patch to write, or `null` when the value was refused or is the one already stored. */
+  /** The patch to write, or `null` when the value was refused, or is the one already stored *and*
+   *  already recorded as chosen — see `alreadySet` on {@link heldFieldOutcome}. */
   commit: Partial<KanbanSettings> | null;
   /** The message shown under the field while it holds something that is not a value, or `null`. */
   error: string | null;
@@ -201,11 +202,19 @@ export interface HeldFieldOutcome {
  * the field until focus leaves is the only way either setting can be typed at all — and leaving it
  * is then also the only moment the field can be put back to what the server is actually on, which
  * an emptied field showing a grey default otherwise lies about.
+ *
+ * `alreadySet` is why a value identical to the one on screen can still be worth writing. Settings
+ * are stored only where someone set them, so a field showing the default is showing a value nobody
+ * chose; typing that same value *is* the choice, and skipping the write because "it did not change"
+ * would throw it away. These two fields are where that matters most: a release that ever moves
+ * `MCP_DEFAULT_PORT` or the default bind address would otherwise move a server the user had
+ * deliberately put there.
  */
 export function heldFieldOutcome(
   key: HeldFieldKey,
   typed: string,
-  stored: KanbanSettings,
+  settings: KanbanSettings,
+  alreadySet: boolean,
 ): HeldFieldOutcome {
   const patch = settingsPatchFor(key, typed);
   const accepted = patch?.[key];
@@ -214,7 +223,7 @@ export function heldFieldOutcome(
     // it still gets the inline message while the field is being typed into.
     const error = HELD_FIELD_INVALID[key];
     return {
-      show: String(stored[key]),
+      show: String(settings[key]),
       commit: null,
       error,
       notice: typed.trim() === "" ? null : error,
@@ -222,7 +231,7 @@ export function heldFieldOutcome(
   }
   return {
     show: String(accepted),
-    commit: accepted === stored[key] ? null : patch,
+    commit: accepted === settings[key] && alreadySet ? null : patch,
     error: null,
     notice: null,
   };
