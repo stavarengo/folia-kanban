@@ -345,7 +345,13 @@ describe("assignment (20260827.03)", () => {
       card({ assignee: ["Rafa", "@alex"] }, "C"),
       card({}, "D"),
     ];
+    // Sorted by the name the plugin compares by, so a leading `@` does not jump the queue.
     expect(boardAssignees(cards)).toEqual(["@alex", "rafa", "Zoe"]);
+    expect(boardAssignees([card({ assignee: ["Zoe", "@bo", "ana"] }, "A")])).toEqual([
+      "ana",
+      "@bo",
+      "Zoe",
+    ]);
   });
 
   it("filters by name, by nobody, and by whoever the reader is", () => {

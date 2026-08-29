@@ -127,7 +127,7 @@ export const SETTING_COPY = {
   },
   userName: {
     name: "Your name",
-    desc: "Signs the comments you write from the board (e.g. “alex” → “- _2026-08-21 11:49 @alex:_ …”), so your own comments never show as unread and a comment landing after one of yours reads as a reply. Leave empty to write comments unsigned.",
+    desc: "Who you are on this board. Signs the comments you write (e.g. “alex” → “- _2026-08-21 11:49 @alex:_ …”), so your own never show as unread and one landing after yours reads as a reply — and it is who “me” means when you assign a card to yourself or filter the board down to your own. Leave empty to write comments unsigned; the one-click assign and the Mine filter are then not offered, and a name typed into a card by hand still works.",
   },
   historyScope: {
     name: "What history records",
@@ -260,7 +260,7 @@ export const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]
   addCardOpenMode: ["add card", "new card", "modal"],
   cardNextTodos: ["todos", "checklist", "preview"],
   subitemsDefault: ["subcards", "collapse", "expand"],
-  userName: ["comments", "author", "signature", "unread"],
+  userName: ["comments", "author", "signature", "unread", "assign", "assignee", "mine"],
   historyScope: ["history scope", "log", "audit"],
   boardPan: ["pan", "scroll sideways", "shift"],
   boardSetupCommands: ["board setup", "create board", "convert to board"],
