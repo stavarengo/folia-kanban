@@ -22,6 +22,7 @@ import {
   DEPENDENT_SETTING_KEYS,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
+  ABOUT_HEADING,
   SETTING_CONTROLS,
   SETTING_COPY,
   SETTING_GROUPS,
@@ -126,6 +127,7 @@ describe("settingDefinitions", () => {
   it("is the only place the imperative tab can get the tab's wording from", () => {
     const literals = mainStringLiterals();
     const wording = [
+      ABOUT_HEADING,
       ...SETTING_GROUPS.map((g) => g.heading),
       ...Object.values(SETTING_COPY).flatMap((c) => [c.name, c.desc]),
       ...[MCP_TOKEN_COPY, MCP_TOKEN_REGENERATE].flatMap((c) => [c.name, c.desc, c.button]),
@@ -138,16 +140,22 @@ describe("settingDefinitions", () => {
   });
 
   it("reports the version it is given", () => {
-    expect(definitions.at(-1)).toMatchObject({ name: "Version", desc: "1.2.3" });
+    // Under a heading of its own: below 1.13 a heading is a row with siblings, not a container, so
+    // a version row after the last section would read as part of it.
+    expect(definitions.at(-1)).toMatchObject({
+      heading: ABOUT_HEADING,
+      items: [{ name: "Version", desc: "1.2.3" }],
+    });
   });
 
   // The tab used to be one flat list of fourteen rows whose only grouping was a naming convention
   // inside the row names ("Side panel — ..."). The groups are the structure now, and this is what
   // stops a row from being added to the copy and forgotten by the layout, or listed twice.
   it("lays the tab out as the groups it declares, with every setting under exactly one heading", () => {
-    expect(definitions.filter(isGroup).map((g) => g.heading)).toEqual(
-      SETTING_GROUPS.map((g) => g.heading),
-    );
+    expect(definitions.filter(isGroup).map((g) => g.heading)).toEqual([
+      ...SETTING_GROUPS.map((g) => g.heading),
+      ABOUT_HEADING,
+    ]);
     const laidOut = SETTING_GROUPS.flatMap((g) => [...g.keys]);
     expect(new Set(laidOut)).toEqual(new Set(Object.keys(SETTING_COPY)));
     expect(laidOut).toHaveLength(new Set(laidOut).size);
@@ -188,7 +196,7 @@ describe("settingDefinitions", () => {
     for (const key of DEPENDENT_SETTING_KEYS)
       expect(SETTING_COPY[key].desc, key).toMatch(/\bOnly used\b/);
     expect(SETTING_COPY.sidePanelMode.desc).toContain(
-      "Only used when details open in the side panel",
+      "Only used when “Show details in” is the side panel",
     );
     expect(SETTING_COPY.addCardOpenMode.desc).toContain(
       "Only used by the two flows that open them",

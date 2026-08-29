@@ -1,5 +1,6 @@
 import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
 import {
+  DEFAULT_SETTINGS,
   DETAIL_WIDTH_MAX,
   DETAIL_WIDTH_MIN,
   MCP_PORT_MAX,
@@ -102,7 +103,7 @@ export const SETTING_COPY = {
   },
   sidePanelMode: {
     name: "Side panel layout",
-    desc: "Split shrinks the board to make room for the panel; float lets the panel overlay the columns. Only used when details open in the side panel.",
+    desc: "Split shrinks the board to make room for the panel; float lets the panel overlay the columns. Only used when “Show details in” is the side panel — a new card's details, opened by the add-card setting into a panel of their own, carry the layout that setting names.",
   },
   detailWidth: {
     name: "Side panel width",
@@ -266,8 +267,10 @@ export const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]
   boardSetupFileMenu: ["board setup", "create board", "convert to board", "file explorer"],
   boardSetupEditorMenu: ["board setup", "convert to board", "right-click"],
   mcpEnabled: ["mcp", "agent", "server"],
-  mcpPort: ["mcp", "port", "27125"],
-  mcpBindAddress: ["mcp", "bind", "127.0.0.1", "loopback", "network"],
+  // Taken from the defaults rather than typed out again: a release that moves either would
+  // otherwise leave the search pointing at a value nothing uses.
+  mcpPort: ["mcp", "port", String(DEFAULT_SETTINGS.mcpPort)],
+  mcpBindAddress: ["mcp", "bind", MCP_DEFAULT_BIND_ADDRESS, "loopback", "network"],
 };
 
 /** What a row needs the settings to say before it means anything. A row whose dependency is not met
@@ -324,6 +327,16 @@ export const MCP_TOKEN_REGENERATE = {
     "New token generated, but the server did not come back up on it. Check the port and bind-address settings.",
   missing: "Turn agent access on first — the token is generated then.",
 } as const;
+
+/**
+ * The heading the version row sits under, and the row's own label.
+ *
+ * The heading is not decoration. Below Obsidian 1.13 a heading is a row, not a container — a
+ * `Setting` with `setHeading()` and siblings after it — so a version row appended after the last
+ * section would read as part of that section, which on desktop is agent access. Giving it a
+ * heading of its own is what makes the two tabs say the same thing.
+ */
+export const ABOUT_HEADING = "About";
 
 /** Label of the row that reports the installed version. */
 export const VERSION_SETTING_NAME = "Version";

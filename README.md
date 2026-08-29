@@ -289,7 +289,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
   - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due changes), or `all` (also comments, subtasks and blocking links).
 - **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp). Desktop only: the whole section is absent on mobile.
 
-The version the vault is running is the last row, below the sections.
+The version the vault is running is the last row, under an **About** heading of its own.
 
 ## Agent access (MCP)
 
