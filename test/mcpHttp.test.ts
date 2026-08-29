@@ -180,6 +180,21 @@ describe("the MCP endpoint", () => {
       }),
     ).rejects.toThrow(/not an address/);
   });
+
+  // `listen` takes the string literally, so an address that only survives normalisation — what a
+  // hand-edited `data.json` carries, since it never passed through the settings tab — would be
+  // resolved as a name and fail.
+  it("binds an address that needs normalising first", async () => {
+    const padded = await startMcpServer({
+      host: { listBoards: () => [], repoFor: () => null },
+      info: { name: "n", title: "t", version: "0" },
+      port: 0,
+      bindAddress: "  127.0.0.1  ",
+      token: TOKEN,
+    });
+    expect(padded.address).toBe("127.0.0.1");
+    await padded.close();
+  });
 });
 
 // The bind address the user chose is what the origin check is judged against, so the rule needs a

@@ -7,6 +7,9 @@
 // that has to be resolved is refused, because "an address valid on this machine" is a fact about
 // the machine's interfaces, and a name that resolves elsewhere today may resolve somewhere else
 // tomorrow.
+//
+// Accepted here means "the user could have meant this", not "this machine has it". The bind itself
+// is what settles that, and it says so in a notice — the same path a taken port already takes.
 
 /** Where the server binds unless the user says otherwise: this machine and nothing else. */
 export const MCP_DEFAULT_BIND_ADDRESS = "127.0.0.1";
@@ -22,21 +25,15 @@ function isIpv4(value: string): boolean {
   return octets.every((o) => IPV4_OCTET.test(o) && Number(o) <= 255);
 }
 
-/** The two hex groups an embedded IPv4 tail (`::ffff:192.168.1.5`) stands for. */
-function ipv4AsGroups(value: string): string[] {
-  const [a = 0, b = 0, c = 0, d = 0] = value.split(".").map(Number);
-  return [(((a << 8) | b) >>> 0).toString(16), (((c << 8) | d) >>> 0).toString(16)];
-}
-
-/** One side of an IPv6 address as canonical hex groups, or `null` when any group is not one. */
-function ipv6Groups(parts: string[], allowIpv4Tail: boolean): string[] | null {
+/** One IPv6 address as canonical hex groups, or `null` when any group is not one.
+ *
+ *  An embedded IPv4 tail (`::ffff:192.168.1.5`) is refused rather than parsed. It is a second
+ *  spelling of an address that already has one, and one of its spellings is a trap: `::ffff:0.0.0.0`
+ *  reads as a specific address here while Node binds it as the IPv4 wildcard, which would put the
+ *  vault on every interface while the setting, the warning and the origin rule all said otherwise. */
+function ipv6Groups(parts: string[]): string[] | null {
   const groups: string[] = [];
-  for (const [i, part] of parts.entries()) {
-    if (allowIpv4Tail && i === parts.length - 1 && part.includes(".")) {
-      if (!isIpv4(part)) return null;
-      groups.push(...ipv4AsGroups(part));
-      continue;
-    }
+  for (const part of parts) {
     if (!IPV6_GROUP.test(part)) return null;
     groups.push(part.replace(/^0+(?=.)/, ""));
   }
@@ -45,8 +42,8 @@ function ipv6Groups(parts: string[], allowIpv4Tail: boolean): string[] | null {
 
 /** The eight canonical groups a `::` address expands to, or `null` when either side is not one. */
 function compressedIpv6(head: string, tail: string): string | null {
-  const left = head === "" ? [] : ipv6Groups(head.split(":"), false);
-  const right = tail === "" ? [] : ipv6Groups(tail.split(":"), true);
+  const left = head === "" ? [] : ipv6Groups(head.split(":"));
+  const right = tail === "" ? [] : ipv6Groups(tail.split(":"));
   if (left === null || right === null) return null;
   // `::` stands for at least one zero group, so the written groups can never add up to eight.
   if (left.length + right.length > 7) return null;
@@ -65,8 +62,20 @@ function canonicalIpv6(value: string): string | null {
   const halves = value.split("::");
   if (halves.length > 2) return null;
   if (halves.length === 2) return compressedIpv6(halves[0] ?? "", halves[1] ?? "");
-  const groups = ipv6Groups(value.split(":"), true);
+  const groups = ipv6Groups(value.split(":"));
   return groups?.length === 8 ? groups.join(":") : null;
+}
+
+/** A link-local IPv6 address is only bindable with the interface it is local to (`fe80::1%eth0`),
+ *  so the zone is part of the address the user stores — and no part of any origin, which is why it
+ *  comes off before anything is compared. */
+const ZONE = /^[0-9a-z._-]+$/;
+
+function withoutZone(address: string): string | null {
+  const at = address.indexOf("%");
+  if (at === -1) return address;
+  const zone = address.slice(at + 1);
+  return ZONE.test(zone) ? address.slice(0, at) : null;
 }
 
 /**
@@ -82,7 +91,8 @@ export function normalizeBindAddress(value: string): string {
 /** The address in a form two spellings of the same address share, or `null` when it is not an IP
  *  literal (`localhost` included: it is a name, however special a one). */
 function canonicalIp(value: string): string | null {
-  const address = normalizeBindAddress(value);
+  const address = withoutZone(normalizeBindAddress(value));
+  if (address === null) return null;
   if (isIpv4(address)) return address;
   return canonicalIpv6(address);
 }
@@ -96,19 +106,18 @@ export function isBindAddress(value: string): boolean {
 
 /** Whether binding here keeps the server reachable from this machine only. */
 export function isLoopbackBindAddress(value: string): boolean {
-  const address = normalizeBindAddress(value);
-  if (address === "localhost") return true;
+  if (normalizeBindAddress(value) === "localhost") return true;
+  const address = canonicalIp(value);
+  if (address === null) return false;
   // The whole of 127.0.0.0/8 is loopback, not just 127.0.0.1.
-  if (isIpv4(address)) return address.startsWith("127.");
-  return canonicalIpv6(address) === "0:0:0:0:0:0:0:1";
+  return address.startsWith("127.") || address === "0:0:0:0:0:0:0:1";
 }
 
 /** Whether binding here means "every address this machine has", which is what `0.0.0.0` and `::`
  *  ask for — including the ones the machine picks up later, on a network it joins tomorrow. */
 export function isWildcardBindAddress(value: string): boolean {
-  const address = normalizeBindAddress(value);
-  if (isIpv4(address)) return address === "0.0.0.0";
-  return canonicalIpv6(address) === "0:0:0:0:0:0:0:0";
+  const address = canonicalIp(value);
+  return address === "0.0.0.0" || address === "0:0:0:0:0:0:0:0";
 }
 
 /**

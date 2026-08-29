@@ -587,7 +587,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     // A toggle left on while nothing is listening is the one state the user cannot see, so the
     // failure says both what broke and that the switch is now lying.
     new Notice(
-      `Folia Kanban: agent access could not start on ${this.settings.mcpBindAddress}:${this.settings.mcpPort}. ${state.message}`,
+      `Folia Kanban: agent access could not start on address ${this.settings.mcpBindAddress}, port ${this.settings.mcpPort}. ${state.message}`,
       10000,
     );
   }

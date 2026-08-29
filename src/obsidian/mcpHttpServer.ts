@@ -12,7 +12,7 @@
 // itself; this one never starts any, so a GET is refused rather than left hanging.
 
 import { Platform } from "obsidian";
-import { isBindAddress, originAllowed } from "../mcp/bindAddress";
+import { isBindAddress, normalizeBindAddress, originAllowed } from "../mcp/bindAddress";
 import type { BoardHost } from "../mcp/host";
 import {
   PROTOCOL_VERSION,
@@ -305,7 +305,9 @@ export async function startMcpServer(options: McpServerOptions): Promise<Running
   // server behind it.
   server.headersTimeout = HEADERS_TIMEOUT_MS;
   server.requestTimeout = REQUEST_TIMEOUT_MS;
-  return await listen(server, options.port, options.bindAddress);
+  // Normalised, not as typed: `listen` takes the string literally, so the brackets or the padding a
+  // hand-edited `data.json` can carry would be resolved as a name and fail as `ENOTFOUND`.
+  return await listen(server, options.port, normalizeBindAddress(options.bindAddress));
 }
 
 function listen(server: Server, port: number, bindAddress: string): Promise<RunningMcpServer> {
