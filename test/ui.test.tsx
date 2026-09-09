@@ -4927,3 +4927,47 @@ describe("assigning a card (20260827.03)", () => {
     expect(screen.queryByRole("button", { name: "Mine" })).toBeNull();
   });
 });
+
+describe("a board read before a change can land after it (20260828.02)", () => {
+  it("keeps the newer load's result when an older load resolves later", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+
+    const originalLoadBoard = repo.loadBoard.bind(repo);
+    const olderBoard = await originalLoadBoard();
+    await repo.renameCard("Tasks/Alpha.md", "Alpha Renamed");
+    const newerBoard = await originalLoadBoard();
+
+    let resolveOlder!: (b: typeof olderBoard) => void;
+    let resolveNewer!: (b: typeof newerBoard) => void;
+    const older = new Promise<typeof olderBoard>((res) => {
+      resolveOlder = res;
+    });
+    const newer = new Promise<typeof newerBoard>((res) => {
+      resolveNewer = res;
+    });
+    let calls = 0;
+    repo.loadBoard = async () => (++calls === 1 ? older : newer);
+
+    // Two vault changes fire two reloads while both reads are still in flight; the second one
+    // requested is the newer one.
+    act(() => {
+      repo.notify();
+      repo.notify();
+    });
+    expect(calls).toBe(2);
+
+    // The newer read resolves first, then the older one resolves after it — out of order.
+    await act(async () => {
+      resolveNewer(newerBoard);
+    });
+    await screen.findByText("Alpha Renamed");
+    await act(async () => {
+      resolveOlder(olderBoard);
+    });
+    // The stale, older result must not overwrite the newer one that already landed.
+    expect(screen.queryByText("Alpha Renamed")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha")).toBeNull();
+  });
+});

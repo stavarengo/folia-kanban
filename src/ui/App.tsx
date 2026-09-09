@@ -169,11 +169,20 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
+  // Reads can overlap — every vault change fires another `load`, and the read it starts can take
+  // longer than one already in flight. Only the newest requested load may land, the same guard
+  // `CardDetail` applies to its own per-card body reads: a result whose sequence number has been
+  // superseded by the time it resolves is dropped rather than handed to `setBoard`/`setError`.
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
-      setBoard(await repo.loadBoard());
+      const b = await repo.loadBoard();
+      if (seq !== loadSeq.current) return;
+      setBoard(b);
       setError(null);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       setError(e instanceof Error ? e.message : String(e));
     }
   }, [repo]);
