@@ -136,6 +136,56 @@ describe("setSubtaskDone", () => {
   });
 });
 
+describe("setSubtaskDone when the note has moved on", () => {
+  const claimedLine = () =>
+    new FakeRepo(
+      { ...config, priorities: ["high"] },
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+
+  // Ticking a claimed line is two writes, and they must stand or fall together: a box written while
+  // the claim is refused leaves the note saying the work is finished and still in Doing.
+  it("writes both halves when the caller names the line as it reads now", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    // Reworded from elsewhere after the board was read; the caller names the current wording.
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it now [status:: doing]\n";
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: { index: 0, text: "Draft it now" },
+      done: true,
+    });
+
+    const line = (await repo.readBody("Tasks/A.md")).subtasks[0];
+    expect(line).toMatchObject({ text: "Draft it now", done: true, status: "done" });
+  });
+
+  it("writes neither half when the caller names a line the note no longer holds", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it now [status:: doing]\n";
+    const before = repo.files.get("Tasks/A.md")!.body;
+
+    await expect(
+      setSubtaskDone(repo, board, {
+        path: "Tasks/A.md",
+        line: { index: 0, text: "Draft it" },
+        done: true,
+      }),
+    ).rejects.toThrow(/no longer reads "Draft it"/);
+
+    expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+  });
+});
+
 describe("setCardPriority", () => {
   function repoWithOneCard(): FakeRepo {
     return new FakeRepo(

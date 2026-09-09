@@ -67,18 +67,14 @@ export async function setSubtaskDone(
   target: { path: string; line: LineRef; done: boolean; link?: string },
 ): Promise<void> {
   const { path, line, done, link } = target;
-  const { index } = line;
   await repo.toggleSubtask(path, line, done);
-  // `link` matters: for a line naming a child note, `syncSubtaskClaim` refuses to act unless the
-  // caller shows the `[[link]]` it read, so that a line that has since been edited underneath is
-  // not acted on by index alone. A caller that leaves it out gets the checkbox written and the
-  // child left where it was — which is the parity this whole path exists to keep.
-  const sync = syncSubtaskClaim(
-    board,
-    path,
-    link === undefined ? { index } : { index, link },
-    done,
-  );
+  // The follow-up names the line the tick just named — the same `line`, not the board's own reading
+  // of it — so the pair cannot half-land: whatever the checkbox was allowed to touch, the claim is
+  // allowed to touch too. `link` matters on top of that: for a line naming a child note,
+  // `syncSubtaskClaim` refuses to act unless the caller shows the `[[link]]` it read, so a line
+  // edited underneath is not acted on by position alone. A caller that leaves it out gets the
+  // checkbox written and the child left where it was — the parity this whole path exists to keep.
+  const sync = syncSubtaskClaim(board, path, link === undefined ? line : { ...line, link }, done);
   if (sync) await repo.applyMove(sync);
 }
 

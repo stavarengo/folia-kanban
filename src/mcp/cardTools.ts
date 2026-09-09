@@ -421,7 +421,7 @@ const setSubtask = tool({
     text: z
       .string()
       .describe(
-        "The subtask's `text`, exactly as get_card reported it. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
+        "The subtask's `text`, exactly as get_card reports it in `subtasks`. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
       ),
     done: z.boolean(),
   }),
@@ -452,7 +452,7 @@ const setSubtask = tool({
       });
     } catch (e) {
       // The note changed between this call's own read and its write — rarer than a stale index,
-      // and the same answer: nothing was written, so it is the caller's to retry.
+      // and the same answer: the refused write did not land, so it is the caller's to retry.
       if (e instanceof StaleLineError) throw new ToolError(e.message);
       throw e;
     }

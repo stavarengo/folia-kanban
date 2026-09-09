@@ -25,7 +25,7 @@ export class StaleLineError extends Error {}
 /** The refusal above, worded for whoever has to act on it. */
 export function staleLine(kind: "subtask" | "comment", path: string, at: LineRef): StaleLineError {
   return new StaleLineError(
-    `The ${kind} at index ${at.index} of "${path}" no longer reads "${at.text}", so nothing was written — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
+    `The ${kind} at index ${at.index} of "${path}" no longer reads "${at.text}", so that write was refused — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
   );
 }
 

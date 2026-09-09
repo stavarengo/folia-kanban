@@ -1008,13 +1008,16 @@ export function subtaskRef(board: Board, parentPath: string, index: number): Lin
  * anywhere, and it must not start now — and neither does a board with no done column at all, where
  * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
  *
- * `line` is the checklist line as the caller showed it: its index, and for a subcard line the
- * `[[link]]` it carried — see the card branch below for why the index alone is not enough there.
+ * `line` is the checklist line as the caller showed it: its index, its text, and for a subcard line
+ * the `[[link]]` it carried — see the card branch below for why the index alone is not enough there.
+ * The text travels from the caller rather than being re-read from the board on purpose: this write
+ * is the second half of a tick, and the two halves must name the SAME line from one reading, or the
+ * box lands while the claim is refused and the note ends up saying two different things.
  */
 export function syncSubtaskClaim(
   board: Board,
   parentPath: string,
-  line: { index: number; link?: string },
+  line: LineRef & { link?: string },
   done: boolean,
 ): CardMutation | null {
   const { index, link } = line;
@@ -1058,7 +1061,7 @@ export function syncSubtaskClaim(
   if (item.status === undefined) return null; // claims nothing — nothing to keep in step
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
   if (next === item.status) return null;
-  return { path: parentPath, setSubtaskStatus: { index, text: item.text, status: next } };
+  return { path: parentPath, setSubtaskStatus: { index, text: line.text, status: next } };
 }
 
 /**

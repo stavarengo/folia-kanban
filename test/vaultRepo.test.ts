@@ -807,6 +807,27 @@ describe("telling our own writes apart from someone else's (onChange)", () => {
     off();
   });
 
+  // A refused write touched nothing, so it must not claim the note either: the change that made it
+  // refuse is exactly the one the board has to draw.
+  it("keeps swallowing nothing after a write it refused", async () => {
+    const { app, repo } = setup();
+    const file = app.vault.addFile(
+      "basic/Cards/One.md",
+      card("status: todo", "\n# One\n\n## Subtasks\n- [ ] Ship it\n"),
+    );
+    const reload = vi.fn();
+    const off = repo.onChange(reload);
+
+    await expect(
+      repo.toggleSubtask("basic/Cards/One.md", { index: 0, text: "Gone" }, true),
+    ).rejects.toThrow(/no longer reads "Gone"/);
+    app.vault.emitEvent("modify", file);
+    vi.advanceTimersByTime(150);
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    off();
+  });
+
   it("reloads when the metadata cache catches up on a file we wrote, and not on any other", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/Ours.md", card("status: todo", "\n# Ours\n"));

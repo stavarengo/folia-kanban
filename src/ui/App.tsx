@@ -547,14 +547,16 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         return { canMoveUp: i > 0, canMoveDown: i >= 0 && i < list.length - 1 };
       },
       toggleTodo: (path, index, done) => {
-        const b = boardRef.current;
-        // The line as this board read it, text and all: the write refuses rather than tick a
-        // position the note has since given to somebody else's todo. A board that cannot name the
-        // line no longer has the one that was clicked, and the reload already on its way draws it.
-        const line = b && subtaskRef(b, path, index);
-        if (!b || !line) return;
         void (async () => {
           try {
+            // The line as this board read it, text and all: the write refuses rather than tick a
+            // position the note has since given to somebody else's todo. A board that cannot name
+            // the line at all is a board this click no longer fits — said out loud, not swallowed,
+            // and followed by the reload that draws what is really there.
+            const b = boardRef.current;
+            const line = b && subtaskRef(b, path, index);
+            if (!b || !line)
+              throw new Error(`"${path}" no longer has the subtask that was clicked.`);
             // Ticking a box is also a statement about where the work belongs, for a line that
             // claims a column, so the claim is kept in step with the checkbox.
             await setSubtaskDone(repo, b, { path, line, done });
@@ -581,11 +583,11 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       removeTodo: (path, index) => {
-        const b = boardRef.current;
-        const line = b && subtaskRef(b, path, index);
-        if (!line) return;
         void (async () => {
           try {
+            const b = boardRef.current;
+            const line = b && subtaskRef(b, path, index);
+            if (!line) throw new Error(`"${path}" no longer has the todo that was removed.`);
             await repo.removeSubtask(path, line);
           } catch (e) {
             reportError(e);

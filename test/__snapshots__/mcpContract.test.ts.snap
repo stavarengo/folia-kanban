@@ -338,7 +338,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "type": "integer",
         },
         "text": {
-          "description": "The subtask's \`text\`, exactly as get_card reported it. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
+          "description": "The subtask's \`text\`, exactly as get_card reports it in \`subtasks\`. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
           "type": "string",
         },
       },

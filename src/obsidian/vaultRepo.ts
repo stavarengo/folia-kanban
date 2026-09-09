@@ -384,7 +384,12 @@ export class VaultRepository implements CardRepository {
       stale = !stillReads(t, at);
       return stale ? t : write(t);
     });
-    if (stale) throw staleLine(kind, path, at);
+    if (!stale) return;
+    // The bytes are untouched, so this note was never ours to claim: dropping the echo guard the
+    // write set on the way in keeps the next change from elsewhere — the very change that made this
+    // one refuse — from being swallowed as our own.
+    this.recentWrites.delete(path);
+    throw staleLine(kind, path, at);
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
