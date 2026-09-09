@@ -86,12 +86,6 @@ export interface KanbanSettings {
    * in this vault. See `docs/mcp.md`.
    */
   mcpBindAddress: string;
-  /**
-   * The bearer token every MCP request must carry, generated on this install the first time the
-   * server is switched on and kept afterwards — a token that changed on each load would break the
-   * agent configured against it. Empty means "none generated yet", and the server stays off.
-   */
-  mcpToken: string;
 }
 
 /**
@@ -141,30 +135,32 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   mcpEnabled: false,
   mcpPort: MCP_DEFAULT_PORT,
   mcpBindAddress: MCP_DEFAULT_BIND_ADDRESS,
-  mcpToken: "",
 };
 
+/** Where the bearer token used to live: an ordinary settings key, written to `data.json` in the
+ *  clear. It is a secret for a server one machine hosts, and `data.json` travels with the vault, so
+ *  it now lives in `App.secretStorage` instead. The key survives here only as something to take out
+ *  of a file written before that move — see {@link takeStoredMcpToken}. */
+const LEGACY_MCP_TOKEN_KEY = "mcpToken";
+
 /**
- * Agent access switched on for the first time is when its token comes into existence: this is the
- * patch that mints it, or nothing at all. `mint` is called only then — a token that changed on each
- * load would break the client configured against it — and `desktop` is what keeps a phone from
- * minting a secret for a server it can never run. A patch rather than whole settings because the
- * token has to reach {@link StoredSettings}: minted into the running copy alone it would be
- * re-minted on every launch, silently breaking the client already configured with the old one.
+ * Takes a token out of a stored set written before the move to secret storage, removing the key so
+ * the next write heals the file. Returns null when there is nothing to take, which is every file
+ * written since. Mutating rather than returning a copy, because the caller's whole interest is that
+ * the key stops being there.
  */
-export function mcpTokenPatch(
-  settings: KanbanSettings,
-  mint: () => string,
-  desktop: boolean,
-): Partial<KanbanSettings> {
-  if (!settings.mcpEnabled || settings.mcpToken || !desktop) return {};
-  return { mcpToken: mint() };
+export function takeStoredMcpToken(stored: StoredSettings): string | null {
+  const record = stored as Record<string, unknown>;
+  if (!(LEGACY_MCP_TOKEN_KEY in record)) return null;
+  const value = record[LEGACY_MCP_TOKEN_KEY];
+  delete record[LEGACY_MCP_TOKEN_KEY];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 /**
  * What `data.json` holds: only the settings someone actually set — the user in the settings tab, or
- * the plugin writing its own bookkeeping (`collapsedCards`, `commentsSeen`, `commentsBaseline`,
- * `mcpToken`). Everything absent is answered by `DEFAULT_SETTINGS` at read time, which is what lets
+ * the plugin writing its own bookkeeping (`collapsedCards`, `commentsSeen`,
+ * `commentsBaseline`). Everything absent is answered by `DEFAULT_SETTINGS` at read time, which is what lets
  * a later release change a default and have it reach installs that never chose one, and what lets a
  * feature tell "never set" from a deliberate choice that happens to equal the default. Keys this
  * build does not know about are carried through untouched, so a file written by a newer one

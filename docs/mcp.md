@@ -10,7 +10,7 @@ It is off until you turn it on, it listens on `127.0.0.1` — this computer and 
 
 | Setting | What it is |
 | --- | --- |
-| **Enable agent access** | Off by default. Switching it on generates the token (once, kept afterwards) and starts the server. Desktop only: on mobile the whole **Agent access (MCP)** section is absent, heading included, because the plugin has no way to listen for connections there. |
+| **Enable agent access** | Off by default. Switching it on generates the token (once, kept afterwards) and starts the server. |
 | **Server port** | `27125` by default; any port from 1024 to 65535. Change it if something else already holds it. |
 | **Bind address** | `127.0.0.1` by default, which keeps the server on this computer. `0.0.0.0` is every IPv4 address it has, `::` every address; any address other than loopback puts it on a network — see [Moving it off this computer](#moving-it-off-this-computer) before you do. |
 | **Agent token** | A **Copy token** button. The token is a password for every board in this vault — paste it into your client's configuration and nowhere else. |
@@ -122,6 +122,8 @@ A `504` means the server stopped making you wait, not that the call was cancelle
 
 Nothing stops an agent from editing your card files directly — Obsidian gives a plugin no lock on the vault, and a plugin cannot restrict what other software on your computer does with your files. This server is how an agent *can* do the right thing; keeping it to that route is a rule you give your agent, not one the plugin enforces.
 
-The token is stored in the plugin's `data.json`, in the clear, like every other setting. Anything that can read your vault can read it — and on the default loopback bind that is the end of it, because anything that can read your vault already has your files and did not need the server to get them.
+The token is kept in Obsidian's own secret storage, not in the plugin's `data.json`, so it does not travel with the vault: a synced copy, a git remote or a backup carries your settings and your cards but not the credential to the server. It is per install — replace it on one computer and the others keep theirs — and it is generated fresh on any install where agent access is on but no token has been minted yet. A vault opened on a second computer therefore has agent access on with a token of that machine's own, which is what you want, since the server it would host is that machine's too. There is no way back: a token that was in `data.json` when this version first ran is moved into secret storage and removed from the file.
+
+What that does not do is protect the token from anything already running as you on this computer, which is where Obsidian decrypts it to use it. On the default loopback bind that is the end of it, because software running as you already has your files and did not need the server to get them.
 
 Moving the bind address off loopback changes that argument, and it is the reason the setting warns you where it lives. From that moment the token is a credential other machines can use, and it is travelling as plain text over plain HTTP: there is no TLS here, so anything that can watch the connection can take it. The plugin does not fix that for you. Keep a non-loopback bind to a network you trust, keep it on only while you need it, and replace the token afterwards.

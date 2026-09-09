@@ -7,11 +7,11 @@ import {
   SETTINGS_FORMAT,
   SETTINGS_FORMAT_KEY,
   hydrateSettings,
-  mcpTokenPatch,
   migratePathKeyedSettings,
   resolveSettings,
   seenMarkerFor,
   settingsForDisk,
+  takeStoredMcpToken,
   type StoredSettings,
 } from "../src/settings";
 
@@ -253,60 +253,65 @@ describe("the plugin writes only what was set", () => {
     expect(main).not.toContain("this.saveData(this.settings)");
   });
 
-  it("records the token minted at load, so the next launch does not mint another", () => {
+  it("keeps the token where the vault cannot carry it, and writes the file that gave one up", () => {
     const from = main.slice(main.indexOf("async loadSettings"));
-    // Whitespace-insensitive, so where the formatter chose to wrap the call does not decide it.
     const body = from.slice(0, from.indexOf("\n  }"));
-    expect(body).toMatch(/this\.applyToStored\(\s*mcpTokenPatch\(/);
-    expect(body).toContain("if (needsSave || minted) await this.saveSettings();");
+    // Read first, migrate second: a secret already held is the newer of the two, and reading it
+    // after the migration would let a synced data.json overwrite a token replaced here.
+    expect(body.indexOf("readMcpToken(this.app)")).toBeGreaterThan(-1);
+    expect(body.indexOf("readMcpToken(this.app)")).toBeLessThan(
+      body.indexOf("this.takeTokenOutOfStored()"),
+    );
+    expect(body).toContain("if (needsSave || migrated) await this.saveSettings();");
+  });
+
+  // The token reaching `data.json` again is the defect this whole arrangement exists to prevent,
+  // and it would be silent: the file is still written, still readable, still correct in every other
+  // way. The only place a value joins the stored set is `applyToStored`, so a token can only get
+  // back in through a settings patch carrying one.
+  it("never puts the token into the set it writes to disk", () => {
+    expect(main).not.toContain("mcpToken:");
+    expect(main).toContain('private mcpToken = "";');
   });
 });
 
-describe("the agent-access token", () => {
-  const mint = () => "minted";
-
-  it("comes into existence the first time agent access is switched on", () => {
-    const on = { ...DEFAULT_SETTINGS, mcpEnabled: true };
-    expect(mcpTokenPatch(on, mint, true)).toEqual({ mcpToken: "minted" });
+// The token is a credential for a server one machine hosts, and `data.json` travels with the vault
+// — through Sync, a git remote, a backup, onto every device the vault is opened on. It lives in
+// `App.secretStorage` now, which does not travel; what is left here is getting it out of the files
+// that were written before that.
+describe("the agent-access token leaving data.json", () => {
+  it("is not a setting any more, so nothing can write it back by writing settings", () => {
+    expect("mcpToken" in DEFAULT_SETTINGS).toBe(false);
+    expect(Object.keys(settingsForDisk({ commentsBaseline: NOW }))).not.toContain("mcpToken");
   });
 
-  // A token that changed on each load would break the client configured against it, silently, in
-  // the user's own editor.
-  it("is kept once it exists, never reissued", () => {
-    const settled = { ...DEFAULT_SETTINGS, mcpEnabled: true, mcpToken: "already here" };
-    expect(mcpTokenPatch(settled, mint, true)).toEqual({});
+  it("is handed over and taken out of the stored set, so the next write heals the file", () => {
+    const stored: StoredSettings = { commentsBaseline: NOW };
+    (stored as Record<string, unknown>)["mcpToken"] = "carried in the vault";
+    expect(takeStoredMcpToken(stored)).toBe("carried in the vault");
+    expect(stored).toEqual({ commentsBaseline: NOW });
   });
 
-  it("is not minted while agent access is off", () => {
-    expect(mcpTokenPatch(DEFAULT_SETTINGS, mint, true)).toEqual({});
+  // Two different files say "nothing to migrate": one that never had the key, and one written by a
+  // build that had the setting but never switched agent access on. Both have to leave the caller
+  // with nothing to keep — but only the second has a key to remove.
+  it("finds nothing to keep in a file with no token, and still drops an empty key", () => {
+    expect(takeStoredMcpToken({ commentsBaseline: NOW })).toBeNull();
+    const empty: StoredSettings = { commentsBaseline: NOW };
+    (empty as Record<string, unknown>)["mcpToken"] = "";
+    expect(takeStoredMcpToken(empty)).toBeNull();
+    expect(empty).toEqual({ commentsBaseline: NOW });
   });
 
-  // The rows are hidden on mobile, but a vault synced from a desktop arrives with the setting on;
-  // a phone that cannot host the server has no business holding its secret.
-  it("is not minted on a platform that cannot host the server", () => {
-    const on = { ...DEFAULT_SETTINGS, mcpEnabled: true };
-    expect(mcpTokenPatch(on, mint, false)).toEqual({});
-  });
-
-  // How the plugin loads its settings, in one line: this pairing is what stops an enabled-but
-  // tokenless data.json — hand-edited, or synced back from a phone that could not mint one — from
-  // leaving the toggle reading on with nothing listening. A server that is never asked to start
-  // never fails, so nothing would have told the user either.
-  it("repairs settings that arrive switched on with no token, the way loading does", () => {
-    const { settings } = hydrateSettings({ mcpEnabled: true, mcpToken: "" }, NOW);
-    expect(settings.mcpToken).toBe("");
-    expect(mcpTokenPatch(settings, mint, true)).toEqual({ mcpToken: "minted" });
-  });
-
-  // The minted token is a patch precisely so it reaches the stored file. Held only in the running
-  // settings it would be minted again on the next launch, and the client configured with the old
-  // one would stop being able to reach the vault — with nothing said about it.
-  it("survives the reload, because minting it is a write like any other", () => {
-    const first = hydrateSettings(onDisk({ commentsBaseline: NOW, mcpEnabled: true }), NOW);
-    const stored = { ...first.stored, ...mcpTokenPatch(first.settings, mint, true) };
-    const second = hydrateSettings(onDisk(stored), NOW);
-    expect(second.settings.mcpToken).toBe("minted");
-    expect(mcpTokenPatch(second.settings, () => "a different one", true)).toEqual({});
+  // The whole migration, end to end: a file written by the old build is read, the token is taken
+  // out, and what would go back to disk no longer carries it. `hydrateSettings` has to leave the
+  // key alone for this to work — it is no longer one of `DEFAULT_SETTINGS`, so nothing prunes it.
+  it("survives a load of a file written before the move, and does not go back", () => {
+    const legacy = onDisk({ commentsBaseline: NOW, mcpEnabled: true });
+    legacy["mcpToken"] = "written by the old build";
+    const { stored } = hydrateSettings(legacy, NOW);
+    expect(takeStoredMcpToken(stored)).toBe("written by the old build");
+    expect(Object.keys(settingsForDisk(stored))).not.toContain("mcpToken");
   });
 });
 

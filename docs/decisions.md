@@ -49,3 +49,15 @@ So the documented answer is the README caveat under "Unread comments": stamps ar
 Each setup is a separate user gesture, a palette confirmation or a menu click, and the window between them is a single `await`. The sequential case, two boards created one after the other in the same folder, already gets `Cards` and `Cards 1`. An atomic claim would replace a path whose value is its simplicity, to guard against a timing no person produces.
 
 **What would change this:** a report of two boards sharing a folder without anyone editing `card-folder` by hand, or a second caller of `makeBoard` that is not a user gesture (a command run in a loop, an MCP tool).
+
+## Mobile is not supported, and the manifest now says so
+
+**Decided 2026-09-10. `isDesktopOnly: true`, and the gated Node import stays gated.**
+
+`manifest.json` used to declare `"isDesktopOnly": false`, which tells the community directory and every phone user that this plugin runs on a phone. Nothing was ever built for that. `src/styles.css` has one media query, `prefers-reduced-motion`, and no `.is-mobile`, `.is-phone` or `.is-tablet` selector at all, where Obsidian's own stylesheet carries hundreds of rules keyed on those classes. Hit targets are fixed at 24, 26 and 30 pixels; several affordances — a card's hover actions, a column's menu — are revealed on hover, which a touch device has no way to produce. No test in the repository exercises a mobile viewport or platform class. The claim was a manifest default nobody had revisited, not a decision.
+
+Honouring it means real styling, real hit-target work and a device to test on. The manifest is what a directory listing and a phone's plugin browser read, so until that work exists the honest value is `true`: a phone will not install it rather than installing something unusable.
+
+The second half of this is `await import("http")` in `src/obsidian/mcpHttpServer.ts`, the Node builtin that hosts agent access, which is reached only after `if (!Platform.isDesktop) throw`. Obsidian's submission requirements say a plugin using a Node API must declare `isDesktopOnly: true`, and the wording is unconditional — it does not carve out a runtime-gated import. That requirement is now met by the line above rather than by the gate, but the gate stays: `Platform.isDesktop` is checked at every path into the server (`buildMcp` and the token minting in `src/main.ts`, the settings group in `src/settingsDefinitions.ts`, and the throw immediately before the import), and it is what keeps the import out of a build that Obsidian nonetheless chose to load. A manifest flag is a promise made to a directory; a runtime check is one enforced in the code, and the two are worth having at once.
+
+**What would change this:** someone wanting the board on a phone badly enough to fund the styling pass — touch-sized targets, the hover-only affordances given a tap route, and `.is-phone`/`.is-tablet` layouts — with a device to check it on. That is its own entry when it comes, not a manifest edit. Nothing about the gated `http` import changes with it: the server is desktop-only whatever the manifest says, because `http` does not exist on mobile.

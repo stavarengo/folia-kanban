@@ -16,16 +16,23 @@ const INFO: ServerInfo = { name: "folia-kanban", title: "Folia Kanban", version:
 const BOARD = "---\nfolia-board: true\ncard-folder: Tasks\ncolumns:\n  - todo\n---\n";
 const PLAIN = "---\ntitle: Not a board\n---\n";
 
-function setup(settings: Partial<KanbanSettings> = {}) {
+/** The settings a scenario starts from, plus the token — which is not a setting: it lives in
+ *  Obsidian's secret storage, and the service is handed it separately. Written together here
+ *  because a scenario is easier to read as one object. */
+type Scenario = Partial<KanbanSettings> & { mcpToken?: string };
+
+function setup({ mcpToken = "", ...settings }: Scenario = {}) {
   const app = new FakeApp();
   app.vault.addFile("Work/Board.md", BOARD);
   app.vault.addFile("Notes/Plain.md", PLAIN);
   let current: KanbanSettings = { ...DEFAULT_SETTINGS, ...settings };
+  let token = mcpToken;
   const states: string[] = [];
   const reported: McpState[] = [];
   const service = new McpService({
     app: app as unknown as App,
     getSettings: () => current,
+    getToken: () => token,
     info: INFO,
     onState: (s) => {
       reported.push(s);
@@ -37,7 +44,9 @@ function setup(settings: Partial<KanbanSettings> = {}) {
     states,
     reported,
     settings: () => current,
-    set: (patch: Partial<KanbanSettings>) => {
+    token: () => token,
+    set: ({ mcpToken: fresh, ...patch }: Scenario) => {
+      if (fresh !== undefined) token = fresh;
       current = { ...current, ...patch };
       return service.sync(current);
     },
@@ -70,7 +79,7 @@ describe("the board host the plugin builds", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${s.settings().mcpToken}`,
+          authorization: `Bearer ${s.token()}`,
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
@@ -182,7 +191,7 @@ describe("the server's lifetime", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${s.settings().mcpToken}`,
+        authorization: `Bearer ${s.token()}`,
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
     });
@@ -282,7 +291,7 @@ describe("the repository an agent writes through", () => {
     app.vault.addFile("Notes/Plain.md", PLAIN);
     let current: KanbanSettings = { ...DEFAULT_SETTINGS, ...settings };
     return {
-      host: vaultBoardHost({ app: app as unknown as App, getSettings: () => current, info: INFO }),
+      host: vaultBoardHost({ app: app as unknown as App, getSettings: () => current }),
       set: (patch: Partial<KanbanSettings>) => {
         current = { ...current, ...patch };
       },

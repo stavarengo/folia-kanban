@@ -25,6 +25,22 @@ export function newMcpToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Where the token is kept: Obsidian's own secret storage, which lives outside the vault, so the
+ *  credential does not travel with it through Sync, a git remote or a backup. Lowercase, dashed and
+ *  prefixed with the plugin id, because the store is one namespace shared by every plugin. */
+const MCP_TOKEN_SECRET_ID = "folia-kanban-mcp-token";
+
+/** The token this install holds, or "" when none has been minted yet. */
+export function readMcpToken(app: App): string {
+  return app.secretStorage.getSecret(MCP_TOKEN_SECRET_ID) ?? "";
+}
+
+/** Keeps a token for the next launch. There is no way back to `data.json`: a token written here is
+ *  replaced by the next one, never moved out. */
+export function writeMcpToken(app: App, token: string): void {
+  app.secretStorage.setSecret(MCP_TOKEN_SECRET_ID, token);
+}
+
 /** How the running server is reported back to whoever asked for it. */
 export type McpState =
   | { kind: "off" }
@@ -38,13 +54,18 @@ export interface McpServiceOptions {
   app: App;
   /** Read live, never captured: the scope and the signature must follow the settings tab. */
   getSettings: () => KanbanSettings;
+  /** The bearer token to demand, read live for the same reason the settings are: replacing it
+   *  restarts the server, and the restart has to be on the new one. Not a setting — it is kept in
+   *  secret storage rather than in `data.json` — so it arrives on its own. */
+  getToken: () => string;
   info: ServerInfo;
   /** Told about every state change, so the plugin can surface a failure instead of a dead toggle. */
   onState?: (state: McpState) => void;
 }
 
-/** The vault, as the tools see it. Exported so a test can hold it without a running server. */
-export function vaultBoardHost(options: McpServiceOptions): BoardHost {
+/** The vault, as the tools see it. Exported so a test can hold it without a running server. Only
+ *  the two members it reads, so building one costs no token and no server lifetime. */
+export function vaultBoardHost(options: Pick<McpServiceOptions, "app" | "getSettings">): BoardHost {
   const { app, getSettings } = options;
   const isBoard = (file: TFile): boolean =>
     isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
@@ -104,13 +125,10 @@ export class McpService {
 
   /** Start, stop or restart so the running server matches `settings`. */
   sync(settings: KanbanSettings): Promise<void> {
+    const token = this.options.getToken();
     const target =
-      settings.mcpEnabled && settings.mcpToken
-        ? {
-            port: settings.mcpPort,
-            bindAddress: settings.mcpBindAddress,
-            token: settings.mcpToken,
-          }
+      settings.mcpEnabled && token
+        ? { port: settings.mcpPort, bindAddress: settings.mcpBindAddress, token }
         : null;
     return this.enqueue(() => this.reconcile(target));
   }

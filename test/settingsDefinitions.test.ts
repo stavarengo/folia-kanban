@@ -324,7 +324,6 @@ describe("settingsPatchFor", () => {
     expect(DEFAULT_SETTINGS.boardSetupEditorMenu).toBe(true);
     // Agent access opens a port; nothing should do that until the user asks for it.
     expect(DEFAULT_SETTINGS.mcpEnabled).toBe(false);
-    expect(DEFAULT_SETTINGS.mcpToken).toBe("");
     // And when it is turned on, it is on this machine only until the user says otherwise.
     expect(DEFAULT_SETTINGS.mcpBindAddress).toBe(MCP_DEFAULT_BIND_ADDRESS);
   });

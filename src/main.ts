@@ -27,11 +27,11 @@ import {
   DEFAULT_SETTINGS,
   adoptExternalSettings,
   hydrateSettings,
-  mcpTokenPatch,
   migratePathKeyedSettings,
   resolveSettings,
   resolveSettingsPatch,
   settingsForDisk,
+  takeStoredMcpToken,
   type KanbanSettings,
   type SettingsPatch,
   type StoredSettings,
@@ -61,7 +61,13 @@ import {
   cardFolderFor,
   uniqueNotePath,
 } from "./boardNote";
-import { McpService, newMcpToken, type McpState } from "./obsidian/mcpService";
+import {
+  McpService,
+  newMcpToken,
+  readMcpToken,
+  writeMcpToken,
+  type McpState,
+} from "./obsidian/mcpService";
 import { stamp } from "./model/dates";
 import { type BoardViewMode, isBoardFrontmatter, resolveBoardViewMode } from "./viewMode";
 
@@ -119,8 +125,16 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** The settings tab, kept so a change arriving from outside can reach the rows it is showing. */
   private settingTab: KanbanSettingTab | null = null;
 
-  /** The MCP server's lifetime. Null on mobile, where the plugin never hosts one. */
+  /** The MCP server's lifetime. Null where the plugin never hosts one — see {@link buildMcp}. */
   private mcp: McpService | null = null;
+
+  /**
+   * The bearer token agents authenticate with, held here rather than in {@link settings} because it
+   * is a credential and the settings travel with the vault. `App.secretStorage` is where it lives
+   * between launches; this is the copy the running server and the settings tab read. "" means none
+   * has been minted, which is also what keeps the server off.
+   */
+  private mcpToken = "";
 
   override async onload(): Promise<void> {
     await this.loadSettings();
@@ -544,18 +558,50 @@ export default class FoliaKanbanPlugin extends Plugin {
     const { settings, stored, needsSave } = hydrateSettings(loaded, stamp());
     this.stored = stored;
     this.settings = settings;
+    // Read before the stored set is asked for one: a secret already here is the newer of the two,
+    // and what makes the migration below one-way.
+    this.mcpToken = readMcpToken(this.app);
+    const migrated = this.takeTokenOutOfStored();
     // Agent access switched on but carrying no token — data.json hand-edited, or synced from an
     // install that could not mint one — would leave the toggle reading on with nothing listening
     // and nothing said about it, because a server that is never asked to start never fails. Mint
     // the token the enabled state implies, here, where the settings arrive.
-    const minted = this.applyToStored(
-      mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop),
-    );
+    this.ensureMcpToken();
     // Persisted right away: the baseline is "when tracking started", and it must not drift to a
     // later launch if nothing else happens to save the settings before then. A file the load had to
-    // prune, repair or mint into is written for the same reason — so the next load reads what this
-    // one decided rather than deciding it again.
-    if (needsSave || minted) await this.saveSettings();
+    // prune, repair or take a token out of is written for the same reason — so the next load reads
+    // what this one decided rather than deciding it again.
+    if (needsSave || migrated) await this.saveSettings();
+  }
+
+  /**
+   * Moves a token written by a build that kept it in `data.json` into secret storage, and takes the
+   * key out of the stored set so the next write removes it from the file for good. Whether anything
+   * was there, which is what tells the caller the file now needs writing.
+   *
+   * The secret wins when both exist: a `data.json` arriving through Sync from a machine still on an
+   * older build carries whatever token that machine has, and adopting it would silently undo a
+   * replacement made here. The stale key is dropped either way — leaving it would mean carrying the
+   * credential in the vault, which is the whole point of the move.
+   */
+  private takeTokenOutOfStored(): boolean {
+    const legacy = takeStoredMcpToken(this.stored);
+    if (legacy === null) return false;
+    this.stored = { ...this.stored };
+    if (!this.mcpToken) {
+      this.mcpToken = legacy;
+      writeMcpToken(this.app, legacy);
+    }
+    return true;
+  }
+
+  /** Mints the token that agent access being on implies, when this install has none. Called
+   *  wherever the switch can have moved — a token minted on every load would break the client
+   *  already configured with the old one, so it is minted once and kept. */
+  private ensureMcpToken(): void {
+    if (!this.settings.mcpEnabled || this.mcpToken || !Platform.isDesktop) return;
+    this.mcpToken = newMcpToken();
+    writeMcpToken(this.app, this.mcpToken);
   }
 
   /**
@@ -595,10 +641,11 @@ export default class FoliaKanbanPlugin extends Plugin {
     if (changedKeys.length > 0) {
       this.stored = stored;
       this.settings = settings;
-      // The same repair `loadSettings` does, for the same reason: agent access can arrive switched
-      // on from an install that had no token to give.
-      if (this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop)))
-        write = true;
+      // The same two repairs `loadSettings` does, for the same reasons: a file written by a build
+      // that kept the token in it has to stop carrying one, and agent access can arrive switched on
+      // from an install that had no token to give.
+      if (this.takeTokenOutOfStored()) write = true;
+      this.ensureMcpToken();
       this.refreshViews();
       // Only when a row it draws actually moved: `data.json` also carries per-card state written by
       // ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
@@ -655,22 +702,24 @@ export default class FoliaKanbanPlugin extends Plugin {
     if (!this.applyToStored(resolveSettingsPatch(this.settings, patch))) return;
     // Switching agent access on for the first time is when its token comes into existence: it is
     // generated once and kept, so the client configured against it keeps working across restarts.
-    this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop));
+    this.ensureMcpToken();
     this.refreshViews();
     void this.mcp?.sync(this.settings);
     await this.saveSettings();
   }
 
   /**
-   * Host the MCP server, on desktop only. `Platform.isDesktop` is a runtime gate rather than a
-   * manifest one: the board itself works everywhere, and declaring the whole plugin desktop-only
-   * would take it off mobile for the sake of a feature that is off by default.
+   * Host the MCP server, on desktop only. The manifest already says `isDesktopOnly`, so this is
+   * defence in depth rather than the only thing standing between a phone and a Node socket: the
+   * server needs Node's `http`, and every path to it is gated on this flag as well as on the
+   * manifest (see `docs/decisions.md`, "Mobile is not supported").
    */
   private buildMcp(): void {
     if (!Platform.isDesktop) return;
     this.mcp = new McpService({
       app: this.app,
       getSettings: () => this.settings,
+      getToken: () => this.mcpToken,
       info: {
         name: this.manifest.id,
         title: this.manifest.name,
@@ -704,7 +753,7 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   /** Put the bearer token on the clipboard, for pasting into an MCP client's configuration. */
   async copyMcpToken(): Promise<void> {
-    const token = this.settings.mcpToken;
+    const token = this.mcpToken;
     if (!token) {
       new Notice(MCP_TOKEN_COPY.missing, 5000);
       return;
@@ -715,9 +764,9 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   /**
    * Replace the bearer token and put the new one on the clipboard, so the client that has to be
-   * reconfigured can be reconfigured in the same gesture. The running server restarts on the new
-   * token through the ordinary settings write, which means every client still holding the old one
-   * is locked out from that moment.
+   * reconfigured can be reconfigured in the same gesture. The running server is restarted on the
+   * new token here, which means every client still holding the old one is locked out from that
+   * moment.
    */
   async regenerateMcpToken(): Promise<void> {
     if (!this.settings.mcpEnabled) {
@@ -725,17 +774,19 @@ export default class FoliaKanbanPlugin extends Plugin {
       return;
     }
     const token = newMcpToken();
-    await this.updateSettings({ mcpToken: token });
-    // `updateSettings` starts the restart but does not wait for it. Waiting here means the notice
-    // reports what actually happened: a port taken in the window between stopping on the old token
-    // and starting on the new one would otherwise be announced as success, and the separate
-    // failure notice would look unrelated to the button just pressed.
+    this.mcpToken = token;
+    writeMcpToken(this.app, token);
+    // The token is not a setting, so no settings write carries it to the server: the restart is
+    // asked for here, and waited on, so the notice reports what actually happened. A port taken in
+    // the window between stopping on the old token and starting on the new one would otherwise be
+    // announced as success, and the separate failure notice would look unrelated to the button just
+    // pressed.
     await this.mcp?.sync(this.settings);
     if (this.mcp && this.mcp.port === null) {
       new Notice(MCP_TOKEN_REGENERATE.replacedButDown, 10000);
       return;
     }
-    // The token is already replaced and saved; a clipboard that refuses does not undo that, and
+    // The token is already replaced and kept; a clipboard that refuses does not undo that, and
     // saying nothing would leave the user with a working server and no idea what its token is.
     try {
       await navigator.clipboard.writeText(token);
@@ -855,7 +906,7 @@ class KanbanSettingTab extends PluginSettingTab {
     }
     void this.plugin.updateSettings(patch).then(() => {
       // Only 1.13 and later reaches this method at all, but the version is asked anyway: both APIs
-      // are @since 1.13.0 and minAppVersion is 1.7.2, so an unguarded call is a promise the
+      // are @since 1.13.0 and minAppVersion is 1.11.4, so an unguarded call is a promise the
       // manifest does not make.
       // Agent access gates the port and bind-address rows, and those two draw themselves from a
       // `render` callback — which carries no `disabled` predicate for `refreshDomState` to

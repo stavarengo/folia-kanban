@@ -159,7 +159,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.17](../../backlog/20260829.17.obsidians-tooltip-paints-over-an-open-folia-menu.md) | Bug: two z-index ladders in one numeric space, five collisions | 02-25 |
 | [20260829.18](../../backlog/20260829.18.the-boards-components-are-drawn-beside-the-apps-component-variables.md) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
 | [20260829.19](../../backlog/20260829.19.the-raw-value-audit-is-blind-to-most-of-what-it-polices.md) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
-| [20260829.20](../../backlog/20260829.20.the-plugin-claims-mobile-support-it-has-never-been-built-for.md) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
+| 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
 | [20260829.21](../../backlog/20260829.21.folia-resolves-and-writes-wikilinks-with-its-own-rules.md) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03, 04-19 |
 | [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 07-16 |
 | [20260829.23](../../backlog/20260829.23.a-card-using-any-other-checkbox-character-loses-its-subtasks.md) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
@@ -171,7 +171,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.29](../../backlog/20260829.29.main-diverges-from-four-workspace-and-settings-conventions.md) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
 | [20260829.30](../../backlog/20260829.30.opening-a-card-note-is-not-a-link-navigation.md) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
 | 20260829.31 (fixed, entry closed) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
-| [20260829.32](../../backlog/20260829.32.the-mcp-bearer-token-travels-with-the-vault-in-the-clear.md) | The MCP bearer token travelling with the vault | 07-02 |
+| 20260829.32 (fixed, entry closed) | The MCP bearer token travelling with the vault | 07-02 |
 | [20260829.33](../../backlog/20260829.33.the-release-path-and-the-directory-guards-do-not-check-what-they-claim.md) | What the release path and the directory guards never check | 07-03, 07-04, 07-12, 07-13, 07-14, 07-15, 07-17 |
 | [20260829.34](../../backlog/20260829.34.the-readme-claims-no-network-requests-and-names-no-third-party-licences.md) | The README's privacy claim, and the missing licence notices | 07-18, 07-19 |
 | [20260829.35](../../backlog/20260829.35.main-ts-is-a-thousand-lines-against-the-review-checklist.md) | `src/main.ts` at 1020 lines, under a waiver that expires | 07-05 |

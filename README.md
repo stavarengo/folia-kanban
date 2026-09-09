@@ -308,7 +308,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
 - **Comments and history**
   - **Your name** — signs the comments you write from the board, tells the board which comments are yours for [unread marking](#unread-comments), and is who "me" means when you [assign a card to yourself](#who-is-working-on-this). Empty (the default) writes comments unsigned and leaves the one-click assign out.
   - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due changes), or `all` (also comments, subtasks and blocking links).
-- **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp). Desktop only: the whole section is absent on mobile.
+- **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp).
 
 The version the vault is running is the last row, under an **About** heading of its own.
 
@@ -340,7 +340,7 @@ The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/m
 
 A card's right-click menu has a **Copy** group with four ways of naming the same file, because what you paste it into decides which one is useful. **Copy path** gives the full path on this device (`/home/you/Vault/Tasks/Ship it.md`) — a terminal, another app, a script. **Copy path relative to vault** gives the path Obsidian itself speaks in (`Tasks/Ship it.md`). **Copy path relative to board folder** gives the path as seen from the folder the board note lives in (`../Tasks/Ship it.md` for a board in a subfolder), which is what a link or a relative reference written next to the board wants. **Copy base name** gives the file name alone (`Ship it.md`).
 
-Only the first one needs the vault to be a folder on disk; where it is not — a vault on mobile — that item says so in a toast rather than copying something else. All four need the clipboard, which a browser or device may withhold; when it does, the action says that instead of failing quietly.
+Only the first one needs the vault to be a folder on disk; where it is not, that item says so in a toast rather than copying something else. All four need the clipboard, which a browser or device may withhold; when it does, the action says that instead of failing quietly.
 
 ## Your data stays yours
 
@@ -350,7 +350,7 @@ Edits are surgical: body changes splice only the section they touch, and frontma
 
 ## Install
 
-**Requirements:** Obsidian **1.7.2+**. Runs on desktop and mobile ([agent access](#agent-access-mcp) is desktop only).
+**Requirements:** Obsidian **1.11.4+**, desktop only. Phones and tablets are not supported — see [Decisions](docs/decisions.md) for why, and what would change it.
 
 ### From Community Plugins
 
