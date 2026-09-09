@@ -6,7 +6,7 @@
 // have had to reinvent it, and the two would have drifted. Everything that moves a card goes
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
-import type { Board, LineRef } from "./types";
+import type { Board, SubItem } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
 import { StaleLineError } from "./repo";
@@ -65,21 +65,18 @@ export async function moveCardOver(
 export async function setSubtaskDone(
   repo: CardRepository,
   board: Board,
-  target: { path: string; line: LineRef; done: boolean; link?: string },
+  target: { path: string; line: SubItem; done: boolean },
 ): Promise<void> {
-  const { path, line, done, link } = target;
+  const { path, line, done } = target;
   await repo.toggleSubtask(path, line, done);
-  // The follow-up names the line the tick just named — the same `line`, not the board's own reading
-  // of it — so the two halves can never write to two different lines. The claim is the half decided
-  // FROM the board, so a board that has not caught up simply contributes nothing (`syncSubtaskClaim`
-  // returns null on words it does not recognise) rather than making the tick fail with it. They are
-  // still two writes: a note edited in the moment between them can have the second refused on its
-  // own, and that says so rather than leaving the caller to find a ticked box with a stale claim.
-  // `link` matters on top of that: for a line naming a child note,
-  // `syncSubtaskClaim` refuses to act unless the caller shows the `[[link]]` it read, so a line
-  // edited underneath is not acted on by position alone. A caller that leaves it out gets the
-  // checkbox written and the child left where it was — the parity this whole path exists to keep.
-  const sync = syncSubtaskClaim(board, path, link === undefined ? line : { ...line, link }, done);
+  // The follow-up is decided from the same reading of the line the tick was, so the two halves can
+  // never name two different lines, and a board one reload behind cannot decide either of them. For
+  // a line naming a child note, `syncSubtaskClaim` still refuses unless the board agrees the line
+  // carries that `[[link]]` — that half writes into ANOTHER note, and a position edited underneath
+  // must not be enough to move somebody else's card. They are two writes, though: a note edited in
+  // the moment between them can have the second refused on its own, and that says so rather than
+  // leaving the caller to find a ticked box with a claim that never moved.
+  const sync = syncSubtaskClaim(board, path, line, done);
   if (!sync) return;
   try {
     await repo.applyMove(sync);

@@ -74,6 +74,9 @@ export interface CardRepository {
    * Apply a drag result: the card's status + order frontmatter, or — for an inline todo, which has
    * no frontmatter of its own — the `[status:: …]` field and checkbox of its checklist line in the
    * note named by `mutation.path`. Plus a history line when one is given.
+   *
+   * A checklist line is named by what it said as well as where it sat, so this throws
+   * {@link StaleLineError} and writes nothing when the note no longer reads that way there.
    */
   applyMove(mutation: CardMutation): Promise<void>;
 

@@ -1780,12 +1780,7 @@ export function CardDetail({
                       // The board's own toggle, called rather than copied: a line that claims a
                       // column has its claim moved with its checkbox, so the two never tell
                       // different stories, and a refusal of either half is worded there once.
-                      setSubtaskDone(repo, board, {
-                        path,
-                        line: { index: s.index, text: s.text },
-                        done: !s.done,
-                        ...(s.link === undefined ? {} : { link: s.link }),
-                      }),
+                      setSubtaskDone(repo, board, { path, line: s, done: !s.done }),
                     )
                   }
                 />

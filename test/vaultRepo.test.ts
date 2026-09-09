@@ -511,7 +511,7 @@ describe("field edits and their history lines", () => {
     expect(app.vault.frontmatter("basic/Cards/One.md")).not.toHaveProperty("assignee");
   });
 
-  it("names the subtask in its history line, reading the text BEFORE the edit lands", async () => {
+  it("names the subtask in its history line, in the words the caller wrote it by", async () => {
     const { app, repo } = repoWithCard("all", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n");
 
     const line = { index: 0, text: "Write the docs" };

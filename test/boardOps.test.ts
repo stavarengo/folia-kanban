@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../src/model/boardOps";
 import { columnOf } from "../src/model/board";
+import type { SubItem } from "../src/model/types";
 import type { BoardConfig } from "../src/model/types";
 import { FakeRepo } from "./fakeRepo";
 
@@ -98,6 +99,13 @@ describe("moveCardOver", () => {
   });
 });
 
+/** A checklist line as a caller read it: what the panel, the tool and the board all pass in. */
+function todoLine(index: number, text: string, status?: string, done = false): SubItem {
+  return status === undefined
+    ? { kind: "todo", text, done, index }
+    : { kind: "todo", text, done, status, index };
+}
+
 describe("setSubtaskDone", () => {
   function withClaimedLine(): FakeRepo {
     return new FakeRepo(
@@ -117,7 +125,7 @@ describe("setSubtaskDone", () => {
     const repo = withClaimedLine();
     await setSubtaskDone(repo, await repo.loadBoard(), {
       path: "Tasks/A.md",
-      line: { index: 0, text: "Draft it" },
+      line: todoLine(0, "Draft it", "doing"),
       done: true,
     });
     expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.done).toBe(true);
@@ -129,7 +137,7 @@ describe("setSubtaskDone", () => {
     const repo = withClaimedLine();
     await setSubtaskDone(repo, await repo.loadBoard(), {
       path: "Tasks/A.md",
-      line: { index: 0, text: "Draft it" },
+      line: todoLine(0, "Draft it", "doing"),
       done: true,
     });
     expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.status).toBe("done");
@@ -158,7 +166,7 @@ describe("setSubtaskDone when the note has moved on", () => {
 
     await setSubtaskDone(repo, board, {
       path: "Tasks/A.md",
-      line: { index: 0, text: "Draft it" },
+      line: todoLine(0, "Draft it", "doing"),
       done: true,
     });
 
@@ -166,9 +174,9 @@ describe("setSubtaskDone when the note has moved on", () => {
     expect(line).toMatchObject({ text: "Draft it", done: true, status: "done" });
   });
 
-  // A board one reload behind is not a reason to refuse a write the note itself accepts: the box is
-  // the caller's to write, and only the claim is decided from the board — so only the claim waits.
-  it("still ticks the box when the board is behind, and leaves the claim to the next reading", async () => {
+  // A board one reload behind is not a reason to refuse a write the note itself accepts, nor to
+  // decide it: both halves are read off the line the caller is looking at.
+  it("writes both halves from the caller's reading when the board is behind", async () => {
     const repo = claimedLine();
     const board = await repo.loadBoard();
     // Reworded from elsewhere after the board was read; the caller names the current wording.
@@ -176,16 +184,44 @@ describe("setSubtaskDone when the note has moved on", () => {
 
     await setSubtaskDone(repo, board, {
       path: "Tasks/A.md",
-      line: { index: 0, text: "Draft it now" },
+      line: todoLine(0, "Draft it now", "doing"),
       done: true,
     });
 
-    // Ticked, and still claiming Doing: the board never read this line, so it had no claim to move.
     expect((await repo.readBody("Tasks/A.md")).subtasks[0]).toMatchObject({
       text: "Draft it now",
       done: true,
-      status: "doing",
+      status: "done",
     });
+  });
+
+  // The shape that matters most, because it is the one a person sees: unticking a line that claims
+  // Done has to drop the claim, or the todo goes on standing in the Done column after the untick.
+  it("drops a Done claim on an untick even when the board never read that line", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [x] Alpha [status:: done]\n- [x] Beta [status:: done]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+    const board = await repo.loadBoard();
+    // The panel removed Alpha a moment ago; the board has not caught up, the note has.
+    await repo.removeSubtask("Tasks/A.md", { index: 0, text: "Alpha" });
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Beta", "done", true),
+      done: false,
+    });
+
+    // Unticked AND unclaimed: it goes back to living with its card instead of standing in Done.
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [ ] Beta\n");
+    expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.status).toBeUndefined();
   });
 
   // The fourth case, and the one a board built from the same store cannot show by itself: a line
@@ -197,7 +233,7 @@ describe("setSubtaskDone when the note has moved on", () => {
 
     await setSubtaskDone(repo, board, {
       path: "Tasks/A.md",
-      line: { index: 1, text: "Two" },
+      line: todoLine(1, "Two"),
       done: true,
     });
 
@@ -213,7 +249,7 @@ describe("setSubtaskDone when the note has moved on", () => {
     await expect(
       setSubtaskDone(repo, board, {
         path: "Tasks/A.md",
-        line: { index: 0, text: "Draft it" },
+        line: todoLine(0, "Draft it", "doing"),
         done: true,
       }),
     ).rejects.toThrow(/no longer reads "Draft it"/);
@@ -249,7 +285,7 @@ describe("setSubtaskDone when the note changes between its two writes", () => {
     await expect(
       setSubtaskDone(repo, board, {
         path: "Tasks/A.md",
-        line: { index: 0, text: "Draft it" },
+        line: todoLine(0, "Draft it", "doing"),
         done: true,
       }),
     ).rejects.toThrow(/The checkbox was written; keeping the line's own column claim in step/);

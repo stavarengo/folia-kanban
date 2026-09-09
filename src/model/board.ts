@@ -11,11 +11,11 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
-  LineRef,
   RelationDirection,
   RelationLink,
   RelationType,
   RelationTypeDef,
+  SubItem,
 } from "./types";
 import { BLOCKS, readInverse, readRelations } from "./relationships";
 
@@ -986,13 +986,12 @@ export function moveSubtask(
 }
 
 /**
- * The checklist line the board read at that position, named the way a write has to name it: its
- * index AND what it said. `null` when this board knows no such line, which is already the answer
- * to "is what the caller saw still there".
+ * The checklist line the board read at that position, whole — a write names a line by what it said
+ * as well as where it sat, and a claim is decided from what the line itself carries. `null` when
+ * this board knows no such line, which is already the answer to "is what was clicked still there".
  */
-export function subtaskRef(board: Board, parentPath: string, index: number): LineRef | null {
-  const item = board.cards[parentPath]?.subItems?.find((s) => s.index === index);
-  return item ? { index, text: item.text } : null;
+export function subtaskRef(board: Board, parentPath: string, index: number): SubItem | null {
+  return board.cards[parentPath]?.subItems?.find((s) => s.index === index) ?? null;
 }
 
 /**
@@ -1008,26 +1007,25 @@ export function subtaskRef(board: Board, parentPath: string, index: number): Lin
  * anywhere, and it must not start now — and neither does a board with no done column at all, where
  * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
  *
- * `line` is the checklist line as the caller showed it: its index, its text, and for a subcard line
- * the `[[link]]` it carried. Both branches below refuse outright when the board's own reading of
- * that position says something else — the words for a todo, the `[[link]]` for a subcard. What is
- * decided here is decided FROM the board (a line's claim, a child's column), so a board reading a
- * different line than the caller saw would compute the answer to a question nobody asked. The text
- * then travels with the write, so the box and the claim name one line rather than two.
+ * `line` is the checklist line as the CALLER read it, whole — the panel's own reading of the note,
+ * the tool's, or the board's when it is the board that was clicked. A line's own claim is written
+ * on the line, so it is read from there and never from the board's copy of that position: a board
+ * one reload behind would otherwise decide the answer for a line nobody was looking at, or, if it
+ * were made to refuse instead, leave an unticked line still claiming Done. The board is asked only
+ * what it alone knows — which column means finished, and where a linked child currently stands.
  */
 export function syncSubtaskClaim(
   board: Board,
   parentPath: string,
-  line: LineRef & { link?: string },
+  line: SubItem,
   done: boolean,
 ): CardMutation | null {
   const { index, link } = line;
-  const parent = board.cards[parentPath];
-  const item = parent?.subItems?.find((s) => s.index === index);
-  if (!item) return null;
   const doneCol = findDoneColumn(board.config.columns);
   if (done && doneCol === null) return null; // nowhere to move the claim to; leave the line's own
-  if (item.kind === "card") {
+  if (line.kind === "card") {
+    const item = board.cards[parentPath]?.subItems?.find((s) => s.index === index);
+    if (!item) return null;
     // The same rule, for a line that names a file: its claim is the child note's own `status`.
     // Ticking sends a child that stands somewhere to Done; unticking one in Done drops its
     // `status` so it rejoins its card; a child claiming nothing is left where it is.
@@ -1059,12 +1057,9 @@ export function syncSubtaskClaim(
     if (parentLines.length > 0) mutation.parentLines = parentLines;
     return mutation;
   }
-  // Everything below reads the line's claim off the board. A board that read other words at this
-  // position read another line, and the claim it would carry over is that line's, not this one's.
-  if (item.text !== line.text) return null;
-  if (item.status === undefined) return null; // claims nothing — nothing to keep in step
-  const next = done ? doneCol : item.status === doneCol ? null : item.status;
-  if (next === item.status) return null;
+  if (line.status === undefined) return null; // claims nothing — nothing to keep in step
+  const next = done ? doneCol : line.status === doneCol ? null : line.status;
+  if (next === line.status) return null;
   return { path: parentPath, setSubtaskStatus: { index, text: line.text, status: next } };
 }
 

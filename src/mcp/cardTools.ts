@@ -444,16 +444,12 @@ const setSubtask = tool({
         `Subtask ${args.index} of "${path}" reads "${line.text}", not "${args.text}". The card changed since you read it — read it again and name the line you mean by what it says now.`,
       );
     }
-    // The line's own `[[link]]` goes with it, exactly as the detail panel passes the subtask it
-    // drew. Without it a subcard line's checkbox is ticked and the child note is left where it was,
-    // which is the one thing this tool promises not to do.
+    // The line goes whole, exactly as the detail panel passes the subtask it drew: its `[[link]]`,
+    // without which a subcard's checkbox is ticked and the child note left where it was — the one
+    // thing this tool promises not to do — and its own `[status:: …]` claim, which is what deciding
+    // where the work now belongs is read from.
     try {
-      await setSubtaskDone(repo, board, {
-        path,
-        line: { index: args.index, text: args.text },
-        done: args.done,
-        ...(line.link === undefined ? {} : { link: line.link }),
-      });
+      await setSubtaskDone(repo, board, { path, line, done: args.done });
     } catch (e) {
       // The note changed between this call's own read and its write — rarer than a stale index.
       // The refused write did not land; when the tick got through and only its column claim was
