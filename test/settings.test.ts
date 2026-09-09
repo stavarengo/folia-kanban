@@ -456,7 +456,7 @@ describe("the plugin reacts to an external settings change", () => {
   // `data.json` also carries per-card state that ordinary board use elsewhere writes. Redrawing the
   // tab for one of those would throw away a name being typed, for a change it is not showing.
   it("leaves the settings tab alone when no row it draws moved", () => {
-    expect(adopt).toContain("changedKeys.some((key) => key in SETTING_CONTROLS)");
+    expect(adopt).toContain("Object.prototype.hasOwnProperty.call(SETTING_CONTROLS, key)");
   });
 
   it("writes back only what this instance decided, never a copy of what it just read", () => {

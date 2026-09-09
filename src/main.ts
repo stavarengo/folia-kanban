@@ -603,7 +603,10 @@ export default class FoliaKanbanPlugin extends Plugin {
       // Only when a row it draws actually moved: `data.json` also carries per-card state written by
       // ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
       // typed for a change the tab is not even showing.
-      if (changedKeys.some((key) => key in SETTING_CONTROLS))
+      // An own key, not `in`: a hand-edited file can carry a key named after something every
+      // object inherits, and `"constructor" in SETTING_CONTROLS` is true. Same call `getControlValue`
+      // makes, for the same reason.
+      if (changedKeys.some((key) => Object.prototype.hasOwnProperty.call(SETTING_CONTROLS, key)))
         this.settingTab?.settingsChangedExternally();
       // Port, bind address, token and the switch itself can all have moved; the running server has
       // to follow them here as it does on any other settings change.
