@@ -292,15 +292,26 @@ describe("the agent-access token leaving data.json", () => {
     expect(stored).toEqual({ commentsBaseline: NOW });
   });
 
-  // Two different files say "nothing to migrate": one that never had the key, and one written by a
-  // build that had the setting but never switched agent access on. Both have to leave the caller
-  // with nothing to keep — but only the second has a key to remove.
-  it("finds nothing to keep in a file with no token, and still drops an empty key", () => {
+  // Two different files say "nothing to keep": one that never had the key, and one written by a
+  // build that had the setting but never switched agent access on. They must not answer the same
+  // way. Only the first is a file with nothing to do; the second still has to be written, and
+  // reading it as "nothing to do" would leave the key on disk for good while the set in memory no
+  // longer has it — which then reads as an external change on every later write.
+  it("tells a file with no key from one whose key is empty, because only one needs writing", () => {
     expect(takeStoredMcpToken({ commentsBaseline: NOW })).toBeNull();
     const empty: StoredSettings = { commentsBaseline: NOW };
     (empty as Record<string, unknown>)["mcpToken"] = "";
-    expect(takeStoredMcpToken(empty)).toBeNull();
+    expect(takeStoredMcpToken(empty)).toBe("");
     expect(empty).toEqual({ commentsBaseline: NOW });
+  });
+
+  // A hand-edited file can carry anything where the token was. There is nothing to migrate, but the
+  // key still goes, and the file still gets written.
+  it("drops a key holding something that is not a token at all", () => {
+    const junk: StoredSettings = { commentsBaseline: NOW };
+    (junk as Record<string, unknown>)["mcpToken"] = { was: "hand-edited" };
+    expect(takeStoredMcpToken(junk)).toBe("");
+    expect(junk).toEqual({ commentsBaseline: NOW });
   });
 
   // The whole migration, end to end: a file written by the old build is read, the token is taken

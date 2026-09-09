@@ -576,8 +576,9 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   /**
    * Moves a token written by a build that kept it in `data.json` into secret storage, and takes the
-   * key out of the stored set so the next write removes it from the file for good. Whether anything
-   * was there, which is what tells the caller the file now needs writing.
+   * key out of the stored set so the next write removes it from the file for good. Returns whether
+   * the key was there at all — an empty one is nothing to keep but still a file to write, and a key
+   * dropped in memory but left on disk would come back as an external change on every later write.
    *
    * The secret wins when both exist: a `data.json` arriving through Sync from a machine still on an
    * older build carries whatever token that machine has, and adopting it would silently undo a
@@ -588,7 +589,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     const legacy = takeStoredMcpToken(this.stored);
     if (legacy === null) return false;
     this.stored = { ...this.stored };
-    if (!this.mcpToken) {
+    if (legacy && !this.mcpToken) {
       this.mcpToken = legacy;
       writeMcpToken(this.app, legacy);
     }

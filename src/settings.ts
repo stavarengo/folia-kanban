@@ -145,16 +145,23 @@ const LEGACY_MCP_TOKEN_KEY = "mcpToken";
 
 /**
  * Takes a token out of a stored set written before the move to secret storage, removing the key so
- * the next write heals the file. Returns null when there is nothing to take, which is every file
- * written since. Mutating rather than returning a copy, because the caller's whole interest is that
- * the key stops being there.
+ * the next write heals the file. Mutating rather than returning a copy, because the caller's whole
+ * interest is that the key stops being there.
+ *
+ * `null` means the key was not there at all, which is every file written since the move. `""` means
+ * it was there with nothing worth keeping in it — the empty default a build wrote before agent
+ * access was ever switched on, or a hand-edited value that is not a string. The two are different
+ * answers on purpose: both leave the caller with no token, but only the second leaves a file that
+ * still has to be written. Collapsing them into `null` would let the key sit in `data.json` for
+ * good, and, worse, make it show up as an external change on every later write, since the set in
+ * memory no longer has it.
  */
 export function takeStoredMcpToken(stored: StoredSettings): string | null {
   const record = stored as Record<string, unknown>;
   if (!(LEGACY_MCP_TOKEN_KEY in record)) return null;
   const value = record[LEGACY_MCP_TOKEN_KEY];
   delete record[LEGACY_MCP_TOKEN_KEY];
-  return typeof value === "string" && value.length > 0 ? value : null;
+  return typeof value === "string" ? value : "";
 }
 
 /**

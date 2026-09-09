@@ -9,6 +9,8 @@ Maintainer notes: how a release is cut, what checks it against the Obsidian comm
 
 Both steps are ours end to end: nothing is drafted for a human to publish by hand.
 
+`manifest.json`'s `minAppVersion` moved to **1.11.4** on 2026-09-10, for `App.secretStorage` (see `docs/decisions.md`). The `versions.json` row that records it is written by the next release, not by hand: `scripts/bump-plugin-version.mjs` does `versions[version] = minAppVersion` on every bump, so whatever version ships first after that change gets the `1.11.4` row automatically. Nothing below it needs rewriting — Obsidian reads the file to find the newest plugin version an older app can still run, and every release up to `0.0.20` genuinely ran on `1.7.2`, so a user still on that app is correctly sent to `0.0.20`. Rewriting those rows to the new floor would tell them no version runs at all.
+
 ## The two scanner checks
 
 The community directory reviews every release with a scanner: Stylelint with its own ruleset, plus ESLint with `eslint-plugin-obsidianmd`. This repo checks itself against that scanner twice, on purpose.
