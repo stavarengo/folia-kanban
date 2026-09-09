@@ -77,9 +77,9 @@ function specificity(selector) {
 }
 
 /**
- * The classes the plugin puts on real `<button>` elements (the opening tag only). A literal that
- * ends in `-` is a class built at runtime (`"folia-chip-" + tone`), so it is kept as a PREFIX and
- * matches every rule for a class that starts with it — those rules style buttons too.
+ * The classes the plugin puts on the `<name>` elements it writes (the opening tag only). A literal
+ * that ends in `-` is a class built at runtime (`"folia-chip-" + tone`), so it is kept as a PREFIX
+ * and matches every rule for a class that starts with it — those rules dress the element too.
  */
 function elementsNamed(tsx, name) {
   const open = `<${name}`;
