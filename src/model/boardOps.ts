@@ -7,7 +7,7 @@
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
 import type { Board, LineRef } from "./types";
-import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
+import { moveCard, resolveDrop, subtaskRef, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
 import { StaleLineError } from "./repo";
 
@@ -68,6 +68,16 @@ export async function setSubtaskDone(
   target: { path: string; line: LineRef; done: boolean; link?: string },
 ): Promise<void> {
   const { path, line, done, link } = target;
+  // Both halves are decided here: the box from the caller's reading of the line, the claim from the
+  // board's. A board that reads other words at that position is reading another line, and would
+  // carry over a claim belonging to it — so the disagreement is settled before anything is written,
+  // rather than after the box has landed.
+  const seen = subtaskRef(board, path, line.index);
+  if (seen === null || seen.text !== line.text) {
+    throw new StaleLineError(
+      `The board reads subtask ${line.index} of "${path}" as ${seen === null ? "no line at all" : `"${seen.text}"`}, not "${line.text}", so nothing was written — the board is behind the note it was read from. Reload it and repeat the edit.`,
+    );
+  }
   await repo.toggleSubtask(path, line, done);
   // The follow-up names the line the tick just named — the same `line`, not the board's own reading
   // of it — so the two halves can never write to two different lines. They are still two writes,

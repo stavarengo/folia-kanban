@@ -152,20 +152,38 @@ describe("setSubtaskDone when the note has moved on", () => {
 
   // Ticking a claimed line is two writes, and they must stand or fall together: a box written while
   // the claim is refused leaves the note saying the work is finished and still in Doing.
-  it("writes both halves when the caller names the line as it reads now", async () => {
+  it("writes both halves when board, caller and note read the same line", async () => {
     const repo = claimedLine();
     const board = await repo.loadBoard();
-    // Reworded from elsewhere after the board was read; the caller names the current wording.
-    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it now [status:: doing]\n";
 
     await setSubtaskDone(repo, board, {
       path: "Tasks/A.md",
-      line: { index: 0, text: "Draft it now" },
+      line: { index: 0, text: "Draft it" },
       done: true,
     });
 
     const line = (await repo.readBody("Tasks/A.md")).subtasks[0];
-    expect(line).toMatchObject({ text: "Draft it now", done: true, status: "done" });
+    expect(line).toMatchObject({ text: "Draft it", done: true, status: "done" });
+  });
+
+  // The board decides the claim, so a board reading other words at that position is reading another
+  // line — and the claim it would carry over is that line's. Settled before the box is written.
+  it("writes neither half when the board is behind the reading the caller acts on", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    // Reworded from elsewhere after the board was read; the caller names the current wording.
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it now [status:: doing]\n";
+    const before = repo.files.get("Tasks/A.md")!.body;
+
+    await expect(
+      setSubtaskDone(repo, board, {
+        path: "Tasks/A.md",
+        line: { index: 0, text: "Draft it now" },
+        done: true,
+      }),
+    ).rejects.toThrow(/The board reads subtask 0 .* as "Draft it", not "Draft it now"/);
+
+    expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
   });
 
   it("writes neither half when the caller names a line the note no longer holds", async () => {

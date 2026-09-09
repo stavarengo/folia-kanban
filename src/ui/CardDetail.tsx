@@ -20,12 +20,8 @@ import type {
   SubItem,
   TitleMode,
 } from "../model/types";
-import {
-  boardLinkResolver,
-  syncSubcardLines,
-  syncSubtaskClaim,
-  type LinkResolver,
-} from "../model/board";
+import { boardLinkResolver, syncSubcardLines, type LinkResolver } from "../model/board";
+import { setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
@@ -1780,14 +1776,17 @@ export function CardDetail({
                   checked={s.done}
                   aria-label={`Toggle ${s.text}`}
                   onChange={() =>
-                    void mutate(async () => {
-                      // Same rule the board's own toggle follows: a line that claims a column has
-                      // its claim moved with its checkbox, so the two never tell different stories.
-                      // Decided before the box is written, so a refused follow-up is known first.
-                      const sync = syncSubtaskClaim(board, path, s, !s.done);
-                      await repo.toggleSubtask(path, { index: s.index, text: s.text }, !s.done);
-                      if (sync) await repo.applyMove(sync);
-                    })
+                    void mutate(() =>
+                      // The board's own toggle, called rather than copied: a line that claims a
+                      // column has its claim moved with its checkbox, so the two never tell
+                      // different stories, and a refusal of either half is worded there once.
+                      setSubtaskDone(repo, board, {
+                        path,
+                        line: { index: s.index, text: s.text },
+                        done: !s.done,
+                        ...(s.link === undefined ? {} : { link: s.link }),
+                      }),
+                    )
                   }
                 />
                 {s.kind === "card" && s.link ? (

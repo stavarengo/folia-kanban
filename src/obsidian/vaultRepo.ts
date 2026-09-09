@@ -385,9 +385,10 @@ export class VaultRepository implements CardRepository {
       return stale ? t : write(t);
     });
     if (!stale) return;
-    // The bytes are untouched, so this note was never ours to claim: dropping the echo guard the
-    // write set on the way in keeps the next change from elsewhere — the very change that made this
-    // one refuse — from being swallowed as our own.
+    // Nothing was written, so the echo guard this call set on the way in is guarding nothing:
+    // dropping it keeps the next change from elsewhere — the very change that made this one
+    // refuse — from being swallowed as ours. At worst it costs one extra reload, when an earlier
+    // write of ours really did land on this note moments ago.
     this.recentWrites.delete(path);
     throw staleLine(kind, path, at);
   }

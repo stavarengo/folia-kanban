@@ -1404,6 +1404,21 @@ describe("subitems in a column of their own", () => {
     expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0, text: "Placed" }, false)).toBeNull(); // still claims doing
   });
 
+  // The claim it would carry over is read off the board. A caller naming other words at that
+  // position is not describing the line the board has there, so there is nothing to carry.
+  it("keeps a claim off a line the board never read there", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Old one", 0, "doing")]),
+    ]);
+    // A plain todo has since been inserted above, and the caller read the note after that.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0, text: "Snuck in" }, true)).toBeNull();
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", { index: 0, text: "Old one" }, true)).toMatchObject(
+      {
+        setSubtaskStatus: { index: 0, text: "Old one", status: "done" },
+      },
+    );
+  });
+
   it("can clear a claim that names no column of this board", () => {
     // Wrong case, or a column since renamed. The graph ignores the value, but it is in the note —
     // if the write path ignored it too, no interface could ever remove it.

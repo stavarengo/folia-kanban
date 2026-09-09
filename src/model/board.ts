@@ -1009,10 +1009,11 @@ export function subtaskRef(board: Board, parentPath: string, index: number): Lin
  * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
  *
  * `line` is the checklist line as the caller showed it: its index, its text, and for a subcard line
- * the `[[link]]` it carried — see the card branch below for why the index alone is not enough there.
- * The text travels from the caller rather than being re-read from the board on purpose: this write
- * is the second half of a tick, and the two halves must name the SAME line from one reading, or the
- * box lands while the claim is refused and the note ends up saying two different things.
+ * the `[[link]]` it carried. Both branches below refuse outright when the board's own reading of
+ * that position says something else — the words for a todo, the `[[link]]` for a subcard. What is
+ * decided here is decided FROM the board (a line's claim, a child's column), so a board reading a
+ * different line than the caller saw would compute the answer to a question nobody asked. The text
+ * then travels with the write, so the box and the claim name one line rather than two.
  */
 export function syncSubtaskClaim(
   board: Board,
@@ -1058,6 +1059,9 @@ export function syncSubtaskClaim(
     if (parentLines.length > 0) mutation.parentLines = parentLines;
     return mutation;
   }
+  // Everything below reads the line's claim off the board. A board that read other words at this
+  // position read another line, and the claim it would carry over is that line's, not this one's.
+  if (item.text !== line.text) return null;
   if (item.status === undefined) return null; // claims nothing — nothing to keep in step
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
   if (next === item.status) return null;
