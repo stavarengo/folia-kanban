@@ -334,3 +334,45 @@ export function migratePathKeyedSettings(
 
 export const DETAIL_WIDTH_MIN = 280;
 export const DETAIL_WIDTH_MAX = 720;
+
+/** Compares two stored sets by value rather than by identity or key order: the file is re-read into
+ *  fresh objects, and the order keys happen to land in says nothing about what anyone changed. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    isRecord(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
+}
+
+/** What an external write to `data.json` amounts to for a running instance: {@link HydratedSettings}
+ *  plus whether the file actually says something different from what this instance is holding. */
+export interface AdoptedSettings extends HydratedSettings {
+  changed: boolean;
+}
+
+/**
+ * Reads `data.json` as it now stands — Sync landed another device's copy, or someone edited it by
+ * hand — and takes it as the state. The file is the truth: every setting the plugin has is written
+ * the moment it changes, so there is nothing in memory that the file does not already know, and
+ * keeping any of it would be keeping a picture that is older than the one on disk. What that cannot
+ * do is reconcile two edits made at once; those still resolve last-write-wins, and this is what
+ * turns the losing side from silently discarded into read.
+ *
+ * `changed` is false when the file says what this instance already holds, which is the case when
+ * the write it is reacting to was its own. Callers use it to stop there: no re-render, and above
+ * all no write back, which would be the other device's next external change and ours again after
+ * that.
+ *
+ * `fallbackBaseline` is the comments baseline to keep when the file carries none. It is this
+ * instance's own, not `stamp()`: a file written by a build that predates the field would otherwise
+ * be stamped with the present moment and count every comment in the vault as already read.
+ */
+export function adoptExternalSettings(
+  loaded: unknown,
+  current: StoredSettings,
+  fallbackBaseline: string,
+): AdoptedSettings {
+  const hydrated = hydrateSettings(loaded, fallbackBaseline);
+  return { ...hydrated, changed: canonical(hydrated.stored) !== canonical(current) };
+}

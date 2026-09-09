@@ -25,6 +25,7 @@ import { remapPath } from "./model/pathOps";
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
 import {
   DEFAULT_SETTINGS,
+  adoptExternalSettings,
   hydrateSettings,
   mcpTokenPatch,
   migratePathKeyedSettings,
@@ -551,6 +552,42 @@ export default class FoliaKanbanPlugin extends Plugin {
     // prune, repair or mint into is written for the same reason — so the next load reads what this
     // one decided rather than deciding it again.
     if (needsSave || minted) await this.saveSettings();
+  }
+
+  /**
+   * Obsidian calls this when `data.json` changes under a running plugin: Sync landing another
+   * device's copy, or someone editing the file by hand. Without it the change is never read and the
+   * next write from here replaces it with the older picture — see {@link adoptExternalSettings} for
+   * what is taken and what still resolves last-write-wins.
+   */
+  override async onExternalSettingsChange(): Promise<void> {
+    // A write of our own still in flight is the file this would otherwise read, or worse, the one
+    // it would race. Waiting for the chain means the read sees the settled file.
+    await this.pendingWrite;
+    if (this.unloaded) return;
+    const loaded: unknown = await this.loadData();
+    if (this.unloaded) return;
+    const { settings, stored, changed, needsSave } = adoptExternalSettings(
+      loaded,
+      this.stored,
+      this.settings.commentsBaseline || stamp(),
+    );
+    let write = needsSave;
+    if (changed) {
+      this.stored = stored;
+      this.settings = settings;
+      // The same repair `loadSettings` does, for the same reason: agent access can arrive switched
+      // on from an install that had no token to give.
+      if (this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop)))
+        write = true;
+      this.refreshViews();
+      // Port, bind address, token and the switch itself can all have moved; the running server has
+      // to follow them here as it does on any other settings change.
+      void this.mcp?.sync(this.settings);
+    }
+    // Only when this instance decided something the file does not already say. Writing back what we
+    // just read would reach the other side as its own external change, and come back again.
+    if (write) await this.saveSettings();
   }
 
   /** Records a patch as something that was actually set: it joins what is kept on disk, and the

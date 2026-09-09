@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SETTINGS,
+  adoptExternalSettings,
   SETTINGS_FORMAT,
   SETTINGS_FORMAT_KEY,
   hydrateSettings,
@@ -306,5 +307,110 @@ describe("the agent-access token", () => {
     const second = hydrateSettings(onDisk(stored), NOW);
     expect(second.settings.mcpToken).toBe("minted");
     expect(mcpTokenPatch(second.settings, () => "a different one", true)).toEqual({});
+  });
+});
+
+describe("a data.json changed by Sync or by hand", () => {
+  const LOCAL: StoredSettings = {
+    commentsBaseline: NOW,
+    detailWidth: 420,
+    collapsedCards: { "Tasks/A.md": true },
+  };
+
+  it("is read, so what the other side wrote is no longer overwritten by this instance", () => {
+    const { settings, stored, changed } = adoptExternalSettings(
+      onDisk({ ...LOCAL, detailWidth: 520 }),
+      LOCAL,
+      NOW,
+    );
+    expect(changed).toBe(true);
+    expect(settings.detailWidth).toBe(520);
+    expect(stored).toEqual({ ...LOCAL, detailWidth: 520 });
+  });
+
+  // The write this instance just made comes back as a change to the same file. Answering it with a
+  // re-render and a write of our own would be the other device's next external change, and ours
+  // again after that.
+  it("says nothing changed when the file already holds what this instance does", () => {
+    const { changed, needsSave } = adoptExternalSettings(onDisk(LOCAL), LOCAL, NOW);
+    expect(changed).toBe(false);
+    expect(needsSave).toBe(false);
+  });
+
+  // Two JSON parses of the same content, and two devices that toggled the same cards in a different
+  // order, both produce objects whose keys sit in different places.
+  it("compares by value, not by the order keys happen to sit in", () => {
+    const local: StoredSettings = {
+      commentsBaseline: NOW,
+      collapsedCards: { "Tasks/A.md": true, "Tasks/B.md": false },
+    };
+    const { changed } = adoptExternalSettings(
+      { collapsedCards: { "Tasks/B.md": false, "Tasks/A.md": true }, commentsBaseline: NOW },
+      local,
+      NOW,
+    );
+    expect(changed).toBe(false);
+  });
+
+  it("adopts a setting the other side put back to its default", () => {
+    const { settings, stored, changed } = adoptExternalSettings(
+      onDisk({ commentsBaseline: NOW, collapsedCards: { "Tasks/A.md": true } }),
+      LOCAL,
+      NOW,
+    );
+    expect(changed).toBe(true);
+    expect("detailWidth" in stored).toBe(false);
+    expect(settings.detailWidth).toBe(DEFAULT_SETTINGS.detailWidth);
+  });
+
+  // Stamping the moment of the sync instead would count every comment ever written as already read,
+  // on a machine where nobody had opened any of those cards.
+  it("keeps this instance's comments baseline when the file carries none", () => {
+    const { settings, needsSave } = adoptExternalSettings({ detailWidth: 520 }, LOCAL, NOW);
+    expect(settings.commentsBaseline).toBe(NOW);
+    // The file is missing the marker as well as the baseline, so it is one to write back.
+    expect(needsSave).toBe(true);
+  });
+
+  it("repairs what a hand-edit left where a value belongs, and asks for the file to be healed", () => {
+    const { settings, needsSave } = adoptExternalSettings(
+      onDisk({ ...LOCAL, collapsedCards: null as unknown as Record<string, boolean> }),
+      LOCAL,
+      NOW,
+    );
+    expect(needsSave).toBe(true);
+    expect(settings.collapsedCards).toEqual({});
+  });
+});
+
+// `src/main.ts` cannot be imported here, so the wiring around the callback is read from the source
+// the same way the block above reads it: what the plugin does with an adopted file is half the fix.
+describe("the plugin reacts to an external settings change", () => {
+  const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+  const body = (() => {
+    const from = main.slice(main.indexOf("override async onExternalSettingsChange"));
+    return from.slice(0, from.indexOf("\n  }"));
+  })();
+
+  it("implements the callback Obsidian offers, without which the change is never seen", () => {
+    expect(main).toContain("override async onExternalSettingsChange()");
+  });
+
+  it("lets a write of its own settle before reading the file back", () => {
+    expect(body).toContain("await this.pendingWrite");
+    expect(body.indexOf("await this.pendingWrite")).toBeLessThan(body.indexOf("this.loadData()"));
+  });
+
+  it("gives up if the plugin unloaded while it was waiting", () => {
+    expect(body.match(/if \(this\.unloaded\) return;/g)).toHaveLength(2);
+  });
+
+  it("pushes the adopted settings into the open boards and the running server", () => {
+    expect(body).toContain("this.refreshViews()");
+    expect(body).toContain("void this.mcp?.sync(this.settings)");
+  });
+
+  it("writes back only what this instance decided, never a copy of what it just read", () => {
+    expect(body).toContain("if (write) await this.saveSettings();");
   });
 });
