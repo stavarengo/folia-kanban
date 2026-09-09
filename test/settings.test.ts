@@ -11,7 +11,8 @@ import {
   resolveSettings,
   seenMarkerFor,
   settingsForDisk,
-  takeStoredMcpToken,
+  peekStoredMcpToken,
+  withoutStoredMcpToken,
   type StoredSettings,
 } from "../src/settings";
 
@@ -273,6 +274,20 @@ describe("the plugin writes only what was set", () => {
     expect(main).not.toContain("mcpToken:");
     expect(main).toContain('private mcpToken = "";');
   });
+
+  // Order is the whole safety of the migration. Obsidian refuses to keep a secret on a machine with
+  // no secure storage, and dropping the key first would make the move a deletion: gone from the
+  // file, held by nothing. So the write comes first and the key only goes once it succeeded.
+  it("keeps the token before it stops keeping the file's copy of it", () => {
+    const from = main.slice(main.indexOf("private takeTokenOutOfStored"));
+    const body = from.slice(0, from.indexOf("\n  }"));
+    expect(body.indexOf("writeMcpToken(this.app, legacy)")).toBeLessThan(
+      body.indexOf("withoutStoredMcpToken(this.stored)"),
+    );
+    // And a refusal leaves the file exactly as it was, rather than reporting a migration that did
+    // not happen — a `true` here would have the settings written back without the key.
+    expect(body).toContain("return false;");
+  });
 });
 
 // The token is a credential for a server one machine hosts, and `data.json` travels with the vault
@@ -285,11 +300,16 @@ describe("the agent-access token leaving data.json", () => {
     expect(Object.keys(settingsForDisk({ commentsBaseline: NOW }))).not.toContain("mcpToken");
   });
 
-  it("is handed over and taken out of the stored set, so the next write heals the file", () => {
+  // Read and removal are separate calls on purpose: the key must not leave the file until the token
+  // is safely in secret storage, and a store that refuses would otherwise turn the migration into a
+  // deletion. So reading leaves the set exactly as it was.
+  it("is handed over without being taken out, and taken out on its own", () => {
     const stored: StoredSettings = { commentsBaseline: NOW };
     (stored as Record<string, unknown>)["mcpToken"] = "carried in the vault";
-    expect(takeStoredMcpToken(stored)).toBe("carried in the vault");
-    expect(stored).toEqual({ commentsBaseline: NOW });
+    expect(peekStoredMcpToken(stored)).toBe("carried in the vault");
+    expect(peekStoredMcpToken(stored)).toBe("carried in the vault");
+    expect(withoutStoredMcpToken(stored)).toEqual({ commentsBaseline: NOW });
+    expect(peekStoredMcpToken(stored)).toBe("carried in the vault");
   });
 
   // Two different files say "nothing to keep": one that never had the key, and one written by a
@@ -298,11 +318,11 @@ describe("the agent-access token leaving data.json", () => {
   // reading it as "nothing to do" would leave the key on disk for good while the set in memory no
   // longer has it — which then reads as an external change on every later write.
   it("tells a file with no key from one whose key is empty, because only one needs writing", () => {
-    expect(takeStoredMcpToken({ commentsBaseline: NOW })).toBeNull();
+    expect(peekStoredMcpToken({ commentsBaseline: NOW })).toBeNull();
     const empty: StoredSettings = { commentsBaseline: NOW };
     (empty as Record<string, unknown>)["mcpToken"] = "";
-    expect(takeStoredMcpToken(empty)).toBe("");
-    expect(empty).toEqual({ commentsBaseline: NOW });
+    expect(peekStoredMcpToken(empty)).toBe("");
+    expect(withoutStoredMcpToken(empty)).toEqual({ commentsBaseline: NOW });
   });
 
   // A hand-edited file can carry anything where the token was. There is nothing to migrate, but the
@@ -310,8 +330,8 @@ describe("the agent-access token leaving data.json", () => {
   it("drops a key holding something that is not a token at all", () => {
     const junk: StoredSettings = { commentsBaseline: NOW };
     (junk as Record<string, unknown>)["mcpToken"] = { was: "hand-edited" };
-    expect(takeStoredMcpToken(junk)).toBe("");
-    expect(junk).toEqual({ commentsBaseline: NOW });
+    expect(peekStoredMcpToken(junk)).toBe("");
+    expect(withoutStoredMcpToken(junk)).toEqual({ commentsBaseline: NOW });
   });
 
   // The whole migration, end to end: a file written by the old build is read, the token is taken
@@ -321,8 +341,8 @@ describe("the agent-access token leaving data.json", () => {
     const legacy = onDisk({ commentsBaseline: NOW, mcpEnabled: true });
     legacy["mcpToken"] = "written by the old build";
     const { stored } = hydrateSettings(legacy, NOW);
-    expect(takeStoredMcpToken(stored)).toBe("written by the old build");
-    expect(Object.keys(settingsForDisk(stored))).not.toContain("mcpToken");
+    expect(peekStoredMcpToken(stored)).toBe("written by the old build");
+    expect(Object.keys(settingsForDisk(withoutStoredMcpToken(stored)))).not.toContain("mcpToken");
   });
 });
 

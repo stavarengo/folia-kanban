@@ -30,15 +30,39 @@ export function newMcpToken(): string {
  *  prefixed with the plugin id, because the store is one namespace shared by every plugin. */
 const MCP_TOKEN_SECRET_ID = "folia-kanban-mcp-token";
 
-/** The token this install holds, or "" when none has been minted yet. */
+/**
+ * The token this install holds, or "" when none has been minted yet.
+ *
+ * A store that cannot be read at all answers the same way, on purpose. Both mean the same thing to
+ * everything downstream — there is no token, so the server does not start — and the alternative is
+ * a throw on the load path, which would take the whole plugin down over a feature that is off by
+ * default. What the user is told is {@link writeMcpToken}'s job, since that is where the failure
+ * becomes something they asked for.
+ */
 export function readMcpToken(app: App): string {
-  return app.secretStorage.getSecret(MCP_TOKEN_SECRET_ID) ?? "";
+  try {
+    return app.secretStorage.getSecret(MCP_TOKEN_SECRET_ID) ?? "";
+  } catch {
+    return "";
+  }
 }
 
-/** Keeps a token for the next launch. There is no way back to `data.json`: a token written here is
- *  replaced by the next one, never moved out. */
-export function writeMcpToken(app: App, token: string): void {
-  app.secretStorage.setSecret(MCP_TOKEN_SECRET_ID, token);
+/**
+ * Keeps a token for the next launch, and says whether it is actually kept. There is no way back to
+ * `data.json`: a token written here is replaced by the next one, never moved out.
+ *
+ * False means the platform has no secure storage — Obsidian throws rather than storing in the clear
+ * — and the caller must then not hold the token either. A token only this session knows would work
+ * until the app closed and lock out the client configured with it afterwards, which is a worse
+ * failure than agent access plainly not starting.
+ */
+export function writeMcpToken(app: App, token: string): boolean {
+  try {
+    app.secretStorage.setSecret(MCP_TOKEN_SECRET_ID, token);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** How the running server is reported back to whoever asked for it. */

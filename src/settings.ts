@@ -144,24 +144,32 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
 const LEGACY_MCP_TOKEN_KEY = "mcpToken";
 
 /**
- * Takes a token out of a stored set written before the move to secret storage, removing the key so
- * the next write heals the file. Mutating rather than returning a copy, because the caller's whole
- * interest is that the key stops being there.
+ * What a stored set written before the move to secret storage still carries where the token used
+ * to be, without changing anything: reading and removing are separate because the removal must not
+ * happen until the token is safely somewhere else.
  *
  * `null` means the key was not there at all, which is every file written since the move. `""` means
  * it was there with nothing worth keeping in it — the empty default a build wrote before agent
  * access was ever switched on, or a hand-edited value that is not a string. The two are different
  * answers on purpose: both leave the caller with no token, but only the second leaves a file that
  * still has to be written. Collapsing them into `null` would let the key sit in `data.json` for
- * good, and, worse, make it show up as an external change on every later write, since the set in
- * memory no longer has it.
+ * good, and, worse, make it show up as an external change on every later write, since the set the
+ * plugin keeps in memory would no longer have it.
  */
-export function takeStoredMcpToken(stored: StoredSettings): string | null {
+export function peekStoredMcpToken(stored: StoredSettings): string | null {
   const record = stored as Record<string, unknown>;
   if (!(LEGACY_MCP_TOKEN_KEY in record)) return null;
   const value = record[LEGACY_MCP_TOKEN_KEY];
-  delete record[LEGACY_MCP_TOKEN_KEY];
   return typeof value === "string" ? value : "";
+}
+
+/** The same stored set with the old token key gone, so the next write heals the file. A copy rather
+ *  than a mutation, so nothing is removed from what the plugin is running on until the caller
+ *  actually takes the result. */
+export function withoutStoredMcpToken(stored: StoredSettings): StoredSettings {
+  const next: Record<string, unknown> = { ...stored };
+  delete next[LEGACY_MCP_TOKEN_KEY];
+  return next;
 }
 
 /**

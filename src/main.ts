@@ -30,8 +30,9 @@ import {
   migratePathKeyedSettings,
   resolveSettings,
   resolveSettingsPatch,
+  peekStoredMcpToken,
   settingsForDisk,
-  takeStoredMcpToken,
+  withoutStoredMcpToken,
   type KanbanSettings,
   type SettingsPatch,
   type StoredSettings,
@@ -46,6 +47,7 @@ import {
   ABOUT_HEADING,
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
+  MCP_TOKEN_UNAVAILABLE,
   SETTING_CONTROLS,
   SETTING_COPY,
   SETTING_GROUPS,
@@ -586,13 +588,18 @@ export default class FoliaKanbanPlugin extends Plugin {
    * credential in the vault, which is the whole point of the move.
    */
   private takeTokenOutOfStored(): boolean {
-    const legacy = takeStoredMcpToken(this.stored);
+    const legacy = peekStoredMcpToken(this.stored);
     if (legacy === null) return false;
-    this.stored = { ...this.stored };
     if (legacy && !this.mcpToken) {
+      // Only once it is safely somewhere else. A store that refuses would otherwise turn the
+      // migration into a deletion: the key gone from the file and nothing holding what was in it.
+      if (!writeMcpToken(this.app, legacy)) {
+        new Notice(MCP_TOKEN_UNAVAILABLE, 10000);
+        return false;
+      }
       this.mcpToken = legacy;
-      writeMcpToken(this.app, legacy);
     }
+    this.stored = withoutStoredMcpToken(this.stored);
     return true;
   }
 
@@ -601,8 +608,14 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  already configured with the old one, so it is minted once and kept. */
   private ensureMcpToken(): void {
     if (!this.settings.mcpEnabled || this.mcpToken || !Platform.isDesktop) return;
-    this.mcpToken = newMcpToken();
-    writeMcpToken(this.app, this.mcpToken);
+    const token = newMcpToken();
+    // Not held unless it is kept: see {@link writeMcpToken} for why a session-only token is worse
+    // than none. The server then never starts, and the notice is what says so.
+    if (!writeMcpToken(this.app, token)) {
+      new Notice(MCP_TOKEN_UNAVAILABLE, 10000);
+      return;
+    }
+    this.mcpToken = token;
   }
 
   /**
@@ -775,8 +788,11 @@ export default class FoliaKanbanPlugin extends Plugin {
       return;
     }
     const token = newMcpToken();
+    if (!writeMcpToken(this.app, token)) {
+      new Notice(MCP_TOKEN_UNAVAILABLE, 10000);
+      return;
+    }
     this.mcpToken = token;
-    writeMcpToken(this.app, token);
     // The token is not a setting, so no settings write carries it to the server: the restart is
     // asked for here, and waited on, so the notice reports what actually happened. A port taken in
     // the window between stopping on the old token and starting on the new one would otherwise be

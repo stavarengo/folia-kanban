@@ -301,6 +301,13 @@ export function isRowDisabled(key: EditableSettingKey, settings: KanbanSettings)
  *  to be drawn again rather than left as it is. */
 export const TAB_REDRAW_KEYS = ["detailPresentation", "addCardFlow", "mcpEnabled"] as const;
 
+/** What is said when the token cannot be kept anywhere. Obsidian stores it in the platform's secure
+ *  storage and refuses rather than falling back to the clear, so on a machine that has none there
+ *  is no token to have — the switch is on and nothing is listening, which is exactly the state the
+ *  user cannot see for themselves. Shared by minting and by replacing, because it is one cause. */
+export const MCP_TOKEN_UNAVAILABLE =
+  "Folia Kanban: agent access needs somewhere safe to keep its token, and this computer has no secure storage Obsidian can use. The server stays off rather than keeping the token in the clear.";
+
 /** The row that hands the bearer token over; not a setting the user edits, so it stands apart. */
 export const MCP_TOKEN_COPY = {
   name: "Agent token",
