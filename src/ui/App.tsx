@@ -587,7 +587,10 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           try {
             const b = boardRef.current;
             const line = b && subtaskRef(b, path, index);
-            if (!line) throw new Error(`"${path}" no longer has the todo that was removed.`);
+            if (!line)
+              throw new Error(
+                `The board no longer draws the todo that was removed from "${path}". Let it reload and try again.`,
+              );
             await repo.removeSubtask(path, line);
           } catch (e) {
             reportError(e);

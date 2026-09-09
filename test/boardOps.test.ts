@@ -166,24 +166,42 @@ describe("setSubtaskDone when the note has moved on", () => {
     expect(line).toMatchObject({ text: "Draft it", done: true, status: "done" });
   });
 
-  // The board decides the claim, so a board reading other words at that position is reading another
-  // line — and the claim it would carry over is that line's. Settled before the box is written.
-  it("writes neither half when the board is behind the reading the caller acts on", async () => {
+  // A board one reload behind is not a reason to refuse a write the note itself accepts: the box is
+  // the caller's to write, and only the claim is decided from the board — so only the claim waits.
+  it("still ticks the box when the board is behind, and leaves the claim to the next reading", async () => {
     const repo = claimedLine();
     const board = await repo.loadBoard();
     // Reworded from elsewhere after the board was read; the caller names the current wording.
     repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it now [status:: doing]\n";
-    const before = repo.files.get("Tasks/A.md")!.body;
 
-    await expect(
-      setSubtaskDone(repo, board, {
-        path: "Tasks/A.md",
-        line: { index: 0, text: "Draft it now" },
-        done: true,
-      }),
-    ).rejects.toThrow(/The board reads subtask 0 .* as "Draft it", not "Draft it now"/);
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: { index: 0, text: "Draft it now" },
+      done: true,
+    });
 
-    expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+    // Ticked, and still claiming Doing: the board never read this line, so it had no claim to move.
+    expect((await repo.readBody("Tasks/A.md")).subtasks[0]).toMatchObject({
+      text: "Draft it now",
+      done: true,
+      status: "doing",
+    });
+  });
+
+  // The fourth case, and the one a board built from the same store cannot show by itself: a line
+  // added since the board was drawn, named from a fresh read of the note, claiming nothing.
+  it("ticks a line the board has never seen at all", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    await repo.addTodo("Tasks/A.md", "Two");
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: { index: 1, text: "Two" },
+      done: true,
+    });
+
+    expect((await repo.readBody("Tasks/A.md")).subtasks.map((s) => s.done)).toEqual([false, true]);
   });
 
   it("writes neither half when the caller names a line the note no longer holds", async () => {

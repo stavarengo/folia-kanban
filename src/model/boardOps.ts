@@ -7,7 +7,7 @@
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
 import type { Board, LineRef } from "./types";
-import { moveCard, resolveDrop, subtaskRef, syncSubtaskClaim } from "./board";
+import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
 import { StaleLineError } from "./repo";
 
@@ -68,21 +68,13 @@ export async function setSubtaskDone(
   target: { path: string; line: LineRef; done: boolean; link?: string },
 ): Promise<void> {
   const { path, line, done, link } = target;
-  // Both halves are decided here: the box from the caller's reading of the line, the claim from the
-  // board's. A board that reads other words at that position is reading another line, and would
-  // carry over a claim belonging to it — so the disagreement is settled before anything is written,
-  // rather than after the box has landed.
-  const seen = subtaskRef(board, path, line.index);
-  if (seen === null || seen.text !== line.text) {
-    throw new StaleLineError(
-      `The board reads subtask ${line.index} of "${path}" as ${seen === null ? "no line at all" : `"${seen.text}"`}, not "${line.text}", so nothing was written — the board is behind the note it was read from. Reload it and repeat the edit.`,
-    );
-  }
   await repo.toggleSubtask(path, line, done);
   // The follow-up names the line the tick just named — the same `line`, not the board's own reading
-  // of it — so the two halves can never write to two different lines. They are still two writes,
-  // though: a note edited in the moment between them can have the second refused on its own, and
-  // that says so rather than leaving the caller to discover a ticked box with a stale claim.
+  // of it — so the two halves can never write to two different lines. The claim is the half decided
+  // FROM the board, so a board that has not caught up simply contributes nothing (`syncSubtaskClaim`
+  // returns null on words it does not recognise) rather than making the tick fail with it. They are
+  // still two writes: a note edited in the moment between them can have the second refused on its
+  // own, and that says so rather than leaving the caller to find a ticked box with a stale claim.
   // `link` matters on top of that: for a line naming a child note,
   // `syncSubtaskClaim` refuses to act unless the caller shows the `[[link]]` it read, so a line
   // edited underneath is not acted on by position alone. A caller that leaves it out gets the

@@ -85,7 +85,8 @@ export interface CardRepository {
   /**
    * Replace the text of one comment, keeping its timestamp + every other byte. `at` is the entry
    * as the caller read it (see {@link LineRef}); a note that no longer reads that way is left
-   * untouched and the call throws {@link StaleLineError}. Same for the three below.
+   * untouched and the call throws {@link StaleLineError}. Same for `removeComment`, `toggleSubtask`
+   * and `removeSubtask` — `addTodo` writes a new line and has no earlier reading to keep.
    */
   updateComment(path: string, at: LineRef, text: string): Promise<void>;
   /** Delete one comment line only. */
