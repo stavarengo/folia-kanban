@@ -1524,6 +1524,26 @@ describe("pop-out window ownership", () => {
     });
   });
 
+  it("closes the side detail panel from a pointerdown in the board's own document", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo(), {
+      ...DEFAULT_SETTINGS,
+      detailPresentation: "side",
+      sidePanelMode: "split",
+    });
+    await screen.findByText("Alpha");
+
+    await inOtherFocusedWindow(async () => {
+      // Opened while another window holds focus, which is when the panel decides where to hang its
+      // teardown listener. It has to be the board's document: hung off the focused window's, a
+      // click on the board itself would never reach it and the panel would stay open.
+      await user.click(screen.getByText("Alpha"));
+      await screen.findByTestId("card-detail");
+      fireEvent.pointerDown(document.body);
+      await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    });
+  });
+
   it("opens a card's context menu in the board's own document", async () => {
     render_(makeRepo());
     const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;

@@ -176,7 +176,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.34](../../backlog/20260829.34.the-readme-claims-no-network-requests-and-names-no-third-party-licences.md) | The README's privacy claim, and the missing licence notices | 07-18, 07-19 |
 | [20260829.35](../../backlog/20260829.35.main-ts-is-a-thousand-lines-against-the-review-checklist.md) | `src/main.ts` at 1020 lines, under a waiver that expires | 07-05 |
 | [20260829.36](../../backlog/20260829.36.the-board-listens-to-the-window-where-it-should-listen-to-its-view.md) | Board chrome listening to the window instead of the host view | 06-05, 06-06, 06-11 |
-| [20260829.37](../../backlog/20260829.37.menus-and-modals-open-in-the-focused-window-not-the-boards-own.md) | Bug: surfaces open in the focused window, not the board's own | 06-04 |
+| 20260829.37 (fixed, entry closed) | Bug: surfaces open in the focused window, not the board's own | 06-04 |
 | [20260829.38](../../backlog/20260829.38.date-handling-is-written-by-hand-beside-the-bundled-moment.md) | Hand-written date arithmetic and formatting, recorded for its trigger | 03-07, 03-08 |
 
 ### Already tracked
