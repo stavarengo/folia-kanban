@@ -1524,6 +1524,29 @@ describe("pop-out window ownership", () => {
     });
   });
 
+  it("walks the card menu with the arrow keys read from the board's own document", async () => {
+    render_(makeRepo());
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+
+    await inOtherFocusedWindow(async () => {
+      fireEvent.contextMenu(card, { clientX: 20, clientY: 20 });
+      const menu = await waitFor(() => {
+        const el = findIn(document, "Card actions");
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      const items = Array.from(
+        menu.querySelectorAll<HTMLButtonElement>(".folia-menu-item:not(:disabled)"),
+      );
+      items[0]?.focus();
+      // Arrow navigation finds the current item by asking a document who has focus. Asked of the
+      // focused window's document, the answer is "nobody here", the menu can't place itself in its
+      // own list, and every arrow key lands back on the first item.
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[1]);
+    });
+  });
+
   it("closes the side detail panel from a pointerdown in the board's own document", async () => {
     const user = userEvent.setup();
     render_(makeRepo(), {
