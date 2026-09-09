@@ -25,9 +25,11 @@ export function newMcpToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Where the token is kept: Obsidian's own secret storage, which lives outside the vault, so the
- *  credential does not travel with it through Sync, a git remote or a backup. Lowercase, dashed and
- *  prefixed with the plugin id, because the store is one namespace shared by every plugin. */
+/** Where the token is kept: Obsidian's own secret storage. Obsidian keeps it encrypted outside the
+ *  vault's files and keys it to this vault, which is both halves of what is wanted — the credential
+ *  does not travel with the vault through Sync, a git remote or a backup, and a second vault opened
+ *  on this machine has its own. The id is lowercase and dashed because Obsidian validates it, and
+ *  carries the plugin id because the store is one namespace shared by every plugin. */
 const MCP_TOKEN_SECRET_ID = "folia-kanban-mcp-token";
 
 /**

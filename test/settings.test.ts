@@ -261,7 +261,7 @@ describe("the plugin writes only what was set", () => {
     // after the migration would let a synced data.json overwrite a token replaced here.
     expect(body.indexOf("readMcpToken(this.app)")).toBeGreaterThan(-1);
     expect(body.indexOf("readMcpToken(this.app)")).toBeLessThan(
-      body.indexOf("this.takeTokenOutOfStored()"),
+      body.indexOf("this.settleMcpToken()"),
     );
     expect(body).toContain("if (needsSave || migrated) await this.saveSettings();");
   });
@@ -279,14 +279,19 @@ describe("the plugin writes only what was set", () => {
   // no secure storage, and dropping the key first would make the move a deletion: gone from the
   // file, held by nothing. So the write comes first and the key only goes once it succeeded.
   it("keeps the token before it stops keeping the file's copy of it", () => {
-    const from = main.slice(main.indexOf("private takeTokenOutOfStored"));
-    const body = from.slice(0, from.indexOf("\n  }"));
-    expect(body.indexOf("writeMcpToken(this.app, legacy)")).toBeLessThan(
+    const from = main.slice(main.indexOf("private settleMcpToken"));
+    const body = from.slice(0, from.indexOf("\n  }\n"));
+    expect(body.indexOf("writeMcpToken(this.app, outcome.token)")).toBeLessThan(
       body.indexOf("withoutStoredMcpToken(this.stored)"),
     );
     // And a refusal leaves the file exactly as it was, rather than reporting a migration that did
     // not happen — a `true` here would have the settings written back without the key.
     expect(body).toContain("return false;");
+    // The settings were resolved from a stored set that still had the key, so dropping it without
+    // resolving them again leaves the credential in `this.settings` for the rest of the session.
+    expect(body.indexOf("withoutStoredMcpToken(this.stored)")).toBeLessThan(
+      body.indexOf("resolveSettings(this.stored)"),
+    );
   });
 });
 

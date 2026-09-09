@@ -402,8 +402,8 @@ export function adoptExternalSettings(
   // file saying every setting was unset. `hydrateSettings` reads it as the latter — right at load,
   // where an install has nothing to lose, and destructive here, where taking it at its word would
   // reset the running settings to their defaults and then write that back over everything the file
-  // is only failing to show: the agent token no client can be told again, the read markers, the
-  // per-card collapse state.
+  // is only failing to show: the read markers, the per-card collapse state, the bind address a
+  // server is answering on.
   if (!isRecord(loaded))
     return {
       settings: resolveSettings(current),

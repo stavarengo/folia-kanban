@@ -23,6 +23,7 @@ import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
 import type { FileOp } from "./model/pathOps";
 import { remapPath } from "./model/pathOps";
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
+import { mcpTokenOutcome } from "./mcp/token";
 import {
   DEFAULT_SETTINGS,
   adoptExternalSettings,
@@ -563,12 +564,11 @@ export default class FoliaKanbanPlugin extends Plugin {
     // Read before the stored set is asked for one: a secret already here is the newer of the two,
     // and what makes the migration below one-way.
     this.mcpToken = readMcpToken(this.app);
-    const migrated = this.takeTokenOutOfStored();
     // Agent access switched on but carrying no token — data.json hand-edited, or synced from an
     // install that could not mint one — would leave the toggle reading on with nothing listening
-    // and nothing said about it, because a server that is never asked to start never fails. Mint
-    // the token the enabled state implies, here, where the settings arrive.
-    this.ensureMcpToken();
+    // and nothing said about it, because a server that is never asked to start never fails. This is
+    // also where a token written by a build that kept it in the file stops being kept there.
+    const migrated = this.settleMcpToken();
     // Persisted right away: the baseline is "when tracking started", and it must not drift to a
     // later launch if nothing else happens to save the settings before then. A file the load had to
     // prune, repair or take a token out of is written for the same reason — so the next load reads
@@ -577,45 +577,39 @@ export default class FoliaKanbanPlugin extends Plugin {
   }
 
   /**
-   * Moves a token written by a build that kept it in `data.json` into secret storage, and takes the
-   * key out of the stored set so the next write removes it from the file for good. Returns whether
-   * the key was there at all — an empty one is nothing to keep but still a file to write, and a key
-   * dropped in memory but left on disk would come back as an external change on every later write.
+   * Bring the token this install holds into line with what it should be — {@link mcpTokenOutcome}
+   * decides that; this does it — and say whether `data.json` has to be written as a result.
    *
-   * The secret wins when both exist: a `data.json` arriving through Sync from a machine still on an
-   * older build carries whatever token that machine has, and adopting it would silently undo a
-   * replacement made here. The stale key is dropped either way — leaving it would mean carrying the
-   * credential in the vault, which is the whole point of the move.
+   * Called wherever any of the three inputs can have moved: the load, an external change to the
+   * file, and the settings write that switches agent access on. The old key is only taken out of
+   * the stored set once the token that was in it is safely somewhere else, so a store that refuses
+   * leaves the file as it was rather than turning the migration into a deletion.
    */
-  private takeTokenOutOfStored(): boolean {
-    const legacy = peekStoredMcpToken(this.stored);
-    if (legacy === null) return false;
-    if (legacy && !this.mcpToken) {
-      // Only once it is safely somewhere else. A store that refuses would otherwise turn the
-      // migration into a deletion: the key gone from the file and nothing holding what was in it.
-      if (!writeMcpToken(this.app, legacy)) {
+  private settleMcpToken(): boolean {
+    const outcome = mcpTokenOutcome(
+      {
+        enabled: this.settings.mcpEnabled,
+        desktop: Platform.isDesktop,
+        secret: this.mcpToken,
+        legacy: peekStoredMcpToken(this.stored),
+      },
+      newMcpToken,
+    );
+    if (outcome.write) {
+      // Not held unless it is kept: a token that lived only until the app closed would lock out the
+      // client configured with it, which is worse than agent access plainly not starting.
+      if (!writeMcpToken(this.app, outcome.token)) {
         new Notice(MCP_TOKEN_UNAVAILABLE, 10000);
         return false;
       }
-      this.mcpToken = legacy;
     }
+    this.mcpToken = outcome.token;
+    if (!outcome.dropLegacy) return false;
     this.stored = withoutStoredMcpToken(this.stored);
+    // The settings were resolved from a stored set that still had the key, so the credential is
+    // sitting in them until something else happens to write a patch. Resolve them again.
+    this.settings = resolveSettings(this.stored);
     return true;
-  }
-
-  /** Mints the token that agent access being on implies, when this install has none. Called
-   *  wherever the switch can have moved — a token minted on every load would break the client
-   *  already configured with the old one, so it is minted once and kept. */
-  private ensureMcpToken(): void {
-    if (!this.settings.mcpEnabled || this.mcpToken || !Platform.isDesktop) return;
-    const token = newMcpToken();
-    // Not held unless it is kept: see {@link writeMcpToken} for why a session-only token is worse
-    // than none. The server then never starts, and the notice is what says so.
-    if (!writeMcpToken(this.app, token)) {
-      new Notice(MCP_TOKEN_UNAVAILABLE, 10000);
-      return;
-    }
-    this.mcpToken = token;
   }
 
   /**
@@ -655,11 +649,10 @@ export default class FoliaKanbanPlugin extends Plugin {
     if (changedKeys.length > 0) {
       this.stored = stored;
       this.settings = settings;
-      // The same two repairs `loadSettings` does, for the same reasons: a file written by a build
-      // that kept the token in it has to stop carrying one, and agent access can arrive switched on
-      // from an install that had no token to give.
-      if (this.takeTokenOutOfStored()) write = true;
-      this.ensureMcpToken();
+      // The same settling `loadSettings` does, for the same reasons: a file written by a build that
+      // kept the token in it has to stop carrying one, and agent access can arrive switched on from
+      // an install that had no token to give.
+      if (this.settleMcpToken()) write = true;
       this.refreshViews();
       // Only when a row it draws actually moved: `data.json` also carries per-card state written by
       // ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
@@ -716,7 +709,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     if (!this.applyToStored(resolveSettingsPatch(this.settings, patch))) return;
     // Switching agent access on for the first time is when its token comes into existence: it is
     // generated once and kept, so the client configured against it keeps working across restarts.
-    this.ensureMcpToken();
+    this.settleMcpToken();
     this.refreshViews();
     void this.mcp?.sync(this.settings);
     await this.saveSettings();
