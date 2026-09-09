@@ -494,6 +494,23 @@ describe("field edits and their history lines", () => {
     expect(app.vault.text("basic/Cards/One.md")).not.toContain("## History");
   });
 
+  it("writes a list-valued key through the real frontmatter path, not just the fake", async () => {
+    const { app, repo } = repoWithCard("all");
+
+    await repo.setFrontmatter("basic/Cards/One.md", { assignee: ["alex", "ana maria"] });
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")["assignee"]).toEqual(["alex", "ana maria"]);
+  });
+
+  it("clears a key that currently holds a list, the same as it clears a scalar", async () => {
+    const { app, repo } = repoWithCard("all");
+    await repo.setFrontmatter("basic/Cards/One.md", { assignee: ["alex", "ana maria"] });
+
+    await repo.unsetFrontmatterKey("basic/Cards/One.md", "assignee");
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")).not.toHaveProperty("assignee");
+  });
+
   it("names the subtask in its history line, reading the text BEFORE the edit lands", async () => {
     const { app, repo } = repoWithCard("all", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n");
 

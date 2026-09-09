@@ -23,7 +23,23 @@ import {
   type ToolDefinition,
 } from "./tool";
 
-const propertyValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const scalarPropertyValue = z.union([z.string(), z.number(), z.boolean()]);
+
+/**
+ * What a frontmatter value may be through `properties`: a scalar, a list of scalars, or `null` to
+ * clear the key. The list case exists because the read side already hands one back — `get_card` and
+ * `get_board` report `assignee` and any other list-valued key exactly as the note holds it — and a
+ * tool that could read a list but never write one back would force whoever holds `["alex", "ana
+ * maria"]` to either drop a name or fold both into one string the board then reads as a single
+ * person. Writing a list still replaces the key wholesale, the same as writing a scalar does.
+ */
+const propertyValue = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(scalarPropertyValue),
+]);
 
 /**
  * A due date, in the one format the board reads. The detail panel writes it from a date picker and
@@ -97,7 +113,7 @@ async function writeField(
   repo: CardRepository,
   path: string,
   key: string,
-  value: string | number | boolean | null,
+  value: string | number | boolean | (string | number | boolean)[] | null,
 ): Promise<void> {
   if (value === null) await repo.unsetFrontmatterKey(path, key);
   else await repo.setFrontmatter(path, { [key]: value });
@@ -293,7 +309,11 @@ const updateCard = tool({
       properties: z
         .record(z.string(), propertyValue)
         .optional()
-        .describe("Any other frontmatter keys to set, or null to remove."),
+        .describe(
+          "Any other frontmatter keys to set, or null to remove. A value can be a list, for a " +
+            "key like `assignee` that names more than one person; writing one replaces the whole " +
+            "key, the same as a scalar does.",
+        ),
     })
     // Not expressible in the published JSON Schema, so clients see an all-optional object and only
     // meet this at call time; `docs/mcp.md` says so.

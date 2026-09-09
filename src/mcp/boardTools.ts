@@ -37,8 +37,7 @@ function cardSummary(board: Board, path: string): Record<string, unknown> {
     // Raw, exactly as its neighbours are: a card may name one person or several, and an agent
     // deciding what to do about that should see which. Reported here and not only by get_card
     // because "who is working on this" is a question about a board, and answering it otherwise
-    // costs one call per card. Note that a list read here cannot be written back as a list —
-    // `update_card`'s property values are scalars — so an agent's write assigns one person.
+    // costs one call per card. `update_card`'s `properties` can write this shape straight back.
     assignee: card.frontmatter["assignee"],
     context: card.context,
     parent: board.placedOf[path],

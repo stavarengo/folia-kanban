@@ -659,6 +659,32 @@ describe("the values a card's own fields will and will not take", () => {
       "due",
     );
   });
+
+  it("writes a list-valued property, the shape get_card and get_board already report", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { assignee: ["alex", "ana maria"] },
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter["assignee"]).toEqual([
+      "alex",
+      "ana maria",
+    ]);
+  });
+
+  it("replaces a list wholesale rather than merging into it", async () => {
+    const { host, repo } = fixture();
+    repo.files.get("Tasks/Ship it.md")!.fm["assignee"] = ["alex", "ana maria"];
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { assignee: "alex" },
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter["assignee"]).toBe(
+      "alex",
+    );
+  });
 });
 
 describe("names that belong to every object, not to any card", () => {

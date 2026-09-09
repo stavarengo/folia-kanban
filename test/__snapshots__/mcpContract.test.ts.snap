@@ -207,9 +207,25 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
               {
                 "type": "null",
               },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                    },
+                    {
+                      "type": "number",
+                    },
+                    {
+                      "type": "boolean",
+                    },
+                  ],
+                },
+                "type": "array",
+              },
             ],
           },
-          "description": "Any other frontmatter keys to set, or null to remove.",
+          "description": "Any other frontmatter keys to set, or null to remove. A value can be a list, for a key like \`assignee\` that names more than one person; writing one replaces the whole key, the same as a scalar does.",
           "propertyNames": {
             "type": "string",
           },
