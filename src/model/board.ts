@@ -1008,7 +1008,9 @@ export function subtaskRef(board: Board, parentPath: string, index: number): Sub
  * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
  *
  * `line` is the checklist line as the CALLER read it, whole — the panel's own reading of the note,
- * the tool's, or the board's when it is the board that was clicked. A line's own claim is written
+ * the tool's, or the board's when it is the board that was clicked. Every one of them reads it
+ * through `parseSubtasks`, so which branch it takes below is the note's own answer to "is this line
+ * a todo or a link to a card", never a caller's guess at it. A line's own claim is written
  * on the line, so it is read from there and never from the board's copy of that position: a board
  * one reload behind would otherwise decide the answer for a line nobody was looking at, or, if it
  * were made to refuse instead, leave an unticked line still claiming Done. The board is asked only
