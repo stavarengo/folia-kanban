@@ -225,7 +225,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
               },
             ],
           },
-          "description": "Any other frontmatter keys to set, or null to remove. A value can be a list, for a key like \`assignee\` that names more than one person; writing one replaces the whole key, the same as a scalar does.",
+          "description": "Any other frontmatter keys to set, or null to remove. A value can be a list, for a key like \`assignee\` that names more than one person; writing one replaces the whole key, the same as a scalar does. \`area\` refuses a list — it feeds a filter that reads one value.",
           "propertyNames": {
             "type": "string",
           },

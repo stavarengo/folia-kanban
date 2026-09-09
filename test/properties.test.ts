@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   FOLIA_CARD_KEYS,
   PANEL_FIELD_KEYS,
+  SCALAR_ONLY_KEYS,
   TOOL_REFUSALS,
   propertySuggestions,
 } from "../src/model/properties";
@@ -46,6 +47,10 @@ describe("the keys Folia Kanban knows", () => {
     expect(TOOL_REFUSALS["priority"]).toBe(
       "use update_card's own `priority` field, so the board remembers the value",
     );
+  });
+
+  it("marks scalar-only exactly the card keys a list would break", () => {
+    expect([...SCALAR_ONLY_KEYS].sort()).toEqual(["area"].sort());
   });
 
   it("declares every field CardFrontmatter spells out", () => {

@@ -685,6 +685,69 @@ describe("the values a card's own fields will and will not take", () => {
       "alex",
     );
   });
+
+  it("replaces a list with another list, not a merge of the two", async () => {
+    const { host, repo } = fixture();
+    repo.files.get("Tasks/Ship it.md")!.fm["assignee"] = ["alex", "ana maria"];
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { assignee: ["bo"] },
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter["assignee"]).toEqual([
+      "bo",
+    ]);
+  });
+
+  it("refuses a list on area, the one key a list would break, and says why", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { area: ["home", "work"] },
+      }),
+    ).rejects.toThrow(/"area" feeds a filter that reads one value/);
+  });
+
+  it("takes a list for tags and context too, not only assignee", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { tags: ["bug", "urgent"], context: ["work"] },
+    });
+    const fm = (await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter;
+    expect(fm?.["tags"]).toEqual(["bug", "urgent"]);
+    expect(fm?.["context"]).toEqual(["work"]);
+  });
+
+  it("takes a list for a key Folia has no opinion about, same as get_card would report one back", async () => {
+    const { host, repo } = fixture();
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { aliases: ["a", "b"] },
+    });
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter["aliases"]).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("writes nothing when one property in the same call is refused", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { type: "bug", area: ["home", "work"] },
+      }),
+    ).rejects.toThrow(/"area" feeds a filter/);
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty(
+      "type",
+    );
+  });
 });
 
 describe("names that belong to every object, not to any card", () => {

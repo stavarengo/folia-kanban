@@ -26,6 +26,16 @@ interface FoliaProperty {
    * that tried and naming what it should have used instead. Absent when nothing refuses the key.
    */
   toolRefusal?: string;
+  /**
+   * True for a key the board reads with a plain `String(fm[key])` coercion — `matchToken` in
+   * `ui/cardView.ts` — so a list landing there is not a wider value, it is one the `area:` filter
+   * and `tagValues`'s free-text search (also `ui/cardView.ts`) silently stop matching. A tool's
+   * `properties` map refuses a list for a key marked here; every other key, Folia's own or the
+   * vault's, is read whole by `get_card`/`get_board` and may be written back the same shape,
+   * scalar or list — a key the plugin has no opinion about, `aliases` and `cssclasses` included,
+   * has nothing here that would misread a list.
+   */
+  scalarOnly?: boolean;
 }
 
 /**
@@ -77,7 +87,16 @@ const FOLIA_PROPERTIES = [
   },
   { key: "type", scope: "card", panelField: true },
   { key: "created", scope: "card", panelField: true },
-  { key: "area", scope: "card" },
+  {
+    key: "area",
+    scope: "card",
+    scalarOnly: true,
+    // The one declared card key a list actually breaks: `area:` in `matchToken` and `tagValues`'s
+    // free-text search (`ui/cardView.ts`) both read it with `typeof fm.area === "string"` /
+    // `String(fm.area)`. Every other declared key with no dedicated read logic (or one already
+    // list-tolerant, like `tags` and `context` two lines down) has nothing here that would misread
+    // a list, so nothing here refuses one.
+  },
   { key: "tags", scope: "card" },
   { key: "context", scope: "card" },
   {
@@ -119,6 +138,15 @@ export const TOOL_REFUSALS: Readonly<Record<string, string>> = Object.fromEntrie
     p.key,
     (p as { toolRefusal: string }).toolRefusal,
   ]),
+);
+
+/**
+ * The declared card keys a list would break — see `FoliaProperty.scalarOnly`. A tool's
+ * `properties` map refuses a list for a key in this set and writes one through for every other
+ * key, Folia's own or the vault's.
+ */
+export const SCALAR_ONLY_KEYS: ReadonlySet<string> = new Set(
+  FOLIA_PROPERTIES.filter((p) => p.scope === "card" && "scalarOnly" in p).map((p) => p.key),
 );
 
 /** Which of the three lists a suggested property name came from, in the order they are offered. */

@@ -7,7 +7,7 @@ import { columnOf } from "../model/board";
 import type { Board } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
-import { TOOL_REFUSALS } from "../model/properties";
+import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import {
@@ -27,11 +27,13 @@ const scalarPropertyValue = z.union([z.string(), z.number(), z.boolean()]);
 
 /**
  * What a frontmatter value may be through `properties`: a scalar, a list of scalars, or `null` to
- * clear the key. The list case exists because the read side already hands one back — `get_card` and
- * `get_board` report `assignee` and any other list-valued key exactly as the note holds it — and a
- * tool that could read a list but never write one back would force whoever holds `["alex", "ana
- * maria"]` to either drop a name or fold both into one string the board then reads as a single
- * person. Writing a list still replaces the key wholesale, the same as writing a scalar does.
+ * clear the key. The list case exists because the read side already hands one back — `get_card`
+ * and `get_board` report a list-valued key, `assignee` most visibly, exactly as the note holds it
+ * — and a tool that could read a list but never write one back would force whoever holds
+ * `["alex", "ana maria"]` to either drop a name or fold both into one string the board then reads
+ * as a single person. Writing a list still replaces the key wholesale, the same as writing a
+ * scalar does. `refuseArrayForScalarKey` below refuses it for the handful of keys a list would
+ * actually break; every other key takes the shape it was given.
  */
 const propertyValue = z.union([
   z.string(),
@@ -71,7 +73,7 @@ function refuseReservedKeys(board: Board, properties: Record<string, unknown> | 
   const relationKeys = new Set(
     [BLOCKS, ...board.config.relations].flatMap((r) => [r.key, r.inverse]),
   );
-  for (const key of Object.keys(properties ?? {})) {
+  for (const [key, value] of Object.entries(properties ?? {})) {
     // Own keys only, so a property named "toString" is an ordinary key rather than a match
     // against Object.prototype that reports native code back to the caller.
     const reserved = Object.prototype.hasOwnProperty.call(TOOL_REFUSALS, key)
@@ -83,7 +85,22 @@ function refuseReservedKeys(board: Board, properties: Record<string, unknown> | 
         `"${key}" is one of this board's relationship keys. Writing it here would add the link without the history line the board records for one, and without the check that stops a card relating to itself. This server has no relationship tool yet, so a relationship has to be made in Obsidian.`,
       );
     }
+    // A list is only bad news on the handful of keys the board reads with a plain `String(...)`
+    // coercion — see `SCALAR_ONLY_KEYS`. Every other key, Folia's own or the vault's, is handed
+    // back whole by `get_card`/`get_board` and may be written back the same shape it came in.
+    refuseArrayForScalarKey(key, value);
   }
+}
+
+/**
+ * The array half of {@link refuseReservedKeys}: split out because it turns on the *value*, not
+ * only the key, and `refuseReservedKeys` otherwise never looks past `Object.keys`.
+ */
+function refuseArrayForScalarKey(key: string, value: unknown): void {
+  if (!Array.isArray(value) || !SCALAR_ONLY_KEYS.has(key)) return;
+  throw new ToolError(
+    `"${key}" feeds a filter that reads one value, not a list — writing a list there is not a wider value, it is one the board would stop matching. Send a single string, number or boolean instead.`,
+  );
 }
 
 /**
@@ -312,7 +329,8 @@ const updateCard = tool({
         .describe(
           "Any other frontmatter keys to set, or null to remove. A value can be a list, for a " +
             "key like `assignee` that names more than one person; writing one replaces the whole " +
-            "key, the same as a scalar does.",
+            "key, the same as a scalar does. `area` refuses a list — it feeds a filter that " +
+            "reads one value.",
         ),
     })
     // Not expressible in the published JSON Schema, so clients see an all-optional object and only
