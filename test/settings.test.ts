@@ -318,12 +318,12 @@ describe("a data.json changed by Sync or by hand", () => {
   };
 
   it("is read, so what the other side wrote is no longer overwritten by this instance", () => {
-    const { settings, stored, changed } = adoptExternalSettings(
+    const { settings, stored, changedKeys } = adoptExternalSettings(
       onDisk({ ...LOCAL, detailWidth: 520 }),
       LOCAL,
       NOW,
     );
-    expect(changed).toBe(true);
+    expect(changedKeys).toEqual(["detailWidth"]);
     expect(settings.detailWidth).toBe(520);
     expect(stored).toEqual({ ...LOCAL, detailWidth: 520 });
   });
@@ -332,8 +332,8 @@ describe("a data.json changed by Sync or by hand", () => {
   // re-render and a write of our own would be the other device's next external change, and ours
   // again after that.
   it("says nothing changed when the file already holds what this instance does", () => {
-    const { changed, needsSave } = adoptExternalSettings(onDisk(LOCAL), LOCAL, NOW);
-    expect(changed).toBe(false);
+    const { changedKeys, needsSave } = adoptExternalSettings(onDisk(LOCAL), LOCAL, NOW);
+    expect(changedKeys).toEqual([]);
     expect(needsSave).toBe(false);
   });
 
@@ -344,21 +344,21 @@ describe("a data.json changed by Sync or by hand", () => {
       commentsBaseline: NOW,
       collapsedCards: { "Tasks/A.md": true, "Tasks/B.md": false },
     };
-    const { changed } = adoptExternalSettings(
+    const { changedKeys } = adoptExternalSettings(
       { collapsedCards: { "Tasks/B.md": false, "Tasks/A.md": true }, commentsBaseline: NOW },
       local,
       NOW,
     );
-    expect(changed).toBe(false);
+    expect(changedKeys).toEqual([]);
   });
 
   it("adopts a setting the other side put back to its default", () => {
-    const { settings, stored, changed } = adoptExternalSettings(
+    const { settings, stored, changedKeys } = adoptExternalSettings(
       onDisk({ commentsBaseline: NOW, collapsedCards: { "Tasks/A.md": true } }),
       LOCAL,
       NOW,
     );
-    expect(changed).toBe(true);
+    expect(changedKeys).toEqual(["detailWidth"]);
     expect("detailWidth" in stored).toBe(false);
     expect(settings.detailWidth).toBe(DEFAULT_SETTINGS.detailWidth);
   });
@@ -377,12 +377,12 @@ describe("a data.json changed by Sync or by hand", () => {
   // running settings and then write the reset back over the token, the read markers and the rest.
   it("keeps what this instance holds when the file cannot be read at all", () => {
     for (const unreadable of [null, undefined, "", 42, ["a"]]) {
-      const { settings, stored, changed, needsSave } = adoptExternalSettings(
+      const { settings, stored, changedKeys, needsSave } = adoptExternalSettings(
         unreadable,
         LOCAL,
         NOW,
       );
-      expect({ changed, needsSave }).toEqual({ changed: false, needsSave: false });
+      expect({ changedKeys, needsSave }).toEqual({ changedKeys: [], needsSave: false });
       expect(stored).toBe(LOCAL);
       expect(settings.detailWidth).toBe(420);
     }
@@ -448,7 +448,15 @@ describe("the plugin reacts to an external settings change", () => {
     const tab = method("settingsChangedExternally(): void {");
     expect(tab).toContain("this.pendingUserName = null;");
     expect(tab).toContain("this.pendingMcpFields = {};");
-    expect(tab).toContain("this.render()");
+    // From 1.13 the tab is Obsidian's to draw; emptying its container would replace what it
+    // rendered, and what its settings search indexed, with the older imperative rows.
+    expect(tab).toContain('requireApiVersion("1.13.0")) this.update()');
+  });
+
+  // `data.json` also carries per-card state that ordinary board use elsewhere writes. Redrawing the
+  // tab for one of those would throw away a name being typed, for a change it is not showing.
+  it("leaves the settings tab alone when no row it draws moved", () => {
+    expect(adopt).toContain("changedKeys.some((key) => key in SETTING_CONTROLS)");
   });
 
   it("writes back only what this instance decided, never a copy of what it just read", () => {

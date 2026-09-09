@@ -346,9 +346,24 @@ function canonical(value: unknown): string {
 }
 
 /** What an external write to `data.json` amounts to for a running instance: {@link HydratedSettings}
- *  plus whether the file actually says something different from what this instance is holding. */
+ *  plus the settings the file actually disagrees with this instance about. Empty when the write it
+ *  is reacting to was this instance's own. Which settings, not only whether any, because what has
+ *  to be told depends on it: the boards care about all of them, the settings tab only about the
+ *  rows it draws. */
 export interface AdoptedSettings extends HydratedSettings {
-  changed: boolean;
+  changedKeys: (keyof KanbanSettings)[];
+}
+
+/** The settings two stored sets disagree on, a key one of them has and the other does not
+ *  included. */
+function changedKeysBetween(
+  before: StoredSettings,
+  after: StoredSettings,
+): (keyof KanbanSettings)[] {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]) as Set<
+    keyof KanbanSettings
+  >;
+  return [...keys].filter((key) => canonical(before[key]) !== canonical(after[key]));
 }
 
 /**
@@ -359,10 +374,9 @@ export interface AdoptedSettings extends HydratedSettings {
  * do is reconcile two edits made at once; those still resolve last-write-wins, and this is what
  * turns the losing side from silently discarded into read.
  *
- * `changed` is false when the file says what this instance already holds, which is the case when
- * the write it is reacting to was its own. Callers use it to stop there: no re-render, and above
- * all no write back, which would be the other device's next external change and ours again after
- * that.
+ * `changedKeys` is empty when the file says what this instance already holds, which is the case
+ * when the write it is reacting to was its own. Callers stop there: no re-render, and above all no
+ * write back, which would be the other device's next external change and ours again after that.
  *
  * `fallbackBaseline` is the comments baseline to keep when the file carries none. It is this
  * instance's own, not `stamp()`: a file written by a build that predates the field would otherwise
@@ -384,8 +398,8 @@ export function adoptExternalSettings(
       settings: resolveSettings(current),
       stored: current,
       needsSave: false,
-      changed: false,
+      changedKeys: [],
     };
   const hydrated = hydrateSettings(loaded, fallbackBaseline);
-  return { ...hydrated, changed: canonical(hydrated.stored) !== canonical(current) };
+  return { ...hydrated, changedKeys: changedKeysBetween(current, hydrated.stored) };
 }

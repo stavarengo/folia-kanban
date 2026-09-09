@@ -586,13 +586,13 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** The settings a re-read of `data.json` amounts to, applied. Split out so the read above owns
    *  only the question of when it is safe to look. */
   private adopt(loaded: unknown): void {
-    const { settings, stored, changed, needsSave } = adoptExternalSettings(
+    const { settings, stored, changedKeys, needsSave } = adoptExternalSettings(
       loaded,
       this.stored,
       this.settings.commentsBaseline || stamp(),
     );
     let write = needsSave;
-    if (changed) {
+    if (changedKeys.length > 0) {
       this.stored = stored;
       this.settings = settings;
       // The same repair `loadSettings` does, for the same reason: agent access can arrive switched
@@ -600,7 +600,11 @@ export default class FoliaKanbanPlugin extends Plugin {
       if (this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop)))
         write = true;
       this.refreshViews();
-      this.settingTab?.settingsChangedExternally();
+      // Only when a row it draws actually moved: `data.json` also carries per-card state written by
+      // ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
+      // typed for a change the tab is not even showing.
+      if (changedKeys.some((key) => key in SETTING_CONTROLS))
+        this.settingTab?.settingsChangedExternally();
       // Port, bind address, token and the switch itself can all have moved; the running server has
       // to follow them here as it does on any other settings change.
       void this.mcp?.sync(this.settings);
@@ -874,7 +878,13 @@ class KanbanSettingTab extends PluginSettingTab {
   settingsChangedExternally(): void {
     this.pendingUserName = null;
     this.pendingMcpFields = {};
-    if (this.containerEl.isShown()) this.render();
+    // The same branch `setControlValue` takes, for the same reason: from 1.13 the tab is Obsidian's
+    // to draw from `getSettingDefinitions`, and emptying `containerEl` behind it would replace what
+    // it rendered — and what its settings search indexed — with the older imperative rows.
+    if (requireApiVersion("1.13.0")) this.update();
+    // Below that, `render` is the only path there is, and it costs nothing to skip when the tab is
+    // not on screen: `display` draws it fresh the next time it is opened.
+    else if (this.containerEl.isConnected) this.render();
   }
 
   override hide(): void {
