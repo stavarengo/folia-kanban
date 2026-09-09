@@ -4970,4 +4970,80 @@ describe("a board read before a change can land after it (20260828.02)", () => {
     expect(screen.queryByText("Alpha Renamed")).toBeInTheDocument();
     expect(screen.queryByText("Alpha")).toBeNull();
   });
+
+  it("does not raise an error from a stale load that fails after a newer one already succeeded", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+
+    const originalLoadBoard = repo.loadBoard.bind(repo);
+    await repo.renameCard("Tasks/Alpha.md", "Alpha Renamed");
+    const newerBoard = await originalLoadBoard();
+
+    let rejectOlder!: (e: Error) => void;
+    let resolveNewer!: (b: typeof newerBoard) => void;
+    const older = new Promise<never>((_res, rej) => {
+      rejectOlder = rej;
+    });
+    const newer = new Promise<typeof newerBoard>((res) => {
+      resolveNewer = res;
+    });
+    let calls = 0;
+    repo.loadBoard = async () => (++calls === 1 ? older : newer);
+
+    act(() => {
+      repo.notify();
+      repo.notify();
+    });
+    expect(calls).toBe(2);
+
+    await act(async () => {
+      resolveNewer(newerBoard);
+    });
+    await screen.findByText("Alpha Renamed");
+    await act(async () => {
+      older.catch(() => {}); // the test's own handler; the app's is what we're checking below
+      rejectOlder(new Error("stale read failed"));
+    });
+    // A failure from a superseded read must not blank the board with an error screen.
+    expect(screen.queryByText(/Couldn.t load the board/)).toBeNull();
+    expect(screen.queryByText("Alpha Renamed")).toBeInTheDocument();
+  });
+
+  it("keeps a newer load's failure over an older load's success arriving after it", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+
+    const originalLoadBoard = repo.loadBoard.bind(repo);
+    const olderBoard = await originalLoadBoard();
+
+    let resolveOlder!: (b: typeof olderBoard) => void;
+    let rejectNewer!: (e: Error) => void;
+    const older = new Promise<typeof olderBoard>((res) => {
+      resolveOlder = res;
+    });
+    const newer = new Promise<never>((_res, rej) => {
+      rejectNewer = rej;
+    });
+    let calls = 0;
+    repo.loadBoard = async () => (++calls === 1 ? older : newer);
+
+    act(() => {
+      repo.notify();
+      repo.notify();
+    });
+    expect(calls).toBe(2);
+
+    await act(async () => {
+      newer.catch(() => {});
+      rejectNewer(new Error("newest read failed"));
+    });
+    await screen.findByText(/Couldn.t load the board/);
+    await act(async () => {
+      resolveOlder(olderBoard);
+    });
+    // The stale success must not clear an error raised by the newer, still-current request.
+    expect(screen.queryByText(/Couldn.t load the board/)).toBeInTheDocument();
+  });
 });
