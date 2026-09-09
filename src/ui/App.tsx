@@ -170,8 +170,8 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
   // Reads can overlap — every vault change fires another `load`, and the read it starts can take
-  // longer than one already in flight. Only the newest requested load may land, the same guard
-  // `CardDetail` applies to its own per-card body reads: a result whose sequence number has been
+  // longer than one already in flight. Only the newest requested load may land, the same sequence
+  // guard `CardDetail` uses for its own per-card body reads: a result whose number has been
   // superseded by the time it resolves is dropped rather than handed to `setBoard`/`setError`.
   const loadSeq = useRef(0);
   const load = useCallback(async () => {

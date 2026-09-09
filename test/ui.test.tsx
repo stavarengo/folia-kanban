@@ -5046,4 +5046,40 @@ describe("a board read before a change can land after it (20260828.02)", () => {
     // The stale success must not clear an error raised by the newer, still-current request.
     expect(screen.queryByText(/Couldn.t load the board/)).toBeInTheDocument();
   });
+
+  it("still opens the card it just created once a load that overtook the add-card flow's own load resolves", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, addCardFlow: "inline-edit" });
+    await screen.findByText("Alpha");
+
+    const originalLoadBoard = repo.loadBoard.bind(repo);
+    let resolveOwnLoad!: () => void;
+    const ownLoad = new Promise<void>((res) => {
+      resolveOwnLoad = res;
+    }).then(() => originalLoadBoard());
+    let calls = 0;
+    repo.loadBoard = async () => (++calls === 1 ? ownLoad : originalLoadBoard());
+
+    await user.click(screen.getByLabelText("Add card to Done"));
+    await user.type(screen.getByLabelText("New card title"), "Fresh card{Enter}");
+    await waitFor(() => expect(calls).toBeGreaterThanOrEqual(1));
+
+    // A second, unrelated vault change reloads before the add-card flow's own load resolves. It
+    // is the newer request, and already sees the new card — createCard already wrote it.
+    await act(async () => {
+      repo.notify();
+    });
+    await screen.findByText("Fresh card");
+    // The panel has not opened yet: the add-card flow is still awaiting its own, now superseded,
+    // load before it selects the card it created.
+    expect(screen.queryByTestId("card-detail")).toBeNull();
+
+    await act(async () => {
+      resolveOwnLoad();
+    });
+    // Once the add-card flow's own load finally settles — too late to apply, but not lost — it
+    // still opens the card it created.
+    expect(await screen.findByRole("heading", { name: "Fresh card" })).toBeInTheDocument();
+  });
 });
