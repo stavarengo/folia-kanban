@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { ColumnDef } from "../model/types";
-import { useBoardActions } from "./context";
+import { useBoardActions, useBoardDocument, useBoardWindow } from "./context";
 import { Icon } from "./icons";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -41,6 +41,11 @@ export function ColumnMenu({
   onExpandAll,
 }: Props) {
   const a = useBoardActions();
+  // The board can live in a pop-out window, so every reach outside the React tree — the portal, the
+  // outside-click listener, the viewport clamp — has to name the board's own document and window,
+  // not the globals that follow whichever window has focus.
+  const doc = useBoardDocument();
+  const win = useBoardWindow();
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState(column.title);
   const [wip, setWip] = useState(column.limit != null ? String(column.limit) : "");
@@ -52,9 +57,9 @@ export function ColumnMenu({
   useLayoutEffect(() => {
     const r = triggerRef.current?.getBoundingClientRect();
     if (!r) return;
-    const left = Math.min(Math.max(8, r.right - MENU_W), window.innerWidth - MENU_W - 8);
+    const left = Math.min(Math.max(8, r.right - MENU_W), win.innerWidth - MENU_W - 8);
     setPos({ top: Math.round(r.bottom + 4), left: Math.round(left) });
-  }, [triggerRef]);
+  }, [triggerRef, win]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -63,9 +68,9 @@ export function ColumnMenu({
       // race its onClick and immediately reopen the menu.
       if (ref.current && !ref.current.contains(t) && !triggerRef.current?.contains(t)) onClose();
     };
-    activeDocument.addEventListener("mousedown", onDoc);
-    return () => activeDocument.removeEventListener("mousedown", onDoc);
-  }, [onClose, triggerRef]);
+    doc.addEventListener("mousedown", onDoc);
+    return () => doc.removeEventListener("mousedown", onDoc);
+  }, [onClose, triggerRef, doc]);
 
   // Return focus to the trigger when the menu closes (keyboard users aren't dropped to <body>).
   useEffect(() => () => triggerRef.current?.focus?.(), [triggerRef]);
@@ -236,6 +241,6 @@ export function ColumnMenu({
         </div>
       )}
     </div>,
-    activeDocument.body,
+    doc.body,
   );
 }

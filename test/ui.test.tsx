@@ -1467,6 +1467,76 @@ describe("drag overlay portal", () => {
   });
 });
 
+describe("pop-out window ownership", () => {
+  // `activeDocument` is Obsidian's handle on "the document of whichever window has focus". A board
+  // can sit in one window while another has focus, so every surface it portals out of the React
+  // tree — and every listener it hangs off a document — has to resolve the board's OWN document.
+  // Standing in for that other, focused window: a second document `activeDocument` points at while
+  // the board stays in the first. On the bug the surfaces follow it there and vanish from the board.
+  const inOtherFocusedWindow = async (fn: (decoy: Document) => Promise<void>) => {
+    const decoy = document.implementation.createHTMLDocument("another Obsidian window");
+    const real = activeDocument;
+    activeDocument = decoy;
+    try {
+      await fn(decoy);
+    } finally {
+      activeDocument = real;
+    }
+  };
+
+  const findIn = (doc: Document, label: string) =>
+    doc.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+
+  it("opens the column menu and its editor modal in the board's own document", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+
+    await inOtherFocusedWindow(async (decoy) => {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Column options for Todo" }));
+
+      const menu = await waitFor(() => {
+        const el = findIn(document, "Column options: Todo");
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      expect(findIn(decoy, "Column options: Todo")).toBeNull();
+      expect(document.body.contains(menu)).toBe(true);
+
+      await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
+      await waitFor(() => expect(findIn(document, "Edit column: Todo")).not.toBeNull());
+      expect(findIn(decoy, "Edit column: Todo")).toBeNull();
+      expect(decoy.body.childElementCount).toBe(0);
+    });
+  });
+
+  it("closes the column menu from a click in the board's own document", async () => {
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+
+    await inOtherFocusedWindow(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Column options for Todo" }));
+      await waitFor(() => expect(findIn(document, "Column options: Todo")).not.toBeNull());
+      // The outside-click teardown has to listen on the board's document too: hung off the focused
+      // window's, nothing the user does in the board's own window would ever reach it.
+      fireEvent.mouseDown(document.body);
+      await waitFor(() => expect(findIn(document, "Column options: Todo")).toBeNull());
+    });
+  });
+
+  it("opens a card's context menu in the board's own document", async () => {
+    render_(makeRepo());
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+
+    await inOtherFocusedWindow(async (decoy) => {
+      fireEvent.contextMenu(card, { clientX: 20, clientY: 20 });
+      await waitFor(() => expect(findIn(document, "Card actions")).not.toBeNull());
+      expect(findIn(decoy, "Card actions")).toBeNull();
+      expect(decoy.body.childElementCount).toBe(0);
+    });
+  });
+});
+
 describe("card context menu", () => {
   // Two ordered top-level cards in Todo so Move up/down has room; Alpha keeps its next-todos.
   const ctxRepo = () =>

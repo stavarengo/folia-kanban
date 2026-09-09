@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useMemo, type RefObject } from "react";
 import type { RelationCount } from "../model/board";
 import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig } from "../model/types";
@@ -274,4 +274,31 @@ export function useBoardActions(): BoardActions {
   const a = useContext(BoardActionsContext);
   if (!a) throw new Error("BoardActionsContext is missing a provider");
   return a;
+}
+
+/**
+ * A ref to the board's root element, provided by App. Obsidian can host a leaf in a pop-out window,
+ * and the `activeDocument` global points at whichever window has focus — which is not necessarily
+ * the one the board is in. Every surface that leaves the React tree (a portal to a body) or reaches
+ * past it (a document listener, `document.activeElement`, viewport geometry) has to resolve the
+ * board's OWN document instead, and the root element is the only thing that always knows it.
+ *
+ * A ref rather than the document itself: the root's identity is stable from App's first render,
+ * while the element it points at only exists after mount.
+ */
+export const BoardRootContext = createContext<RefObject<HTMLElement | null> | null>(null);
+
+/** The document the board is rendered in — the portal target and listener host for its surfaces. */
+export function useBoardDocument(): Document {
+  const ref = useContext(BoardRootContext);
+  if (!ref) throw new Error("BoardRootContext is missing a provider");
+  // Before the root mounts there is no owner to ask, and nothing that consumes this exists yet
+  // either: every caller is a menu, a modal or a panel the user opened on a board already on screen.
+  return ref.current?.ownerDocument ?? activeDocument;
+}
+
+/** The window the board is rendered in, whose viewport its fixed-position surfaces are clamped to. */
+export function useBoardWindow(): Window {
+  const doc = useBoardDocument();
+  return doc.defaultView ?? activeWindow;
 }

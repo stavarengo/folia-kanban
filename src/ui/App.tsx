@@ -25,6 +25,7 @@ import {
   RepoContext,
   MatchContextContext,
   SettingsContext,
+  BoardRootContext,
   unreadStateOf,
   type BoardActions,
   type ColumnPatch,
@@ -908,60 +909,62 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
           <ContextsContext.Provider value={stableContexts}>
             <RelationCountsContext.Provider value={relationCountsValue}>
               <MatchContextContext.Provider value={matchCtx}>
-                <div className="folia-root folia-scope" ref={rootRef}>
-                  <Toolbar
-                    ref={searchRef}
-                    query={query}
-                    onChange={setQuery}
-                    matchCount={counts.match}
-                    totalCount={counts.total}
-                    canFilterMine={settings.userName.trim() !== ""}
-                  />
-                  {board.cardFolderWarning && (
-                    <div className="folia-card-folder-notice" role="status">
-                      {board.cardFolderWarning}
-                    </div>
-                  )}
-                  <div className="folia-main" role="region" aria-label="Board">
-                    <Board
-                      board={board}
-                      today={todayValue}
-                      selectedPath={selected}
-                      wipLimits={wipLimits}
-                      filter={filter}
-                      doneColumnId={doneColumnId}
-                      onMove={(activeId, overId) => void onMove(activeId, overId)}
-                      onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+                <BoardRootContext.Provider value={rootRef}>
+                  <div className="folia-root folia-scope" ref={rootRef}>
+                    <Toolbar
+                      ref={searchRef}
+                      query={query}
+                      onChange={setQuery}
+                      matchCount={counts.match}
+                      totalCount={counts.total}
+                      canFilterMine={settings.userName.trim() !== ""}
                     />
-                    {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
-                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
-                    {detailMode !== "modal" && detail}
-                  </div>
-                  {detailMode === "modal" &&
-                    panelShown &&
-                    rootRef.current &&
-                    createPortal(
-                      <div
-                        className="folia-detail-modal-backdrop"
-                        onPointerDown={(e) => {
-                          if (e.target === e.currentTarget) closeDetail();
-                        }}
-                      >
-                        {detail}
-                      </div>,
-                      rootRef.current,
+                    {board.cardFolderWarning && (
+                      <div className="folia-card-folder-notice" role="status">
+                        {board.cardFolderWarning}
+                      </div>
                     )}
-                  {toast && (
-                    <div
-                      className={"folia-toast folia-toast-" + toast.tone}
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
-                      {toast.text}
+                    <div className="folia-main" role="region" aria-label="Board">
+                      <Board
+                        board={board}
+                        today={todayValue}
+                        selectedPath={selected}
+                        wipLimits={wipLimits}
+                        filter={filter}
+                        doneColumnId={doneColumnId}
+                        onMove={(activeId, overId) => void onMove(activeId, overId)}
+                        onAddCard={(columnId, title) => void onAddCard(columnId, title)}
+                      />
+                      {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,
+                    float overlays it. Modal renders via a portal into the root, over a backdrop. */}
+                      {detailMode !== "modal" && detail}
                     </div>
-                  )}
-                </div>
+                    {detailMode === "modal" &&
+                      panelShown &&
+                      rootRef.current &&
+                      createPortal(
+                        <div
+                          className="folia-detail-modal-backdrop"
+                          onPointerDown={(e) => {
+                            if (e.target === e.currentTarget) closeDetail();
+                          }}
+                        >
+                          {detail}
+                        </div>,
+                        rootRef.current,
+                      )}
+                    {toast && (
+                      <div
+                        className={"folia-toast folia-toast-" + toast.tone}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
+                        {toast.text}
+                      </div>
+                    )}
+                  </div>
+                </BoardRootContext.Provider>
               </MatchContextContext.Provider>
             </RelationCountsContext.Provider>
           </ContextsContext.Provider>

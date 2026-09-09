@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { ColumnDef, ColumnGroup, ColumnSort } from "../model/types";
-import { useBoardActions, type ColumnPatch } from "./context";
+import { useBoardActions, useBoardDocument, type ColumnPatch } from "./context";
 import { Icon } from "./icons";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -48,6 +48,9 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
  */
 export function ColumnEditModal({ column, onClose }: Props) {
   const a = useBoardActions();
+  // Portalled to the board's OWN document body: `activeDocument` is whichever window has focus,
+  // which for a board in a pop-out window is not the one the modal belongs to.
+  const doc = useBoardDocument();
   const [draft, setDraft] = useState<Draft>(() => toDraft(column));
   const ref = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -273,6 +276,6 @@ export function ColumnEditModal({ column, onClose }: Props) {
         </footer>
       </div>
     </div>,
-    activeDocument.body,
+    doc.body,
   );
 }

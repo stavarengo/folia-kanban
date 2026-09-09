@@ -36,7 +36,13 @@ import {
   sameAssignee,
   toggleAssignee,
 } from "./cardView";
-import { useBoardActions, useRepo, useSettings, useSettingsUpdater } from "./context";
+import {
+  useBoardActions,
+  useBoardDocument,
+  useRepo,
+  useSettings,
+  useSettingsUpdater,
+} from "./context";
 import { Icon } from "./icons";
 import { Markdown } from "./Markdown";
 
@@ -798,6 +804,9 @@ export function CardDetail({
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
+  // The panel can live in a pop-out window; `activeDocument` follows focus, so focus bookkeeping
+  // and the outside-click/drag listeners name the board's own document instead.
+  const doc = useBoardDocument();
   const settings = useSettings();
   const updateSettings = useSettingsUpdater();
   // The board reloads on a debounce, so for a moment after this card's file is renamed or moved
@@ -1092,7 +1101,7 @@ export function CardDetail({
   // Dialog focus management: focus in on open, return focus to the opener on close. The create form
   // autofocuses its title input (a synchronous commit-phase focus), so don't steal it back here.
   useEffect(() => {
-    openerRef.current = activeDocument.activeElement as HTMLElement | null;
+    openerRef.current = doc.activeElement as HTMLElement | null;
     if (!isCreate) panelRef.current?.focus();
     return () => openerRef.current?.focus?.();
   }, []);
@@ -1185,7 +1194,7 @@ export function CardDetail({
         return;
       // Commit any in-progress edit before closing: blurring fires the focused field's onBlur,
       // which initiates its repo write synchronously — so clicking away saves instead of discarding.
-      const ae = activeDocument.activeElement as HTMLElement | null;
+      const ae = doc.activeElement as HTMLElement | null;
       if (
         ae &&
         panelRef.current?.contains(ae) &&
@@ -1194,9 +1203,9 @@ export function CardDetail({
         ae.blur();
       onClose();
     };
-    activeDocument.addEventListener("pointerdown", onPointerDown);
-    return () => activeDocument.removeEventListener("pointerdown", onPointerDown);
-  }, [isSide, onClose]);
+    doc.addEventListener("pointerdown", onPointerDown);
+    return () => doc.removeEventListener("pointerdown", onPointerDown);
+  }, [isSide, onClose, doc]);
 
   // Drag the panel's left border to resize (side modes). Width is derived from the panel's own
   // right edge so it works whether the panel is a flex sibling (split) or right-docked (float).
@@ -1210,13 +1219,13 @@ export function CardDetail({
       setDragWidth(latest);
     };
     const onUp = () => {
-      activeDocument.removeEventListener("pointermove", onMove);
-      activeDocument.removeEventListener("pointerup", onUp);
+      doc.removeEventListener("pointermove", onMove);
+      doc.removeEventListener("pointerup", onUp);
       setDragWidth(null);
       updateSettings({ detailWidth: latest });
     };
-    activeDocument.addEventListener("pointermove", onMove);
-    activeDocument.addEventListener("pointerup", onUp);
+    doc.addEventListener("pointermove", onMove);
+    doc.addEventListener("pointerup", onUp);
   };
 
   // Every write the panel makes goes through here, and a failure is reported the way every other

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { createPortal } from "react-dom";
 import { samePriority } from "../model/priorities";
 import { priorityOptions, priorityTone, sameAssignee, toggleAssignee } from "./cardView";
-import { useBoardActions, useSettings } from "./context";
+import { useBoardActions, useBoardDocument, useBoardWindow, useSettings } from "./context";
 import { Icon, type IconName } from "./icons";
 
 export interface ContextTarget {
@@ -53,6 +53,11 @@ export function CardContextMenu({
   // nobody to assign the card to in one click and the item is not offered — the detail panel's own
   // field, which takes a typed name, is where an unnamed user assigns anything.
   const me = useSettings().userName.trim();
+  // The board can live in a pop-out window, so the portal, the outside-click listener, the focus
+  // bookkeeping and the viewport clamp all name the board's own document and window rather than the
+  // globals, which follow whichever window has focus.
+  const doc = useBoardDocument();
+  const win = useBoardWindow();
   const ref = useRef<HTMLDivElement>(null);
   // True once an item was activated. On dismissal (Escape / outside-click) we restore focus to the
   // opener; when an action ran we must NOT, since the action may have moved focus elsewhere on
@@ -67,16 +72,16 @@ export function CardContextMenu({
     if (!el) return;
     const h = el.offsetHeight;
     const w = el.offsetWidth;
-    const left = Math.min(Math.max(8, target.x), window.innerWidth - w - 8);
-    const top = Math.min(Math.max(8, target.y), window.innerHeight - h - 8);
+    const left = Math.min(Math.max(8, target.x), win.innerWidth - w - 8);
+    const top = Math.min(Math.max(8, target.y), win.innerHeight - h - 8);
     setPos({ top: Math.round(top), left: Math.round(left) });
-  }, [target.x, target.y]);
+  }, [target.x, target.y, win]);
 
   // Focus the first item on open and restore focus to the originating card on close, so a keyboard
   // user who opens then Escapes the menu keeps their place on the board (mirrors CardDetail's opener
   // capture/restore).
   useEffect(() => {
-    const opener = activeDocument.activeElement as HTMLElement | null;
+    const opener = doc.activeElement as HTMLElement | null;
     ref.current?.querySelector<HTMLButtonElement>(".folia-menu-item:not(:disabled)")?.focus();
     return () => {
       if (!actioned.current) opener?.focus?.();
@@ -87,9 +92,9 @@ export function CardContextMenu({
     const onDoc = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    activeDocument.addEventListener("pointerdown", onDoc);
-    return () => activeDocument.removeEventListener("pointerdown", onDoc);
-  }, [onClose]);
+    doc.addEventListener("pointerdown", onDoc);
+    return () => doc.removeEventListener("pointerdown", onDoc);
+  }, [onClose, doc]);
 
   // Arrow-key navigation between enabled items, matching the keyboard reach of the rest of the UI.
   const onKeyDown = (e: KeyboardEvent) => {
@@ -104,7 +109,7 @@ export function CardContextMenu({
       ref.current?.querySelectorAll<HTMLButtonElement>(".folia-menu-item:not(:disabled)") ?? [],
     );
     if (items.length === 0) return;
-    const cur = items.indexOf(activeDocument.activeElement as HTMLButtonElement);
+    const cur = items.indexOf(doc.activeElement as HTMLButtonElement);
     const dir = e.key === "ArrowDown" ? 1 : -1;
     const next = (cur + dir + items.length) % items.length;
     items[next]?.focus();
@@ -268,6 +273,6 @@ export function CardContextMenu({
         </>
       )}
     </div>,
-    activeDocument.body,
+    doc.body,
   );
 }
