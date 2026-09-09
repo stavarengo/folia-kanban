@@ -119,24 +119,16 @@ const buttons = (tsx) => elementsNamed(tsx, "button");
  * Every element the plugin dresses, whatever its tag. The theme half of this check is about
  * <button> and nothing else, but the collision half is not: a doubled rule out-ranks its own
  * neighbours on a <p> exactly as it does on a button, and two of the rows that sent this check
- * looking were a <p> and a <span>. Only tags the plugin actually writes are scanned, so a class
- * built at runtime still reaches the check through the button pass that credits its family.
+ * looking were a <p> and a <span>. So no tag is named here — every lowercase opening tag in the
+ * file is read, and only the ones carrying a `folia-*` class are kept. A TypeScript generic
+ * (`Map<string, …>`) matches the same shape and falls out through that filter, which is why the
+ * filter is the whole definition: a list of tag names would silently stop covering the next tag
+ * someone reaches for.
  */
 const carriers = (tsx) =>
-  [
-    "button",
-    "p",
-    "span",
-    "li",
-    "div",
-    "h2",
-    "h3",
-    "label",
-    "input",
-    "textarea",
-    "ul",
-    "ol",
-  ].flatMap((name) => elementsNamed(tsx, name));
+  [...new Set([...tsx.matchAll(/<([a-z][\w-]*)/g)].map((m) => m[1]))]
+    .flatMap((name) => elementsNamed(tsx, name))
+    .filter((element) => element.classes.size > 0);
 
 /** Every `selector { body }` pair, including the ones nested inside `@media`. */
 function rules(css) {
