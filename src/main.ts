@@ -561,12 +561,27 @@ export default class FoliaKanbanPlugin extends Plugin {
    * what is taken and what still resolves last-write-wins.
    */
   override async onExternalSettingsChange(): Promise<void> {
-    // A write of our own still in flight is the file this would otherwise read, or worse, the one
-    // it would race. Waiting for the chain means the read sees the settled file.
-    await this.pendingWrite;
-    if (this.unloaded) return;
-    const loaded: unknown = await this.loadData();
-    if (this.unloaded) return;
+    // Both awaits below are moments where this instance can change its own settings — a collapse
+    // toggle, a width drag, a rename arriving in the same Sync burst. Adopting then would compare
+    // the file against settings newer than it and drop them. The stored set is replaced rather than
+    // mutated on every write, so its identity is the whole test; a few attempts, and if the user is
+    // still typing we leave the file to the write that is already on its way.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const before = this.stored;
+      await this.pendingWrite;
+      if (this.unloaded) return;
+      // A file being written by Sync right now can be unreadable rather than merely old.
+      const loaded: unknown = await this.loadData().catch(() => null);
+      if (this.unloaded) return;
+      if (this.stored !== before) continue;
+      this.adopt(loaded);
+      return;
+    }
+  }
+
+  /** The settings a re-read of `data.json` amounts to, applied. Split out so the read above owns
+   *  only the question of when it is safe to look. */
+  private adopt(loaded: unknown): void {
     const { settings, stored, changed, needsSave } = adoptExternalSettings(
       loaded,
       this.stored,
@@ -587,7 +602,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
     // Only when this instance decided something the file does not already say. Writing back what we
     // just read would reach the other side as its own external change, and come back again.
-    if (write) await this.saveSettings();
+    if (write) void this.saveSettings();
   }
 
   /** Records a patch as something that was actually set: it joins what is kept on disk, and the

@@ -373,6 +373,19 @@ export function adoptExternalSettings(
   current: StoredSettings,
   fallbackBaseline: string,
 ): AdoptedSettings {
+  // A read that produced no object is a file that is missing, unreadable or half-written, not a
+  // file saying every setting was unset. `hydrateSettings` reads it as the latter — right at load,
+  // where an install has nothing to lose, and destructive here, where taking it at its word would
+  // reset the running settings to their defaults and then write that back over everything the file
+  // is only failing to show: the agent token no client can be told again, the read markers, the
+  // per-card collapse state.
+  if (!isRecord(loaded))
+    return {
+      settings: resolveSettings(current),
+      stored: current,
+      needsSave: false,
+      changed: false,
+    };
   const hydrated = hydrateSettings(loaded, fallbackBaseline);
   return { ...hydrated, changed: canonical(hydrated.stored) !== canonical(current) };
 }

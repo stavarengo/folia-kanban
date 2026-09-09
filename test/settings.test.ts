@@ -372,6 +372,22 @@ describe("a data.json changed by Sync or by hand", () => {
     expect(needsSave).toBe(true);
   });
 
+  // `loadData` answers null for a file that is absent — a git checkout over `.obsidian`, a Sync
+  // delete, a half-written file — and reading that as "every setting is unset" would reset the
+  // running settings and then write the reset back over the token, the read markers and the rest.
+  it("keeps what this instance holds when the file cannot be read at all", () => {
+    for (const unreadable of [null, undefined, "", 42, ["a"]]) {
+      const { settings, stored, changed, needsSave } = adoptExternalSettings(
+        unreadable,
+        LOCAL,
+        NOW,
+      );
+      expect({ changed, needsSave }).toEqual({ changed: false, needsSave: false });
+      expect(stored).toBe(LOCAL);
+      expect(settings.detailWidth).toBe(420);
+    }
+  });
+
   it("repairs what a hand-edit left where a value belongs, and asks for the file to be healed", () => {
     const { settings, needsSave } = adoptExternalSettings(
       onDisk({ ...LOCAL, collapsedCards: null as unknown as Record<string, boolean> }),
@@ -387,30 +403,45 @@ describe("a data.json changed by Sync or by hand", () => {
 // the same way the block above reads it: what the plugin does with an adopted file is half the fix.
 describe("the plugin reacts to an external settings change", () => {
   const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
-  const body = (() => {
-    const from = main.slice(main.indexOf("override async onExternalSettingsChange"));
+  const method = (name: string): string => {
+    const from = main.slice(main.indexOf(name));
     return from.slice(0, from.indexOf("\n  }"));
-  })();
+  };
+  const handler = method("override async onExternalSettingsChange");
+  const adopt = method("private adopt(");
 
   it("implements the callback Obsidian offers, without which the change is never seen", () => {
     expect(main).toContain("override async onExternalSettingsChange()");
   });
 
   it("lets a write of its own settle before reading the file back", () => {
-    expect(body).toContain("await this.pendingWrite");
-    expect(body.indexOf("await this.pendingWrite")).toBeLessThan(body.indexOf("this.loadData()"));
+    expect(handler).toContain("await this.pendingWrite");
+    expect(handler.indexOf("await this.pendingWrite")).toBeLessThan(
+      handler.indexOf("this.loadData()"),
+    );
+  });
+
+  // Both awaits are a window in which a collapse toggle or a rename can change the settings here.
+  // Adopting after one would compare the file against a newer picture and drop it.
+  it("starts over if this instance changed its own settings while it was reading", () => {
+    expect(handler).toContain("const before = this.stored;");
+    expect(handler).toContain("if (this.stored !== before) continue;");
+  });
+
+  it("survives a file that cannot be read at all, rather than failing inside the callback", () => {
+    expect(handler).toContain("this.loadData().catch(() => null)");
   });
 
   it("gives up if the plugin unloaded while it was waiting", () => {
-    expect(body.match(/if \(this\.unloaded\) return;/g)).toHaveLength(2);
+    expect(handler.match(/if \(this\.unloaded\) return;/g)).toHaveLength(2);
   });
 
   it("pushes the adopted settings into the open boards and the running server", () => {
-    expect(body).toContain("this.refreshViews()");
-    expect(body).toContain("void this.mcp?.sync(this.settings)");
+    expect(adopt).toContain("this.refreshViews()");
+    expect(adopt).toContain("void this.mcp?.sync(this.settings)");
   });
 
   it("writes back only what this instance decided, never a copy of what it just read", () => {
-    expect(body).toContain("if (write) await this.saveSettings();");
+    expect(adopt).toContain("if (write) void this.saveSettings();");
   });
 });
