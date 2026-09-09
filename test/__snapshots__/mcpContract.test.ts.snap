@@ -284,7 +284,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Append an unchecked line to a card's \`## Subtasks\` checklist.",
+    "description": "Append an unchecked line to a card's \`## Subtasks\` checklist. The reply names the line it wrote, \`index\` and \`text\`, in the words set_subtask_done will expect.",
     "inputSchema": {
       "properties": {
         "board": {

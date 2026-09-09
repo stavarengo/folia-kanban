@@ -9,6 +9,7 @@
 import type { Board, LineRef } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
+import { StaleLineError } from "./repo";
 
 /** Where a move lands: a column, and a slot in it. An absent `index` means the end of the column. */
 export interface MoveTarget {
@@ -69,13 +70,23 @@ export async function setSubtaskDone(
   const { path, line, done, link } = target;
   await repo.toggleSubtask(path, line, done);
   // The follow-up names the line the tick just named — the same `line`, not the board's own reading
-  // of it — so the pair cannot half-land: whatever the checkbox was allowed to touch, the claim is
-  // allowed to touch too. `link` matters on top of that: for a line naming a child note,
+  // of it — so the two halves can never write to two different lines. They are still two writes,
+  // though: a note edited in the moment between them can have the second refused on its own, and
+  // that says so rather than leaving the caller to discover a ticked box with a stale claim.
+  // `link` matters on top of that: for a line naming a child note,
   // `syncSubtaskClaim` refuses to act unless the caller shows the `[[link]]` it read, so a line
   // edited underneath is not acted on by position alone. A caller that leaves it out gets the
   // checkbox written and the child left where it was — the parity this whole path exists to keep.
   const sync = syncSubtaskClaim(board, path, link === undefined ? line : { ...line, link }, done);
-  if (sync) await repo.applyMove(sync);
+  if (!sync) return;
+  try {
+    await repo.applyMove(sync);
+  } catch (e) {
+    if (!(e instanceof StaleLineError)) throw e;
+    throw new StaleLineError(
+      `${e.message} The checkbox was written; keeping the line's own column claim in step with it was not, so the line says two things until the next edit.`,
+    );
+  }
 }
 
 /**

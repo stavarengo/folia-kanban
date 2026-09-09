@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../src/model/boardOps";
 import { columnOf } from "../src/model/board";
 import type { BoardConfig } from "../src/model/types";
@@ -183,6 +183,40 @@ describe("setSubtaskDone when the note has moved on", () => {
     ).rejects.toThrow(/no longer reads "Draft it"/);
 
     expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+  });
+});
+
+describe("setSubtaskDone when the note changes between its two writes", () => {
+  // The halves name one line, which is not the same as being one write: a note edited in the gap
+  // can have the claim refused after the box has landed, and the caller is told exactly that.
+  it("names the half that landed when the other is refused", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+    const board = await repo.loadBoard();
+    const toggle = repo.toggleSubtask.bind(repo);
+    vi.spyOn(repo, "toggleSubtask").mockImplementation(async (path, at, done) => {
+      await toggle(path, at, done);
+      const e = repo.files.get("Tasks/A.md")!;
+      // Someone adds a line above it in the moment after the box is written.
+      e.body = e.body.replace("## Subtasks\n\n", "## Subtasks\n\n- [ ] Snuck in\n");
+    });
+
+    await expect(
+      setSubtaskDone(repo, board, {
+        path: "Tasks/A.md",
+        line: { index: 0, text: "Draft it" },
+        done: true,
+      }),
+    ).rejects.toThrow(/The checkbox was written; keeping the line's own column claim in step/);
   });
 });
 

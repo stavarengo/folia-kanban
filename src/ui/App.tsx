@@ -676,15 +676,19 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         void (async () => {
           // Reassign this column's items to a neighbour so none are orphaned — cards through their
           // frontmatter, placed inline todos through their own checklist line.
+          // One that cannot be rehomed does not stop the others, but it is not swallowed either:
+          // the column is about to go, and an item left claiming it would be stranded quietly.
+          let stranded: unknown;
           for (const p of orphans) {
             const mut = reassignColumn(b, p, neighbor.id);
             if (!mut) continue;
             try {
               await repo.applyMove(mut);
-            } catch {
-              /* best-effort */
+            } catch (e) {
+              stranded ??= e;
             }
           }
+          if (stranded !== undefined) reportError(stranded);
           try {
             await repo.setColumns(cols.filter((c) => c.id !== id));
           } finally {

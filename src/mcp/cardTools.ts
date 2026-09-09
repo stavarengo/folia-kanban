@@ -389,7 +389,8 @@ const addComment = tool({
 const addSubtask = tool({
   name: "add_subtask",
   title: "Add a subtask",
-  description: "Append an unchecked line to a card's `## Subtasks` checklist.",
+  description:
+    "Append an unchecked line to a card's `## Subtasks` checklist. The reply names the line it wrote, `index` and `text`, in the words set_subtask_done will expect.",
   input: z.object({
     board: boardArg,
     card: cardArg,
@@ -404,8 +405,11 @@ const addSubtask = tool({
     const subtasks = (await repo.readBody(path)).subtasks;
     // The line this call added, which with one line written is the one after those already there.
     // Reporting `at(-1)` would name whatever ended up last, and a follow-up set_subtask_done would
-    // tick that instead of the caller's own.
-    return { path, index: subtasks[before]?.index, subtasks: subtasks.length };
+    // tick that instead of the caller's own. Its `text` comes back read from the note rather than
+    // echoed from the argument: the note is what set_subtask_done compares against, and what it
+    // reads back has been trimmed of the padding and the inline fields the line still carries.
+    const added = subtasks[before];
+    return { path, index: added?.index, text: added?.text, subtasks: subtasks.length };
   },
 });
 
@@ -451,8 +455,9 @@ const setSubtask = tool({
         ...(line.link === undefined ? {} : { link: line.link }),
       });
     } catch (e) {
-      // The note changed between this call's own read and its write — rarer than a stale index,
-      // and the same answer: the refused write did not land, so it is the caller's to retry.
+      // The note changed between this call's own read and its write — rarer than a stale index.
+      // The refused write did not land; when the tick got through and only its column claim was
+      // refused, the message says which half, so a retry knows what it is repeating.
       if (e instanceof StaleLineError) throw new ToolError(e.message);
       throw e;
     }

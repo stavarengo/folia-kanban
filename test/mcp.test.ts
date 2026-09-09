@@ -268,6 +268,32 @@ describe("writing through the tools", () => {
     ]);
   });
 
+  // The two tools have to agree on what the line is called, or the pair cannot be used together:
+  // one writes the caller's string verbatim, the other compares against what the note reads back.
+  it("hands add_subtask's caller the words set_subtask_done will accept", async () => {
+    const { host, repo } = fixture();
+    for (const text of ["  padded  ", "Draft it [status:: doing]"]) {
+      const added = (await call(host, "add_subtask", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md",
+        text,
+      })) as { index: number; text: string };
+
+      await call(host, "set_subtask_done", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md",
+        index: added.index,
+        text: added.text,
+        done: true,
+      });
+    }
+
+    expect((await repo.readBody("Tasks/Write docs.md")).subtasks.map((s) => s.done)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
   // The shape this guards against is an agent's, not a person's: one get_card, then a loop of
   // set_subtask_done calls whose indices went stale the moment the first write reordered nothing —
   // or the moment anyone else touched the note. Naming the words too is what makes that safe.
