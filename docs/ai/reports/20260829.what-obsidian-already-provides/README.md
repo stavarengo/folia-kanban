@@ -83,7 +83,7 @@ Counted from the files. "Cross-refs" are headings that point at another section'
 Ordered by what the gap costs today. Items marked **bug** are wrong behaviour a user can hit now, not maintenance debt.
 
 1. **05-01** (trade-off) — `WorkspaceLeaf.prototype.setViewState` is replaced for the whole app for the plugin's lifetime, and no lint rule, guard or written Obsidian guideline covers it.
-2. **05-10** (clear win) — **bug.** `Plugin.onExternalSettingsChange` is not implemented, so a `data.json` changed by Sync or by hand is silently overwritten with what this instance had in memory.
+2. **05-10** (clear win) — **bug.** `Plugin.onExternalSettingsChange` is not implemented, so a `data.json` changed by Sync or by hand is silently overwritten with what this instance had in memory. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 3. **04-12** (clear win) — **bug.** Subtask and comment edits apply a line index taken from an earlier read, with no recheck inside `vault.process`; the MCP `set_subtask_done` tool is the riskiest caller.
 4. **04-02** (clear win) — **bug.** Subcard links are written as a bare `[[basename]]`, so Folia can write a link Folia itself cannot resolve as soon as two notes share a name.
 5. **02-01** (clear win) — **bug.** `--text-on-accent-inverted` is never used, so a user with a pale accent colour gets white text on a near-white button.
@@ -170,7 +170,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.28](../../backlog/20260829.28.the-board-takes-over-markdown-opens-by-patching-a-core-prototype.md) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
 | [20260829.29](../../backlog/20260829.29.main-diverges-from-four-workspace-and-settings-conventions.md) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
 | [20260829.30](../../backlog/20260829.30.opening-a-card-note-is-not-a-link-navigation.md) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
-| [20260829.31](../../backlog/20260829.31.a-synced-or-externally-edited-data-json-is-silently-overwritten.md) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
+| 20260829.31 (fixed, entry closed) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
 | [20260829.32](../../backlog/20260829.32.the-mcp-bearer-token-travels-with-the-vault-in-the-clear.md) | The MCP bearer token travelling with the vault | 07-02 |
 | [20260829.33](../../backlog/20260829.33.the-release-path-and-the-directory-guards-do-not-check-what-they-claim.md) | What the release path and the directory guards never check | 07-03, 07-04, 07-12, 07-13, 07-14, 07-15, 07-17 |
 | [20260829.34](../../backlog/20260829.34.the-readme-claims-no-network-requests-and-names-no-third-party-licences.md) | The README's privacy claim, and the missing licence notices | 07-18, 07-19 |

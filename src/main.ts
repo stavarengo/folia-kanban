@@ -116,6 +116,9 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Tail of the settings-write chain; see {@link saveSettings}. */
   private pendingWrite: Promise<void> = Promise.resolve();
 
+  /** The settings tab, kept so a change arriving from outside can reach the rows it is showing. */
+  private settingTab: KanbanSettingTab | null = null;
+
   /** The MCP server's lifetime. Null on mobile, where the plugin never hosts one. */
   private mcp: McpService | null = null;
 
@@ -144,7 +147,8 @@ export default class FoliaKanbanPlugin extends Plugin {
     });
     this.registerBoardSetupActions();
 
-    this.addSettingTab(new KanbanSettingTab(this.app, this));
+    this.settingTab = new KanbanSettingTab(this.app, this);
+    this.addSettingTab(this.settingTab);
     this.buildMcp();
 
     this.patchLeafSetViewState();
@@ -596,6 +600,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       if (this.applyToStored(mcpTokenPatch(this.settings, newMcpToken, Platform.isDesktop)))
         write = true;
       this.refreshViews();
+      this.settingTab?.settingsChangedExternally();
       // Port, bind address, token and the switch itself can all have moved; the running server has
       // to follow them here as it does on any other settings change.
       void this.mcp?.sync(this.settings);
@@ -858,6 +863,18 @@ class KanbanSettingTab extends PluginSettingTab {
 
   override display(): void {
     this.render();
+  }
+
+  /**
+   * The file changed underneath, and every row on screen predates it. Redrawing is not only so the
+   * user sees the new values: the held fields commit whatever their input holds when focus leaves,
+   * read straight off the DOM, so leaving a port field nobody touched would write the value it is
+   * still showing back over the change that just arrived.
+   */
+  settingsChangedExternally(): void {
+    this.pendingUserName = null;
+    this.pendingMcpFields = {};
+    if (this.containerEl.isShown()) this.render();
   }
 
   override hide(): void {

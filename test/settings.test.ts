@@ -441,6 +441,16 @@ describe("the plugin reacts to an external settings change", () => {
     expect(adopt).toContain("void this.mcp?.sync(this.settings)");
   });
 
+  // The held rows commit whatever their input holds when focus leaves, read off the DOM. A tab left
+  // showing the values from before the change writes them straight back over it.
+  it("tells the settings tab, whose rows would otherwise commit what they still show", () => {
+    expect(adopt).toContain("this.settingTab?.settingsChangedExternally()");
+    const tab = method("settingsChangedExternally(): void {");
+    expect(tab).toContain("this.pendingUserName = null;");
+    expect(tab).toContain("this.pendingMcpFields = {};");
+    expect(tab).toContain("this.render()");
+  });
+
   it("writes back only what this instance decided, never a copy of what it just read", () => {
     expect(adopt).toContain("if (write) void this.saveSettings();");
   });
