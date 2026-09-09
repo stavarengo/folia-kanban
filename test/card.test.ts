@@ -182,6 +182,12 @@ describe("subtasks: Obsidian's own checkbox rule — space is open, anything els
     expect(setSubcardDone(doc, ["Child"], true)).toBe(doc);
   });
 
+  it("unticks a custom character on a CRLF note without disturbing its line ending", () => {
+    const doc = "# C\r\n\r\n## Subtasks\r\n- [/] item\r\n";
+    const out = setSubtaskDone(doc, 0, false);
+    expect(out).toBe("# C\r\n\r\n## Subtasks\r\n- [ ] item\r\n");
+  });
+
   it("never reads the box's own closing ']' as its character", () => {
     // `- []] a`: the box holds no character at all — `]` is what closes it, not a value inside it.
     // A naive `.` in CHECKBOX_RE would capture it as the checkbox character and read the line done.
