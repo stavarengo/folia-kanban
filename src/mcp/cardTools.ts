@@ -10,6 +10,7 @@ import { descriptionRefusal } from "../model/card";
 import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
+import { StaleLineError } from "../model/repo";
 import {
   boardArg,
   cardArg,
@@ -412,11 +413,16 @@ const setSubtask = tool({
   name: "set_subtask_done",
   title: "Tick or untick a subtask",
   description:
-    "Check or uncheck one `## Subtasks` line by its index, as get_card reports it. A line that claims a column of its own is kept in step with its checkbox.",
+    "Check or uncheck one `## Subtasks` line, named by the index AND the text get_card reported for it. A line that claims a column of its own is kept in step with its checkbox.",
   input: z.object({
     board: boardArg,
     card: cardArg,
     index: z.number().int().min(0).describe("The subtask's `index`, as get_card reports it."),
+    text: z
+      .string()
+      .describe(
+        "The subtask's `text`, exactly as get_card reported it. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
+      ),
     done: z.boolean(),
   }),
   run: async (host, args) => {
@@ -429,16 +435,28 @@ const setSubtask = tool({
         `"${path}" has no subtask ${args.index}. It has ${subtasks.length}, indexed ${subtasks.map((s) => s.index).join(", ") || "not at all"}.`,
       );
     }
+    if (line.text !== args.text) {
+      throw new ToolError(
+        `Subtask ${args.index} of "${path}" reads "${line.text}", not "${args.text}". The card changed since you read it — read it again and name the line you mean by what it says now.`,
+      );
+    }
     // The line's own `[[link]]` goes with it, exactly as the detail panel passes the subtask it
     // drew. Without it a subcard line's checkbox is ticked and the child note is left where it was,
     // which is the one thing this tool promises not to do.
-    await setSubtaskDone(repo, board, {
-      path,
-      index: args.index,
-      done: args.done,
-      ...(line.link === undefined ? {} : { link: line.link }),
-    });
-    return { path, index: args.index, done: args.done };
+    try {
+      await setSubtaskDone(repo, board, {
+        path,
+        line: { index: args.index, text: args.text },
+        done: args.done,
+        ...(line.link === undefined ? {} : { link: line.link }),
+      });
+    } catch (e) {
+      // The note changed between this call's own read and its write — rarer than a stale index,
+      // and the same answer: nothing was written, so it is the caller's to retry.
+      if (e instanceof StaleLineError) throw new ToolError(e.message);
+      throw e;
+    }
+    return { path, index: args.index, text: args.text, done: args.done };
   },
 });
 

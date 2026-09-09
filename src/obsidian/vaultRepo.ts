@@ -16,10 +16,12 @@ import type {
   ColumnDef,
   ContextConfig,
   HistoryScope,
+  LineRef,
   RelationType,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
+import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "../viewMode";
 import { attachPropertySuggest } from "./propertySuggest";
 import { buildBoard, resolveCardFolder } from "../model/board";
@@ -33,6 +35,7 @@ import {
   appendComment,
   appendHistory,
   cardStats,
+  commentStillReads,
   parseBody,
   parseFrontmatter,
   parseSubtasks,
@@ -44,6 +47,7 @@ import {
   setSubtaskDone,
   setSubtaskStatus as setSubtaskStatusText,
   splitFrontmatter,
+  subtaskStillReads,
   updateTimestampedLine,
 } from "../model/card";
 import {
@@ -360,6 +364,29 @@ export class VaultRepository implements CardRepository {
     await this.app.vault.process(this.file(path), fn);
   }
 
+  /**
+   * Edit one line of a note, but only while the note still reads the way the caller described it.
+   * `vault.process` is what makes a read-modify-write see the current bytes, so the check belongs
+   * INSIDE its callback — against the very text the edit is about to be made on, not against a
+   * snapshot read before it. A note that has moved on since is handed straight back, byte for byte,
+   * and the refusal is raised after the write returns rather than thrown out of the callback: what
+   * `process` does with a throw from inside is not ours to promise.
+   */
+  private async editLine(
+    path: string,
+    kind: "subtask" | "comment",
+    at: LineRef,
+    write: (text: string) => string,
+  ): Promise<void> {
+    const stillReads = kind === "subtask" ? subtaskStillReads : commentStillReads;
+    let stale = false;
+    await this.editBody(path, (t) => {
+      stale = !stillReads(t, at);
+      return stale ? t : write(t);
+    });
+    if (stale) throw staleLine(kind, path, at);
+  }
+
   async applyMove(mutation: CardMutation): Promise<void> {
     if (mutation.setFrontmatter)
       await this.writeFrontmatter(mutation.path, mutation.setFrontmatter);
@@ -370,8 +397,8 @@ export class VaultRepository implements CardRepository {
       // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
       // where a subitem sits, so writing them separately would leave a moment where the board
       // reloads on a line that says two different things.
-      const { index, status, done } = mutation.setSubtaskStatus;
-      await this.editBody(mutation.path, (t) =>
+      const { index, text, status, done } = mutation.setSubtaskStatus;
+      await this.editLine(mutation.path, "subtask", { index, text }, (t) =>
         setSubtaskStatusText(
           done === undefined ? t : setSubtaskDone(t, index, done),
           index,
@@ -432,34 +459,35 @@ export class VaultRepository implements CardRepository {
     await this.editBody(path, (t) => appendComment(t, text, stamp(), author));
     await this.maybeHistory(path, "comment", commentAddedLine());
   }
-  async updateComment(path: string, index: number, text: string): Promise<void> {
-    await this.editBody(path, (t) => updateTimestampedLine(t, SECTION.comments, index, text));
+  async updateComment(path: string, at: LineRef, text: string): Promise<void> {
+    await this.editLine(path, "comment", at, (t) =>
+      updateTimestampedLine(t, SECTION.comments, at.index, text),
+    );
     await this.maybeHistory(path, "comment", commentEditedLine());
   }
-  async removeComment(path: string, index: number): Promise<void> {
-    await this.editBody(path, (t) => removeTimestampedLine(t, SECTION.comments, index));
+  async removeComment(path: string, at: LineRef): Promise<void> {
+    await this.editLine(path, "comment", at, (t) =>
+      removeTimestampedLine(t, SECTION.comments, at.index),
+    );
     await this.maybeHistory(path, "comment", commentRemovedLine());
   }
   async addTodo(path: string, text: string): Promise<void> {
     await this.editBody(path, (t) => addTodoText(t, text));
     await this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
-  async toggleSubtask(path: string, index: number, done: boolean): Promise<void> {
-    // Capture the item text BEFORE the splice so the history line can name it.
-    const itemText =
-      parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
-    await this.editBody(path, (t) => setSubtaskDone(t, index, done));
+  async toggleSubtask(path: string, at: LineRef, done: boolean): Promise<void> {
+    // The history line names `at.text`, and the write only lands while the note still reads that
+    // way — so the record and the tick are the same line, with nothing read separately to disagree.
+    await this.editLine(path, "subtask", at, (t) => setSubtaskDone(t, at.index, done));
     await this.maybeHistory(
       path,
       "subtask",
-      done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText),
+      done ? subtaskDoneLine(at.text) : subtaskReopenedLine(at.text),
     );
   }
-  async removeSubtask(path: string, index: number): Promise<void> {
-    const itemText =
-      parseSubtasks(await this.app.vault.cachedRead(this.file(path)))[index]?.text ?? "";
-    await this.editBody(path, (t) => removeSubtaskText(t, index));
-    await this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
+  async removeSubtask(path: string, at: LineRef): Promise<void> {
+    await this.editLine(path, "subtask", at, (t) => removeSubtaskText(t, at.index));
+    await this.maybeHistory(path, "subtask", subtaskRemovedLine(at.text));
   }
 
   /**

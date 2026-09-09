@@ -11,6 +11,7 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
+  LineRef,
   RelationDirection,
   RelationLink,
   RelationType,
@@ -842,9 +843,10 @@ export interface CardMutation {
    * An inline todo's placement, written to its own `## Subtasks` line instead of to frontmatter:
    * the line's `[status:: …]` field (`null` clears it) and, when the move states one, its checkbox.
    * An absent `done` leaves the box exactly as the note has it. Mutually exclusive with
-   * `setFrontmatter` — a checklist line has no frontmatter of its own.
+   * `setFrontmatter` — a checklist line has no frontmatter of its own. `text` is what the line said
+   * when the board read it, so the write refuses a position that has since become another line.
    */
-  setSubtaskStatus?: { index: number; status: string | null; done?: boolean };
+  setSubtaskStatus?: { index: number; text: string; status: string | null; done?: boolean };
   /** Frontmatter keys to remove from `path` — how a subcard's own `status` claim is dropped. */
   unsetFrontmatter?: string[];
   /**
@@ -972,13 +974,25 @@ export function moveSubtask(
     return null; // the line already says this
   }
   const setSubtaskStatus =
-    done === undefined ? { index, status: claimTo } : { index, status: claimTo, done };
+    done === undefined
+      ? { index, text: item.text, status: claimTo }
+      : { index, text: item.text, status: claimTo, done };
   const label = item.text || "todo";
   return {
     path: parentPath,
     setSubtaskStatus,
     history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
   };
+}
+
+/**
+ * The checklist line the board read at that position, named the way a write has to name it: its
+ * index AND what it said. `null` when this board knows no such line, which is already the answer
+ * to "is what the caller saw still there".
+ */
+export function subtaskRef(board: Board, parentPath: string, index: number): LineRef | null {
+  const item = board.cards[parentPath]?.subItems?.find((s) => s.index === index);
+  return item ? { index, text: item.text } : null;
 }
 
 /**
@@ -1044,7 +1058,7 @@ export function syncSubtaskClaim(
   if (item.status === undefined) return null; // claims nothing — nothing to keep in step
   const next = done ? doneCol : item.status === doneCol ? null : item.status;
   if (next === item.status) return null;
-  return { path: parentPath, setSubtaskStatus: { index, status: next } };
+  return { path: parentPath, setSubtaskStatus: { index, text: item.text, status: next } };
 }
 
 /**
@@ -1116,7 +1130,9 @@ export function reassignColumn(
   // someone deleted the done column, in their own note, with nothing to undo it.
   return {
     path: todoRef.parentPath,
-    setSubtaskStatus: { index: todoRef.index, status: toColumnId },
+    // A todo tile's title IS its checklist line's text (that is what `buildBoard` mints it from),
+    // which is what the write needs to recognise the line it was told to move.
+    setSubtaskStatus: { index: todoRef.index, text: card.title, status: toColumnId },
   };
 }
 

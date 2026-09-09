@@ -514,13 +514,122 @@ describe("field edits and their history lines", () => {
   it("names the subtask in its history line, reading the text BEFORE the edit lands", async () => {
     const { app, repo } = repoWithCard("all", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n");
 
-    await repo.toggleSubtask("basic/Cards/One.md", 0, true);
-    await repo.removeSubtask("basic/Cards/One.md", 0);
+    const line = { index: 0, text: "Write the docs" };
+    await repo.toggleSubtask("basic/Cards/One.md", line, true);
+    await repo.removeSubtask("basic/Cards/One.md", line);
 
     const text = app.vault.text("basic/Cards/One.md") ?? "";
     expect(text).toContain("Subtask done: Write the docs");
     expect(text).toContain("Subtask removed: Write the docs");
     expect(text).not.toContain("- [x] Write the docs");
+  });
+
+  describe("a write carrying an index from an earlier read", () => {
+    const PATH = "basic/Cards/One.md";
+    const FRONTMATTER = "status: todo\npriority: B";
+    const TWO_TODOS = "\n# One\n\n## Subtasks\n- [ ] Write the docs\n- [ ] Ship it\n";
+    const THREE_COMMENTS =
+      "\n# One\n\n## Comments\n- _2026-06-13 10:00:_ one\n- _2026-06-13 11:00:_ two\n- _2026-06-13 12:00:_ three\n";
+
+    /**
+     * The card as the caller read it, and then as somebody else left it: a line inserted at the
+     * top of the section, which is all it takes for every index below to name a different line.
+     */
+    function editedUnderneath(body: string, sectionStart: string, inserted: string) {
+      const { app, repo } = repoWithCard("all", body);
+      app.vault.addFile(PATH, card(FRONTMATTER, body.replace(sectionStart, inserted)));
+      return { app, repo, before: app.vault.text(PATH) ?? "" };
+    }
+
+    const subtasksEdited = () =>
+      editedUnderneath(TWO_TODOS, "- [ ] Write the docs", "- [ ] Snuck in\n- [ ] Write the docs");
+    const commentsEdited = () =>
+      editedUnderneath(
+        THREE_COMMENTS,
+        "- _2026-06-13 10:00:_ one",
+        "- _2026-06-13 09:00:_ zero\n- _2026-06-13 10:00:_ one",
+      );
+
+    it("refuses to tick a line the note no longer holds, and leaves every byte as it was", async () => {
+      const { app, repo, before } = subtasksEdited();
+
+      // Index 1 was "Ship it" when the caller read it; it is "Write the docs" now.
+      await expect(repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true)).rejects.toThrow(
+        /no longer reads "Ship it"/,
+      );
+
+      expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    it("refuses to remove a line the note no longer holds", async () => {
+      const { app, repo, before } = subtasksEdited();
+
+      await expect(repo.removeSubtask(PATH, { index: 1, text: "Ship it" })).rejects.toThrow(
+        /no longer reads "Ship it"/,
+      );
+
+      expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    it("refuses to move a todo's line when the position has become another line", async () => {
+      const { app, repo, before } = subtasksEdited();
+
+      await expect(
+        repo.applyMove({
+          path: PATH,
+          setSubtaskStatus: { index: 1, text: "Ship it", status: "doing" },
+        }),
+      ).rejects.toThrow(/no longer reads "Ship it"/);
+
+      expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    it("refuses to edit or delete a comment that has moved, and writes no history for it", async () => {
+      const { app, repo, before } = commentsEdited();
+
+      await expect(repo.updateComment(PATH, { index: 1, text: "two" }, "edited")).rejects.toThrow(
+        /no longer reads "two"/,
+      );
+      await expect(repo.removeComment(PATH, { index: 1, text: "two" })).rejects.toThrow(
+        /no longer reads "two"/,
+      );
+
+      expect(app.vault.text(PATH)).toBe(before);
+      expect(app.vault.text(PATH)).not.toContain("## History");
+    });
+
+    // The check has to run on the text `vault.process` hands the callback. Read the note first and
+    // check THAT, and this is the case that slips through: the note changes in the moment between.
+    it("catches a note that changes between the read and the write itself", async () => {
+      const { app, repo } = repoWithCard("all", TWO_TODOS);
+      const process = app.vault.process.bind(app.vault);
+      vi.spyOn(app.vault, "process").mockImplementation(async (file, fn) => {
+        app.vault.addFile(
+          PATH,
+          card(
+            FRONTMATTER,
+            TWO_TODOS.replace("- [ ] Write the docs", "- [ ] Snuck in\n- [ ] Write the docs"),
+          ),
+        );
+        return process(file, fn);
+      });
+
+      await expect(repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true)).rejects.toThrow(
+        /no longer reads "Ship it"/,
+      );
+
+      expect(app.vault.text(PATH)).toContain("- [ ] Ship it");
+      expect(app.vault.text(PATH)).not.toContain("- [x]");
+    });
+
+    it("still writes when the note is the one the caller described", async () => {
+      const { app, repo } = repoWithCard("all", TWO_TODOS);
+
+      await repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true);
+
+      expect(app.vault.text(PATH)).toContain("- [x] Ship it");
+      expect(app.vault.text(PATH)).toContain("Subtask done: Ship it");
+    });
   });
 
   it("keeps a comment's timestamp when its text is edited, and drops only the removed one", async () => {
@@ -532,8 +641,8 @@ describe("field edits and their history lines", () => {
       .split("\n")
       .find((l) => l.includes("first"));
 
-    await repo.updateComment("basic/Cards/One.md", 0, "edited");
-    await repo.removeComment("basic/Cards/One.md", 1);
+    await repo.updateComment("basic/Cards/One.md", { index: 0, text: "first" }, "edited");
+    await repo.removeComment("basic/Cards/One.md", { index: 1, text: "second" });
 
     const text = app.vault.text("basic/Cards/One.md") ?? "";
     expect(text).toContain("edited");
@@ -809,7 +918,7 @@ describe("applying a move", () => {
 
     await repo.applyMove({
       path: "basic/Cards/One.md",
-      setSubtaskStatus: { index: 0, status: "doing", done: true },
+      setSubtaskStatus: { index: 0, text: "Write the docs", status: "doing", done: true },
     });
 
     expect(app.vault.text("basic/Cards/One.md")).toContain("- [x] Write the docs [status:: doing]");
@@ -919,7 +1028,7 @@ describe("applying a move", () => {
 
     await repo.applyMove({
       path: "basic/Cards/One.md",
-      setSubtaskStatus: { index: 0, status: null },
+      setSubtaskStatus: { index: 0, text: "Write the docs", status: null },
     });
 
     // The checkbox is not the move's business: a status-only move must leave it exactly as it was.

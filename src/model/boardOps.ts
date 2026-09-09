@@ -6,7 +6,7 @@
 // have had to reinvent it, and the two would have drifted. Everything that moves a card goes
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
-import type { Board } from "./types";
+import type { Board, LineRef } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
 
@@ -64,10 +64,11 @@ export async function moveCardOver(
 export async function setSubtaskDone(
   repo: CardRepository,
   board: Board,
-  target: { path: string; index: number; done: boolean; link?: string },
+  target: { path: string; line: LineRef; done: boolean; link?: string },
 ): Promise<void> {
-  const { path, index, done, link } = target;
-  await repo.toggleSubtask(path, index, done);
+  const { path, line, done, link } = target;
+  const { index } = line;
+  await repo.toggleSubtask(path, line, done);
   // `link` matters: for a line naming a child note, `syncSubtaskClaim` refuses to act unless the
   // caller shows the `[[link]]` it read, so that a line that has since been edited underneath is
   // not acted on by index alone. A caller that leaves it out gets the checkbox written and the

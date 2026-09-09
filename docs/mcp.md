@@ -80,7 +80,9 @@ Every tool takes `board`, the vault path of the board note (`Work/Board.md`), ex
 | `update_card` | writes | Changes `title`, `description`, `priority`, `due`, or any other frontmatter key through `properties`. `null` clears any of them. `due` is `YYYY-MM-DD` and is refused in any other shape, rather than written as prose the board cannot read. |
 | `add_comment` | writes | Appends a comment to `## Comments`, timestamped and signed with the **Your name** setting. One line: a comment is stored as a single list item. |
 | `add_subtask` | writes | Appends an unchecked line to `## Subtasks`, and reports the `index` of the line it added. One line, for the same reason. |
-| `set_subtask_done` | writes | Ticks or unticks one subtask by its `index`, as `get_card` reports it. A line claiming a column of its own is kept in step with its checkbox. |
+| `set_subtask_done` | writes | Ticks or unticks one subtask, named by BOTH the `index` and the `text` `get_card` reported for it. A line claiming a column of its own is kept in step with its checkbox. |
+
+`set_subtask_done` takes the line's words as well as its position, and refuses the write when the note no longer reads that way. An index is only a position: anything added or removed above a line — by hand, by sync, by another tool, or by an earlier call in the same loop — moves every line below it, and a tick decided against an old reading would land on somebody else's todo. So read the card, pass back what it said, and treat the refusal as the signal to read it again rather than as a failure to work around. Nothing is written when it refuses.
 
 `update_card` refuses `status`, `order`, `priority`, `due`, `title` and `folia-board` inside `properties`, and says which tool or field owns each instead — so an agent cannot set a column by hand and skip the history line that move is owed, or retitle a card in the frontmatter while the file and every link to it keep the old name.
 

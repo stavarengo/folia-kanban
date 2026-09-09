@@ -1785,7 +1785,7 @@ export function CardDetail({
                       // its claim moved with its checkbox, so the two never tell different stories.
                       // Decided before the box is written, so a refused follow-up is known first.
                       const sync = syncSubtaskClaim(board, path, s, !s.done);
-                      await repo.toggleSubtask(path, s.index, !s.done);
+                      await repo.toggleSubtask(path, { index: s.index, text: s.text }, !s.done);
                       if (sync) await repo.applyMove(sync);
                     })
                   }
@@ -1863,7 +1863,9 @@ export function CardDetail({
                   className="folia-icon-btn folia-mini"
                   aria-label="Remove"
                   title="Remove"
-                  onClick={() => void mutate(() => repo.removeSubtask(path, s.index))}
+                  onClick={() =>
+                    void mutate(() => repo.removeSubtask(path, { index: s.index, text: s.text }))
+                  }
                 >
                   <Icon name="close" size={13} />
                 </button>
@@ -1959,13 +1961,13 @@ export function CardDetail({
                   sourcePath={path}
                   onSave={(val) =>
                     void mutate(async () => {
-                      await repo.updateComment(path, i, val);
+                      await repo.updateComment(path, { index: i, text: c.text }, val);
                       postedHereEdited(i, val);
                     })
                   }
                   onDelete={() =>
                     void mutate(async () => {
-                      await repo.removeComment(path, i);
+                      await repo.removeComment(path, { index: i, text: c.text });
                       postedHereRemoved(i);
                     })
                   }

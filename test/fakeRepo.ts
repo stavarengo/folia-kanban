@@ -3,6 +3,7 @@
 // exercise genuine parse/mutate logic without Obsidian.
 
 import type { CardRepository, PropertyNamesInUse, PropertySuggestSource } from "../src/model/repo";
+import { staleLine } from "../src/model/repo";
 import type { FileOp } from "../src/model/pathOps";
 import type {
   Board,
@@ -13,6 +14,7 @@ import type {
   ColumnDef,
   ContextConfig,
   HistoryScope,
+  LineRef,
   RelationType,
 } from "../src/model/types";
 import type { CardMutation } from "../src/model/board";
@@ -24,6 +26,7 @@ import {
   appendComment,
   appendHistory,
   cardStats,
+  commentStillReads,
   parseBody,
   parseSubtasks,
   pendingSubcardLinks,
@@ -33,6 +36,7 @@ import {
   setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus,
+  subtaskStillReads,
   updateTimestampedLine,
 } from "../src/model/card";
 
@@ -189,8 +193,9 @@ export class FakeRepo implements CardRepository {
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
     for (const key of mutation.unsetFrontmatter ?? []) delete this.entry(mutation.path).fm[key];
     if (mutation.setSubtaskStatus) {
-      const { index, status, done } = mutation.setSubtaskStatus;
+      const { index, text, status, done } = mutation.setSubtaskStatus;
       const e = this.entry(mutation.path);
+      this.requireLine(mutation.path, "subtask", { index, text });
       e.body = setSubtaskStatus(
         done === undefined ? e.body : setSubtaskDone(e.body, index, done),
         index,
@@ -235,36 +240,49 @@ export class FakeRepo implements CardRepository {
     this.entry(path).body = appendComment(this.entry(path).body, text, this.ts, this.getUserName());
     this.maybeHistory(path, "comment", commentAddedLine());
   }
-  async updateComment(path: string, index: number, text: string) {
+  async updateComment(path: string, at: LineRef, text: string) {
+    this.requireLine(path, "comment", at);
     this.entry(path).body = updateTimestampedLine(
       this.entry(path).body,
       SECTION.comments,
-      index,
+      at.index,
       text,
     );
     this.maybeHistory(path, "comment", commentEditedLine());
   }
-  async removeComment(path: string, index: number) {
-    this.entry(path).body = removeTimestampedLine(this.entry(path).body, SECTION.comments, index);
+  async removeComment(path: string, at: LineRef) {
+    this.requireLine(path, "comment", at);
+    this.entry(path).body = removeTimestampedLine(
+      this.entry(path).body,
+      SECTION.comments,
+      at.index,
+    );
     this.maybeHistory(path, "comment", commentRemovedLine());
   }
   async addTodo(path: string, text: string) {
     this.entry(path).body = addTodo(this.entry(path).body, text);
     this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
-  async toggleSubtask(path: string, index: number, done: boolean) {
-    const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
-    this.entry(path).body = setSubtaskDone(this.entry(path).body, index, done);
+  async toggleSubtask(path: string, at: LineRef, done: boolean) {
+    this.requireLine(path, "subtask", at);
+    this.entry(path).body = setSubtaskDone(this.entry(path).body, at.index, done);
     this.maybeHistory(
       path,
       "subtask",
-      done ? subtaskDoneLine(itemText) : subtaskReopenedLine(itemText),
+      done ? subtaskDoneLine(at.text) : subtaskReopenedLine(at.text),
     );
   }
-  async removeSubtask(path: string, index: number) {
-    const itemText = parseSubtasks(this.entry(path).body)[index]?.text ?? "";
-    this.entry(path).body = removeSubtask(this.entry(path).body, index);
-    this.maybeHistory(path, "subtask", subtaskRemovedLine(itemText));
+  async removeSubtask(path: string, at: LineRef) {
+    this.requireLine(path, "subtask", at);
+    this.entry(path).body = removeSubtask(this.entry(path).body, at.index);
+    this.maybeHistory(path, "subtask", subtaskRemovedLine(at.text));
+  }
+
+  /** The adapter's refusal, in memory: a position that no longer holds the caller's line. */
+  private requireLine(path: string, kind: "subtask" | "comment", at: LineRef) {
+    const body = this.entry(path).body;
+    const reads = kind === "subtask" ? subtaskStillReads : commentStillReads;
+    if (!reads(body, at)) throw staleLine(kind, path, at);
   }
 
   private editRelations(

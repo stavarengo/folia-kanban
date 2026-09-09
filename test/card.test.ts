@@ -20,6 +20,8 @@ import {
   cardStats,
   updateTimestampedLine,
   removeTimestampedLine,
+  subtaskStillReads,
+  commentStillReads,
   SECTION,
 } from "../src/model/card";
 import { historyAllows } from "../src/model/history";
@@ -1202,5 +1204,52 @@ describe("author names are sanitized into something the line grammar can hold", 
     expect(parseBody(out).comments).toEqual([
       { timestamp: "2026-06-13 10:00", author: "Alx", text: "hi" },
     ]);
+  });
+});
+
+// The question every index-addressed write asks before it writes. Getting it wrong in one direction
+// lets a write land on a stranger's line; in the other it refuses edits that were never in danger,
+// which is why the notes below are the awkward ones: CRLF, legacy prefixes, prose, inline fields.
+describe("does the note still read the line the caller described", () => {
+  const subtasks = "# C\n\n## Subtasks\n- [ ] one\n- [x] two [status:: doing]\n- [ ] [[Child]]\n";
+
+  it("says yes to the line at that index and no to any other", () => {
+    expect(subtaskStillReads(subtasks, { index: 0, text: "one" })).toBe(true);
+    expect(subtaskStillReads(subtasks, { index: 1, text: "two" })).toBe(true);
+    expect(subtaskStillReads(subtasks, { index: 0, text: "two" })).toBe(false);
+    expect(subtaskStillReads(subtasks, { index: 9, text: "one" })).toBe(false);
+  });
+
+  it("reads a line the way its caller did: no inline field, no checkbox, links intact", () => {
+    // `two` carries `[status:: doing]` and a ticked box; neither is part of what the panel showed.
+    expect(subtaskStillReads(subtasks, { index: 1, text: "two [status:: doing]" })).toBe(false);
+    expect(subtaskStillReads(subtasks, { index: 2, text: "[[Child]]" })).toBe(true);
+  });
+
+  it("does not mistake a CRLF note, or an indented line, for a changed one", () => {
+    const crlf = ["# C\r", "\r", "## Subtasks\r", "- [ ] one\r", "  - [x] two\r", ""].join("\n");
+    expect(subtaskStillReads(crlf, { index: 0, text: "one" })).toBe(true);
+    expect(subtaskStillReads(crlf, { index: 1, text: "two" })).toBe(true);
+  });
+
+  it("sees a line inserted above for what it is: every index below it now names another line", () => {
+    const inserted = subtasks.replace("- [ ] one", "- [ ] zero\n- [ ] one");
+    expect(subtaskStillReads(inserted, { index: 0, text: "one" })).toBe(false);
+    expect(subtaskStillReads(inserted, { index: 1, text: "one" })).toBe(true);
+  });
+
+  it("reads comments through their own prefixes — current, legacy and none at all", () => {
+    const current = appendComment(SAMPLE_CARD, "hello", "2026-06-13 10:00", "agent");
+    expect(commentStillReads(current, { index: 0, text: "hello" })).toBe(true);
+    const legacy = "# C\n\n## Comments\n- [2026-06-13 10:00] one\n- two\n\nloose prose\n";
+    expect(commentStillReads(legacy, { index: 0, text: "one" })).toBe(true);
+    expect(commentStillReads(legacy, { index: 1, text: "two" })).toBe(true);
+    expect(commentStillReads(legacy, { index: 2, text: "loose prose" })).toBe(true);
+    expect(commentStillReads(legacy, { index: 2, text: "one" })).toBe(false);
+  });
+
+  it("does not mistake a CRLF comment for a changed one", () => {
+    const crlf = ["# C\r", "\r", "## Comments\r", "- _2026-06-13 10:00:_ one\r", ""].join("\n");
+    expect(commentStillReads(crlf, { index: 0, text: "one" })).toBe(true);
   });
 });

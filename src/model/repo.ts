@@ -8,11 +8,26 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
+  LineRef,
   RelationType,
 } from "./types";
 import type { CardMutation } from "./board";
 import type { FileOp } from "./pathOps";
 import type { PropertySuggestion } from "./properties";
+
+/**
+ * A write that was refused because the note no longer reads the way the caller described it: the
+ * line at that index is not the one it meant, so nothing was written at all. Reaches the person as
+ * a toast and an agent as a tool failure, both of which say the same thing — read again, then act.
+ */
+export class StaleLineError extends Error {}
+
+/** The refusal above, worded for whoever has to act on it. */
+export function staleLine(kind: "subtask" | "comment", path: string, at: LineRef): StaleLineError {
+  return new StaleLineError(
+    `The ${kind} at index ${at.index} of "${path}" no longer reads "${at.text}", so nothing was written — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
+  );
+}
 
 /** Frontmatter keys already in use, split by where the notes carrying them live. */
 export interface PropertyNamesInUse {
@@ -67,13 +82,17 @@ export interface CardRepository {
   unsetFrontmatterKey(path: string, key: string): Promise<void>;
   setDescription(path: string, description: string): Promise<void>;
   addComment(path: string, text: string): Promise<void>;
-  /** Replace the text of the index-th comment, keeping its timestamp + every other byte. */
-  updateComment(path: string, index: number, text: string): Promise<void>;
-  /** Delete the index-th comment line only. */
-  removeComment(path: string, index: number): Promise<void>;
+  /**
+   * Replace the text of one comment, keeping its timestamp + every other byte. `at` is the entry
+   * as the caller read it (see {@link LineRef}); a note that no longer reads that way is left
+   * untouched and the call throws {@link StaleLineError}. Same for the three below.
+   */
+  updateComment(path: string, at: LineRef, text: string): Promise<void>;
+  /** Delete one comment line only. */
+  removeComment(path: string, at: LineRef): Promise<void>;
   addTodo(path: string, text: string): Promise<void>;
-  toggleSubtask(path: string, index: number, done: boolean): Promise<void>;
-  removeSubtask(path: string, index: number): Promise<void>;
+  toggleSubtask(path: string, at: LineRef, done: boolean): Promise<void>;
+  removeSubtask(path: string, at: LineRef): Promise<void>;
 
   /**
    * Declare a relationship of `type` (a key of the board's vocabulary, `BoardConfig.relations`)

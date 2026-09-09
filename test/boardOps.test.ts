@@ -117,7 +117,7 @@ describe("setSubtaskDone", () => {
     const repo = withClaimedLine();
     await setSubtaskDone(repo, await repo.loadBoard(), {
       path: "Tasks/A.md",
-      index: 0,
+      line: { index: 0, text: "Draft it" },
       done: true,
     });
     expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.done).toBe(true);
@@ -129,7 +129,7 @@ describe("setSubtaskDone", () => {
     const repo = withClaimedLine();
     await setSubtaskDone(repo, await repo.loadBoard(), {
       path: "Tasks/A.md",
-      index: 0,
+      line: { index: 0, text: "Draft it" },
       done: true,
     });
     expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.status).toBe("done");

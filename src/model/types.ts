@@ -46,6 +46,19 @@ const undeclaredTypedKey: never = undefined as unknown as Exclude<
 >;
 void undeclaredTypedKey;
 
+/**
+ * One line of a note as the caller read it: where it sat, and what it said. An index alone is a
+ * position, and a position names a different line the moment anything above it is added or
+ * removed — so every write decided against an earlier read carries the text it believed was there,
+ * and refuses when the note no longer reads that way.
+ */
+export interface LineRef {
+  /** 0-based, in the order the section's reader lists its entries. */
+  index: number;
+  /** The entry's text, as that same reader reports it (`SubItem.text`, a comment's `text`). */
+  text: string;
+}
+
 type SubItemKind = "todo" | "card";
 
 /** One line of a card's `## Subtasks` checklist: either a plain todo or a link to a

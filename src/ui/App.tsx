@@ -10,6 +10,7 @@ import {
   parseTodoPath,
   reassignColumn,
   relationCounts,
+  subtaskRef,
 } from "../model/board";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { dateOnly } from "../model/dates";
@@ -546,13 +547,17 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         return { canMoveUp: i > 0, canMoveDown: i >= 0 && i < list.length - 1 };
       },
       toggleTodo: (path, index, done) => {
+        const b = boardRef.current;
+        // The line as this board read it, text and all: the write refuses rather than tick a
+        // position the note has since given to somebody else's todo. A board that cannot name the
+        // line no longer has the one that was clicked, and the reload already on its way draws it.
+        const line = b && subtaskRef(b, path, index);
+        if (!b || !line) return;
         void (async () => {
           try {
             // Ticking a box is also a statement about where the work belongs, for a line that
             // claims a column, so the claim is kept in step with the checkbox.
-            const b = boardRef.current;
-            if (b) await setSubtaskDone(repo, b, { path, index, done });
-            else await repo.toggleSubtask(path, index, done);
+            await setSubtaskDone(repo, b, { path, line, done });
           } catch (e) {
             reportError(e);
           } finally {
@@ -576,9 +581,12 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
         })();
       },
       removeTodo: (path, index) => {
+        const b = boardRef.current;
+        const line = b && subtaskRef(b, path, index);
+        if (!line) return;
         void (async () => {
           try {
-            await repo.removeSubtask(path, index);
+            await repo.removeSubtask(path, line);
           } catch (e) {
             reportError(e);
           } finally {

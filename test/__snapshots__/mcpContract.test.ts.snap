@@ -317,7 +317,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Check or uncheck one \`## Subtasks\` line by its index, as get_card reports it. A line that claims a column of its own is kept in step with its checkbox.",
+    "description": "Check or uncheck one \`## Subtasks\` line, named by the index AND the text get_card reported for it. A line that claims a column of its own is kept in step with its checkbox.",
     "inputSchema": {
       "properties": {
         "board": {
@@ -337,11 +337,16 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "minimum": 0,
           "type": "integer",
         },
+        "text": {
+          "description": "The subtask's \`text\`, exactly as get_card reported it. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
+          "type": "string",
+        },
       },
       "required": [
         "board",
         "card",
         "index",
+        "text",
         "done",
       ],
       "type": "object",

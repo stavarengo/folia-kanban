@@ -257,6 +257,7 @@ describe("writing through the tools", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md",
       index: added.index,
+      text: "Draft it",
       done: true,
     });
     const body = await repo.readBody("Tasks/Write docs.md");
@@ -267,6 +268,33 @@ describe("writing through the tools", () => {
     ]);
   });
 
+  // The shape this guards against is an agent's, not a person's: one get_card, then a loop of
+  // set_subtask_done calls whose indices went stale the moment the first write reordered nothing —
+  // or the moment anyone else touched the note. Naming the words too is what makes that safe.
+  it("refuses a tick whose index no longer holds the line the caller named", async () => {
+    const { host, repo } = fixture();
+    for (const text of ["Draft it", "Ship it"]) {
+      await call(host, "add_subtask", { board: "Board.md", card: "Tasks/Write docs.md", text });
+    }
+
+    await expect(
+      call(host, "set_subtask_done", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md",
+        index: 0,
+        text: "Ship it", // index 1, as the note actually reads
+        done: true,
+      }),
+    ).rejects.toThrow(/reads "Draft it", not "Ship it"/);
+
+    const body = await repo.readBody("Tasks/Write docs.md");
+    expect(body.subtasks.map((s) => s.done)).toEqual([false, false]);
+    expect(body.history.map((h) => h.text)).toEqual([
+      "Subtask added: Draft it",
+      "Subtask added: Ship it",
+    ]);
+  });
+
   it("says how many subtasks there are when asked for one that is not there", async () => {
     const { host } = fixture();
     await expect(
@@ -274,6 +302,7 @@ describe("writing through the tools", () => {
         board: "Board.md",
         card: "Tasks/Write docs.md",
         index: 4,
+        text: "Nothing there",
         done: true,
       }),
     ).rejects.toThrow(/no subtask 4/);
@@ -853,6 +882,7 @@ describe("ticking a checklist line that names a child note", () => {
       board: "Board.md",
       card: "Tasks/Parent.md",
       index: 0,
+      text: "[[Child]]",
       done: true,
     });
     const board = await repo.loadBoard();
@@ -868,6 +898,7 @@ describe("ticking a checklist line that names a child note", () => {
       board: "Board.md",
       card: "Tasks/Parent.md",
       index: 0,
+      text: "[[Child]]",
       done: false,
     });
     expect((await repo.loadBoard()).cards["Tasks/Child.md"]?.frontmatter.status).not.toBe("done");

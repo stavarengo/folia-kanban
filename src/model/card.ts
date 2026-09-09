@@ -10,7 +10,7 @@
 // vault.process(file, text => ...).
 
 import { parse as parseYaml } from "yaml";
-import type { CardBody, CardStats, SubItem } from "./types";
+import type { CardBody, CardStats, LineRef, SubItem } from "./types";
 import { fencedLines, unclosedFence } from "./fences";
 import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
@@ -403,6 +403,24 @@ export function parseBody(text: string): CardBody {
     comments: parseTimestamped(body, SECTION.comments),
     history: parseTimestamped(body, SECTION.history),
   };
+}
+
+/**
+ * Whether `text` still reads, at that position, the checklist line the caller described. Asked
+ * inside the write, against the very text about to be changed: the index was produced by a read
+ * that may be minutes old, and a line inserted above it since would silently hand the write
+ * somebody else's todo. Compared through `parseSubtasks`, the same reader every caller got its
+ * `SubItem.text` from, so a `[status:: …]` field or an indent can never make a line look changed.
+ */
+export function subtaskStillReads(text: string, at: LineRef): boolean {
+  return parseSubtasks(text)[at.index]?.text === at.text;
+}
+
+/** The same question for a `## Comments` entry, read the way the panel that offered it read it. */
+export function commentStillReads(text: string, at: LineRef): boolean {
+  return (
+    parseTimestamped(splitFrontmatter(text).body, SECTION.comments)[at.index]?.text === at.text
+  );
 }
 
 export function cardStats(text: string): CardStats {

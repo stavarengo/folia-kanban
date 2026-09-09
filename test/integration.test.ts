@@ -74,7 +74,7 @@ describe("comment edit/delete are byte-stable", () => {
     const repo = new FakeRepo(config, {
       "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 },
     });
-    await repo.updateComment("Tasks/A.md", 1, "edited two");
+    await repo.updateComment("Tasks/A.md", { index: 1, text: "two" }, "edited two");
     const expected = bodyWith3.replace(
       "- [2026-06-13 11:00] two",
       "- [2026-06-13 11:00] edited two",
@@ -86,7 +86,7 @@ describe("comment edit/delete are byte-stable", () => {
     const repo = new FakeRepo(config, {
       "Tasks/A.md": { fm: { status: "todo" }, body: bodyWith3 },
     });
-    await repo.removeComment("Tasks/A.md", 0);
+    await repo.removeComment("Tasks/A.md", { index: 0, text: "one" });
     const expected = bodyWith3.replace("- [2026-06-13 10:00] one\n", "");
     expect(repo.files.get("Tasks/A.md")!.body).toBe(expected);
   });
