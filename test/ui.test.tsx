@@ -4710,13 +4710,16 @@ describe("a title far wider than the panel (20260827.02)", () => {
     });
     expect(value).toHaveAttribute("title", HUGE);
     expect(value).toHaveAttribute("aria-expanded", "false");
-    // Both of the things Obsidian's app.css does to every button have to be undone here, and
-    // neither is visible from jsdom: `white-space: nowrap` would hold the whole title on one line
-    // whatever the clamp says, and `height: var(--input-height)` would pin the box at one line's
-    // worth of height, so the clamped lines would spill over the text underneath.
-    const buttonRule = rule(".folia-title-value.folia-title-value");
-    expect(buttonRule).toContain("white-space: normal");
-    expect(buttonRule).toContain("height: auto");
+    // Both of the things Obsidian's app.css does to every button have to be undone, and neither is
+    // visible from jsdom: `white-space: nowrap` would hold the whole title on one line whatever the
+    // clamp says, and `height: var(--input-height)` would pin the box at one line's worth of
+    // height, so the clamped lines would spill over the text underneath. The undo lives on
+    // `.folia-link.folia-link` now, once for every link the board draws (20260829.02), so what
+    // this row needs is that rule AND the class that reaches it.
+    expect(value).toHaveClass("folia-link");
+    const linkRule = rule(".folia-link.folia-link");
+    expect(linkRule).toContain("white-space: normal");
+    expect(linkRule).toContain("height: auto");
 
     // The clamp lives in a plain element inside the control rather than on the button, so that it
     // needs no assumption about how a browser treats a button's inner display. On a current
@@ -4738,6 +4741,98 @@ describe("a title far wider than the panel (20260827.02)", () => {
     const openRule = rule(".folia-title-value.is-expanded .folia-title-value-text");
     expect(openRule).toContain("-webkit-line-clamp: none");
     expect(openRule).toContain("overflow: visible");
+  });
+});
+
+describe("a link that has to lose the theme's button shape (20260829.01, 20260829.02)", () => {
+  // Every one of these lives in the cascade, which jsdom cannot run: it loads no Obsidian theme,
+  // so there `.folia-link` already computes what it declares and no arrangement of the stylesheet
+  // could ever look wrong. What a test CAN pin is the stylesheet's own shape — which rules exist,
+  // what they say, and the order they say it in — plus the classes the markup actually puts on the
+  // elements those rules are written for. Read the panel in Obsidian for the rest.
+  const css = readFileSync("src/styles.css", "utf8");
+  const rule = (selector: string) => {
+    const at = css.indexOf(`\n${selector} {`);
+    return at === -1 ? "" : css.slice(at, css.indexOf("\n}", at));
+  };
+  const at = (selector: string) => css.indexOf(`\n${selector} {`);
+
+  it("undoes the theme's single-line button shape once, for every link the board draws", () => {
+    // Obsidian's `button:not(.clickable-icon)` gives every button `white-space: nowrap` and
+    // `height: var(--input-height)`. A link sitting in a paragraph survives neither: a long card
+    // name cannot wrap, so it pushes its panel sideways instead of breaking.
+    const base = rule(".folia-link.folia-link");
+    expect(base).toContain("white-space: normal");
+    expect(base).toContain("height: auto");
+  });
+
+  it("writes each base class above the rules that refine it", () => {
+    // A doubled class is doubled to beat the theme, and it beats the plugin's own single-class
+    // rules as a side effect. Keeping the base above its refinements is what lets equal weights
+    // settle by source order again; the refinements below carry the same doubled weight so they
+    // are equal in the first place.
+    for (const [base, refinements] of [
+      [
+        ".folia-link.folia-link",
+        [".folia-title-value.folia-title-value", ".folia-title-why.folia-title-why"],
+      ],
+      [
+        ".folia-muted.folia-muted",
+        [
+          ".folia-title-reason.folia-title-reason",
+          ".folia-title-step-reason.folia-title-step-reason",
+        ],
+      ],
+      [
+        ".folia-icon-btn.folia-icon-btn",
+        [".folia-mini.folia-mini", ".folia-column-menu-btn.folia-column-menu-btn"],
+      ],
+    ] as const) {
+      expect(at(base)).toBeGreaterThan(-1);
+      for (const refinement of refinements) {
+        expect(at(refinement)).toBeGreaterThan(at(base));
+      }
+    }
+  });
+
+  it("keeps the title row reading as a title rather than as the link it is built from", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const value = detail.querySelector(".folia-title-value") as HTMLElement;
+    // The row is a `.folia-link` button, so `.folia-link.folia-link` hands it the accent colour and
+    // `font: inherit`. Taking those back is the whole reason this rule is doubled.
+    expect(value).toHaveClass("folia-link");
+    const own = rule(".folia-title-value.folia-title-value");
+    expect(own).toContain("font-size: var(--folia-font-size-md)");
+    expect(own).toContain("font-weight: var(--folia-font-weight-semibold)");
+    expect(own).toContain("color: var(--text-normal)");
+  });
+
+  it("keeps the title's supporting lines at the size they ask for", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const reason = detail.querySelector(".folia-title-reason") as HTMLElement;
+    // The reason line wears `.folia-muted`, whose doubled rule sets a LARGER size than this line
+    // asks for, so the refinement only lands if it is doubled too.
+    expect(reason).toHaveClass("folia-muted");
+    expect(rule(".folia-title-reason.folia-title-reason")).toContain(
+      "font-size: var(--folia-font-size-xs)",
+    );
+    const why = within(detail).getByRole("button", { name: "Why this title?" });
+    expect(why).toHaveClass("folia-link");
+    expect(rule(".folia-title-why.folia-title-why")).toContain(
+      "font-size: var(--folia-font-size-xs)",
+    );
+    await user.click(why);
+    const step = detail.querySelector(".folia-title-step-reason") as HTMLElement;
+    expect(step).toHaveClass("folia-muted");
+    expect(rule(".folia-title-step-reason.folia-title-step-reason")).toContain(
+      "font-size: var(--folia-font-size-xs)",
+    );
   });
 });
 

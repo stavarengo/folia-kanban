@@ -207,12 +207,48 @@ function dressing(own) {
   return out;
 }
 
-/** Every property a rule body sets, normalised enough to compare two rules for a clash. */
+/**
+ * The shorthands this stylesheet writes, each with the longhands it sets. A rule saying
+ * `font: inherit` and a rule saying `font-size: 11px` are a clash, and comparing property names
+ * literally would never see it — that is exactly how `.folia-link.folia-link` spent a release
+ * quietly setting the size of every title row that tried to declare its own.
+ */
+const SHORTHANDS = {
+  background: ["background-color", "background-image", "background-position", "background-size"],
+  border: ["border-width", "border-style", "border-color"],
+  "border-radius": [
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "border-bottom-right-radius",
+    "border-bottom-left-radius",
+  ],
+  flex: ["flex-grow", "flex-shrink", "flex-basis"],
+  font: ["font-style", "font-variant", "font-weight", "font-size", "line-height", "font-family"],
+  gap: ["row-gap", "column-gap"],
+  inset: ["top", "right", "bottom", "left"],
+  margin: ["margin-top", "margin-right", "margin-bottom", "margin-left"],
+  overflow: ["overflow-x", "overflow-y"],
+  padding: ["padding-top", "padding-right", "padding-bottom", "padding-left"],
+  "place-items": ["align-items", "justify-items"],
+  "text-decoration": ["text-decoration-line", "text-decoration-color", "text-decoration-style"],
+  transition: [
+    "transition-property",
+    "transition-duration",
+    "transition-timing-function",
+    "transition-delay",
+  ],
+};
+
+/**
+ * Every property a rule body sets, each shorthand accompanied by the longhands it writes, so two
+ * rules clash whenever the sets they touch overlap however each of them spelled it.
+ */
 const properties = (body) =>
   body
     .split(";")
     .map((decl) => decl.split(":")[0]?.trim().toLowerCase())
-    .filter((prop) => prop && !prop.startsWith("--"));
+    .filter((prop) => prop && !prop.startsWith("--"))
+    .flatMap((prop) => [prop, ...(SHORTHANDS[prop] ?? [])]);
 
 for (const element of elements) {
   // A runtime-built family (`"folia-chip-" + tone`) is credited as a whole: which member a button

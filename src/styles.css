@@ -11,6 +11,18 @@
    specificity step higher, which is enough. `pnpm buttons:check` (scripts/check-button-styles.mjs)
    holds the line so nobody has to remember the trap.
 
+   That borrowed weight has a second edge, and it is the one that bites: a doubled rule also
+   out-ranks the plugin's OWN single-class rules for the same element, so a refinement can lose to
+   the rule it meant to refine and still read correctly in the file. Two habits keep it honest.
+   A rule that refines an element wearing a doubled class is doubled too — see `.folia-mini`,
+   `.folia-title-why`. And a class that other rules refine has its base rule written ABOVE them,
+   which is why `.folia-link` and `.folia-muted` sit near the top of this file rather than in the
+   sections that use them: past that point equal weights settle by source order, the way CSS reads.
+   `buttons:check` catches the first habit (a doubled base out-ranking a later refinement) but not
+   the second: a refinement written above its base loses on plain source order, and that is
+   indistinguishable from a variant class legitimately overriding a base one — `.folia-chip` and
+   `.folia-chip-prio-1.folia-chip-prio-1` are exactly that shape. Ordering is the guard there.
+
    The token block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down
    the tree, and several surfaces are portalled OUT of the board root — the card context menu and
    the column popover to the document body, the edit-column modal to the body, the drag overlay to
@@ -134,6 +146,37 @@
 .folia-menu-prio.folia-menu-prio,
 .folia-swatch.folia-swatch {
   box-shadow: none;
+}
+
+/* The two classes several components hang on an element and then refine: `.folia-link` for text
+   that acts as a link, `.folia-muted` for a line that recedes. Both land on <button> elements
+   somewhere in the board, so both are named twice for the reason the header note gives — and that
+   borrowed weight is precisely why they belong HERE, above every component rule. A refinement
+   written further down carries the same doubled weight and wins on source order; written below a
+   base rule that sits mid-file, it would have to out-weigh it instead, which is how three title
+   rows spent a release rendering something other than what they declared. */
+.folia-link.folia-link {
+  background: transparent;
+  border: none;
+  color: var(--link-color, var(--folia-accent));
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  /* Obsidian's app.css does two things to every button that text drawn inside a paragraph cannot
+     survive: `white-space: nowrap`, so a long card name never wraps and pushes its panel sideways
+     instead, and `height: var(--input-height)`, which pins the box to one text input's worth of
+     height whatever it holds. Undone here once, for every link the board draws. Neither is visible
+     from jsdom, where no Obsidian stylesheet is loaded. */
+  white-space: normal;
+  height: auto;
+}
+.folia-muted.folia-muted {
+  color: var(--text-faint, var(--text-muted));
+  font-size: var(--folia-font-size-sm);
+  font-style: italic;
 }
 
 /* The view content area has default padding; the board needs the full pane with no inset. */
@@ -387,17 +430,6 @@
   padding: 9px 12px;
   background: var(--folia-col-bg);
   position: relative;
-}
-.folia-column-menu-btn {
-  width: 24px;
-  height: 24px;
-  opacity: 0;
-  transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
-}
-.folia-column:hover .folia-column-menu-btn,
-.folia-column-menu-btn:focus-visible,
-.folia-column-menu-btn[aria-expanded="true"] {
-  opacity: 1;
 }
 .folia-column-dot {
   width: 8px;
@@ -1234,6 +1266,22 @@
   height: 24px;
   margin-left: auto;
 }
+/* The column header's menu button, doubled and placed here for the same reason as `.folia-mini`,
+   and not up in the column-header section where it reads: written above `.folia-icon-btn`, every
+   declaration it makes is one the base rule already makes, so it was silently dropped — the button
+   drew at the base rule's full size and appeared without the fade this rule asks for. Its state
+   rules follow it, so their `opacity: 1` still wins over the `opacity: 0` here. */
+.folia-column-menu-btn.folia-column-menu-btn {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
+}
+.folia-column:hover .folia-column-menu-btn,
+.folia-column-menu-btn:focus-visible,
+.folia-column-menu-btn[aria-expanded="true"] {
+  opacity: 1;
+}
 
 /* ------------------------------------------------------------------ inline add / inputs */
 .folia-add-card {
@@ -1504,19 +1552,15 @@
   flex-direction: column;
   gap: 2px;
 }
-/* Named twice so it out-specifies Obsidian's own `button:not(.clickable-icon)` colouring — this
-   reads as text, not as a control, and the theme's raised face would say otherwise.
-
-   The `white-space` and the `height` are the two things Obsidian's app.css does to every button
-   that a wrapping title cannot survive: `white-space: nowrap` means the text never wraps at all,
-   and `height: var(--input-height)` pins the box to one text input's worth of height, so whatever
-   does not fit the first line is clipped. Neither is visible from jsdom, where no Obsidian
-   stylesheet is loaded. */
+/* The row reads as the card's title, not as a link, so it takes back the size, weight and colour
+   `.folia-link.folia-link` hands every link — named twice to match that rule's weight, and sitting
+   below it so source order settles the rest. The underline stays: the row IS clickable, it expands
+   the clamped title. It is drawn from the button's own `currentColor`, so winning `color` here
+   colours the underline with it; a version that moved these declarations to an inner element left
+   a body-coloured title under an accent-coloured line, and `text-decoration-color` is not
+   available in this repo (see `.folia-link-missing`). */
 .folia-title-value.folia-title-value {
   display: block;
-  height: auto;
-  white-space: normal;
-  text-align: left;
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   color: var(--text-normal);
@@ -1539,11 +1583,14 @@
   -webkit-line-clamp: none;
   overflow: visible;
 }
-.folia-title-reason {
+/* Both refine an element that also carries `.folia-muted` or `.folia-link`, whose rules are
+   doubled for the theme's sake, so a single class here would lose the font size without a trace.
+   Doubled to match, and below those rules so source order decides. */
+.folia-title-reason.folia-title-reason {
   margin: 0;
   font-size: var(--folia-font-size-xs);
 }
-.folia-title-why {
+.folia-title-why.folia-title-why {
   align-self: flex-start;
   font-size: var(--folia-font-size-xs);
 }
@@ -1578,7 +1625,9 @@
   color: var(--text-normal);
   overflow-wrap: anywhere;
 }
-.folia-title-step-reason {
+/* Doubled for the same reason as `.folia-title-reason`: it sits on an element wearing
+   `.folia-muted`. */
+.folia-title-step-reason.folia-title-step-reason {
   grid-column: 1 / -1;
   font-size: var(--folia-font-size-xs);
 }
@@ -1774,17 +1823,6 @@
   margin-left: auto;
   cursor: help;
 }
-.folia-link.folia-link {
-  background: transparent;
-  border: none;
-  color: var(--link-color, var(--folia-accent));
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  padding: 0;
-  font: inherit;
-  text-align: left;
-}
 .folia-link-missing {
   color: var(--text-muted);
   /* Drawn as a border, not as `text-decoration: underline dashed`: Obsidian's community-directory
@@ -1927,11 +1965,6 @@
   font-size: var(--folia-font-size-xxs-plus);
   color: var(--text-faint, var(--text-muted));
   font-variant-numeric: tabular-nums;
-}
-.folia-muted.folia-muted {
-  color: var(--text-faint, var(--text-muted));
-  font-size: var(--folia-font-size-sm);
-  font-style: italic;
 }
 
 /* ------------------------------------------------------------------ focus visibility */
