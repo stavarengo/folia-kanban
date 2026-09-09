@@ -16,7 +16,13 @@ import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
-const CHECKBOX_RE = /^(\s*[-*]\s+)\[([ xX])\]\s+(.*?)\r?$/;
+// Obsidian's own rule for a checklist item's done-ness: a space means open, and literally any
+// other single character means done (`[/]`, `[-]`, `[>]`, and whatever else a theme defines) — not
+// only `x`/`X`. Reading view's checkbox styling and every theme that colours a checklist follow that
+// rule, so the parser has to match it too, or a card written with one of those characters silently
+// loses its subtask state. `[^\]]` rather than `.`, so the character can be anything but the `]`
+// that closes the box — `.` would let the box's own closing bracket read as the box's character.
+const CHECKBOX_RE = /^(\s*[-*]\s+)\[([^\]])\]\s+(.*?)\r?$/;
 const BULLET_RE = /^\s*[-*]\s+/;
 const WIKILINK_ONLY_RE = /^\[\[([^\]]+)\]\]$/;
 // A checklist line's own column, written as an Obsidian/Dataview inline field: `- [ ] Ship it
@@ -463,16 +469,31 @@ export function addSubcard(text: string, link: string): string {
 /**
  * Rewrite only the character inside the checkbox of line `i`; every other byte of the line, the
  * author's spacing included, passes through — this runs on notes nobody has open.
+ *
+ * Marking a line done that already carries a custom done-character (`[/]`, `[-]`, ...) leaves that
+ * character alone rather than overwriting it with `x`: it is already done by Obsidian's own rule
+ * (anything but space), so there is nothing to change, and rewriting it would destroy information
+ * the user put there on purpose (what kind of "done" this is) for no semantic gain. Only a line
+ * that is actually transitioning from open gets the plain `x` this plugin has always written.
+ * Marking a line NOT done always writes a plain space: Obsidian has exactly one character for
+ * "open", so there is no custom character to preserve on that side, and any custom done-character
+ * the line had is necessarily lost — the model here is binary done/not-done, not five checklist
+ * states, and space is the only spelling of "not done" Obsidian recognizes.
  */
 function tickLine(lines: string[], i: number, done: boolean): void {
   const line = lines[i] ?? "";
   const m = CHECKBOX_RE.exec(line);
   if (!m) return;
+  const current = m[2] ?? " ";
+  if (done && current !== " ") return;
   const at = (m[1] ?? "").length + 1;
   lines[i] = line.slice(0, at) + (done ? "x" : " ") + line.slice(at + 1);
 }
 
-/** Toggle/set the done state of the index-th subtask (0-based among checklist items). */
+/**
+ * Mark the index-th subtask done or not done. Setting done on a line that is already done by
+ * Obsidian's own rule (any character but space) is a no-op — see {@link tickLine}.
+ */
 export function setSubtaskDone(text: string, index: number, done: boolean): string {
   return withBody(text, (body) => {
     const lines = body.split("\n");

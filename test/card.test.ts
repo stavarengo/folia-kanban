@@ -141,6 +141,62 @@ describe("subtasks: todos vs subcards", () => {
   });
 });
 
+describe("subtasks: Obsidian's own checkbox rule — space is open, anything else is done", () => {
+  const withChar = (c: string) => `# C\n\n## Subtasks\n- [${c}] item\n`;
+
+  it.each([["/"], ["-"], [">"], ["?"], ["!"], ["X"]])(
+    "reads '%s' as done, the same as 'x'",
+    (c) => {
+      expect(parseSubtasks(withChar(c))[0]).toMatchObject({ done: true });
+    },
+  );
+
+  it("reads a bare space as not done", () => {
+    expect(parseSubtasks(withChar(" "))[0]).toMatchObject({ done: false });
+  });
+
+  it("counts a custom-character line in cardStats the same as [x]", () => {
+    const s = cardStats(withChar("/"));
+    expect(s.checklist).toBe(1);
+    expect(s.checklistDone).toBe(1);
+  });
+
+  it("marking an already-done custom-character line done again keeps the user's character, not 'x'", () => {
+    const doc = withChar("/");
+    expect(setSubtaskDone(doc, 0, true)).toBe(doc);
+  });
+
+  it("marking a custom-character line NOT done writes a plain space, the only spelling Obsidian has for open", () => {
+    const out = setSubtaskDone(withChar("/"), 0, false);
+    expect(out).toBe(withChar(" "));
+    expect(parseSubtasks(out)[0]).toMatchObject({ done: false });
+  });
+
+  it("marking an open line done still writes 'x', unchanged from before this character class widened", () => {
+    const out = setSubtaskDone(withChar(" "), 0, true);
+    expect(out).toBe(withChar("x"));
+  });
+
+  it("setSubcardDone marking done also preserves an already-done custom character", () => {
+    const doc = "# P\n\n## Subtasks\n- [/] [[Child]]\n";
+    expect(setSubcardDone(doc, ["Child"], true)).toBe(doc);
+  });
+
+  it("never reads the box's own closing ']' as its character", () => {
+    // `- []] a`: the box holds no character at all — `]` is what closes it, not a value inside it.
+    // A naive `.` in CHECKBOX_RE would capture it as the checkbox character and read the line done.
+    expect(parseSubtasks("# C\n\n## Subtasks\n- []] a\n")).toEqual([]);
+  });
+
+  it("an astral character (most emoji), a surrogate pair, does not match — same as on an unpatched note", () => {
+    // Out of scope for this fix: the backlog only asks for the single-code-unit characters Obsidian
+    // themes actually use (/, -, >, ...). CHECKBOX_RE captures exactly one UTF-16 code unit, so a
+    // line like this fails to match, exactly as it did before this character class widened — no
+    // subtask is read from it, but nothing is corrupted either.
+    expect(parseSubtasks(withChar("🤔"))).toEqual([]);
+  });
+});
+
 describe("setDescription", () => {
   it("replaces description, preserves title and later sections", () => {
     let t = appendComment(SAMPLE_CARD, "keep me", "2026-06-13 10:00");
