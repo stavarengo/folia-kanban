@@ -10,6 +10,11 @@
 // (0,1,1). The usual fix is to name the class twice — `.folia-link.folia-link { … }` — which
 // matches exactly the same elements at (0,2,0); selecting through an ancestor class works too.
 //
+// Doubling has a second edge, and the last pass here is about that one: the borrowed weight also
+// out-ranks the plugin's own single-class rules for the same element, so a rule written to refine
+// another can lose to it and go on reading correctly in the file. That collision has nothing to do
+// with the tag, so that pass looks at every element the plugin dresses, not only the buttons.
+//
 // Only the properties the theme actually sets on buttons are policed, so a rule about layout,
 // spacing or typography is left alone. One exception is deliberate: Obsidian also overrides button
 // `padding`, but only under `.is-tablet`, so it costs nothing on desktop and policing it here would
@@ -19,9 +24,9 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
 
-// Only the React UI is scanned. Buttons built through Obsidian's own Setting API (`src/settings.ts`)
-// are deliberately out of scope: those are Obsidian's controls in Obsidian's settings pane, and
-// they are SUPPOSED to wear the theme's button face.
+// Only the React UI is scanned. Controls built through Obsidian's own Setting API
+// (`src/settings.ts`) are deliberately out of scope: those are Obsidian's controls in Obsidian's
+// settings pane, and they are SUPPOSED to wear the theme's face.
 const UI_DIR = "src/ui";
 const CSS_FILE = "src/styles.css";
 
@@ -76,9 +81,12 @@ function specificity(selector) {
  * ends in `-` is a class built at runtime (`"folia-chip-" + tone`), so it is kept as a PREFIX and
  * matches every rule for a class that starts with it — those rules style buttons too.
  */
-function buttons(tsx) {
+function elementsNamed(tsx, name) {
+  const open = `<${name}`;
   const out = [];
-  for (let i = tsx.indexOf("<button"); i !== -1; i = tsx.indexOf("<button", i + 1)) {
+  for (let i = tsx.indexOf(open); i !== -1; i = tsx.indexOf(open, i + 1)) {
+    // `<buttons>` is not a `<button>`, and `<span-ish>` is not a `<span>`.
+    if (/[\w-]/.test(tsx[i + open.length] ?? "")) continue;
     let depth = 0;
     let end = i;
     while (end < tsx.length && !(tsx[end] === ">" && depth === 0)) {
@@ -104,6 +112,31 @@ function buttons(tsx) {
   }
   return out;
 }
+
+const buttons = (tsx) => elementsNamed(tsx, "button");
+
+/**
+ * Every element the plugin dresses, whatever its tag. The theme half of this check is about
+ * <button> and nothing else, but the collision half is not: a doubled rule out-ranks its own
+ * neighbours on a <p> exactly as it does on a button, and two of the rows that sent this check
+ * looking were a <p> and a <span>. Only tags the plugin actually writes are scanned, so a class
+ * built at runtime still reaches the check through the button pass that credits its family.
+ */
+const carriers = (tsx) =>
+  [
+    "button",
+    "p",
+    "span",
+    "li",
+    "div",
+    "h2",
+    "h3",
+    "label",
+    "input",
+    "textarea",
+    "ul",
+    "ol",
+  ].flatMap((name) => elementsNamed(tsx, name));
 
 /** Every `selector { body }` pair, including the ones nested inside `@media`. */
 function rules(css) {
@@ -214,8 +247,39 @@ function dressing(own) {
  * quietly setting the size of every title row that tried to declare its own.
  */
 const SHORTHANDS = {
-  background: ["background-color", "background-image", "background-position", "background-size"],
-  border: ["border-width", "border-style", "border-color"],
+  animation: [
+    "animation-name",
+    "animation-duration",
+    "animation-timing-function",
+    "animation-delay",
+    "animation-iteration-count",
+    "animation-direction",
+    "animation-fill-mode",
+    "animation-play-state",
+  ],
+  background: [
+    "background-color",
+    "background-image",
+    "background-position",
+    "background-size",
+    "background-repeat",
+    "background-attachment",
+    "background-clip",
+    "background-origin",
+  ],
+  border: [
+    "border-width",
+    "border-style",
+    "border-color",
+    "border-top",
+    "border-right",
+    "border-bottom",
+    "border-left",
+  ],
+  "border-bottom": ["border-bottom-width", "border-bottom-style", "border-bottom-color"],
+  "border-left": ["border-left-width", "border-left-style", "border-left-color"],
+  "border-right": ["border-right-width", "border-right-style", "border-right-color"],
+  "border-top": ["border-top-width", "border-top-style", "border-top-color"],
   "border-radius": [
     "border-top-left-radius",
     "border-top-right-radius",
@@ -227,10 +291,17 @@ const SHORTHANDS = {
   gap: ["row-gap", "column-gap"],
   inset: ["top", "right", "bottom", "left"],
   margin: ["margin-top", "margin-right", "margin-bottom", "margin-left"],
+  "list-style": ["list-style-type", "list-style-position", "list-style-image"],
+  outline: ["outline-width", "outline-style", "outline-color"],
   overflow: ["overflow-x", "overflow-y"],
   padding: ["padding-top", "padding-right", "padding-bottom", "padding-left"],
   "place-items": ["align-items", "justify-items"],
-  "text-decoration": ["text-decoration-line", "text-decoration-color", "text-decoration-style"],
+  "text-decoration": [
+    "text-decoration-line",
+    "text-decoration-color",
+    "text-decoration-style",
+    "text-decoration-thickness",
+  ],
   transition: [
     "transition-property",
     "transition-duration",
@@ -243,12 +314,13 @@ const SHORTHANDS = {
  * Every property a rule body sets, each shorthand accompanied by the longhands it writes, so two
  * rules clash whenever the sets they touch overlap however each of them spelled it.
  */
-const properties = (body) =>
+const written = (body) =>
   body
     .split(";")
     .map((decl) => decl.split(":")[0]?.trim().toLowerCase())
-    .filter((prop) => prop && !prop.startsWith("--"))
-    .flatMap((prop) => [prop, ...(SHORTHANDS[prop] ?? [])]);
+    .filter((prop) => prop && !prop.startsWith("--"));
+
+const properties = (body) => written(body).flatMap((prop) => [prop, ...(SHORTHANDS[prop] ?? [])]);
 
 for (const element of elements) {
   // A runtime-built family (`"folia-chip-" + tone`) is credited as a whole: which member a button
@@ -270,27 +342,45 @@ for (const element of elements) {
     for (const prop of declared(rule.body)) covered.add(prop);
   }
 
-  // Doubling a class to beat the theme also raises it against the plugin's OWN later rules, and
-  // that is the one way this convention can break something. Two rules on the same button setting
-  // the same property should still resolve by source order — the later one refines the earlier —
-  // so a case where weight overrules order means a refinement has gone silently dead.
-  for (const [i, earlier] of dress.entries()) {
-    for (const later of dress.slice(i + 1)) {
-      if (compare(earlier.spec, later.spec) <= 0) continue;
-      const clash = properties(earlier.body).filter((prop) =>
-        properties(later.body).includes(prop),
-      );
-      if (clash.length === 0) continue;
-      problems.push(
-        `${CSS_FILE}: \`${later.selector}\` sets ${clash.join(", ")} for the <button> with class "${[...element.classes].join(" ")}", but the earlier \`${earlier.selector}\` now out-weighs it, so that declaration is dead. Give \`${later.selector}\` the same doubled weight.`,
-      );
-    }
-  }
   const missing = ["color", "background", "box-shadow"].filter((p) => !covered.has(p));
   if (missing.length > 0) {
     const label = [...element.classes].join(" ");
     const problem = `${CSS_FILE}: the <button> with class "${label}" has no winning rule for ${missing.join(", ")}, so the theme still supplies ${missing.length === 1 ? "it" : "them"} in the real app. Declare ${missing.join(", ")} (\`none\` is a fine answer) on one of its own rules.`;
     if (!problems.includes(problem)) problems.push(problem);
+  }
+}
+
+// Doubling a class to beat the theme also raises it against the plugin's OWN later rules, and that
+// is the one way this convention can break something. Two rules on the same element setting the
+// same property should still resolve by source order — the later one refines the earlier — so a
+// case where weight overrules order means a refinement has gone silently dead. This runs over every
+// element the plugin dresses, not only the buttons: the collision has nothing to do with the tag.
+for (const element of carriers(tsx)) {
+  const own = [...classes].flatMap((c) =>
+    c.endsWith("-")
+      ? element.classes.has(c)
+        ? [...css.matchAll(new RegExp(`\\.(${c}[\\w-]+)`, "g"))].map((m) => m[1])
+        : []
+      : element.classes.has(c)
+        ? [c]
+        : [],
+  );
+  const dress = dressing(
+    [...new Set([...own, ...element.classes])].filter((c) => !c.endsWith("-")),
+  );
+  for (const [i, earlier] of dress.entries()) {
+    for (const later of dress.slice(i + 1)) {
+      if (compare(earlier.spec, later.spec) <= 0) continue;
+      // The comparison runs over expanded sets, the report over what the rule actually says: a
+      // dead `transition` should read as one property, not as its five longhands.
+      const beaten = new Set(properties(earlier.body));
+      const clash = written(later.body).filter((prop) =>
+        [prop, ...(SHORTHANDS[prop] ?? [])].some((p) => beaten.has(p)),
+      );
+      if (clash.length === 0) continue;
+      const problem = `${CSS_FILE}: \`${later.selector}\` sets ${clash.join(", ")} for the element with class "${[...element.classes].join(" ")}", but the earlier \`${earlier.selector}\` out-weighs it, so that declaration is dead. Give \`${later.selector}\` the same doubled weight.`;
+      if (!problems.includes(problem)) problems.push(problem);
+    }
   }
 }
 

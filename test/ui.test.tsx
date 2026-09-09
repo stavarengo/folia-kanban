@@ -4657,6 +4657,19 @@ describe("the panel names the file, names the override, and explains the title (
   });
 });
 
+/** The stylesheet as text, and the two ways these tests read it.
+ *
+ * jsdom loads no Obsidian theme, so nothing here can compute what a rule actually wins in the real
+ * app; what a test CAN pin is what the file says and the order it says it in. `rule` returns one
+ * rule's declarations by exact selector, `ruleAt` its offset in the file, so two rules can be
+ * compared for position where source order is what decides between them. */
+const styles = readFileSync("src/styles.css", "utf8");
+const rule = (selector: string) => {
+  const at = styles.indexOf(`\n${selector} {`);
+  return at === -1 ? "" : styles.slice(at, styles.indexOf("\n}", at));
+};
+const ruleAt = (selector: string) => styles.indexOf(`\n${selector} {`);
+
 describe("a title far wider than the panel (20260827.02)", () => {
   // One 200-character token with nothing to break on: the shape that used to push the header's
   // buttons out of reach. jsdom has no layout engine, so these tests cannot say the buttons are
@@ -4665,12 +4678,6 @@ describe("a title far wider than the panel (20260827.02)", () => {
   // recoverable without the header growing to hold it, and the CSS rules the behaviour rests on
   // are still in the stylesheet. Whether it looks right is a human's answer, in Obsidian.
   const HUGE = "x".repeat(200);
-  const css = readFileSync("src/styles.css", "utf8");
-  /** The declarations of one CSS rule, by exact selector. */
-  const rule = (selector: string) => {
-    const at = css.indexOf(`\n${selector} {`);
-    return at === -1 ? "" : css.slice(at, css.indexOf("\n}", at));
-  };
 
   it("keeps the actions out of the title, and the whole title reachable from the header", async () => {
     const user = userEvent.setup();
@@ -4750,12 +4757,6 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
   // could ever look wrong. What a test CAN pin is the stylesheet's own shape — which rules exist,
   // what they say, and the order they say it in — plus the classes the markup actually puts on the
   // elements those rules are written for. Read the panel in Obsidian for the rest.
-  const css = readFileSync("src/styles.css", "utf8");
-  const rule = (selector: string) => {
-    const at = css.indexOf(`\n${selector} {`);
-    return at === -1 ? "" : css.slice(at, css.indexOf("\n}", at));
-  };
-  const at = (selector: string) => css.indexOf(`\n${selector} {`);
 
   it("undoes the theme's single-line button shape once, for every link the board draws", () => {
     // Obsidian's `button:not(.clickable-icon)` gives every button `white-space: nowrap` and
@@ -4788,11 +4789,28 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
         [".folia-mini.folia-mini", ".folia-column-menu-btn.folia-column-menu-btn"],
       ],
     ] as const) {
-      expect(at(base)).toBeGreaterThan(-1);
+      expect(ruleAt(base)).toBeGreaterThan(-1);
       for (const refinement of refinements) {
-        expect(at(refinement)).toBeGreaterThan(at(base));
+        expect(ruleAt(refinement)).toBeGreaterThan(ruleAt(base));
       }
     }
+  });
+
+  it("keeps the column menu button at the size and fade its own rule asks for", () => {
+    // Written above `.folia-icon-btn` it declared nothing the base rule did not already declare,
+    // so the button drew at the base size and its opacity was switched without the fade. Doubled
+    // and moved below the base, every declaration lands; the state rules follow it, so the button
+    // still shows on hover, on focus and while its menu is open.
+    const own = rule(".folia-column-menu-btn.folia-column-menu-btn");
+    expect(own).toContain("width: 24px");
+    expect(own).toContain("height: 24px");
+    expect(own).toContain("opacity: 0");
+    expect(own).toContain("transition: opacity");
+    // The three state selectors share one rule, so `at` (which anchors on a rule's own line) does
+    // not reach them; their position in the file is what matters here.
+    expect(styles.indexOf(".folia-column:hover .folia-column-menu-btn")).toBeGreaterThan(
+      ruleAt(".folia-column-menu-btn.folia-column-menu-btn"),
+    );
   });
 
   it("keeps the title row reading as a title rather than as the link it is built from", async () => {

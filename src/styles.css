@@ -18,10 +18,13 @@
    `.folia-title-why`. And a class that other rules refine has its base rule written ABOVE them,
    which is why `.folia-link` and `.folia-muted` sit near the top of this file rather than in the
    sections that use them: past that point equal weights settle by source order, the way CSS reads.
-   `buttons:check` catches the first habit (a doubled base out-ranking a later refinement) but not
-   the second: a refinement written above its base loses on plain source order, and that is
-   indistinguishable from a variant class legitimately overriding a base one — `.folia-chip` and
-   `.folia-chip-prio-1.folia-chip-prio-1` are exactly that shape. Ordering is the guard there.
+   `buttons:check` enforces the first habit on every element the plugin dresses, whatever its tag.
+   It cannot enforce the second: a refinement written above its base loses on plain source order,
+   and that is indistinguishable from a variant class legitimately overriding a base one —
+   `.folia-chip` and `.folia-chip-prio-1.folia-chip-prio-1` are exactly that shape. Ordering is the
+   only guard there, which is the reason it is written down. Repeating a refinement's class a THIRD
+   time would win from anywhere and make the ordering habit unnecessary, but it turns every base
+   rule into something the guard reads as dead, so the habit is the cheaper half of that trade.
 
    The token block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down
    the tree, and several surfaces are portalled OUT of the board root — the card context menu and
@@ -1838,6 +1841,10 @@
   text-decoration: line-through;
   color: var(--text-muted);
 }
+/* The empty-state row in either list is a bare `<li class="folia-muted">`, and `.folia-muted` is
+   doubled, so it takes the smaller italic size from this rule's `md`. That is the intent — the
+   placeholder should recede — and it is recorded here because a sweep for dead declarations finds
+   it and would otherwise find it again every time. */
 .folia-comments li,
 .folia-history li {
   display: flex;
