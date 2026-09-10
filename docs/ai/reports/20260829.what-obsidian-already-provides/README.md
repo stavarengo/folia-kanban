@@ -90,13 +90,13 @@ Ordered by what the gap costs today. Items marked **bug** are wrong behaviour a 
 6. **06-04** (clear win) — **bug.** Menus, the modal and the panel's listeners use `activeDocument`, which follows the focused window rather than the board that owns them. Confirmed live: with the Settings window focused, the column popover rendered into that window.
 7. **07-01** (trade-off) — `manifest.json` sets `isDesktopOnly: false` while the plugin dynamically imports the Node `http` builtin. The gating is correct and the submission requirement still says "must"; the reasoning exists only as a code comment.
 8. **07-02** (trade-off) — the MCP bearer token is stored in `data.json` in the clear, so a credential for a server bound to one machine travels with the vault. `App.secretStorage` (1.11.4) is the written answer.
-9. **05-02** (clear win) — **bug.** Every "Open note" affordance ignores modifier keys, so Ctrl/Cmd-click cannot open a card in a new tab, split or window the way it does everywhere else in Obsidian.
+9. **05-02** (clear win) — **bug.** Every "Open note" affordance ignores modifier keys, so Ctrl/Cmd-click cannot open a card in a new tab, split or window the way it does everywhere else in Obsidian. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 10. **04-01** (trade-off) — **bug.** The wikilink resolver is hand-written, has no `sourcePath`, never consults `aliases`, and silently drops a relationship when two cards share a basename.
 11. **04-06** (trade-off) — **bug.** Card tags are read only from the `tags` frontmatter key, so a card tagged in its body is invisible to the board's own tag filter with nothing telling the user why.
 12. **02-25** (trade-off) — **bug.** Folia's z-index ladder shares the numeric space with Obsidian's `--layer-*` scale, with five exact collisions. Confirmed live: Obsidian's tooltip (layer 70) paints over an open Folia menu (60).
 13. **04-15** (trade-off) — **bug.** The checklist parser accepts only `[ ]`, `[x]` and `[X]`, so a card using any other checkbox character loses its subtask state.
 14. **02-10** (trade-off) — the raw-value audit's pixel detector is `\d{2,}px`, so every single-digit px value passes unseen, and the waiver retired on "nothing remains to migrate" was signed off against that overstated coverage.
-15. **05-03** (clear win) — **bug.** The detail panel's rendered links have no hover preview, because the view is never registered as a hover-link source.
+15. **05-03** (clear win) — **bug.** The detail panel's rendered links have no hover preview, because the view is never registered as a hover-link source. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 
 ## Governance findings
 
@@ -169,7 +169,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.27](../../backlog/20260829.27.the-adapter-takes-the-long-way-round-the-vault-api.md) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |
 | [20260829.28](../../backlog/20260829.28.the-board-takes-over-markdown-opens-by-patching-a-core-prototype.md) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
 | [20260829.29](../../backlog/20260829.29.main-diverges-from-four-workspace-and-settings-conventions.md) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
-| [20260829.30](../../backlog/20260829.30.opening-a-card-note-is-not-a-link-navigation.md) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
+| 20260829.30 (fixed, entry closed) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
 | 20260829.31 (fixed, entry closed) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
 | 20260829.32 (fixed, entry closed) | The MCP bearer token travelling with the vault | 07-02 |
 | [20260829.33](../../backlog/20260829.33.the-release-path-and-the-directory-guards-do-not-check-what-they-claim.md) | What the release path and the directory guards never check | 07-03, 07-04, 07-12, 07-13, 07-14, 07-15, 07-17 |
