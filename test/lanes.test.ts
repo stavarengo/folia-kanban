@@ -4,11 +4,8 @@ import {
   drawnInColumn,
   drawnPaths,
   fallbackColumnOf,
-  laneOf,
   laneRefusal,
-  lanesOf,
   prospectiveCard,
-  strandedLanePaths,
 } from "../src/model/lanes";
 import type { MatchContext } from "../src/model/filter";
 import { BLOCKS } from "../src/model/relationships";
@@ -48,10 +45,11 @@ function card(basename: string, fm: Partial<Card["frontmatter"]> = {}): Card {
 describe("what a column is", () => {
   it("reads a column with a rule as a lane and one without as plain", () => {
     const b = buildBoard(laned, []);
-    expect(lanesOf(b).map((l) => l.columnId)).toEqual(["research"]);
-    expect(laneOf(b, "research")?.rule).toBe("area:research");
-    expect(laneOf(b, "todo")).toBeNull();
-    expect(laneOf(b, "nosuchcolumn")).toBeNull();
+    // A lane draws by its rule from every bucket; a plain column draws its own and nothing else.
+    const withCards = buildBoard(laned, [card("Hit", { status: "todo", area: "research" })]);
+    expect(drawnPaths(withCards, "research", ctx)).toEqual(["Tasks/Hit.md"]);
+    expect(drawnPaths(withCards, "done", ctx)).toEqual([]);
+    expect(drawnPaths(b, "nosuchcolumn", ctx)).toEqual([]);
   });
 
   it("falls back to the first column that is not itself a lane", () => {
@@ -87,7 +85,6 @@ describe("what a column draws", () => {
       card("Drawn", { status: "research", area: "research" }),
       card("Plain", { status: "todo" }),
     ]);
-    expect(strandedLanePaths(b, ctx)).toEqual(["Tasks/Stranded.md"]);
     expect(drawnPaths(b, "todo", ctx)).toEqual(["Tasks/Plain.md", "Tasks/Stranded.md"]);
     // The stranded card is not smuggled into every plain column, only the fallback one.
     expect(drawnPaths(b, "done", ctx)).toEqual([]);
@@ -97,7 +94,7 @@ describe("what a column draws", () => {
   it("has nowhere to put it when every column carries a rule", () => {
     const allLanes: BoardConfig = { ...base, columns: [laned.columns[1]!] };
     const b = buildBoard(allLanes, [card("Stranded", { status: "research", area: "home" })]);
-    expect(strandedLanePaths(b, ctx)).toEqual(["Tasks/Stranded.md"]);
+    expect(fallbackColumnOf(b)).toBeUndefined();
     expect(drawnPaths(b, "research", ctx)).toEqual([]);
   });
 });
@@ -212,7 +209,6 @@ describe("filing a card into a column", () => {
     const board = buildBoard(perReader, [card("Msg", { status: "inbox" })]);
     // Without a reader the rule cannot be judged, so the card is not declared stranded and not
     // moved to the fallback column on a guess — it stays listed under the lane its status names.
-    expect(strandedLanePaths(board, ctx)).toEqual([]);
     expect(drawnPaths(board, "inbox", ctx)).toEqual(["Tasks/Msg.md"]);
     expect(drawnPaths(board, "todo", ctx)).toEqual([]);
   });

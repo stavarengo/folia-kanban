@@ -395,13 +395,16 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   );
 
   const moveTo = useCallback(
-    async (path: string, columnId: string) => {
+    async (path: string, columnId: string): Promise<boolean> => {
       const b = boardRef.current;
-      if (!b) return;
+      if (!b) return false;
       const card = b.cards[path];
-      if (card && refusedByLane(columnId, card)) return;
+      // Answered, not swallowed: a caller that reports success afterwards must not report it over
+      // a refusal that already said the opposite.
+      if (card && refusedByLane(columnId, card)) return false;
       try {
         await moveCardTo(repo, b, { path, columnId });
+        return true;
       } finally {
         await load();
       }
@@ -545,7 +548,9 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         if (!doneColumnId) return;
         const title = boardRef.current?.cards[path]?.title ?? "Card";
         void moveTo(path, doneColumnId)
-          .then(() => showToast(`${title} — done!`))
+          .then((moved) => {
+            if (moved) showToast(`${title} — done!`);
+          })
           .catch(reportError);
       },
       remove: (path) => {
@@ -801,8 +806,17 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         const neighbor =
           [...cols.slice(0, idx)].reverse().find((c) => !c.filter) ??
           cols.slice(idx + 1).find((c) => !c.filter);
-        if (!neighbor) return; // every other column is a lane: nowhere to rehome them honestly
         const orphans = b.columns[id] ?? [];
+        // An empty column needs no home for anything and just goes. A column with cards and no
+        // plain column left to take them cannot be deleted without stranding them, and says so
+        // rather than doing nothing.
+        if (!neighbor && orphans.length > 0) {
+          showToast(
+            `"${cols[idx]?.title ?? id}" still holds cards, and every other column is filled by a rule rather than by status — there is nowhere to move them. Move them yourself first, or add a plain column.`,
+            "error",
+          );
+          return;
+        }
         void (async () => {
           // Reassign this column's items to a neighbour so none are orphaned — cards through their
           // frontmatter, placed inline todos through their own checklist line.
@@ -810,6 +824,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           // the column is about to go, and an item left claiming it would be stranded quietly.
           let stranded: unknown;
           for (const p of orphans) {
+            if (!neighbor) break;
             const mut = reassignColumn(b, p, neighbor.id);
             if (!mut) continue;
             try {

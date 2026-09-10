@@ -3229,6 +3229,74 @@ describe("cross-column make-room (live relocation gap)", () => {
     await user.keyboard("{Escape}"); // clean up the active drag
   });
 
+  it("refuses a drop into a lane the card does not match, and snaps the card back", async () => {
+    // The headline gesture: Doing carries a rule Alpha fails, so the drop writes nothing, says why,
+    // and the card returns to Todo rather than staying in the make-room gap the drag opened.
+    placeCards();
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "doing", title: "Doing", filter: "area:research" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": { fm: { type: "task", status: "todo", order: 1 }, body: "\n# Alpha\n" },
+      },
+    );
+    render_(repo);
+    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    main.focus();
+    await user.keyboard("{ }");
+    await crossIntoDoing(user);
+    // Mid-drag the card has left Todo's bucket, and a lane draws only by its rule, so nothing shows
+    // it in place — this is exactly the state a refusal must not leave behind.
+    await waitFor(() => expect(cardsIn("Todo")).not.toContain("Tasks/Alpha.md"));
+    await user.keyboard("{ }"); // drop it
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
+    // Back where it started, not left behind in the gap.
+    await waitFor(() => expect(cardsIn("Todo")).toContain("Tasks/Alpha.md"));
+    expect(cardsIn("Doing")).not.toContain("Tasks/Alpha.md");
+  });
+
+  it("lets the same drop through once the card matches the lane's rule", async () => {
+    placeCards();
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "doing", title: "Doing", filter: "area:research" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo", order: 1, area: "research" },
+          body: "\n# Alpha\n",
+        },
+      },
+    );
+    render_(repo);
+    // Matching the rule, Alpha is already drawn twice — in Todo and in the lane. Drag the Todo one.
+    await screen.findAllByText("Alpha");
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    const main = within(todoCol).getByText("Alpha").closest(".folia-card-main") as HTMLElement;
+    main.focus();
+    await user.keyboard("{ }");
+    await crossIntoDoing(user);
+    await user.keyboard("{ }");
+
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("doing"));
+    expect(screen.queryByText(/does not match it/)).toBeNull();
+  });
+
   it("persists the cross-column move on drop (Alpha's status becomes doing)", async () => {
     placeCards();
     const user = userEvent.setup();
@@ -4287,6 +4355,56 @@ describe("the detail panel reports a failed write", () => {
     expect(created).toEqual([]);
     // The form stays put, exactly as it does after any other refused create.
     expect(within(detail).getByLabelText("New card title")).toHaveValue("Nowhere");
+  });
+
+  it("does not claim a card is done when the done column refused it", async () => {
+    const user = userEvent.setup();
+    // A board whose Done column carries a rule: marking a card done writes nothing, so the toast
+    // must be the refusal and never the cheerful "— done!".
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "done", title: "Done", filter: "priority:high" },
+        ],
+      },
+      { "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" } },
+    );
+    render_(repo);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+
+    await user.click(screen.getByLabelText('Mark "Alpha" done'));
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(screen.queryByText(/— done!/)).toBeNull();
+    expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
+  });
+
+  it("still deletes an empty column when every other column is a lane", async () => {
+    const user = userEvent.setup();
+    // Nothing to rehome means no neighbour is needed: refusing here would be a column that cannot
+    // be deleted for a reason that does not apply to it.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": { fm: { type: "task", status: "research", area: "research" }, body: "" },
+      },
+    );
+    render_(repo);
+    await screen.findByText("Research");
+
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.queryByText("Todo")).toBeNull());
   });
 
   it("refuses to give a checklist line a column a lane would not draw it in", async () => {

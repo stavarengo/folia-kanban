@@ -252,17 +252,23 @@ export function Column({
   // the model reads the board as saved. The lane pull and the stranded fallback are unaffected by a
   // drag preview, so they come straight from the model. Memoized: a lane walks every bucket, and a
   // keystroke in the search box must not pay for that.
+  // Only a lane and the fallback column are ever given cards from outside their own bucket, so no
+  // other column asks the model at all — for them the bucket the prop carries IS the answer.
+  const isFallback = !columnFilter && fallbackColumnOf(board) === column.id;
+  const asksTheModel = columnFilter != null || isFallback;
   const modelPaths = useMemo(
-    () => drawnPaths(board, column.id, matchCtx),
-    [board, column.id, matchCtx],
+    () => (asksTheModel ? drawnPaths(board, column.id, matchCtx) : []),
+    [asksTheModel, board, column.id, matchCtx],
   );
   const ownPaths = cardPaths.filter((p) => board.cards[p]);
-  // Only the fallback column is ever given cards from outside its own bucket, so no other column
-  // pays for the comparison.
-  const isFallback = !columnFilter && fallbackColumnOf(board) === column.id;
-  const stranded = isFallback
-    ? modelPaths.filter((p) => !(board.columns[column.id] ?? []).includes(p))
-    : [];
+  // A lane's whole population is the model's answer. A plain column keeps the bucket the prop
+  // carries — that is the one a drag in flight shows relocated — and the fallback column adds the
+  // cards the model gives it from outside that bucket.
+  const stranded = useMemo(() => {
+    if (!isFallback) return [];
+    const own = new Set(board.columns[column.id] ?? []);
+    return modelPaths.filter((p) => !own.has(p));
+  }, [board, column.id, isFallback, modelPaths]);
   const lanePaths = columnFilter
     ? modelPaths
     : stranded.length

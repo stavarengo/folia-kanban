@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { boardMatchContext, columnOf } from "../model/board";
+import type { MatchContext } from "../model/filter";
 import { laneMismatch, laneVerdict, prospectiveCard } from "../model/lanes";
 import type { Board, Card } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
@@ -117,15 +118,24 @@ function refuseArrayForScalarKey(key: string, value: unknown): void {
  * blocking a legitimate move over a rule you cannot read is worse than the write it prevents. Those
  * keep the warning this tool has always returned.
  */
-function refuseLaneMismatch(board: Board, columnId: string, card: Card, next: string): void {
-  const check = laneVerdict(board, columnId, card, boardMatchContext(board));
+function refuseLaneMismatch(
+  board: Board,
+  target: { columnId: string; card: Card; ctx: MatchContext },
+  next: string,
+): void {
+  const check = laneVerdict(board, target.columnId, target.card, target.ctx);
   if (check?.verdict !== "rejects") return;
-  throw new ToolError(`${laneMismatch(check.lane, card)} ${next}`);
+  throw new ToolError(`${laneMismatch(check.lane, target.card)} ${next}`);
 }
 
 /** What remains to be said about a lane whose rule this server cannot fully evaluate. */
-function laneWarning(board: Board, columnId: string, card: Card): string | undefined {
-  const check = laneVerdict(board, columnId, card, boardMatchContext(board));
+function laneWarning(
+  board: Board,
+  columnId: string,
+  card: Card,
+  ctx: MatchContext,
+): string | undefined {
+  const check = laneVerdict(board, columnId, card, ctx);
   if (check?.verdict !== "unknown") return undefined;
   return `Column "${columnId}" is filled by the rule \`${check.lane.rule}\`, not by a card's status, and part of that rule reads state this server cannot see — which comments a person has read, or who "me" is. The board draws this card there only if it really matches; check it with get_board.`;
 }
@@ -246,14 +256,14 @@ const createCard = tool({
     // put to the card `createCard` is about to write: a rule asking for a field this call has no way
     // to set is a rule the new card cannot satisfy.
     if (args.description !== undefined) refuseUnsafeDescription(args.description);
+    const laneCtx = boardMatchContext(board);
     const willBe = prospectiveCard(args.title, args.column, {
       ...(args.priority === undefined ? {} : { priority: args.priority }),
       ...(args.due === undefined ? {} : { due: args.due }),
     });
     refuseLaneMismatch(
       board,
-      args.column,
-      willBe,
+      { columnId: args.column, card: willBe, ctx: laneCtx },
       "No card was created. Create it in a column with no rule of its own and give it what the rule asks for with update_card, or pass the fields the rule wants to this call.",
     );
     const path = await repo.createCard(args.title, args.column);
@@ -271,7 +281,7 @@ const createCard = tool({
         `Card "${path}" was created in "${args.column}", but filling in its fields failed: ${e instanceof Error ? e.message : String(e)}. The card is on the board — finish it with update_card rather than creating it again.`,
       );
     }
-    const warning = laneWarning(board, args.column, willBe);
+    const warning = laneWarning(board, args.column, willBe, laneCtx);
     return { path, column: args.column, ...(warning === undefined ? {} : { warning }) };
   },
 });
@@ -298,11 +308,11 @@ const moveCard = tool({
     const path = resolveCardPath(board, args.card);
     refuseSlotForChecklistLine(board, path, args);
     const card = board.cards[path];
+    const laneCtx = boardMatchContext(board);
     if (card) {
       refuseLaneMismatch(
         board,
-        args.column,
-        card,
+        { columnId: args.column, card, ctx: laneCtx },
         "Nothing was moved. Give the card what the rule asks for with update_card first, or move it to a column with no rule of its own.",
       );
     }
@@ -318,7 +328,7 @@ const moveCard = tool({
     }
     const after = await repo.loadBoard();
     const slot = (after.columns[args.column] ?? []).indexOf(path);
-    const warning = card ? laneWarning(board, args.column, card) : undefined;
+    const warning = card ? laneWarning(board, args.column, card, laneCtx) : undefined;
     return {
       path,
       column: landedColumn(after, path),

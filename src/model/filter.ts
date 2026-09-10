@@ -265,7 +265,7 @@ const TOKEN_RULES: Record<FilterKey, TokenRule> = {
   },
   assignee: {
     test: matchAssignee,
-    answerable: (value, ctx) => value !== "me" || ctx.me !== undefined,
+    answerable: (value, ctx) => value !== "me" || (ctx.me ?? "").trim() !== "",
   },
   due: { test: matchDue },
   is: { test: matchIs, answerable: (_value, ctx) => ctx.relations !== undefined },
