@@ -129,7 +129,11 @@ if (dispatched === undefined) {
 }
 
 console.log(dispatched.url);
-console.log("Watching. The run pauses for your approval in the Actions UI before it releases.");
+console.log(
+  tag === undefined
+    ? "Watching. The run pauses for your approval in the Actions UI before it releases."
+    : "Watching. A republish is not approved again; it runs straight through.",
+);
 
 const watched = gh(["run", "watch", String(dispatched.databaseId), "--exit-status"], {
   inherit: true,

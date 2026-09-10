@@ -21,13 +21,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Superseded pull-request runs are worth nothing, so cancel them. On main a
-  # started run is never cancelled, so nothing interrupts a run that is mid
-  # release or waiting at the approval gate. (A run still *queued* behind it is
-  # a different matter: GitHub keeps one pending run per group and drops the
-  # older one when a newer arrives. That is fine — a queued run has done
-  # nothing, and the next push starts another.)
+  # Pull-request runs share a group per branch and supersede each other, since
+  # only the latest commit matters. Every other run gets a group of its own, so
+  # nothing queues behind anything: a run parked at the approval gate must not
+  # hold up the verification of later pushes, and a queued republish must not be
+  # dropped when an unrelated push arrives (GitHub keeps only one pending run
+  # per group). The release itself is serialised by the release job's own group.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -172,7 +172,15 @@ jobs:
           part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
           SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
 
-          previous=$(git describe --tags --abbrev=0 --match '*.*.*' 2>/dev/null || true)
+          # `--exclude '*-*'` matches .release-it.json's tagExclude, so this and
+          # release-it agree on where the last release was; the assertion after
+          # it refuses to guess if some other dotted tag has landed in between,
+          # which would silently narrow the range the scan below reads.
+          previous=$(git describe --tags --abbrev=0 --match '*.*.*' --exclude '*-*' 2>/dev/null || true)
+          if [ -n "$previous" ] && [[ ! "$previous" =~ $SEMVER ]]; then
+            echo "::error::The nearest tag, '$previous', is not a plain semver release tag, so where the last release ended cannot be established."
+            exit 1
+          fi
           if [ -n "$previous" ]; then
             range="$previous..HEAD"
             since="$previous"
@@ -251,6 +259,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # One release at a time for the whole repository. Two approved runs both
+    # arriving here would otherwise race on the same base commit; queued this
+    # way, the second reaches its guard, sees that main has moved, and stops.
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+
     permissions:
       contents: write
       id-token: write
@@ -261,9 +276,30 @@ jobs:
       url: ${{ steps.publish.outputs.url }}
 
     steps:
+      # Before the checkout, because the checkout is handed this value: a
+      # malformed input should be refused by name, not turn into a "ref not
+      # found" from an action that never got to say what was wrong.
+      - name: Validate the republish input
+        if: ${{ inputs.tag != '' }}
+        shell: bash
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          # Plain semver only (no "v" prefix) — matches manifest.version and the
+          # release-it tag contract. Same grammar as the plan job and
+          # scripts/bump-plugin-version.mjs.
+          part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+          SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
+          if [[ ! "$TAG_INPUT" =~ $SEMVER ]]; then
+            echo "::error::'$TAG_INPUT' is not a plain semver release tag (e.g. 1.2.3)."
+            exit 1
+          fi
+
       # main, not github.sha: .release-it.json requires the branch and its
       # upstream, and a detached HEAD has neither. The guard below turns that
-      # into the "did main move while approval waited" check.
+      # into the "did main move while approval waited" check. The republish ref
+      # is spelled out in full, so a branch that happens to share the tag's name
+      # cannot be checked out in its place.
       #
       # Still no persisted credentials, even though this is the job that pushes.
       # The push token is injected in the release step alone, so it is not in
@@ -271,7 +307,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || 'main' }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || 'main' }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -283,19 +319,16 @@ jobs:
           git fetch --no-tags origin main
 
           if [ -n "$TAG_INPUT" ]; then
-            # Plain semver only (no "v" prefix) — matches manifest.version and
-            # the release-it tag contract. Same grammar as the plan job and
-            # scripts/bump-plugin-version.mjs.
-            part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
-            SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
-            if [[ ! "$TAG_INPUT" =~ $SEMVER ]]; then
-              echo "::error::'$TAG_INPUT' is not a plain semver release tag (e.g. 1.2.3)."
-              exit 1
-            fi
             # Only republish tags whose commit is on main, so a stray tag on an
             # unmerged or forked commit cannot reach the directory.
-            if ! git merge-base --is-ancestor "$TAG_INPUT^{commit}" FETCH_HEAD; then
+            if ! git merge-base --is-ancestor "refs/tags/$TAG_INPUT^{commit}" FETCH_HEAD; then
               echo "::error::Tag '$TAG_INPUT' is not reachable from origin/main; refusing to republish."
+              exit 1
+            fi
+            # ...and only the commit that tag names: everything below is built
+            # from the working tree, so the tree has to be that commit.
+            if [ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/tags/$TAG_INPUT^{commit}")" ]; then
+              echo "::error::The checkout is not the commit tag '$TAG_INPUT' points at; refusing to republish."
               exit 1
             fi
             echo "Republishing the existing tag $TAG_INPUT."
@@ -457,12 +490,15 @@ jobs:
           PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
           NOTES: ${{ steps.notes.outputs.file }}
         run: |
-          # Reusing an existing release is what makes the republish path a
-          # recovery rather than a second attempt at the same create.
+          # Created as a draft, published in the last step once all three assets
+          # are on it: a release the directory can see with a file missing is
+          # worse than one that appears a minute later. Reusing an existing
+          # release is what makes the republish path a recovery rather than a
+          # second attempt at the same create.
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Reusing the existing GitHub release for $TAG."
           else
-            args=("$TAG" --title "$TAG")
+            args=("$TAG" --title "$TAG" --draft)
 
             if [ -n "$NOTES" ]; then
               args+=(--notes-file "$NOTES")
@@ -487,6 +523,16 @@ jobs:
           TAG: ${{ steps.resolve.outputs.tag }}
         run: gh release upload "$TAG" dist/main.js dist/manifest.json dist/styles.css --clobber
 
+      # Only now is the release worth looking at. This also repairs a release
+      # left as a draft, or flagged the wrong way, by a run that died between
+      # the two steps above — which is the case the republish path exists for.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+        run: gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE"
+
   announce:
     name: Announce
     needs: release
@@ -510,6 +556,7 @@ jobs:
           else
             body="$RUNNER_TEMP/portal-response"
             status=$(curl --silent --location --output "$body" --write-out '%{http_code}' \
+              --connect-timeout 10 --max-time 60 \
               --header "Cookie: $PORTAL_COOKIE" \
               https://community.obsidian.md/account/plugins/folia-kanban/check-release) || status="000"
 
@@ -550,6 +597,7 @@ jobs:
           text=$(printf 'folia-kanban %s is released.\n%s\nCommunity portal: %s' "$VERSION" "$URL" "$PORTAL")
 
           if ! curl --silent --fail --output /dev/null --request POST \
+            --connect-timeout 10 --max-time 30 \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
             --data-urlencode "text=$text"; then
