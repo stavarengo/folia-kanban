@@ -28,7 +28,7 @@ import {
   subtaskRef,
   subtreePaths,
 } from "../src/model/board";
-import type { Board, BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
+import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
 import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {
@@ -258,16 +258,13 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       { id: "research", title: "Research", filter: "area:research" },
     ],
   };
-  /** The rules for a board with nothing collapsed and no lane pulling anything, unless overridden. */
+  /** The rules for a board with nothing collapsed, unless overridden. Lane rules are the model's. */
   const rules = (over: Partial<FilterVisibility> = {}): FilterVisibility => ({
     matches: () => true,
     showsChildren: () => true,
-    laneDraws: () => false,
+    ctx: { today: "2026-09-10", doneColumnId: "done", relations: {} },
     ...over,
   });
-  /** The lane rule of `laneConfig`, applied for real: `area: research`. */
-  const researchLane = (b: Board) => (columnId: string, path: string) =>
-    columnId === "research" && b.cards[path]?.frontmatter.area === "research";
 
   it("always includes a card standing in a plain column, filter or not", () => {
     // Solo stands on its own; Placed is a subcard whose own status puts it in a column of its own,
@@ -288,9 +285,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     // and pulls by its rule, which this card fails. The board's first plain column takes it in
     // instead of the card being drawn nowhere, so the tally may count it.
     const b = buildBoard(laneConfig, [card("Stray", { status: "research", area: "home" })]);
-    expect(filterVisiblePaths(b, rules({ laneDraws: researchLane(b) })).has("Tasks/Stray.md")).toBe(
-      true,
-    );
+    expect(filterVisiblePaths(b, rules()).has("Tasks/Stray.md")).toBe(true);
   });
 
   it("excludes it when the board has no plain column to fall back to", () => {
@@ -303,16 +298,12 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       ],
     };
     const b = buildBoard(allLanes, [card("Stray", { status: "research", area: "home" })]);
-    expect(filterVisiblePaths(b, rules({ laneDraws: () => false })).has("Tasks/Stray.md")).toBe(
-      false,
-    );
+    expect(filterVisiblePaths(b, rules()).has("Tasks/Stray.md")).toBe(false);
   });
 
   it("includes a card in a lane's bucket that the lane does pull in", () => {
     const b = buildBoard(laneConfig, [card("Real", { status: "research", area: "research" })]);
-    expect(filterVisiblePaths(b, rules({ laneDraws: researchLane(b) })).has("Tasks/Real.md")).toBe(
-      true,
-    );
+    expect(filterVisiblePaths(b, rules()).has("Tasks/Real.md")).toBe(true);
   });
 
   it("includes a card another lane pulls in, though its own status names a lane that will not", () => {
@@ -328,9 +319,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       ],
     };
     const b = buildBoard(twoLanes, [card("Cross", { status: "laneA", area: "bbb" })]);
-    const laneRules = (columnId: string, path: string) =>
-      b.cards[path]?.frontmatter.area === (columnId === "laneA" ? "aaa" : "bbb");
-    expect(filterVisiblePaths(b, rules({ laneDraws: laneRules })).has("Tasks/Cross.md")).toBe(true);
+    expect(filterVisiblePaths(b, rules()).has("Tasks/Cross.md")).toBe(true);
   });
 
   it("includes a matching nested card whose non-matching parent lifts it", () => {
@@ -350,7 +339,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       card("Root", { status: "research", area: "research" }, ["Child"]),
       card("Child", {}),
     ]);
-    const visible = filterVisiblePaths(b, rules({ laneDraws: researchLane(b) }));
+    const visible = filterVisiblePaths(b, rules());
     expect(visible.has("Tasks/Root.md")).toBe(true);
     expect(visible.has("Tasks/Child.md")).toBe(true);
   });
@@ -361,7 +350,7 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
       card("Child", {}),
     ]);
     const matches = (p: string) => p === "Tasks/Child.md";
-    const visible = filterVisiblePaths(b, rules({ matches, laneDraws: researchLane(b) }));
+    const visible = filterVisiblePaths(b, rules({ matches }));
     expect(visible.has("Tasks/Child.md")).toBe(false); // would need a lift, but its column is a lane
   });
 

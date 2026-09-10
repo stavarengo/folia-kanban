@@ -20,7 +20,7 @@ import type {
 } from "./types";
 import { dateOnly } from "./dates";
 import type { MatchContext } from "./filter";
-import { fallbackColumnOf } from "./lanes";
+import { isDrawnSomewhere } from "./lanes";
 import { BLOCKS, readInverse, readRelations } from "./relationships";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
@@ -709,14 +709,13 @@ export function boardMatchContext(board: Board, today = dateOnly()): MatchContex
 
 /** What the UI knows and the model cannot work out for itself, injected into `filterVisiblePaths`. */
 export interface FilterVisibility {
-  /** Does this card match the active filter on its own merits? (The filter grammar lives in the UI.) */
+  /** Does this card match the active filter on its own merits? */
   matches: (path: string) => boolean;
   /** Is this card drawing the group of subcards nested under it, or is it collapsed? */
   showsChildren: (path: string) => boolean;
-  /** Does the filter-lane column `columnId` pull this card into itself? A lane's population is its
-   *  own rule applied to every card standing in a column (never to nested ones), which is again
-   *  UI-side filter grammar. Only ever asked about a card that is in some column's bucket. */
-  laneDraws: (columnId: string, path: string) => boolean;
+  /** What a lane's rule is judged against — the same context the board draws with, so the tally
+   *  and the columns can never disagree about whether a lane holds a card. */
+  ctx: MatchContext;
 }
 
 /**
@@ -749,14 +748,12 @@ export function filterVisiblePaths(board: Board, rules: FilterVisibility): Set<s
   for (const [colId, paths] of Object.entries(board.columns)) {
     for (const p of paths) columnOfPath[p] = colId;
   }
-  const fallback = fallbackColumnOf(board);
+  // Asked of the model, not restated here: `isDrawnSomewhere` is the same rule the columns draw by,
+  // including the fallback column and the lane rules this caller cannot evaluate.
   const drawnInItsBucket = (path: string): boolean => {
     const col = columnOfPath[path];
     if (col === undefined || !laneColumnIdSet.has(col)) return true;
-    if (laneColumnIds.some((id) => rules.laneDraws(id, path))) return true;
-    // Drawn by no lane, so the fallback column takes it in (`strandedLanePaths`) — unless the board
-    // has no plain column to fall back to, and then it really is drawn nowhere.
-    return fallback !== undefined;
+    return isDrawnSomewhere(board, path, rules.ctx);
   };
   const memo = new Map<string, boolean>();
   const visible = (path: string): boolean => {

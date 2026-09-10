@@ -139,8 +139,12 @@ function standing(board: Board): { path: string; columnId: string }[] {
  *
  * An empty result means nothing draws the card — what {@link fallbackColumnOf} exists to catch.
  */
-function drawnBy(board: Board, card: Card, standsIn: string, ctx: MatchContext): string[] {
-  const lanes = lanesOf(board);
+function drawnBy(
+  lanes: readonly Lane[],
+  card: Card,
+  standsIn: string,
+  ctx: MatchContext,
+): string[] {
   const pulled = lanes
     .filter((lane) => {
       const verdict = judgeCard(card, lane.filter, ctx);
@@ -158,11 +162,12 @@ function drawnBy(board: Board, card: Card, standsIn: string, ctx: MatchContext):
  * in, and the only cards a plain column is ever given from outside its own bucket.
  */
 function strandedLanePaths(board: Board, ctx: MatchContext): string[] {
-  if (lanesOf(board).length === 0) return [];
+  const lanes = lanesOf(board);
+  if (lanes.length === 0) return [];
   const out: string[] = [];
   for (const { path, columnId } of standing(board)) {
     const card = board.cards[path];
-    if (card && drawnBy(board, card, columnId, ctx).length === 0) out.push(path);
+    if (card && drawnBy(lanes, card, columnId, ctx).length === 0) out.push(path);
   }
   return out;
 }
@@ -175,10 +180,11 @@ export function drawnPaths(board: Board, columnId: string, ctx: MatchContext): s
   const column = board.config.columns.find((c) => c.id === columnId);
   if (!column) return [];
   if (column.filter) {
+    const lanes = lanesOf(board);
     const out: string[] = [];
     for (const { path, columnId: from } of standing(board)) {
       const card = board.cards[path];
-      if (card && drawnBy(board, card, from, ctx).includes(columnId)) out.push(path);
+      if (card && drawnBy(lanes, card, from, ctx).includes(columnId)) out.push(path);
     }
     return out;
   }
@@ -203,7 +209,7 @@ export function drawnInColumn(
   if (!column) return null;
   const card = board.cards[path];
   if (!card) return null;
-  return drawnBy(board, card, column.id, ctx)[0] ?? fallbackColumnOf(board) ?? null;
+  return drawnBy(lanesOf(board), card, column.id, ctx)[0] ?? fallbackColumnOf(board) ?? null;
 }
 
 /**
@@ -228,4 +234,21 @@ export function prospectiveCard(
     frontmatter: { type: "task", status: columnId, created: dateOnly(), ...fields },
     childLinks: [],
   };
+}
+
+/**
+ * Is this card drawn anywhere on the board? False only for one it would show nowhere at all.
+ *
+ * The tally asks this rather than resolving lane rules itself: two answers to "does a lane draw
+ * this" is how a toolbar comes to say "0 of 1" beside a tile the user can plainly see.
+ */
+export function isDrawnSomewhere(board: Board, path: string, ctx: MatchContext): boolean {
+  const standsIn = board.config.columns.find((c) => (board.columns[c.id] ?? []).includes(path));
+  if (!standsIn) return false;
+  const card = board.cards[path];
+  if (!card) return false;
+  return (
+    drawnBy(lanesOf(board), card, standsIn.id, ctx).length > 0 ||
+    fallbackColumnOf(board) !== undefined
+  );
 }

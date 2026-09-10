@@ -921,14 +921,6 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   );
   matchCtxRef.current = matchCtx;
 
-  // Each filter-lane column's rule, parsed once per board rather than per keystroke: the tally has
-  // to ask whether a lane draws a given card, and a lane's population is its rule, not its bucket.
-  const laneFilters = useMemo(() => {
-    const out = new Map<string, ReturnType<typeof parseFilter>>();
-    for (const c of board?.config.columns ?? []) if (c.filter) out.set(c.id, parseFilter(c.filter));
-    return out;
-  }, [board]);
-
   const counts = useMemo(() => {
     let total = 0;
     let match = 0;
@@ -947,11 +939,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       const visible = filterVisiblePaths(board, {
         matches: matchesFilter,
         showsChildren: (p) => !isCollapsedIn(settings, p),
-        laneDraws: (columnId, p) => {
-          const rule = laneFilters.get(columnId);
-          const c = board.cards[p];
-          return rule != null && c != null && matchCard(c, rule, matchCtx);
-        },
+        ctx: matchCtx,
       });
       for (const path of Object.keys(board.cards)) {
         total++;
@@ -959,7 +947,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       }
     }
     return { total, match };
-  }, [board, filter, matchCtx, settings, laneFilters]);
+  }, [board, filter, matchCtx, settings]);
 
   // "/" focuses the search box, as the placeholder advertises. The host decides WHEN the key is
   // this board's — only it knows which leaf has focus — and the board decides whether it wants it,

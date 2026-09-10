@@ -4357,6 +4357,64 @@ describe("the detail panel reports a failed write", () => {
     expect(within(detail).getByLabelText("New card title")).toHaveValue("Nowhere");
   });
 
+  it("refuses the panel's own Status field when the target column is a lane", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo", area: "home" },
+          body: "\n# Alpha\n",
+        },
+      },
+    );
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+
+    await user.selectOptions(within(detail).getByLabelText("Status"), "research");
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
+  });
+
+  it("refuses giving a subcard a lane's column from the panel", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/Root.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Root\n\n## Subtasks\n- [ ] [[Kid]]\n",
+        },
+        "Tasks/Kid.md": { fm: { type: "task", area: "home" }, body: "\n# Kid\n" },
+      },
+    );
+    render_(repo);
+    await user.click(await screen.findByText("Root", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+
+    await user.selectOptions(
+      await within(detail).findByLabelText("Column for [[Kid]]"),
+      "research",
+    );
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Kid.md")?.fm["status"]).toBeUndefined();
+  });
+
   it("does not claim a card is done when the done column refused it", async () => {
     const user = userEvent.setup();
     // A board whose Done column carries a rule: marking a card done writes nothing, so the toast

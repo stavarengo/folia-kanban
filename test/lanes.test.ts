@@ -4,6 +4,7 @@ import {
   drawnInColumn,
   drawnPaths,
   fallbackColumnOf,
+  isDrawnSomewhere,
   laneRefusal,
   prospectiveCard,
 } from "../src/model/lanes";
@@ -126,6 +127,31 @@ describe("which column a card is drawn in", () => {
   it("names a plain column as itself", () => {
     const b = buildBoard(twoLanes, [card("Plain", { status: "todo" })]);
     expect(drawnInColumn(b, "todo", "Tasks/Plain.md", ctx)).toBe("todo");
+  });
+});
+
+describe("the tally and the board agree", () => {
+  // The toolbar used to resolve lane rules itself, with a matcher that had no notion of "cannot
+  // tell" — so on an all-lanes board with an unreadable rule it counted 0 beside a visible tile.
+  it("counts a card the board draws under a rule this caller cannot read", () => {
+    const allLanes: BoardConfig = {
+      ...base,
+      columns: [{ id: "mine", title: "Mine", filter: "assignee:me" }],
+    };
+    const b = buildBoard(allLanes, [card("Msg", { status: "mine" })]);
+    expect(fallbackColumnOf(b)).toBeUndefined();
+    expect(drawnPaths(b, "mine", ctx)).toEqual(["Tasks/Msg.md"]);
+    expect(isDrawnSomewhere(b, "Tasks/Msg.md", ctx)).toBe(true);
+  });
+
+  it("does not count one no column draws", () => {
+    const allLanes: BoardConfig = {
+      ...base,
+      columns: [{ id: "urgent", title: "Urgent", filter: "priority:high" }],
+    };
+    const b = buildBoard(allLanes, [card("Stray", { status: "urgent", priority: "low" })]);
+    expect(drawnPaths(b, "urgent", ctx)).toEqual([]);
+    expect(isDrawnSomewhere(b, "Tasks/Stray.md", ctx)).toBe(false);
   });
 });
 

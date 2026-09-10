@@ -1571,6 +1571,9 @@ export function CardDetail({
               onChange={(e) =>
                 void mutate(async () => {
                   const status = e.target.value;
+                  // The panel's Status field is a column change like any other, so a lane that
+                  // would not draw the card refuses it here too.
+                  if (card && actions.refusedByLane(status, card)) return;
                   await repo.setFrontmatter(path, { status });
                   // If this card is somebody's subcard, its `- [ ] [[link]]` lines follow the
                   // column, as a dragged tile's would.
@@ -1873,6 +1876,10 @@ export function CardDetail({
                             // is over, so it leaves the checkbox as it is; a named column ticks or
                             // unticks the line, as it does for an inline todo.
                             if (value === "") return repo.unsetFrontmatterKey(child, "status");
+                            // Giving a subcard a column of its own is the same write, judged the
+                            // same way — a lane draws by its rule and takes no card by hand.
+                            const childCard = board.cards[child];
+                            if (childCard && actions.refusedByLane(value, childCard)) return;
                             await repo.setFrontmatter(child, { status: value });
                             const sync = syncSubcardLines(board, child, value);
                             if (sync) await repo.applyMove(sync);
