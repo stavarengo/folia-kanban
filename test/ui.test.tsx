@@ -59,6 +59,44 @@ function fakeHost() {
 }
 
 /**
+ * Swap in a ResizeObserver a test can drive. Records every (observer, target) pair so a test can
+ * fire the one it means — the board watches several boxes at once, and which one moved is the
+ * whole point of most of these assertions.
+ */
+function captureResizeObserver() {
+  const original = globalThis.ResizeObserver;
+  const watches: { target: Element; fire: (entries: Element[]) => void }[] = [];
+  globalThis.ResizeObserver = class {
+    constructor(private cb: ResizeObserverCallback) {}
+    observe(target: Element) {
+      watches.push({
+        target,
+        fire: (entries) =>
+          this.cb(
+            entries.map((t) => ({ target: t }) as ResizeObserverEntry),
+            this as unknown as ResizeObserver,
+          ),
+      });
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  } as unknown as typeof ResizeObserver;
+  return {
+    targets: () => watches.map((w) => w.target),
+    /**
+     * Notify every observer watching `target`, the way one real resize does — the board watches
+     * its root from two places at once. `entries` defaults to that same target.
+     */
+    fire: (target: Element, entries: Element[] = [target]) => {
+      const matching = watches.filter((w) => w.target === target);
+      if (matching.length === 0) throw new Error("nothing is observing that element");
+      act(() => matching.forEach((w) => w.fire(entries)));
+    },
+    restore: () => (globalThis.ResizeObserver = original),
+  };
+}
+
+/**
  * Render the board into a second window, the way Obsidian's pop-out puts a leaf in one. An iframe
  * is the only two-window shape jsdom has, and it is enough: its document has a real `defaultView`
  * with an `innerHeight` of its own, while `activeDocument` (the setup file points it at the main
@@ -360,6 +398,36 @@ describe("status bar clearance", () => {
     expect(clearance()).toBe("0px");
   });
 
+  it("re-asks which bar the window has when the board is moved to another one", async () => {
+    // "Move to new window" carries the board's DOM across without re-rendering it, so nothing in
+    // React marks the move. Without re-resolving, the board keeps the old window's clearance.
+    const observers = captureResizeObserver();
+    try {
+      addStatusBar(document, 25);
+      render_(makeRepo());
+      await screen.findByText("Alpha");
+      const root = document.querySelector(".folia-root") as HTMLElement;
+      expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("31px");
+
+      const home = root.parentElement!;
+      const frame = document.createElement("iframe");
+      document.body.appendChild(frame);
+      const popout = frame.contentDocument!;
+      try {
+        popout.body.appendChild(popout.adoptNode(root));
+        expect(root.ownerDocument).toBe(popout);
+        // The root getting a new box is the only signal the move leaves behind.
+        observers.fire(root);
+        expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
+      } finally {
+        // Hand it back so the render's own teardown still finds what it mounted.
+        home.appendChild(document.adoptNode(root));
+      }
+    } finally {
+      observers.restore();
+    }
+  });
+
   it("reads the bar from the board's own window, not from whichever one has focus", async () => {
     // The pop-out case: the focused window has a status bar, the board's own window has none. The
     // board must reserve nothing, not the 32px the old fallback wrote whenever it found no bar.
@@ -372,35 +440,15 @@ describe("status bar clearance", () => {
 });
 
 describe("card detail — description preview height", () => {
-  /** Swap in a ResizeObserver a test can fire, and record everything it was pointed at. */
-  function captureResizeObserver() {
-    const original = globalThis.ResizeObserver;
-    const seen: { targets: Element[]; fire?: (targets: Element[]) => void } = { targets: [] };
-    globalThis.ResizeObserver = class {
-      constructor(private cb: ResizeObserverCallback) {}
-      observe(target: Element) {
-        seen.targets.push(target);
-        seen.fire = (targets) =>
-          this.cb(
-            targets.map((t) => ({ target: t }) as ResizeObserverEntry),
-            this as unknown as ResizeObserver,
-          );
-      }
-      unobserve(): void {}
-      disconnect(): void {}
-    } as unknown as typeof ResizeObserver;
-    return { seen, restore: () => (globalThis.ResizeObserver = original) };
-  }
-
   /** Open Alpha's panel with the observer captured, and hand back the pieces a test measures. */
   async function openWithObserver() {
-    const captured = captureResizeObserver();
+    const observers = captureResizeObserver();
     const user = userEvent.setup();
     render_(makeRepo());
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     return {
-      ...captured,
+      ...observers,
       preview: detail.querySelector(".folia-desc-view") as HTMLElement,
       panel: detail as HTMLElement,
       root: document.querySelector(".folia-root") as HTMLElement,
@@ -437,18 +485,16 @@ describe("card detail — description preview height", () => {
   });
 
   it("re-measures when the board's own box changes, not only when the window resizes", async () => {
-    const { seen, restore, root, panel, maxH } = await openWithObserver();
+    const { targets, fire, restore, root, panel, maxH } = await openWithObserver();
     try {
       // A split drag resizes the root without touching the window; the panel's own border drag
       // resizes only the panel. Both are watched, and neither is the preview itself, whose size IS
       // the value being set here — observing that would be a feedback loop.
-      expect(seen.targets).toContain(root);
-      expect(seen.targets).toContain(panel);
+      expect(targets()).toContain(root);
+      expect(targets()).toContain(panel);
 
       const before = maxH();
-      withWindowHeight(500, () => {
-        act(() => seen.fire?.([root]));
-      });
+      withWindowHeight(500, () => fire(root));
       expect(maxH()).toBe("476px");
       expect(maxH()).not.toBe(before);
     } finally {
@@ -457,13 +503,11 @@ describe("card detail — description preview height", () => {
   });
 
   it("answers a panel resize only when its width moved, since its height follows the cap", async () => {
-    const { seen, restore, panel, maxH } = await openWithObserver();
+    const { fire, restore, panel, maxH } = await openWithObserver();
     try {
       const before = maxH();
       // The panel growing taller is the panel reacting to the cap. Answering it would loop.
-      withWindowHeight(500, () => {
-        act(() => seen.fire?.([panel]));
-      });
+      withWindowHeight(500, () => fire(panel));
       expect(maxH()).toBe(before);
 
       // A narrower panel can wrap the header above the preview and move it, so that is answered.
@@ -480,9 +524,7 @@ describe("card detail — description preview height", () => {
           y: 0,
         }),
       });
-      withWindowHeight(500, () => {
-        act(() => seen.fire?.([panel]));
-      });
+      withWindowHeight(500, () => fire(panel));
       expect(maxH()).toBe("476px");
     } finally {
       restore();

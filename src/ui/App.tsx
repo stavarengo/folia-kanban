@@ -268,16 +268,36 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   useEffect(() => {
     const root = rootRef.current;
     if (!board || !root) return;
-    const bar = root.ownerDocument.querySelector(".status-bar");
+    let bar: Element | null = null;
+    let barHeight: ResizeObserver | null = null;
     const apply = () => {
       const h = bar?.getBoundingClientRect().height ?? 0;
       root.style.setProperty("--folia-statusbar-clearance", `${h > 0 ? h + 6 : 0}px`);
     };
-    apply();
-    if (!bar) return;
-    const observer = new ResizeObserver(apply);
-    observer.observe(bar);
-    return () => observer.disconnect();
+    const resolve = () => {
+      const found = root.ownerDocument.querySelector(".status-bar");
+      if (found !== bar) {
+        barHeight?.disconnect();
+        barHeight = null;
+        bar = found;
+        if (bar) {
+          barHeight = new ResizeObserver(apply);
+          barHeight.observe(bar);
+        }
+      }
+      apply();
+    };
+    resolve();
+    // "Move to new window" carries the board's DOM across without re-rendering it, so React never
+    // hears that the board is somewhere else now — but the root gets a new box on the way, which
+    // is the one signal that outlives the move. Re-asking which bar this window has, rather than
+    // re-measuring the old one, is what makes a board keep the right clearance in either window.
+    const place = new ResizeObserver(resolve);
+    place.observe(root);
+    return () => {
+      place.disconnect();
+      barHeight?.disconnect();
+    };
   }, [board]);
 
   const onMove = useCallback(
