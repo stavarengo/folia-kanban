@@ -41,16 +41,50 @@ const parseTag = (argv) => {
   die("Usage: pnpm dev:helpers:release [--tag <existing tag to republish>]");
 };
 
+// The same grammar the workflow enforces (and scripts/bump-plugin-version.mjs
+// writes), so a typo is refused here rather than three minutes into a run.
+const IDENTIFIER = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const TAG = new RegExp(
+  String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-${IDENTIFIER}(?:\.${IDENTIFIER})*)?$`,
+);
+
 const tag = parseTag(process.argv.slice(2));
-if (tag !== undefined && !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tag)) {
+if (tag !== undefined && !TAG.test(tag)) {
   die(`"${tag}" is not a plain semver tag (e.g. 1.2.3). The pipeline would refuse it.`);
 }
 
 gh(["--version"]);
 if (gh(["auth", "status", "--hostname", "github.com"]).status !== 0) die(GH_UNAUTHENTICATED);
 
-// Runs dispatched before this moment belong to someone else.
-const dispatchedAt = Date.now();
+const me = gh(["api", "user", "--jq", ".login"]);
+if (me.status !== 0) die(GH_UNAUTHENTICATED);
+const login = me.stdout.trim();
+
+const listRuns = () => {
+  const listed = gh([
+    "run",
+    "list",
+    "--workflow",
+    WORKFLOW,
+    "--branch",
+    "main",
+    "--event",
+    "workflow_dispatch",
+    "--user",
+    login,
+    "--limit",
+    "10",
+    "--json",
+    "databaseId,url",
+  ]);
+  return listed.status === 0 ? JSON.parse(listed.stdout) : undefined;
+};
+
+// Run ids only ever grow, so "newer than everything that existed a moment ago"
+// identifies our own run without comparing this machine's clock to GitHub's.
+const before = listRuns();
+if (before === undefined) die(`Could not list runs of ${WORKFLOW}. Check: gh repo view`);
+const highestBefore = before.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
 
 const run = ["workflow", "run", WORKFLOW, "--ref", "main"];
 if (tag !== undefined) run.push("--field", `tag=${tag}`);
@@ -66,24 +100,18 @@ console.log(
 // The run is queued asynchronously, so it is not listable the instant the
 // dispatch returns.
 const findRun = () => {
-  const listed = gh([
-    "run",
-    "list",
-    "--workflow",
-    WORKFLOW,
-    "--branch",
-    "main",
-    "--event",
-    "workflow_dispatch",
-    "--limit",
-    "10",
-    "--json",
-    "databaseId,createdAt,url",
-  ]);
-  if (listed.status !== 0) return undefined;
-  const runs = JSON.parse(listed.stdout);
-  // A second of slack: the runner's clock is not this machine's.
-  return runs.find((candidate) => Date.parse(candidate.createdAt) >= dispatchedAt - 1000);
+  // GitHub's dispatch API answers with nothing to correlate on, so "newer than
+  // the snapshot, same actor" is as close as this gets. If that matches more
+  // than one run, say so rather than watch a coin toss.
+  const fresh = listRuns()?.filter((candidate) => candidate.databaseId > highestBefore) ?? [];
+  if (fresh.length > 1) {
+    die(
+      `More than one new run of ${WORKFLOW} appeared, so this cannot tell which one it started:\n${fresh
+        .map((candidate) => `  ${candidate.url}`)
+        .join("\n")}`,
+    );
+  }
+  return fresh[0];
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

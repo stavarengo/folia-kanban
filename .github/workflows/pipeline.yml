@@ -1,9 +1,10 @@
 name: Pipeline
 
-# One run, one commit, from verify to announce. The jobs are chained with
-# `needs`, so the release that gets published is the one whose exact commit
-# passed `pnpm verify` in the same run — nothing is inferred from a green tick
-# on another workflow, and no job triggers another workflow as a side effect.
+# One run, from verify to announce. The jobs are chained with `needs`, so what
+# gets published is the commit that passed `pnpm verify` in this same run, with
+# release-it's version bump committed on top of it — nothing is inferred from a
+# green tick on another workflow, and no job triggers another workflow as a side
+# effect.
 on:
   push:
     branches: [main]
@@ -21,8 +22,12 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Superseded pull-request runs are worth nothing, so cancel them. A run on
-  # main is never cancelled: it may be the one holding a half-finished release.
+  # Superseded pull-request runs are worth nothing, so cancel them. On main a
+  # started run is never cancelled, so nothing interrupts a run that is mid
+  # release or waiting at the approval gate. (A run still *queued* behind it is
+  # a different matter: GitHub keeps one pending run per group and drops the
+  # older one when a newer arrives. That is fine — a queued run has done
+  # nothing, and the next push starts another.)
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -160,6 +165,13 @@ jobs:
         id: plan
         shell: bash
         run: |
+          # semver.org's grammar, prerelease identifiers included: an empty or
+          # zero-padded identifier is not a version, and a tag that is not a
+          # version is a release Obsidian will not match. The same expression
+          # lives in scripts/bump-plugin-version.mjs and the release job below.
+          part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+          SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
+
           previous=$(git describe --tags --abbrev=0 --match '*.*.*' 2>/dev/null || true)
           if [ -n "$previous" ]; then
             range="$previous..HEAD"
@@ -190,6 +202,10 @@ jobs:
             # .release-it.json's git requirements, which is why this job runs on
             # a checkout of main rather than a detached commit.
             version=$(pnpm exec release-it --release-version --ci | tail -n 1)
+            if [[ ! "$version" =~ $SEMVER ]]; then
+              echo "::error::release-it answered '$version', which is not a plain semver version."
+              exit 1
+            fi
             echo "Next version: $version" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Nothing to release: no feat, fix or breaking-change commit since $since." >> "$GITHUB_STEP_SUMMARY"
@@ -269,8 +285,11 @@ jobs:
 
           if [ -n "$TAG_INPUT" ]; then
             # Plain semver only (no "v" prefix) — matches manifest.version and
-            # the release-it tag contract.
-            if [[ ! "$TAG_INPUT" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            # the release-it tag contract. Same grammar as the plan job and
+            # scripts/bump-plugin-version.mjs.
+            part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+            SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
+            if [[ ! "$TAG_INPUT" =~ $SEMVER ]]; then
               echo "::error::'$TAG_INPUT' is not a plain semver release tag (e.g. 1.2.3)."
               exit 1
             fi
@@ -305,10 +324,16 @@ jobs:
 
       - name: Bump, write the changelog, commit, tag and push
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          pnpm ci:release
+          # The version that was approved, handed back to release-it, so the
+          # approval is an invariant rather than a prediction: release-it works
+          # the increment out again otherwise, and a tag appearing during the
+          # wait would move the answer.
+          pnpm ci:release --increment "$VERSION"
 
       - name: Resolve the released version
         id: resolve
@@ -322,6 +347,18 @@ jobs:
             # release-it wrote this version into package.json and manifest.json
             # and tagged the commit with the same string.
             tag=$(node -p "require('./package.json').version")
+          fi
+
+          # Obsidian matches a release to a plugin by the version string in the
+          # manifest, so a tag that disagrees with it is a listing that never
+          # updates. On the ordinary path release-it writes both from one value;
+          # on the republish path this is what stops an arbitrary
+          # semver-shaped tag, sitting on any commit reachable from main, from
+          # being published as if it were a release.
+          manifest=$(node -p "require('./manifest.json').version")
+          if [ "$manifest" != "$tag" ]; then
+            echo "::error::manifest.json says $manifest but the release tag is $tag. Refusing to publish a release Obsidian cannot match."
+            exit 1
           fi
 
           case "$tag" in
@@ -340,6 +377,11 @@ jobs:
       - name: Build the plugin
         run: pnpm build
 
+      # The subject digests are this build's. The source revision recorded
+      # beside them is the run's own GITHUB_SHA, which the action reads from the
+      # event and no input can override: the commit that triggered the run, one
+      # parent below the release commit release-it just made (and, on the
+      # republish path, the tip of main at dispatch time rather than the tag).
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
         with:

@@ -23,8 +23,13 @@ if (typeof version !== "string" || version.length === 0) {
 // manifest.version and the git tag must be the same plain-semver string —
 // Obsidian rejects a "v" prefix. release-it passes ${tagName} in, so the two
 // can never drift; a prefixed or malformed tag fails the release here.
-const SEMVER =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+// The grammar from semver.org, prerelease identifiers included: an empty or
+// zero-padded numeric identifier is not a version, and a tag that is not a
+// version is a release Obsidian will not match.
+const IDENTIFIER = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const SEMVER = new RegExp(
+  String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-${IDENTIFIER}(?:\.${IDENTIFIER})*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`,
+);
 if (!SEMVER.test(version)) {
   throw new Error(`version "${version}" must be plain semver with no "v" prefix (e.g. "1.0.0")`);
 }

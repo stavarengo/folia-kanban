@@ -11,7 +11,8 @@
     "tag": true,
     "tagName": "${version}",
     "tagAnnotation": "Release ${version}",
-    "push": true
+    "push": true,
+    "pushArgs": ["--follow-tags", "--atomic"]
   },
   "hooks": {
     "after:bump": "pnpm release:bump-plugin-version ${tagName}"
