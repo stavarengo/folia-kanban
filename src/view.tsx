@@ -1,8 +1,8 @@
 import type { TFile, WorkspaceLeaf } from "obsidian";
-import { FileView } from "obsidian";
+import { FileView, Scope } from "obsidian";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { App as BoardApp } from "./ui/App";
+import { App as BoardApp, type BoardHost } from "./ui/App";
 import { VaultRepository } from "./obsidian/vaultRepo";
 import type { KanbanSettings, SettingsPatch } from "./settings";
 
@@ -29,6 +29,20 @@ export class KanbanView extends FileView {
   private root: Root | null = null;
   private repo: VaultRepository | null = null;
   private repoPath: string | null = null;
+  private onSlash: ((target: EventTarget | null) => boolean) | null = null;
+
+  /**
+   * Stable across renders on purpose: the board binds its shortcut in an effect keyed on this
+   * object, so a new one on every re-render would unbind and rebind on every settings change.
+   */
+  private readonly host: BoardHost = {
+    bindSearchShortcut: (onSlash) => {
+      this.onSlash = onSlash;
+      return () => {
+        if (this.onSlash === onSlash) this.onSlash = null;
+      };
+    },
+  };
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -37,6 +51,13 @@ export class KanbanView extends FileView {
     private openAsMarkdown: (view: KanbanView) => void,
   ) {
     super(leaf);
+    // A view scope runs only while its leaf has focus, which is what makes "/" belong to one board:
+    // with two boards open side by side, the other one never sees the key. The app scope is the
+    // parent so every global hotkey still resolves while a board is focused.
+    this.scope = new Scope(this.app.scope);
+    // Returning false is what tells Obsidian to swallow the key; the board declines it while the
+    // user is typing, and then the field gets its own slash.
+    this.scope.register([], "/", (evt) => this.onSlash?.(evt.target) !== true);
   }
 
   getViewType(): string {
@@ -133,6 +154,7 @@ export class KanbanView extends FileView {
           repo={this.repo}
           settings={this.getSettings()}
           onUpdateSettings={this.updateSettings}
+          host={this.host}
         />
       </StrictMode>,
     );

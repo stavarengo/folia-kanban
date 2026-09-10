@@ -102,6 +102,26 @@ function pathForm(
   }
 }
 
+/**
+ * What the board borrows from the leaf it is mounted in. `src/ui/**` cannot import `obsidian`, so
+ * anything only the host view can answer arrives through this port.
+ *
+ * Today that is one thing: the board-level `/` shortcut. `.folia-root` is not focusable, so a `/`
+ * typed with focus on `<body>` never reaches a React handler, and the board used to listen on its
+ * whole document instead — which meant every open board inspected every keypress, and with two
+ * boards side by side the one that happened to bind last answered for all of them. The host
+ * registers the same shortcut on the view's keymap scope, which Obsidian runs only for the leaf
+ * that has focus.
+ */
+export interface BoardHost {
+  /**
+   * Hand the host the board's `/` handler. It is called with the element the key was typed at and
+   * returns whether the board took the key, which is the host's cue to suppress it. Returns the
+   * unbind function.
+   */
+  bindSearchShortcut(onSlash: (target: EventTarget | null) => boolean): () => void;
+}
+
 interface Props {
   repo: CardRepository;
   /** Live settings, sourced from the plugin via the view. */
@@ -111,9 +131,11 @@ interface Props {
   onUpdateSettings: (patch: SettingsPatch) => void;
   /** Overridable for deterministic tests; defaults to the real date. */
   today?: string;
+  /** The leaf hosting this board, when there is one. See {@link BoardHost}. */
+  host?: BoardHost;
 }
 
-export function App({ repo, settings, onUpdateSettings, today }: Props) {
+export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   const [board, setBoard] = useState<BoardModel | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Add-card flows: which column is in CREATE mode, plus a one-shot presentation override and a
@@ -818,28 +840,22 @@ export function App({ repo, settings, onUpdateSettings, today }: Props) {
     return { total, match };
   }, [board, filter, matchCtx, settings, laneFilters]);
 
-  // "/" focuses the search box (the placeholder advertises it), but only when this board view is
-  // the active, visible one and the user isn't already typing in a field. A document-level listener
-  // is required because `.folia-root` isn't focusable, so a `/` pressed with focus on <body> never
-  // bubbles to a React handler on it. Scoped to the root's owning document so pop-out windows work.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const doc = root.ownerDocument;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
-      // Skip when this Folia Kanban tab is hidden/backgrounded (display:none → no client rects), so a
-      // foregrounded note doesn't have its "/" stolen by an off-screen board.
-      if (root.getClientRects().length === 0) return;
-      const t = e.target as HTMLElement | null;
-      const tag = t?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
-      e.preventDefault();
-      searchRef.current?.focus();
-    };
-    doc.addEventListener("keydown", onKeyDown);
-    return () => doc.removeEventListener("keydown", onKeyDown);
-  }, [board]);
+  // "/" focuses the search box, as the placeholder advertises. The host decides WHEN the key is
+  // this board's — only it knows which leaf has focus — and the board decides whether it wants it,
+  // which it doesn't while the user is typing in a field. A board with no host (a test, any
+  // embedding without a leaf) simply has no shortcut.
+  useEffect(
+    () =>
+      host?.bindSearchShortcut((target) => {
+        const el = target as HTMLElement | null;
+        const tag = el?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
+          return false;
+        searchRef.current?.focus();
+        return true;
+      }),
+    [host],
+  );
 
   if (error) return <div className="folia-error">Couldn’t load the board: {error}</div>;
   if (!board) return <div className="folia-loading">Loading board…</div>;

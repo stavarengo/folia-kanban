@@ -37,6 +37,22 @@ function makeRepo() {
   });
 }
 
+/** Stands in for `KanbanView`'s side of the `BoardHost` port: holds the board's `/` handler and
+ *  lets a test fire it at a chosen target, the way the view's keymap scope does. */
+function fakeHost() {
+  let onSlash: ((target: EventTarget | null) => boolean) | null = null;
+  return {
+    bindSearchShortcut(handler: (target: EventTarget | null) => boolean) {
+      onSlash = handler;
+      return () => {
+        onSlash = null;
+      };
+    },
+    slash: (target: EventTarget | null) => onSlash?.(target) ?? false,
+    bound: () => onSlash !== null,
+  };
+}
+
 const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
   render(<App repo={repo} settings={settings} onUpdateSettings={() => {}} today="2026-06-13" />);
 
@@ -279,6 +295,53 @@ describe("card detail — priority", () => {
     await user.tab();
     await waitFor(() => expect("priority" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
     expect(repo.config.priorities).toEqual([]);
+  });
+});
+
+describe("card detail — description preview height", () => {
+  /** Swap in a ResizeObserver that a test can fire, and hand back what it was pointed at. */
+  function captureResizeObserver() {
+    const original = globalThis.ResizeObserver;
+    const seen: { target?: Element; fire?: () => void } = {};
+    globalThis.ResizeObserver = class {
+      constructor(private cb: ResizeObserverCallback) {}
+      observe(target: Element) {
+        seen.target = target;
+        seen.fire = () => this.cb([], this as unknown as ResizeObserver);
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver;
+    return { seen, restore: () => (globalThis.ResizeObserver = original) };
+  }
+
+  it("re-measures when the board's own box changes, not only when the window resizes", async () => {
+    const { seen, restore } = captureResizeObserver();
+    try {
+      const user = userEvent.setup();
+      render_(makeRepo());
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const preview = detail.querySelector(".folia-desc-view") as HTMLElement;
+      // The board root is what is watched: a split drag resizes it without touching the window, and
+      // its size never depends on the height being measured here, so there is no feedback loop.
+      expect(seen.target).toBe(document.querySelector(".folia-root"));
+
+      const before = preview.style.getPropertyValue("--folia-desc-max-h");
+      // jsdom reports every rect as zero, so the measurement is `innerHeight - 0 - 24`. Shrinking
+      // the window and firing the observer stands in for a divider drag moving the preview.
+      const height = window.innerHeight;
+      try {
+        Object.defineProperty(window, "innerHeight", { configurable: true, value: 500 });
+        act(() => seen.fire?.());
+        expect(preview.style.getPropertyValue("--folia-desc-max-h")).toBe("476px");
+        expect(preview.style.getPropertyValue("--folia-desc-max-h")).not.toBe(before);
+      } finally {
+        Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+      }
+    } finally {
+      restore();
+    }
   });
 });
 
@@ -2151,18 +2214,51 @@ describe("search filter (single source of truth)", () => {
   });
 
   it("pressing '/' (focus not in a field) focuses the search input, as the placeholder promises", async () => {
-    render_(makeRepo());
+    const host = fakeHost();
+    render(
+      <App
+        repo={makeRepo()}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host}
+      />,
+    );
     await screen.findByText("Alpha");
     const search = screen.getByLabelText("Search cards");
-    // jsdom has no layout, so .folia-root's getClientRects() is empty and the "is this board the
-    // visible tab?" guard would bail. Fake a non-empty rect list (mirrors the offsetHeight stub
-    // used elsewhere) so the guard sees a visible board, like in a real foregrounded leaf.
-    const root = document.querySelector(".folia-root") as HTMLElement;
-    Object.defineProperty(root, "getClientRects", { configurable: true, value: () => [{}] });
     expect(document.activeElement).not.toBe(search);
-    // The hint advertises "(press /)"; dispatch it at the document level (focus on <body>).
-    fireEvent.keyDown(document.body, { key: "/" });
+    // The board answers for a key typed with focus on <body> — .folia-root isn't focusable, so this
+    // is exactly the case the shortcut exists for — and tells the host it took the key.
+    let took = false;
+    act(() => {
+      took = host.slash(document.body);
+    });
+    expect(took).toBe(true);
     expect(document.activeElement).toBe(search);
+  });
+
+  it("'/' typed in a field is left to that field, and the board unbinds when it unmounts", async () => {
+    const host = fakeHost();
+    const view = render(
+      <App
+        repo={makeRepo()}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host}
+      />,
+    );
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards");
+    // Declining is what makes the host let the key through to the input the user is typing in.
+    let took = true;
+    act(() => {
+      took = host.slash(search);
+    });
+    expect(took).toBe(false);
+    expect(document.activeElement).not.toBe(search);
+    view.unmount();
+    expect(host.bound()).toBe(false);
   });
 
   it("the Overdue chip populates the input with due:overdue and filters to overdue cards", async () => {

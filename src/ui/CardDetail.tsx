@@ -39,6 +39,8 @@ import {
 import {
   useBoardActions,
   useBoardDocument,
+  useBoardRootRef,
+  useBoardWindow,
   useRepo,
   useSettings,
   useSettingsUpdater,
@@ -807,6 +809,8 @@ export function CardDetail({
   // The panel can live in a pop-out window; `activeDocument` follows focus, so focus bookkeeping
   // and the outside-click/drag listeners name the board's own document instead.
   const doc = useBoardDocument();
+  const win = useBoardWindow();
+  const boardRootRef = useBoardRootRef();
   const settings = useSettings();
   const updateSettings = useSettingsUpdater();
   // The board reloads on a debounce, so for a moment after this card's file is renamed or moved
@@ -1124,20 +1128,28 @@ export function CardDetail({
   // Cap the rendered preview to the space between its top and the viewport bottom (leaving a small
   // gutter), but never below a readable floor. Works across split/float/modal: it measures the
   // preview's own on-screen position, so the modal's max-height and the side panel's scroll both
-  // resolve to a sensible ceiling. Re-runs on mount, when the preview (re)appears, and on resize.
+  // resolve to a sensible ceiling. Re-runs on mount, when the preview (re)appears, and whenever the
+  // board's box changes size — dragging a split divider or collapsing a sidebar moves the preview
+  // without resizing any window, so a `resize` listener would sleep through it. Observing the board
+  // root rather than the preview keeps this out of a feedback loop: the root's size is not a
+  // function of the height being set here. `useBoardWindow()` is the pop-out's viewport, not the
+  // focused window's.
   useLayoutEffect(() => {
     if (isCreate || editingDesc) return;
     const measure = () => {
       const el = descViewRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      const avail = window.innerHeight - top - 24; // 24px gutter to the viewport edge
+      const avail = win.innerHeight - top - 24; // 24px gutter to the viewport edge
       setDescMaxHeight(Math.max(160, Math.round(avail)));
     };
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [isCreate, editingDesc, path, body]);
+    const root = boardRootRef.current;
+    if (!root) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [isCreate, editingDesc, path, body, win, boardRootRef]);
 
   // Leaving the editor (save/cancel/navigation) drops any carried-over preview height so the
   // preview returns to the viewport-measured behavior.

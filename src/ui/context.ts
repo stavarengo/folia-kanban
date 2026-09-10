@@ -288,6 +288,13 @@ export function useBoardActions(): BoardActions {
  */
 export const BoardRootContext = createContext<RefObject<HTMLElement | null> | null>(null);
 
+/** The board's root element once it is mounted, for measurements that resolve against its box. */
+export function useBoardRootRef(): RefObject<HTMLElement | null> {
+  const ref = useContext(BoardRootContext);
+  if (!ref) throw new Error("BoardRootContext is missing a provider");
+  return ref;
+}
+
 /** The document the board is rendered in — the portal target and listener host for its surfaces. */
 export function useBoardDocument(): Document {
   const ref = useContext(BoardRootContext);

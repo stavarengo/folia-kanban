@@ -26,6 +26,17 @@ if (hasDom) {
     };
   }
 
+  // jsdom has no ResizeObserver and no layout to drive one. The stub records nothing and never
+  // fires: the code under test measures once on mount anyway, and a test that wants a resize calls
+  // the measuring path itself.
+  if (!globalThis.ResizeObserver) {
+    globalThis.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver;
+  }
+
   // jsdom doesn't implement the Pointer Capture API; stub it so pointer handlers that capture/release
   // (e.g. the board pan-scroll) don't throw under test.
   if (!Element.prototype.setPointerCapture) {
