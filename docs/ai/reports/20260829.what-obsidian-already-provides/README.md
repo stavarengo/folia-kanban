@@ -163,7 +163,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.21](../../backlog/20260829.21.folia-resolves-and-writes-wikilinks-with-its-own-rules.md) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03, 04-19 |
 | [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 07-16 |
 | [20260829.23](../../backlog/20260829.23.a-card-using-any-other-checkbox-character-loses-its-subtasks.md) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
-| [20260829.24](../../backlog/20260829.24.a-card-tagged-in-its-body-is-invisible-to-the-boards-tag-filter.md) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
+| 20260829.24 (fixed, entry closed) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
 | [20260829.25](../../backlog/20260829.25.subtask-and-comment-edits-apply-a-line-index-from-an-earlier-read.md) | Bug: a stale line index applied inside `vault.process` | 04-12 |
 | [20260829.26](../../backlog/20260829.26.any-change-anywhere-in-the-vault-reloads-the-entire-board.md) | Any vault change anywhere reloads the whole board | 04-09 |
 | [20260829.27](../../backlog/20260829.27.the-adapter-takes-the-long-way-round-the-vault-api.md) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |

@@ -247,6 +247,19 @@ describe("matchCard", () => {
     expect(matchCard(c, parseFilter("tag:green"), ctx)).toBe(false);
   });
 
+  it("tag token matches a tag written in the card's body", () => {
+    const c = { ...card({}), bodyTags: ["home", "Errands"] };
+    expect(matchCard(c, parseFilter("tag:home"), ctx)).toBe(true);
+    // Obsidian treats tag names case-insensitively, and so does the token.
+    expect(matchCard(c, parseFilter("tag:errands"), ctx)).toBe(true);
+    expect(matchCard(c, parseFilter("tag:green"), ctx)).toBe(false);
+  });
+
+  it("body tags join the free-text haystack, like frontmatter tags", () => {
+    const c = { ...card({}), bodyTags: ["garden-prep"] };
+    expect(matchCard(c, parseFilter("garden-prep"), ctx)).toBe(true);
+  });
+
   it("context token reads the card's context frontmatter (string or array)", () => {
     expect(matchCard(card({ context: "acme" }), parseFilter("context:acme"), ctx)).toBe(true);
     expect(matchCard(card({ context: ["acme", "beta"] }), parseFilter("context:beta"), ctx)).toBe(
@@ -411,6 +424,34 @@ describe("assignment (20260827.03)", () => {
     ]);
     expect(chips[0]?.title).toBe("Assigned to Rafa");
     expect(cardChips(card({}), "2026-06-16", "done")).toEqual([]);
+  });
+
+  it("shows a body tag as a tag chip, after the frontmatter ones", () => {
+    const c = { ...card({ area: "ops", tags: ["red"] }), bodyTags: ["home"] };
+    expect(cardChips(c, "2026-06-16", "done").map((chip) => chip.label)).toEqual([
+      "ops",
+      "red",
+      "home",
+    ]);
+  });
+
+  it("drops a body tag the card already lists in its frontmatter, whatever the case", () => {
+    const c = { ...card({ tags: ["Home"] }), bodyTags: ["home", "errands"] };
+    expect(cardChips(c, "2026-06-16", "done").map((chip) => chip.label)).toEqual([
+      "Home",
+      "errands",
+    ]);
+  });
+
+  it("leaves a card with no body tags reading exactly as before", () => {
+    // Including the frontmatter's own repeats: deduping those is a different change, and this
+    // card's chips must not move because body tags became a thing.
+    const c = card({ area: "ops", tags: ["ops", "red"] });
+    expect(cardChips(c, "2026-06-16", "done").map((chip) => chip.label)).toEqual([
+      "ops",
+      "ops",
+      "red",
+    ]);
   });
 });
 

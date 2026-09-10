@@ -357,6 +357,7 @@ export class FakeVault extends Events {
 
 export class FakeMetadataCache extends Events {
   private caches = new Map<string, Record<string, unknown>>();
+  private tags = new Map<string, { tag: string }[]>();
   constructor(private vault: FakeVault) {
     super();
     // A real vault has a cache entry for every file it knows about. Only a WRITE leaves the cache
@@ -380,9 +381,32 @@ export class FakeMetadataCache extends Events {
     else this.caches.set(path, frontmatter);
   }
 
-  getFileCache(file: TFile): { frontmatter?: Record<string, unknown> } | null {
+  /**
+   * The body tags the cache claims a note carries, `#` included the way Obsidian reports them.
+   * Set explicitly like the frontmatter above, and for the same reason: whether a `#word` in a
+   * body counts as a tag is Obsidian's lexer's answer, and a fake that guessed it from the text
+   * would be a second answer no test could tell apart from the real one.
+   */
+  setTags(path: string, tags: string[] | undefined): void {
+    if (tags === undefined) this.tags.delete(path);
+    else
+      this.tags.set(
+        path,
+        tags.map((tag) => ({ tag })),
+      );
+  }
+
+  getFileCache(file: TFile): {
+    frontmatter?: Record<string, unknown>;
+    tags?: { tag: string }[];
+  } | null {
     const frontmatter = this.caches.get(file.path);
-    return frontmatter === undefined ? null : { frontmatter };
+    const tags = this.tags.get(file.path);
+    if (frontmatter === undefined && tags === undefined) return null;
+    return {
+      ...(frontmatter !== undefined ? { frontmatter } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+    };
   }
 
   /** The cache catching up a tick after a write, which is what the adapter waits for. */

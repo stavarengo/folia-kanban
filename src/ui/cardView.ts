@@ -266,6 +266,16 @@ export function cardUrgency(
   return u === "overdue" || u === "today" || u === "soon" ? u : null;
 }
 
+/**
+ * Every tag the board credits a card with: its `area`, its frontmatter `tags`, and the tags
+ * Obsidian read out of the note's body (`Card.bodyTags`, filled by the adapter — this file cannot
+ * import `obsidian`). Obsidian counts a `#tag` written in the text as a tag of the note, so a card
+ * tagged that ordinary way has to answer the board's `tag:` filter too.
+ *
+ * The body set is appended, and only a body tag that repeats one already listed is dropped
+ * (case-insensitively, the way Obsidian treats tag names). Frontmatter values are never deduped
+ * against each other: a card with no body tags reads exactly as it did before.
+ */
 function tagValues(card: Card): string[] {
   const fm = card.frontmatter;
   const out: string[] = [];
@@ -275,6 +285,13 @@ function tagValues(card: Card): string[] {
     for (const t of fmTags) if (typeof t === "string" && t) out.push(t);
   } else if (typeof fmTags === "string" && fmTags) {
     out.push(fmTags);
+  }
+  const seen = new Set(out.map((t) => t.toLowerCase()));
+  for (const t of card.bodyTags ?? []) {
+    const key = t.toLowerCase();
+    if (t === "" || seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
   }
   return out;
 }
@@ -413,7 +430,7 @@ export function isEmptyFilter(f: Filter): boolean {
   return f.text.length === 0 && f.tokens.length === 0;
 }
 
-/** Lower-cased free-text haystack: title + basename + priority + tags (area + tags) + assignees. */
+/** Lower-cased free-text haystack: title + basename + priority + tags (area + frontmatter + body) + assignees. */
 function freeTextHaystack(card: Card): string {
   return [
     card.title,

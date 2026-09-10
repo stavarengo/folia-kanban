@@ -135,6 +135,25 @@ export class VaultRepository implements CardRepository {
     return cached ?? {};
   }
 
+  /**
+   * The tags Obsidian read out of a note's body, `#` stripped, in the order they appear.
+   *
+   * Read from the metadata cache and nowhere else, deliberately: which `#word` in a body is a tag
+   * is Obsidian's own lexer's answer (code fences, inline code, the character set, escapes), and a
+   * regex here would be a second, quietly different answer — which is the very drift this fix
+   * exists to close. So a note with no cache entry yet contributes no body tags, unlike its
+   * frontmatter (which `loadBoard` re-parses from the text when the cache has nothing).
+   */
+  private bodyTagsOf(file: TFile): string[] {
+    const tags = this.app.metadataCache.getFileCache(file)?.tags ?? [];
+    const out: string[] = [];
+    for (const t of tags) {
+      const tag = t.tag.replace(/^#/, "");
+      if (tag !== "") out.push(tag);
+    }
+    return out;
+  }
+
   private markWrite(path: string) {
     this.recentWrites.set(path, Date.now());
   }
@@ -267,6 +286,7 @@ export class VaultRepository implements CardRepository {
         .map((s) => s.link ?? "")
         .filter((l) => l !== "");
       const { title, source } = resolveTitle(f.basename, fm, text, config.titleMode);
+      const bodyTags = this.bodyTagsOf(f);
       cards.push({
         path: f.path,
         basename: f.basename,
@@ -276,6 +296,7 @@ export class VaultRepository implements CardRepository {
         childLinks,
         subItems,
         stats: cardStats(text),
+        ...(bodyTags.length > 0 ? { bodyTags } : {}),
       });
     }
     // buildBoard derives each card's `context` from its path; carry the configs alongside.

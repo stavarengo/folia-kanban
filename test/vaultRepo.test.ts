@@ -68,6 +68,47 @@ describe("the fake this suite runs against", () => {
   });
 });
 
+describe("a card's body tags", () => {
+  it("reach the board from the metadata cache, with the leading # off", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo", "\nTaking this #home tonight.\n"));
+    app.metadataCache.setTags("basic/Cards/One.md", ["#home", "#errands"]);
+
+    const board = await repo.loadBoard();
+
+    expect(board.cards["basic/Cards/One.md"]?.bodyTags).toEqual(["home", "errands"]);
+  });
+
+  it("stay absent for a card whose body has none, so nothing downstream has to test for empty", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+
+    const board = await repo.loadBoard();
+
+    expect(board.cards["basic/Cards/One.md"]?.bodyTags).toBeUndefined();
+  });
+
+  it("come from the cache only — an uncached note contributes none, unlike its frontmatter", async () => {
+    // Deliberate: which `#word` in a body is a tag is Obsidian's lexer's answer, and a regex here
+    // would be a second, quietly different one. Frontmatter has a text fallback because parsing
+    // YAML is not a judgement call; tag lexing is.
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo", "\nTaking this #home tonight.\n"));
+    app.vault.addFile("basic/Cards/Two.md", card("status: todo", "\nAnd this #home too.\n"));
+    app.metadataCache.setFrontmatter("basic/Cards/One.md", undefined);
+    app.metadataCache.setTags("basic/Cards/Two.md", ["#home"]);
+
+    const board = await repo.loadBoard();
+
+    // The cached one gets its body tag, so this fails if the wiring breaks rather than passing by
+    // the absence of one; the uncached one keeps its frontmatter (re-parsed from the text) and no
+    // body tags at all.
+    expect(board.cards["basic/Cards/Two.md"]?.bodyTags).toEqual(["home"]);
+    expect(board.cards["basic/Cards/One.md"]?.frontmatter.status).toBe("todo");
+    expect(board.cards["basic/Cards/One.md"]?.bodyTags).toBeUndefined();
+  });
+});
+
 describe("card-folder resolution against a live vault", () => {
   it("prefers the board-note-relative reading a './' asks for", async () => {
     const { app, repo } = setup();

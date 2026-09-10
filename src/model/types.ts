@@ -232,6 +232,15 @@ export interface Card {
    */
   context?: string;
   /**
+   * Tags Obsidian found in the note's BODY (`#tag` written in the text), without the leading `#`
+   * and in the order they appear. Frontmatter tags are not repeated here — they already reach the
+   * board through `frontmatter.tags`, and the two are unioned where tags are read.
+   *
+   * Filled by the adapter from the metadata cache, because deciding what counts as a tag in a
+   * body (code fences, inline code, the valid character set) is Obsidian's job, not ours.
+   */
+  bodyTags?: string[];
+  /**
    * Typed relationships to other cards, both directions, resolved against the board. Filled by
    * `buildBoard` from the vocabulary's frontmatter keys — derived, never written back as a whole
    * (only an outgoing list is ever written, by the card that declares it). Outgoing links first,
