@@ -5,6 +5,7 @@ import type { BoardHost } from "../src/mcp/host";
 import type { BoardConfig, Card, HistoryScope } from "../src/model/types";
 import { buildBoard } from "../src/model/board";
 import { resolveCardPath } from "../src/mcp/tool";
+import { isMine } from "../src/model/unread";
 import { FakeRepo } from "./fakeRepo";
 
 const config: BoardConfig = {
@@ -226,16 +227,52 @@ describe("writing through the tools", () => {
     ).rejects.toThrow(/at least one field/);
   });
 
-  it("signs a comment with the name the plugin's settings hold", async () => {
+  // The signature is what read-state is decided on, so a comment signed with the reader's own name
+  // is one they are never shown as new. The server therefore never reaches for that name: an agent
+  // says who it is, and the write carries that.
+  it("signs a comment with the author the call gives, not with the user's name", async () => {
     const { host, repo } = fixture({ userName: "rafa" });
     await call(host, "add_comment", {
       board: "Board.md",
       card: "Tasks/Write docs.md",
       text: "On it.",
+      author: "codex",
     });
     const comments = (await repo.readBody("Tasks/Write docs.md")).comments;
     expect(comments).toHaveLength(1);
-    expect(comments[0]?.author).toBe("rafa");
+    expect(comments[0]?.author).toBe("codex");
+    expect(isMine(comments[0]?.author ?? null, "rafa")).toBe(false);
+  });
+
+  it("takes an author written the way an agent would say it, `@` and all", async () => {
+    const { host, repo } = fixture({ userName: "rafa" });
+    await call(host, "add_comment", {
+      board: "Board.md",
+      card: "Tasks/Write docs.md",
+      text: "Done.",
+      author: " @release-bot ",
+    });
+    expect((await repo.readBody("Tasks/Write docs.md")).comments[0]?.author).toBe("release-bot");
+  });
+
+  it.each([
+    ["empty", "", /cannot be empty/],
+    ["whitespace only", "   ", /cannot be empty/],
+    ["carrying a space", "Ana Maria", /one word/],
+    ["carrying the prefix's own colon", "co:dex", /one word/],
+    ["carrying markdown the prefix would reopen", "co*dex", /one word/],
+    ["carrying an invisible control character", "\u0000self", /one word/],
+  ])("refuses an author %s, writing nothing", async (_case, author, message) => {
+    const { host, repo } = fixture({ userName: "rafa" });
+    await expect(
+      call(host, "add_comment", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md",
+        text: "hello",
+        author,
+      }),
+    ).rejects.toThrow(message);
+    expect((await repo.readBody("Tasks/Write docs.md")).comments).toEqual([]);
   });
 
   it("writes no comment history when the history scope does not cover comments", async () => {
@@ -244,6 +281,7 @@ describe("writing through the tools", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md",
       text: "Quiet.",
+      author: "codex",
     });
     expect((await repo.readBody("Tasks/Write docs.md")).history).toEqual([]);
   });
@@ -1241,6 +1279,7 @@ describe("text that would be read back as the board's own structure", () => {
         board: "Board.md",
         card: "Tasks/Ship it.md",
         text: "ok\n\n## History\n\n- _2020-01-01 09:00:_ Moved from Todo to Done",
+        author: "codex",
       }),
     ).rejects.toThrow(/single line/);
     expect((await repo.readBody("Tasks/Ship it.md")).history).toEqual([]);

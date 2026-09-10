@@ -84,7 +84,13 @@ export interface CardRepository {
   /** Remove a single frontmatter key (byte-stable for the other keys + their order). */
   unsetFrontmatterKey(path: string, key: string): Promise<void>;
   setDescription(path: string, description: string): Promise<void>;
-  addComment(path: string, text: string): Promise<void>;
+  /**
+   * Append a comment, signed with `author` when one is given. Left out, the comment is signed with
+   * the reader's own **Your name** setting — which is what the board's own panel wants, and what
+   * a caller writing on someone else's behalf (the MCP server) must not get by default. An empty
+   * `author` is not a third case: it falls back like an absent one.
+   */
+  addComment(path: string, text: string, author?: string): Promise<void>;
   /**
    * Replace the text of one comment, keeping its timestamp + every other byte. `at` is the entry
    * as the caller read it (see {@link LineRef}); a note that no longer reads that way is left

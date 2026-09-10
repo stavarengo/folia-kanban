@@ -8,11 +8,11 @@ import type { MatchContext } from "../model/filter";
 import { laneMismatch, laneVerdict, prospectiveCard } from "../model/lanes";
 import type { Board, Card } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
-import { descriptionRefusal } from "../model/card";
 import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import { StaleLineError } from "../model/repo";
+import { refuseAuthor, refuseMultilineEntry, refuseUnsafeDescription } from "./refusals";
 import {
   boardArg,
   cardArg,
@@ -153,57 +153,6 @@ async function writeField(
 ): Promise<void> {
   if (value === null) await repo.unsetFrontmatterKey(path, key);
   else await repo.setFrontmatter(path, { [key]: value });
-}
-
-/**
- * A description the plugin would read back as something other than a description is refused, using
- * the same judgement the detail panel makes before it saves one.
- *
- * `setDescription` splices the text in verbatim, so a line reading `## History` inside it does not
- * stay text: the note is parsed back and that heading starts the real History section. An agent
- * could write its own audit trail, and sign a comment with the user's name, through the one tool
- * whose whole purpose is that writes are accountable. The description also silently loses
- * everything below the injected heading, so the call reports success over text that is largely
- * gone. The panel refuses this and says why; so does this.
- */
-function refuseUnsafeDescription(description: string): void {
-  const refusal = descriptionRefusal(description);
-  if (refusal === null) return;
-  if (refusal.kind === "heading") {
-    throw new ToolError(
-      `That description contains "${refusal.line}", which starts a section the board owns. The note would read it as that section rather than as description, and everything after it would stop being description at all. Use add_comment for a comment; history is the board's to write.`,
-    );
-  }
-  if (refusal.kind === "title") {
-    throw new ToolError(
-      `That description opens with "${refusal.line}", and a card reads its title from the first \`#\` heading. The line would be taken as the title rather than kept as description, and it would not come back. Use \`##\` or lower, or set the title with update_card's own \`title\` field.`,
-    );
-  }
-  throw new ToolError(
-    `That description leaves a code fence open ("${refusal.line}"). Everything after it in the note, the board's own sections included, would be swallowed by the fence. Close it and try again.`,
-  );
-}
-
-/**
- * Text that becomes one Markdown list item has to stay one line.
- *
- * A subtask and a comment are each written as a single `- …` line. A newline in the middle of one
- * is not a longer entry — it is raw Markdown spliced into the note: a second checklist line the
- * caller did not ask for, or a `## History` heading that opens the real section and lets an agent
- * write the record that is supposed to be about it. The panel's subtask control is a one-line
- * input, so this is the first caller that could send a newline at all.
- *
- * What this does not do, and is not meant to, is police what one line may say. A single-line
- * subtask carrying a `[status:: done]` claim promotes itself to a card on the board — and typing
- * exactly that into the panel does the same thing. The tools are meant to be as capable as a
- * person, not more careful than one; it is the forging of the board's own record that is out of
- * bounds.
- */
-function refuseMultilineEntry(what: "subtask" | "comment", text: string): void {
-  if (!/[\r\n]/.test(text)) return;
-  throw new ToolError(
-    `A ${what} is written as a single line, so its text cannot contain a line break — spliced into the note, the second line would be read as Markdown of its own rather than as part of what you wrote. Send it as one line${what === "comment" ? ", or as several comments" : ""}.`,
-  );
 }
 
 /** The board really has that column, or an error naming the ones it does have. */
@@ -410,17 +359,21 @@ const addComment = tool({
   name: "add_comment",
   title: "Comment on a card",
   description:
-    "Append a comment to a card's `## Comments` section, timestamped and signed with the name configured in the plugin's settings.",
+    "Append a comment to a card's `## Comments` section, timestamped and signed with the `author` you give. Sign it with your own name: the user's name is theirs, and a comment wearing it is one they will never be shown as new.",
   input: z.object({
     board: boardArg,
     card: cardArg,
     text: z.string().min(1).describe("The comment, as a single line."),
+    author: z
+      .string()
+      .describe("Who is writing, as one word: your own name (`codex`), never the user's."),
   }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
     refuseMultilineEntry("comment", args.text);
-    await repo.addComment(path, args.text);
+    refuseAuthor(args.author);
+    await repo.addComment(path, args.text, args.author);
     return { path, comments: (await repo.readBody(path)).comments.length };
   },
 });

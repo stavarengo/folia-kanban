@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, FileManager, MetadataCache, Vault } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DataCorruptionError } from "../src/model/schemas";
+import { parseBody } from "../src/model/card";
+import { isMine, unreadComments } from "../src/model/unread";
 import {
   AbstractInputSuggest,
   CapacitorAdapter,
@@ -1051,6 +1053,28 @@ describe("the rest of the vault surface", () => {
     scope = "all";
     await repo.addComment("basic/Cards/One.md", "second");
     expect(app.vault.text("basic/Cards/One.md")).toContain("## History");
+  });
+
+  // Someone writing on another person's behalf — the MCP server, whose caller is an agent — names
+  // that person, and the reader's own name is not reached for. Otherwise the note claims the
+  // reader wrote it, and `isMine` then keeps the comment out of everything unread.
+  it("signs a comment with the author it is given rather than with the user's name", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    const repo = new VaultRepository(
+      app as unknown as App,
+      "basic/Board.md",
+      () => "moves",
+      () => "Rafa",
+    );
+
+    await repo.addComment("basic/Cards/One.md", "from the agent", "Codex");
+
+    const comments = parseBody(app.vault.text("basic/Cards/One.md") ?? "").comments;
+    expect(comments[0]?.author).toBe("Codex");
+    expect(isMine(comments[0]?.author ?? null, "Rafa")).toBe(false);
+    expect(unreadComments(comments, undefined, "Rafa").kind).toBe("unread");
   });
 });
 

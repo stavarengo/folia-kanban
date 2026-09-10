@@ -56,6 +56,22 @@ export function normalizeAuthor(raw: string): string {
 }
 
 /**
+ * Whether a name can sign a comment, and why not when it cannot — the judgement, with the wording
+ * left to whoever asked (the same split as `descriptionRefusal`). A leading `@` and surrounding
+ * space are forgiven, because `@codex` is the obvious way for a writer to name itself; anything
+ * else {@link normalizeAuthor} would rewrite is refused rather than silently changed, so a name
+ * that signs a comment is the name that was asked for. Control characters are refused too: they
+ * are invisible in the note, survive normalization, and could collide with {@link SELF}.
+ */
+export function authorRefusal(raw: string): "empty" | "unwritable" | null {
+  const name = raw.trim().replace(/^@+/, "");
+  if (name === "") return "empty";
+  const unwritable =
+    normalizeAuthor(name) !== name || [...name].some((c) => c <= "\u001f" || c === "\u007f");
+  return unwritable ? "unwritable" : null;
+}
+
+/**
  * Stands in for the reader when they have set no name. It contains characters the line grammar
  * cannot carry, so nothing parsed out of a note can ever collide with it — which is the point: it
  * lets a caller say "this comment is the reader's own" about a line that carries no signature.

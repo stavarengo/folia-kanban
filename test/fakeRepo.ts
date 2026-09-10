@@ -236,8 +236,9 @@ export class FakeRepo implements CardRepository {
   async setDescription(path: string, description: string) {
     this.entry(path).body = setDescription(this.entry(path).body, description);
   }
-  async addComment(path: string, text: string) {
-    this.entry(path).body = appendComment(this.entry(path).body, text, this.ts, this.getUserName());
+  async addComment(path: string, text: string, author?: string) {
+    const signature = author || this.getUserName();
+    this.entry(path).body = appendComment(this.entry(path).body, text, this.ts, signature);
     this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, at: LineRef, text: string) {

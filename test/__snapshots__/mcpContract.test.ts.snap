@@ -251,9 +251,13 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Append a comment to a card's \`## Comments\` section, timestamped and signed with the name configured in the plugin's settings.",
+    "description": "Append a comment to a card's \`## Comments\` section, timestamped and signed with the \`author\` you give. Sign it with your own name: the user's name is theirs, and a comment wearing it is one they will never be shown as new.",
     "inputSchema": {
       "properties": {
+        "author": {
+          "description": "Who is writing, as one word: your own name (\`codex\`), never the user's.",
+          "type": "string",
+        },
         "board": {
           "description": "Vault path of the board note, e.g. \`Work/Board.md\`.",
           "type": "string",
@@ -272,6 +276,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
         "board",
         "card",
         "text",
+        "author",
       ],
       "type": "object",
     },

@@ -560,9 +560,9 @@ export class VaultRepository implements CardRepository, HoverParent {
     // No history kind maps to a description edit, so this stays ungated.
     return this.editBody(path, (t) => setDescriptionText(t, description));
   }
-  async addComment(path: string, text: string): Promise<void> {
-    const author = this.getUserName();
-    await this.editBody(path, (t) => appendComment(t, text, stamp(), author));
+  async addComment(path: string, text: string, author?: string): Promise<void> {
+    const signature = author || this.getUserName();
+    await this.editBody(path, (t) => appendComment(t, text, stamp(), signature));
     await this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, at: LineRef, text: string): Promise<void> {
