@@ -1143,9 +1143,11 @@ export function CardDetail({
       const avail = win.innerHeight - top - 24; // 24px gutter to the viewport edge
       setDescMaxHeight(Math.max(160, Math.round(avail)));
     };
-    measure();
+    // Nothing to measure against before the root is mounted — and `useBoardWindow()` still answers
+    // with the focused window until it is, which is the wrong viewport for a board in a pop-out.
     const root = boardRootRef.current;
     if (!root) return;
+    measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     return () => observer.disconnect();
