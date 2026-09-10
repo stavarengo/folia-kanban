@@ -153,7 +153,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.11](../../backlog/20260829.11.the-board-draws-its-own-toast.md) | The board's own toast beside the app's notice | 01-07, 06-09 |
 | [20260829.12](../../backlog/20260829.12.every-button-in-the-board-is-drawn-from-scratch.md) | Every button drawn from scratch, and the specificity fight after it | 01-08, 02-30 |
 | [20260829.13](../../backlog/20260829.13.icon-sizes-are-thirty-four-hard-coded-numbers.md) | Icon size decided at 34 call sites instead of by a scale | 01-10, 02-14 |
-| 20260829.14 (closed, entry deleted) | Not a bug: Obsidian rewrites `--text-on-accent` on `<body>` for a light accent and Folia's tokens inherit it, so the board's buttons already turn dark with the app's own | 02-01 |
+| 20260829.14 (withdrawn / not a bug) | Obsidian rewrites `--text-on-accent` on `<body>` for a light accent and Folia's tokens inherit it, so the board's buttons already turn dark with the app's own | 02-01 |
 | [20260829.15](../../backlog/20260829.15.folia-reads-the-themes-colours-through-its-own-fallbacks.md) | Theme colour read through Folia's own fallbacks and mixes | 02-02, 02-03, 02-04, 02-05, 02-06, 02-07, 02-08, 02-20, 02-24, 02-31 |
 | [20260829.16](../../backlog/20260829.16.the-folia-token-layer-is-a-second-design-system.md) | The `--folia-*` layer as a second design system | 02-11, 02-12, 02-13, 02-15, 02-21, 02-22, 02-23, 02-26, 02-27, 02-28, 02-44 |
 | 20260829.17 (fixed, entry closed) | Bug: two z-index ladders in one numeric space — the body-portalled surfaces now read Obsidian's `--layer-*` scale, so a tooltip still covers a Folia menu, exactly as it covers the app's own | 02-25 |
@@ -162,9 +162,9 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
 | 20260829.21 (fixed, entry closed) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03 |
 | [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 04-19, 07-16 |
-| [20260829.23](../../backlog/20260829.23.a-card-using-any-other-checkbox-character-loses-its-subtasks.md) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
+| 20260829.23 (fixed, entry closed) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
 | 20260829.24 (fixed, entry closed) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
-| [20260829.25](../../backlog/20260829.25.subtask-and-comment-edits-apply-a-line-index-from-an-earlier-read.md) | Bug: a stale line index applied inside `vault.process` | 04-12 |
+| 20260829.25 (fixed, entry closed) | Bug: a stale line index applied inside `vault.process` | 04-12 |
 | [20260829.26](../../backlog/20260829.26.any-change-anywhere-in-the-vault-reloads-the-entire-board.md) | Any vault change anywhere reloads the whole board | 04-09 |
 | [20260829.27](../../backlog/20260829.27.the-adapter-takes-the-long-way-round-the-vault-api.md) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |
 | [20260829.28](../../backlog/20260829.28.the-board-takes-over-markdown-opens-by-patching-a-core-prototype.md) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
