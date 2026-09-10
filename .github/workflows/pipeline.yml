@@ -259,14 +259,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # One release at a time, and one republish of a given tag at a time, in
+    # One ordinary release at a time, and one republish per tag at a time, in
     # separate groups. A group holds one running job and one pending job, and a
-    # third arrival drops the pending one — which is fine for an ordinary
-    # release (nothing has happened yet, and the commits are still there for the
-    # next run) and would not be for a deliberate republish, so a republish
-    # never shares a queue with anything but another attempt at the same tag.
+    # third arrival drops the pending one; for an ordinary release that costs
+    # the approval, since nothing in the repository has changed yet and the
+    # commits are still there, while a dropped republish would lose a
+    # deliberate recovery, so a republish only ever queues behind another
+    # attempt at its own tag.
+    #
+    # The two groups are not serialised against each other, so do not dispatch a
+    # republish of a version while that version is being cut — the only way to
+    # have two jobs on one release, and the only way to reopen the window the
+    # draft-first sequence below closes.
     concurrency:
-      group: release-${{ github.repository }}-${{ inputs.tag || 'main' }}
+      group: release-${{ github.repository }}-${{ inputs.tag && format('tag-{0}', inputs.tag) || 'main' }}
       cancel-in-progress: false
 
     permissions:
