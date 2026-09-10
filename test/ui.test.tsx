@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { readFileSync } from "node:fs";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { act, render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
@@ -300,6 +300,59 @@ describe("card detail — priority", () => {
     await user.tab();
     await waitFor(() => expect("priority" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
     expect(repo.config.priorities).toEqual([]);
+  });
+});
+
+describe("status bar clearance", () => {
+  // Obsidian's bar lives outside the React tree, so RTL's unmount does not take it with it.
+  afterEach(() => document.querySelectorAll(".status-bar").forEach((el) => el.remove()));
+
+  /** Put a `.status-bar` of the given height into a document, the way Obsidian's own is. */
+  function addStatusBar(doc: Document, height: number) {
+    const bar = doc.createElement("div");
+    bar.className = "status-bar";
+    Object.defineProperty(bar, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ height, width: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0 }),
+    });
+    doc.body.appendChild(bar);
+    return bar;
+  }
+
+  const clearance = () =>
+    (document.querySelector(".folia-root") as HTMLElement).style.getPropertyValue(
+      "--folia-statusbar-clearance",
+    );
+
+  it("reserves the bar's height plus a gutter when the board's window has one", async () => {
+    addStatusBar(document, 25);
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    expect(clearance()).toBe("31px");
+  });
+
+  it("reserves nothing when there is no bar, rather than guessing a height for it", async () => {
+    // A pop-out window has no status bar. The old code could not tell that apart from a failed
+    // measurement and reserved 32px anyway — dead space at the foot of every column.
+    render_(makeRepo());
+    await screen.findByText("Alpha");
+    expect(clearance()).toBe("0px");
+  });
+
+  it("reads the bar from the board's own window, not from whichever one has focus", async () => {
+    // `activeDocument` follows focus, so a board in a pop-out would otherwise measure the main
+    // window's bar and reserve room for something its own window does not have.
+    const focusedElsewhere = document.implementation.createHTMLDocument("other window");
+    addStatusBar(focusedElsewhere, 25);
+    const realActive = activeDocument;
+    Object.assign(globalThis, { activeDocument: focusedElsewhere });
+    try {
+      render_(makeRepo());
+      await screen.findByText("Alpha");
+      expect(clearance()).toBe("0px");
+    } finally {
+      Object.assign(globalThis, { activeDocument: realActive });
+    }
   });
 });
 

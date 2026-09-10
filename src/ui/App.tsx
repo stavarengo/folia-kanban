@@ -259,13 +259,25 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     );
   }, [board]);
 
-  // Obsidian's status bar is fixed to the window bottom; reserve clearance so the columns and the
-  // side detail panel don't clip their last content behind it. Measure the real height once the
-  // root is mounted (the first render shows a loading div, so the ref isn't ready until board loads).
+  // Obsidian's status bar is fixed to the bottom of its window and the workspace runs underneath
+  // it, so the columns and the side detail panel reserve its height to keep their last content out
+  // from behind it. The bar belongs to the board's OWN window, which is why this reads the root's
+  // document rather than `activeDocument`: that one follows focus, and a pop-out window has no
+  // status bar at all, so a board there reserves nothing. Watching the bar's box is what keeps the
+  // reservation true when its height changes, rather than freezing it at the first board load.
   useEffect(() => {
-    if (!board || !rootRef.current) return;
-    const h = activeDocument.querySelector(".status-bar")?.getBoundingClientRect().height ?? 0;
-    rootRef.current.style.setProperty("--folia-statusbar-clearance", `${h > 0 ? h + 6 : 32}px`);
+    const root = rootRef.current;
+    if (!board || !root) return;
+    const bar = root.ownerDocument.querySelector(".status-bar");
+    const apply = () => {
+      const h = bar?.getBoundingClientRect().height ?? 0;
+      root.style.setProperty("--folia-statusbar-clearance", `${h > 0 ? h + 6 : 0}px`);
+    };
+    apply();
+    if (!bar) return;
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => observer.disconnect();
   }, [board]);
 
   const onMove = useCallback(
