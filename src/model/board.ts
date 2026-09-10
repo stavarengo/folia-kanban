@@ -18,6 +18,7 @@ import type {
   RelationTypeDef,
   SubItem,
 } from "./types";
+import { fallbackColumnOf } from "./lanes";
 import { BLOCKS, readInverse, readRelations } from "./relationships";
 
 const DONE_RE = /\b(done|complete|completed|finished|shipped|closed)\b/i;
@@ -715,7 +716,8 @@ export interface FilterVisibility {
  * - a card in some `board.columns` bucket renders there, EXCEPT in a filter-lane's bucket: a lane
  *   ignores its own bucket and pulls by its rule instead, so such a card renders only where some
  *   lane's rule actually reaches it (any lane, not just the one whose id its `status` names — every
- *   lane pulls from every bucket);
+ *   lane pulls from every bucket) or, when no lane reaches it at all, in the board's fallback
+ *   column (`fallbackColumnOf`), which is what keeps such a card on the board;
  * - a genuinely nested, non-placed card (`nestedCards`) NESTS under its immediate parent when that
  *   parent matches, is itself visible, and is drawing its children;
  * - and is LIFTED to the top level of its inherited column when that parent does NOT match — the
@@ -731,10 +733,14 @@ export function filterVisiblePaths(board: Board, rules: FilterVisibility): Set<s
   for (const [colId, paths] of Object.entries(board.columns)) {
     for (const p of paths) columnOfPath[p] = colId;
   }
+  const fallback = fallbackColumnOf(board);
   const drawnInItsBucket = (path: string): boolean => {
     const col = columnOfPath[path];
     if (col === undefined || !laneColumnIdSet.has(col)) return true;
-    return laneColumnIds.some((id) => rules.laneDraws(id, path));
+    if (laneColumnIds.some((id) => rules.laneDraws(id, path))) return true;
+    // Drawn by no lane, so the fallback column takes it in (`strandedLanePaths`) — unless the board
+    // has no plain column to fall back to, and then it really is drawn nowhere.
+    return fallback !== undefined;
   };
   const memo = new Map<string, boolean>();
   const visible = (path: string): boolean => {

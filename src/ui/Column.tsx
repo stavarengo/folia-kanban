@@ -21,6 +21,7 @@ import {
   type Filter,
   type MatchContext,
 } from "../model/filter";
+import { drawnPaths } from "../model/lanes";
 import { groupAndSortCards } from "./cardView";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -235,29 +236,36 @@ export function Column({
     if (!keepOpen) setAdding(false);
   };
 
-  const allPaths = cardPaths.filter((p) => board.cards[p]);
   // #9: the global search is the single source of truth — a parsed §1 Filter (empty = no filtering).
   const globalFiltering = !isEmptyFilter(filter);
   const columnFilter = column.filter ? parseFilter(column.filter) : null;
   const matchCtx = useMatchContext();
 
-  // #1 — an area-filtered column is an AUTO-POPULATED LANE, not a within-status filter. When a
-  // column carries a non-empty `filter` rule it pulls EVERY top-level card on the board matching
-  // the rule (cross-board — status need not equal this column's id), so e.g. `area:research status:todo`
-  // surfaces matching cards wherever they live. A card may appear in several lanes and/or in its
-  // status column too; we deliberately do NOT de-dupe across columns. A column with no rule keeps
-  // showing exactly its own status bucket (`cardPaths`), byte-identical to before.
-  const topLevelPaths = columnFilter
-    ? board.config.columns.flatMap((c) => board.columns[c.id] ?? []).filter((p) => board.cards[p])
-    : allPaths;
-  // The lane's own population (matched by the rule) — what the count badge + WIP reflect for a
-  // filter-lane. For a plain column this is just the status bucket.
+  // What this column draws is `drawnPaths`, the model's one definition of column membership: a lane
+  // pulls every card standing in a column that its rule matches, wherever that card lives, and
+  // ignores its own status bucket; a plain column draws its own bucket plus, in the board's first
+  // plain column, any card whose `status` names a lane that will not draw it — which would
+  // otherwise be on screen nowhere.
+  //
+  // A plain column takes that bucket from `cardPaths` rather than from the model, because a
+  // cross-column drag in flight shows the dragged card already moved in (`applyReloc` in Board) and
+  // the model reads the board as saved. The lane pull and the stranded fallback are unaffected by a
+  // drag preview, so they come straight from the model. Memoized: a lane walks every bucket, and a
+  // keystroke in the search box must not pay for that.
+  const modelPaths = useMemo(
+    () => drawnPaths(board, column.id, matchCtx),
+    [board, column.id, matchCtx],
+  );
+  const ownPaths = cardPaths.filter((p) => board.cards[p]);
+  const stranded = columnFilter
+    ? []
+    : modelPaths.filter((p) => !(board.columns[column.id] ?? []).includes(p));
   const lanePaths = columnFilter
-    ? topLevelPaths.filter((p) => {
-        const c = board.cards[p];
-        return c != null && matchCard(c, columnFilter, matchCtx);
-      })
-    : allPaths;
+    ? modelPaths
+    : stranded.length
+      ? [...ownPaths, ...stranded]
+      : ownPaths;
+
   // The rendered set additionally ANDs the global search filter (parsed §1 Filter) on top of the
   // lane — net per column: (lane-pull OR status-bucket) AND (empty global OR global matchCard).
   let paths = lanePaths;

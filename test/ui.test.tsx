@@ -2867,12 +2867,12 @@ describe("nested subcards under a filter (#20260826.10)", () => {
     expect(await screen.findByRole("button", { name: /subitems for "Root"/ })).toBeInTheDocument();
   });
 
-  it("counts nothing for a matching card its lane refuses to draw, nor for its children", async () => {
+  it("draws a card its lane refuses in the fallback column, and counts it there", async () => {
     const user = userEvent.setup();
     // TopParent's own status files it in the Research lane's bucket, but the lane ignores its
-    // bucket and pulls by its rule (`area:research`), which TopParent fails. Nothing draws it, and
-    // nothing can draw a child under a parent that is not on screen. Both match the search; the
-    // toolbar must still credit neither.
+    // bucket and pulls by its rule (`area:research`), which TopParent fails. It used to be drawn
+    // nowhere; the first plain column takes it in instead, so both it and the child nested under it
+    // are on screen and the toolbar credits both.
     const repo = new FakeRepo(
       {
         ...config,
@@ -2894,10 +2894,14 @@ describe("nested subcards under a filter (#20260826.10)", () => {
 
     await user.type(screen.getByLabelText("Search cards"), "urgent");
 
-    expect(document.querySelectorAll(".folia-card")).toHaveLength(0);
+    expect(document.querySelectorAll(".folia-card")).toHaveLength(2);
     expect(screen.getByText(/of/, { selector: ".folia-toolbar-status span" })).toHaveTextContent(
-      "0 of 2",
+      "2 of 2",
     );
+    // Drawn under Todo, the board's first column with no rule of its own — never inside Research,
+    // which shows only what its rule reaches.
+    const todo = document.querySelectorAll(".folia-column")[0];
+    expect(todo?.textContent).toContain("TopParent");
   });
 
   it("does not credit a match hidden inside a collapsed parent", async () => {

@@ -283,11 +283,27 @@ describe("filterVisiblePaths (§ what a filter actually shows, for counting)", (
     expect(visible.has("Tasks/Placed.md")).toBe(true);
   });
 
-  it("excludes a card sitting in a lane's bucket that no lane's rule pulls in", () => {
+  it("includes a card in a lane's bucket that no lane pulls in — the fallback column draws it", () => {
     // Its own `status` names the lane, so buildBoard files it there — but a lane ignores its bucket
-    // and pulls by its rule, which this card fails. Nothing draws it, so nothing may count it.
+    // and pulls by its rule, which this card fails. The board's first plain column takes it in
+    // instead of the card being drawn nowhere, so the tally may count it.
     const b = buildBoard(laneConfig, [card("Stray", { status: "research", area: "home" })]);
     expect(filterVisiblePaths(b, rules({ laneDraws: researchLane(b) })).has("Tasks/Stray.md")).toBe(
+      true,
+    );
+  });
+
+  it("excludes it when the board has no plain column to fall back to", () => {
+    // Every column is a rule-view, so a card matching no rule has no place the board can give it.
+    const allLanes: BoardConfig = {
+      ...config,
+      columns: [
+        { id: "research", title: "Research", filter: "area:research" },
+        { id: "garden", title: "Garden", filter: "area:garden" },
+      ],
+    };
+    const b = buildBoard(allLanes, [card("Stray", { status: "research", area: "home" })]);
+    expect(filterVisiblePaths(b, rules({ laneDraws: () => false })).has("Tasks/Stray.md")).toBe(
       false,
     );
   });

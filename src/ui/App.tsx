@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Board as BoardModel, ColumnDef } from "../model/types";
+import type { Board as BoardModel, Card, ColumnDef } from "../model/types";
 import {
   columnOf,
   filterVisiblePaths,
@@ -8,11 +8,13 @@ import {
   moveColumn,
   moveSubtask,
   parseTodoPath,
+  resolveDrop,
   reassignColumn,
   relationCounts,
   subtaskRef,
 } from "../model/board";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
+import { laneRefusal, prospectiveCard } from "../model/lanes";
 import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
@@ -204,6 +206,9 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
+  // Filled below, once the board and the settings it reads are in hand. The write paths run long
+  // after that, so they read it here rather than closing over a value declared after them.
+  const matchCtxRef = useRef<MatchContext | null>(null);
   // Reads can overlap — every vault change fires another `load`, and the read it starts can take
   // longer than one already in flight. Only the newest requested load may land, the same sequence
   // guard `CardDetail` uses for its own per-card body reads: a result whose number has been
@@ -317,10 +322,31 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     };
   }, [boardShown, host]);
 
+  /**
+   * A lane is a view of its rule and never an owner of a card, so filing one into a lane it does
+   * not match would leave the card claiming a column that will not draw it. The write is refused
+   * with the reason instead: nothing is written, and the card returns to where it was.
+   */
+  const refusedByLane = useCallback(
+    (columnId: string, card: Card): boolean => {
+      const b = boardRef.current;
+      const ctx = matchCtxRef.current;
+      if (!b || !ctx) return false;
+      const why = laneRefusal(b, columnId, card, ctx);
+      if (why === null) return false;
+      showToast(`${why} Nothing was changed.`, "error");
+      return true;
+    },
+    [showToast],
+  );
+
   const onMove = useCallback(
     async (activeId: string, overId: string) => {
       const b = boardRef.current;
       if (!b) return;
+      const resolved = resolveDrop(b, activeId, overId);
+      const dragged = b.cards[activeId];
+      if (resolved && dragged && refusedByLane(resolved.columnId, dragged)) return;
       try {
         await moveCardOver(repo, b, { activeId, overId });
       } catch (e) {
@@ -330,11 +356,14 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         await load();
       }
     },
-    [repo, load, reportError],
+    [repo, load, reportError, refusedByLane],
   );
 
   const onAddCard = useCallback(
     async (columnId: string, title: string) => {
+      // Judged before the note exists, on the card `createCard` is about to write: a lane asking
+      // for a field an added card has no way to carry is a lane the card would never appear in.
+      if (refusedByLane(columnId, prospectiveCard(title, columnId))) return;
       try {
         const path = await repo.createCard(title, columnId);
         await load();
@@ -350,7 +379,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         reportError(e);
       }
     },
-    [repo, load, settings.addCardFlow, settings.addCardOpenMode, reportError],
+    [repo, load, settings.addCardFlow, settings.addCardOpenMode, reportError, refusedByLane],
   );
 
   const doneColumnId = useMemo(
@@ -362,13 +391,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     async (path: string, columnId: string) => {
       const b = boardRef.current;
       if (!b) return;
+      const card = b.cards[path];
+      if (card && refusedByLane(columnId, card)) return;
       try {
         await moveCardTo(repo, b, { path, columnId });
       } finally {
         await load();
       }
     },
-    [repo, load],
+    [repo, load, refusedByLane],
   );
 
   const setColumnsAndReload = useCallback(
@@ -850,6 +881,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     }),
     [todayValue, doneColumnId, relationCountsValue, settings, pinnedSeen],
   );
+  matchCtxRef.current = matchCtx;
 
   // Each filter-lane column's rule, parsed once per board rather than per keystroke: the tally has
   // to ask whether a lane draws a given card, and a lane's population is its rule, not its bucket.

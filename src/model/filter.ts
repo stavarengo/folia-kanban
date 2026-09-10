@@ -272,18 +272,51 @@ const TOKEN_RULES: Record<FilterKey, TokenRule> = {
   unread: { test: matchUnread, answerable: (_value, ctx) => ctx.unread !== undefined },
 };
 
-function matchToken(card: Card, token: FilterToken, ctx: MatchContext): boolean {
-  return TOKEN_RULES[token.key].test(card, token.value, ctx);
+/** What a filter says about a card: it matches, it does not, or this context cannot tell. */
+export type FilterVerdict = "matches" | "rejects" | "unknown";
+
+/**
+ * The engine behind {@link matchCard} and {@link judgeCard}. With `skipUnanswerable` off, a token
+ * the context cannot answer is tested anyway and reads as its documented default ("no card is
+ * blocked, nothing is unread, nobody is me") — the right answer for a search box, which must return
+ * something. With it on, such a token is set aside and the whole verdict becomes `unknown`, which
+ * is what a caller about to refuse a write over a rule needs: refusing a card because the server
+ * cannot see who has read it would be worse than the write it prevents.
+ */
+function judge(
+  card: Card,
+  filter: Filter,
+  ctx: MatchContext,
+  skipUnanswerable: boolean,
+): FilterVerdict {
+  if (filter.text.length) {
+    const hay = freeTextHaystack(card);
+    for (const t of filter.text) if (!hay.includes(t)) return "rejects";
+  }
+  let unanswered = false;
+  for (const token of filter.tokens) {
+    const rule = TOKEN_RULES[token.key];
+    if (skipUnanswerable && rule.answerable?.(token.value, ctx) === false) {
+      unanswered = true;
+      continue;
+    }
+    if (!rule.test(card, token.value, ctx)) return "rejects";
+  }
+  return unanswered ? "unknown" : "matches";
 }
 
 /** Pure predicate: does a card satisfy every term of the parsed filter? */
 export function matchCard(card: Card, filter: Filter, ctx: MatchContext): boolean {
-  if (filter.text.length) {
-    const hay = freeTextHaystack(card);
-    for (const t of filter.text) if (!hay.includes(t)) return false;
-  }
-  for (const token of filter.tokens) if (!matchToken(card, token, ctx)) return false;
-  return true;
+  return judge(card, filter, ctx, false) === "matches";
+}
+
+/**
+ * Like {@link matchCard}, but says "I cannot tell" instead of guessing when the context is missing
+ * what a token reads. Only a caller that will act on a "no" — refusing a write — needs the
+ * distinction; everything that merely shows cards wants {@link matchCard}.
+ */
+export function judgeCard(card: Card, filter: Filter, ctx: MatchContext): FilterVerdict {
+  return judge(card, filter, ctx, true);
 }
 
 /** Convenience: parse + match in one call (e.g. a one-off area-scoped column rule). */
