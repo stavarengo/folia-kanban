@@ -148,21 +148,44 @@ export function deriveContext(cardFolder: string, path: string): string | undefi
   return rest.slice(0, slash);
 }
 
-/** What a `[[wikilink]]` binds to on a given set of cards: a card path, or null. */
+/** What a `[[wikilink]]` binds to on a given set of cards, read from one note: a card path, or null. */
 export type LinkResolver = (link: string) => string | null;
+
+/**
+ * The same question with the note asking it named, which is what Obsidian needs to answer it: the
+ * host resolves a link differently depending on where it is written (a name a sibling note carries
+ * wins over a distant one). Supplied by the adapter — see {@link Board.resolveLink}.
+ */
+export type SourcedLinkResolver = NonNullable<Board["resolveLink"]>;
+
+/** The part of a link that names a note: the `#anchor` and the `|alias` dropped. */
+function linkpathOf(link: string): string {
+  const noAnchor = link.split("#");
+  const noAlias = (noAnchor[0] ?? link).split("|");
+  return (noAlias[0] ?? "").trim();
+}
 
 /**
  * Build the one resolver every reading of a `[[wikilink]]` goes through — subcard parentage,
  * blocking relationships, and the detail panel's rows alike — so they can never disagree about
- * which card a link names. A link carrying a folder segment binds to that exact path; otherwise
- * it matches by basename, but only when that basename is unambiguous (duplicate basenames across
- * folders resolve to nothing rather than silently binding the wrong one). A `.md` suffix, an
- * `#anchor` and a `|alias` are all tolerated.
+ * which card a link names. A `.md` suffix, an `#anchor` and a `|alias` are all tolerated, and the
+ * answer is always a card on this board or nothing: a link naming a note outside the card folder
+ * resolves to null, the way it always has.
+ *
+ * `host` is the vault's own resolution (Obsidian's `MetadataCache`, injected by the adapter) and
+ * is authoritative when it is there, so a link binds to exactly the note the same link would open
+ * in the editor — including the shortest-path and same-folder rules, which need the note the link
+ * is written in and are why this takes a `sourcePath` at all.
+ *
+ * Without a host — a board assembled in a test, or by any caller with no vault behind it — the
+ * fallback is the basename index this always used: a link carrying a folder segment binds to that
+ * exact path, a bare name binds only when one card answers to it, and an ambiguous name binds to
+ * nothing rather than to whichever card came first.
  *
  * Feed it real notes only: the synthetic cards minted for placed inline todos borrow their note's
  * file name, and would make every card holding one look like two cards sharing a name.
  */
-function linkResolver(cards: Iterable<Card>): LinkResolver {
+function linkResolver(cards: Iterable<Card>, host?: SourcedLinkResolver): SourcedLinkResolver {
   const byBasename = new Map<string, string[]>();
   const byPath = new Set<string>();
   for (const c of cards) {
@@ -171,10 +194,13 @@ function linkResolver(cards: Iterable<Card>): LinkResolver {
     if (arr) arr.push(c.path);
     else byBasename.set(c.basename, [c.path]);
   }
-  return (link) => {
-    const noAnchor = link.split("#");
-    const noAlias = (noAnchor[0] ?? link).split("|");
-    const raw = (noAlias[0] ?? "").trim();
+  return (link, sourcePath) => {
+    const raw = linkpathOf(link);
+    if (raw === "") return null;
+    if (host !== undefined) {
+      const hit = host(raw, sourcePath);
+      return hit !== null && byPath.has(hit) ? hit : null;
+    }
     if (raw.includes("/")) {
       const withMd = /\.md$/i.test(raw) ? raw : raw + ".md";
       if (byPath.has(withMd)) return withMd;
@@ -187,9 +213,16 @@ function linkResolver(cards: Iterable<Card>): LinkResolver {
   };
 }
 
-/** The resolver for a built board: its real notes, never the tiles minted for placed todos. */
-export function boardLinkResolver(board: Board): LinkResolver {
-  return linkResolver(Object.values(board.cards).filter((c) => !c.todoRef));
+/**
+ * The resolver for a built board, reading links as the note at `sourcePath` writes them. The board
+ * carries the answer it was built with (the vault's, where there is a vault), so every later
+ * reading agrees with the one that decided the board's own nesting; a `Board` assembled by hand
+ * falls back to the basename index over its real notes.
+ */
+export function boardLinkResolver(board: Board, sourcePath: string): LinkResolver {
+  const resolve =
+    board.resolveLink ?? linkResolver(Object.values(board.cards).filter((c) => !c.todoRef));
+  return (link) => resolve(link, sourcePath);
 }
 
 /** Alphabetical by displayed title; the basename breaks ties so the order stays deterministic. */
@@ -257,7 +290,7 @@ function isGenuinelyNested(path: string, parentOf: Record<string, string>): bool
  */
 function buildRelations(
   cards: Card[],
-  resolve: LinkResolver,
+  resolve: SourcedLinkResolver,
   types: readonly RelationTypeDef[],
 ): void {
   const outgoing: Record<string, RelationLink[]> = {};
@@ -334,7 +367,7 @@ function buildRelations(
         addEdge(
           type.key,
           { path: c.path, target: c.basename },
-          { path: resolve(target), target },
+          { path: resolve(target, c.path), target },
           "from",
         );
       }
@@ -343,7 +376,7 @@ function buildRelations(
       for (const target of readInverse(c.frontmatter, type)) {
         addEdge(
           type.key,
-          { path: resolve(target), target },
+          { path: resolve(target, c.path), target },
           { path: c.path, target: c.basename },
           "to",
         );
@@ -360,6 +393,7 @@ export function buildBoard(
   config: BoardConfig,
   cards: Card[],
   contexts: Record<string, ContextConfig> = {},
+  hostResolve?: SourcedLinkResolver,
 ): Board {
   // Derive each card's context from its path (#14): one place, so every card on the board carries
   // the same notion of context the `context:` filter token reads. Path-derived, never written.
@@ -368,7 +402,7 @@ export function buildBoard(
     if (ctx !== undefined) c.context = ctx;
   }
 
-  const resolve = linkResolver(cards);
+  const resolve = linkResolver(cards, hostResolve);
   const cardsByPath: Record<string, Card> = {};
   for (const c of cards) cardsByPath[c.path] = c;
 
@@ -377,7 +411,7 @@ export function buildBoard(
   const parentOf: Record<string, string> = {};
   for (const c of cards) {
     for (const link of c.childLinks) {
-      const childPath = resolve(link);
+      const childPath = resolve(link, c.path);
       if (childPath && childPath !== c.path && !parentOf[childPath]) {
         parentOf[childPath] = c.path;
       }
@@ -456,7 +490,7 @@ export function buildBoard(
         // parent's box was ever ticked. Every write the board makes ticks that box (`moveCard`),
         // but a `status` edited by hand in the child note reaches the parent only here — so the
         // progress bar tells the truth either way, and the note catches up on the next move.
-        const child = item.link === undefined ? null : resolve(item.link);
+        const child = item.link === undefined ? null : resolve(item.link, c.path);
         const finished =
           child !== null && child !== c.path && cardsByPath[child]?.frontmatter.status === doneCol;
         if (!item.done && doneCol !== null && finished) placedFor(c.path).doneByColumn++;
@@ -533,7 +567,18 @@ export function buildBoard(
     childrenOf[parent] = columnEffectiveOrders(childGroups[parent] ?? []).map((x) => x.card.path);
   }
 
-  return { config, columns, cards: cardsByPath, parentOf, placedOf, childrenOf, contexts };
+  return {
+    config,
+    columns,
+    cards: cardsByPath,
+    parentOf,
+    placedOf,
+    childrenOf,
+    contexts,
+    // The board keeps the reading that decided its own nesting, so nothing looking at it later
+    // (the detail panel, a checklist tick, an MCP tool) can bind the same link to another card.
+    resolveLink: resolve,
+  };
 }
 
 /** How many links of one type a card shows in each direction (see {@link relationCounts}). */
@@ -1035,7 +1080,7 @@ export function syncSubtaskClaim(
     // caller says which `[[link]]` it showed the person, and a line that no longer carries that
     // link (the note was edited under the open panel) gets no write rather than a wrong one.
     if (link === undefined || item.link !== link) return null;
-    const child = boardLinkResolver(board)(link);
+    const child = boardLinkResolver(board, parentPath)(link);
     const status = child === null ? undefined : board.cards[child]?.frontmatter.status;
     if (child === null || status === undefined) return null;
     const moving = done ? status !== doneCol && doneCol !== null : status === doneCol;
@@ -1079,10 +1124,12 @@ function parentLinesOf(
   done: boolean,
   except?: string,
 ): NonNullable<CardMutation["parentLines"]> {
-  const resolve = boardLinkResolver(board);
   const out: NonNullable<CardMutation["parentLines"]> = [];
   for (const c of Object.values(board.cards)) {
     if (c.todoRef || c.path === childPath || c.path === except) continue;
+    // Each note's own links, read from that note: which card `[[A]]` names depends on where it is
+    // written, so a resolver bound to one card cannot answer for another's checklist.
+    const resolve = boardLinkResolver(board, c.path);
     const links = (c.subItems ?? [])
       .filter(
         (s): s is typeof s & { link: string } =>

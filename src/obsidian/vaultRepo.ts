@@ -135,6 +135,46 @@ export class VaultRepository implements CardRepository {
     return f;
   }
 
+  /**
+   * Which note a link written in `sourcePath` names, answered by the vault itself — the same
+   * answer the editor gives when that link is clicked, shortest-path and same-folder rules
+   * included. `link` is a bare linkpath (no `#anchor`, no `|alias`); a `.md` suffix is fine.
+   * Null for a link naming no note.
+   */
+  private resolveLink(link: string, sourcePath: string): string | null {
+    return this.app.metadataCache.getFirstLinkpathDest(link, sourcePath)?.path ?? null;
+  }
+
+  /**
+   * How a link to the note at `targetPath` should be written inside a note at `sourcePath`, per
+   * this vault's own link settings — the shortest name that still names one note, a relative or
+   * absolute path where the vault is set up that way.
+   *
+   * Only the text INSIDE the brackets: every link Folia writes is a wikilink, whatever the vault's
+   * "use [[Wikilinks]]" setting says, because Folia's own reading of a note (the `## Subtasks`
+   * checklist, the relationship keys) only recognizes that form. A vault set to Markdown links
+   * therefore gets a wikilink here — the honest shape until reading Markdown links is built too.
+   */
+  private linkTextTo(targetPath: string, sourcePath: string): string {
+    const file = this.app.vault.getAbstractFileByPath(targetPath);
+    const bare = targetPath.replace(/\.md$/i, "");
+    if (!(file instanceof TFile)) return bare;
+    const generated = this.app.fileManager.generateMarkdownLink(file, sourcePath).trim();
+    // The full vault path is the fallback because it names exactly one note under every setting.
+    return /^\[\[[^\]]+\]\]$/.test(generated) ? generated.slice(2, -2) : bare;
+  }
+
+  /**
+   * The note a relationship `target` names, read from the card that declares it — or null when it
+   * names no note, or carries an `#anchor` / `|alias`. A decorated target said more than "which
+   * note", so it is left alone rather than rewritten into a plainer link that loses the rest.
+   */
+  private relationTargetPath(target: string, sourcePath: string): string | null {
+    const raw = target.trim();
+    if (raw === "" || raw.includes("#") || raw.includes("|")) return null;
+    return this.resolveLink(raw, sourcePath);
+  }
+
   private frontmatterOf(file: TFile): CardFrontmatter {
     const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
     return cached ?? {};
@@ -306,7 +346,12 @@ export class VaultRepository implements CardRepository {
       });
     }
     // buildBoard derives each card's `context` from its path; carry the configs alongside.
-    const board = buildBoard(config, cards, await this.loadContexts(config.cardFolder));
+    const board = buildBoard(
+      config,
+      cards,
+      await this.loadContexts(config.cardFolder),
+      (link, source) => this.resolveLink(link, source),
+    );
     return cardFolderWarning ? { ...board, cardFolderWarning } : board;
   }
 
@@ -564,10 +609,22 @@ export class VaultRepository implements CardRepository {
   async addRelation(path: string, type: RelationType, target: string): Promise<void> {
     // Refused at the write, not just hidden at the read: a self-link is dropped when the board is
     // built, so storing one would put a line in the note that no panel can show or take back.
-    if (isSelfRelation(path, this.file(path).basename, target)) return;
+    // Where the vault names the note, that answer settles it: a target is a self-link when it
+    // reaches this very note, whatever it was spelled as. Only a target the vault cannot place —
+    // a card that is not there yet, or one carrying an anchor — falls back to comparing names.
+    const targetPath = this.relationTargetPath(target, path);
+    const self =
+      targetPath !== null
+        ? targetPath === path
+        : isSelfRelation(path, this.file(path).basename, target);
+    if (self) return;
     if (!(await this.knownRelation(type))) return;
-    const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, target));
-    if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, target));
+    // Same reason as `addSubcard`: whatever the caller named the card, the note gets the link this
+    // vault would write to it, so the board reads back the card the caller meant. A target naming
+    // no note (a link to a card that is not there yet) is stored exactly as it was typed.
+    const written = targetPath === null ? target : this.linkTextTo(targetPath, path);
+    const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, written));
+    if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, written));
   }
 
   async removeRelation(
@@ -625,8 +682,11 @@ export class VaultRepository implements CardRepository {
     // create the subcard in a column named "[object Object]".
     const parentStatus = scalarText(parentFm["status"]);
     const childPath = await this.createCard(title, parentStatus || "todo");
-    const childBase = (childPath.split("/").pop() ?? "").replace(/\.md$/i, "");
-    await this.editBody(parentPath, (t) => addSubcardText(t, childBase));
+    // Written the way THIS vault writes links, from this parent: a bare file name is ambiguous the
+    // moment a second note takes it, and Folia would then write a link Folia cannot read back.
+    await this.editBody(parentPath, (t) =>
+      addSubcardText(t, this.linkTextTo(childPath, parentPath)),
+    );
     return childPath;
   }
 

@@ -132,7 +132,9 @@ export function relationLinkText(target: string): string {
  * that nothing on the board can show or undo. Both ends refuse it instead.
  *
  * A bare name matching this card's file name counts even when another folder holds a same-named
- * card: the board refuses to bind an ambiguous name at all, so that link would be dead anyway.
+ * card: a link is read from the note that writes it, and a note's own folder wins a bare name, so
+ * such a link reaches this card and nothing else. The vault adapter compares resolved paths where
+ * it can and falls back to this reading otherwise (`VaultRepository.addRelation`).
  */
 export function isSelfRelation(path: string, basename: string, target: string): boolean {
   const raw = targetIdentity(target);

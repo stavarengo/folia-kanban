@@ -349,6 +349,15 @@ export interface Board {
    * `parentOf` also links the members of a subcard cycle to each other, and those render top-level.
    */
   placedOf: Record<string, string>;
+  /**
+   * Which card a `[[wikilink]]` written in the note at `sourcePath` names on this board — a card
+   * path, or null for a link naming nothing here. Set by `buildBoard` from the host's own link
+   * resolution (Obsidian's `MetadataCache` in the vault adapter), so a link binds to the note the
+   * editor would open with it, and every later reading of that link agrees with the nesting the
+   * board was built with. Absent only on a `Board` assembled without going through `buildBoard`;
+   * `boardLinkResolver` then falls back to matching unambiguous file names.
+   */
+  resolveLink?: (link: string, sourcePath: string) => string | null;
   /** Context configs keyed by subfolder name (#14). Empty when the board has no subfolders. */
   contexts: Record<string, ContextConfig>;
   /**

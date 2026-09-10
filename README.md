@@ -285,6 +285,8 @@ A heading that becomes the title stays part of the note's body, so it is also de
 
 The file name is still the card's identity: `[[wikilinks]]` between cards, and therefore subcard parentage, always match the file name, never the displayed title. Two cards can safely show the same title.
 
+Two cards can share a file name too. A `[[wikilink]]` between cards binds to the note Obsidian itself would open with it: a name a card's own folder holds wins over the same name elsewhere, and a link carrying a folder path names that exact note. Links the board writes for you — the checklist line for a new subcard, a relationship you add from the detail panel — are written the way this vault writes links, so a name two folders share comes out as the full path rather than as a bare name that could reach either note. Links already in your notes are never rewritten.
+
 ## Settings
 
 Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is a handful of headed sections, and a row that only applies under another setting says so in its own description and greys out until that setting says otherwise.

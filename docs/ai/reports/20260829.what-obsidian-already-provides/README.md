@@ -160,8 +160,8 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.18](../../backlog/20260829.18.the-boards-components-are-drawn-beside-the-apps-component-variables.md) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
 | [20260829.19](../../backlog/20260829.19.the-raw-value-audit-is-blind-to-most-of-what-it-polices.md) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
 | 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
-| [20260829.21](../../backlog/20260829.21.folia-resolves-and-writes-wikilinks-with-its-own-rules.md) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03, 04-19 |
-| [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 07-16 |
+| 20260829.21 (fixed, entry closed) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03 |
+| [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 04-19, 07-16 |
 | [20260829.23](../../backlog/20260829.23.a-card-using-any-other-checkbox-character-loses-its-subtasks.md) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
 | 20260829.24 (fixed, entry closed) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
 | [20260829.25](../../backlog/20260829.25.subtask-and-comment-edits-apply-a-line-index-from-an-earlier-read.md) | Bug: a stale line index applied inside `vault.process` | 04-12 |

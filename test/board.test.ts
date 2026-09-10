@@ -530,13 +530,68 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     expect(moveCard(b, "Tasks/Child.md", "later", 0)?.parentLines).toBeUndefined();
   });
 
+  it("binds an ambiguous link the way the vault does, when the vault answers", () => {
+    // The rule Obsidian applies and the basename index could not: a name two folders share binds
+    // to the note beside the one that wrote the link.
+    const sameFolder = (link: string, source: string) =>
+      link === "Child" ? `${source.slice(0, source.lastIndexOf("/"))}/Child.md` : null;
+    const b = buildBoard(
+      config,
+      [
+        {
+          ...withItems("Parent", { status: "todo" }, [link("Child", 0)]),
+          path: "Tasks/x/Parent.md",
+        },
+        { ...card("Child", { status: "todo" }), path: "Tasks/x/Child.md" },
+        { ...card("Child", { status: "todo" }), path: "Tasks/y/Child.md" },
+      ],
+      {},
+      sameFolder,
+    );
+    expect(boardLinkResolver(b, "Tasks/x/Parent.md")("Child")).toBe("Tasks/x/Child.md");
+    expect(b.parentOf["Tasks/x/Child.md"]).toBe("Tasks/x/Parent.md");
+    expect(b.parentOf["Tasks/y/Child.md"]).toBeUndefined();
+  });
+
+  it("binds nothing when the vault names a note that is not a card on this board", () => {
+    const elsewhere = () => "Elsewhere/Child.md";
+    const b = buildBoard(
+      config,
+      [
+        withItems("Parent", { status: "todo" }, [link("Child", 0)]),
+        card("Child", { status: "todo" }),
+      ],
+      {},
+      elsewhere,
+    );
+    expect(boardLinkResolver(b, "Tasks/Parent.md")("Child")).toBeNull();
+    expect(b.parentOf["Tasks/Child.md"]).toBeUndefined();
+  });
+
+  it("hands the vault the link name alone, without its anchor or its alias", () => {
+    const seen: string[] = [];
+    buildBoard(
+      config,
+      [
+        withItems("Parent", { status: "todo" }, [link("Child#Notes|see this", 0)]),
+        card("Child", {}),
+      ],
+      {},
+      (link, source) => {
+        seen.push(`${link} @ ${source}`);
+        return null;
+      },
+    );
+    expect(seen).toContain("Child @ Tasks/Parent.md");
+  });
+
   it("does not bind an ambiguous link to either card", () => {
     const b = buildBoard(config, [
       withItems("Parent", { status: "todo" }, [link("Child", 0)]),
       { ...card("Child", { status: "todo" }), path: "Tasks/x/Child.md" },
       { ...card("Child", { status: "todo" }), path: "Tasks/y/Child.md" },
     ]);
-    expect(boardLinkResolver(b)("Child")).toBeNull();
+    expect(boardLinkResolver(b, "Tasks/Parent.md")("Child")).toBeNull();
     expect(syncSubcardLines(b, "Tasks/x/Child.md", "done")).toBeNull();
   });
 

@@ -930,9 +930,10 @@ export function CardDetail({
     },
     [repo],
   );
-  // The same reading of a `[[wikilink]]` the board used to nest subcards, so a link the board bound
-  // is never shown here as missing, and one the board refused (an ambiguous name) is never bound.
-  const resolve = useMemo(() => boardLinkResolver(board), [board]);
+  // The same reading of a `[[wikilink]]` the board used to nest subcards, read from THIS card the
+  // way the vault reads a link written in it — so a link the board bound is never shown here as
+  // missing, and neither reading can bind a name to a card the other one refused.
+  const resolve = useMemo(() => boardLinkResolver(board, path), [board, path]);
 
   // Unread comments (§ unread). Read-state is plugin data keyed by card path, so it is read from
   // settings rather than from the note. Two things happen here and their order is the whole point:

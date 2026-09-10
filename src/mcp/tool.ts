@@ -2,7 +2,7 @@
 // and the card it was asked about. The tools themselves live in boardTools.ts / cardTools.ts.
 
 import { z } from "zod";
-import { columnOf, parseTodoPath } from "../model/board";
+import { boardLinkResolver, columnOf, parseTodoPath } from "../model/board";
 import type { Board } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { BoardHost } from "./host";
@@ -88,28 +88,48 @@ export async function openBoard(
 
 /**
  * The card `ref` names. A vault path is the exact form `get_board` hands out and is matched first;
- * a title or file name is accepted too, and is refused rather than guessed when the board has more
- * than one card answering to it.
+ * a title or a file name is accepted too, and is refused rather than guessed when the board has
+ * more than one card answering to it.
+ *
+ * A file name is read the way the board itself reads a `[[wikilink]]` written in the board note,
+ * so the tools and the board can never bind one name to two different cards: a name two folders
+ * share names the card that link would open, rather than nothing. A title has no such reading —
+ * it is not a link target — so titles are matched here and nowhere else, and two cards answering
+ * to one title are still named rather than guessed between.
  */
 export function resolveCardPath(board: Board, ref: string): string {
   // `hasOwn`, not a truthiness test: `board.cards` is a plain object, so a ref of
   // "toString" or "constructor" would otherwise resolve to a function off the prototype and crash
   // somewhere far from here, instead of getting the "no card answers to that" error.
   if (Object.prototype.hasOwnProperty.call(board.cards, ref)) return ref;
+  const linked = boardLinkResolver(board, board.config.path)(ref);
   const matches = Object.values(board.cards).filter(
     (c) =>
-      c.title === ref ||
       // A checklist line standing in a column of its own carries its parent's file name, so
-      // matching on that would make every such line a rival of the note it lives in. Its own text
-      // is its title, which is matched above, and that is the only name it answers to.
-      (!c.todoRef && (c.basename === ref || c.path === `${ref}.md`)),
+      // matching it by that name would make every such line a rival of the note it lives in. Its
+      // own text is its title, which is what it answers to.
+      c.title === ref || (!c.todoRef && c.path === linked),
   );
-  if (matches.length === 1) return matches[0]?.path ?? ref;
-  if (matches.length > 1) {
+  const ambiguous = (paths: string[]): never => {
     throw new ToolError(
-      `"${ref}" names ${matches.length} cards on this board: ${matches.map((c) => c.path).join(", ")}. Pass one of those paths.`,
+      `"${ref}" names ${paths.length} cards on this board: ${paths.join(", ")}. Pass one of those paths.`,
     );
-  }
+  };
+  const bound = [...new Set(matches.map((c) => c.path))];
+  if (bound.length === 1) return bound[0] ?? ref;
+  if (bound.length > 1) ambiguous(bound);
+  // Nothing bound. The file name may still sit on a card the vault's link resolution passed over —
+  // a note outside the card folder can win a bare name — or on two of them at once. A card that
+  // owns the name alone is what the caller meant; two are named rather than guessed between.
+  const named = [
+    ...new Set(
+      Object.values(board.cards)
+        .filter((c) => !c.todoRef && (c.basename === ref || c.path === `${ref}.md`))
+        .map((c) => c.path),
+    ),
+  ];
+  if (named.length === 1) return named[0] ?? ref;
+  if (named.length > 1) ambiguous(named);
   throw new ToolError(
     `No card "${ref}" on board "${board.config.path}". Pass a card path as get_board reports it.`,
   );

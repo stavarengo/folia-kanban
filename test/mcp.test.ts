@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { TOOLS } from "../src/mcp/tools";
 import { handleMessage, type ServerInfo } from "../src/mcp/protocol";
 import type { BoardHost } from "../src/mcp/host";
-import type { BoardConfig, HistoryScope } from "../src/model/types";
+import type { BoardConfig, Card, HistoryScope } from "../src/model/types";
+import { buildBoard } from "../src/model/board";
+import { resolveCardPath } from "../src/mcp/tool";
 import { FakeRepo } from "./fakeRepo";
 
 const config: BoardConfig = {
@@ -1165,5 +1167,55 @@ describe("a description that opens with a heading the card reads as its title", 
       description: "## Question\n\nwhy?",
     });
     expect((await repo.readBody("Tasks/Ship it.md")).description).toBe("## Question\n\nwhy?");
+  });
+});
+
+describe("the card a tool's `card` argument names", () => {
+  function note(path: string, title = path.split("/").pop()?.replace(/\.md$/, "") ?? ""): Card {
+    return {
+      path,
+      basename: path.split("/").pop()?.replace(/\.md$/, "") ?? "",
+      title,
+      titleSource: "filename",
+      frontmatter: { status: "todo" },
+      childLinks: [],
+    };
+  }
+  // Same file name, different displayed titles — the shape a `title:` property or a heading makes.
+  const twins = [note("Tasks/x/Dup.md", "First"), note("Tasks/y/Dup.md", "Second")];
+
+  it("reads a file name the way a link in the board note would read it", () => {
+    // Same rule as everywhere else: the vault answers, and it answers with one note.
+    const board = buildBoard(config, twins, {}, (link) =>
+      link === "Dup" ? "Tasks/x/Dup.md" : null,
+    );
+    expect(resolveCardPath(board, "Dup")).toBe("Tasks/x/Dup.md");
+  });
+
+  it("names both cards when nothing can pick between them", () => {
+    const board = buildBoard(config, twins);
+    expect(() => resolveCardPath(board, "Dup")).toThrow(
+      /"Dup" names 2 cards on this board: Tasks\/x\/Dup\.md, Tasks\/y\/Dup\.md/,
+    );
+  });
+
+  it("names both cards when the vault binds one and the other answers to the same title", () => {
+    // A title is not a link target, so the vault's answer cannot settle a title it never saw. Two
+    // cards genuinely answer to "Dup" here, and an agent gets to say which.
+    const sameTitle = [note("Tasks/x/Dup.md"), note("Tasks/y/Dup.md")];
+    const board = buildBoard(config, sameTitle, {}, (link) =>
+      link === "Dup" ? "Tasks/x/Dup.md" : null,
+    );
+    expect(() => resolveCardPath(board, "Dup")).toThrow(/names 2 cards/);
+  });
+
+  it("still finds a card whose name the vault gave to a note outside the board", () => {
+    const board = buildBoard(config, [note("Tasks/Solo.md")], {}, () => "Elsewhere/Solo.md");
+    expect(resolveCardPath(board, "Solo")).toBe("Tasks/Solo.md");
+  });
+
+  it("refuses a title two cards answer to", () => {
+    const board = buildBoard(config, [note("Tasks/One.md", "Same"), note("Tasks/Two.md", "Same")]);
+    expect(() => resolveCardPath(board, "Same")).toThrow(/names 2 cards/);
   });
 });

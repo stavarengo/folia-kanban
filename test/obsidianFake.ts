@@ -396,6 +396,42 @@ export class FakeMetadataCache extends Events {
       );
   }
 
+  /**
+   * Obsidian's own link resolution, close enough for the rules Folia depends on and measured
+   * against Obsidian 1.13.7 in the examples vault:
+   *
+   * - a linkpath carrying a folder is read from the vault root first, then relative to the note
+   *   the link is written in;
+   * - a bare file name binds to a note in the SAME folder as the source before any other, and
+   *   between the rest to the first in path order — never to nothing, which is where the real
+   *   thing and Folia's old basename index part ways;
+   * - a `.md` suffix is accepted;
+   * - an ALIAS is not a link target. `[[Some alias]]` lands in `unresolvedLinks` in Obsidian too;
+   *   aliases only feed the link suggester, which rewrites the link to `[[Note|Some alias]]` as it
+   *   inserts it. A fake that resolved them would be a rule Obsidian does not have.
+   */
+  getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null {
+    const clean = linkpath.replace(/\.md$/i, "").trim();
+    if (clean === "") return null;
+    const at = (path: string): TFile | null => {
+      const f = this.vault.getAbstractFileByPath(path);
+      return f instanceof TFile ? f : null;
+    };
+    const slash = sourcePath.lastIndexOf("/");
+    const sourceDir = slash === -1 ? "" : sourcePath.slice(0, slash);
+    if (clean.includes("/")) {
+      return at(`${clean}.md`) ?? (sourceDir ? at(`${sourceDir}/${clean}.md`) : null);
+    }
+    const named = this.vault
+      .getMarkdownFiles()
+      .filter((f) => f.basename === clean)
+      .sort((a, b) => a.path.localeCompare(b.path));
+    const sameFolder = named.find(
+      (f) => f.path === `${sourceDir ? sourceDir + "/" : ""}${clean}.md`,
+    );
+    return sameFolder ?? named[0] ?? null;
+  }
+
   getFileCache(file: TFile): {
     frontmatter?: Record<string, unknown>;
     tags?: { tag: string }[];
@@ -423,6 +459,16 @@ export class FakeFileManager {
 
   async processFrontMatter(file: TFile, fn: (fm: Record<string, unknown>) => void): Promise<void> {
     this.vault.writeFrontmatter(file.path, fn);
+  }
+
+  /**
+   * The vault's default link style: the shortest name that still names one note (Obsidian's
+   * `newLinkFormat: "shortest"`), so a file name two folders share is written as a full path.
+   * Wikilink form, which is what the vault this is a fake of is set to.
+   */
+  generateMarkdownLink(file: TFile, _sourcePath: string): string {
+    const shared = this.vault.getMarkdownFiles().filter((f) => f.basename === file.basename);
+    return shared.length > 1 ? `[[${file.path.replace(/\.md$/i, "")}]]` : `[[${file.basename}]]`;
   }
 
   async renameFile(file: TAbstractFile, dest: string): Promise<void> {

@@ -55,8 +55,8 @@ const MIRRORED: {
     "on",
     "offref",
   ],
-  metadataCache: ["getFileCache", "on", "offref"],
-  fileManager: ["processFrontMatter", "renameFile", "trashFile"],
+  metadataCache: ["getFileCache", "getFirstLinkpathDest", "on", "offref"],
+  fileManager: ["processFrontMatter", "renameFile", "trashFile", "generateMarkdownLink"],
 };
 
 describe("the fake this suite runs against", () => {
@@ -390,6 +390,87 @@ describe("relationships the board note does not name", () => {
     await repo.removeRelation("basic/Cards/One.md", "blocks", ["[[Two]]"]);
 
     expect(app.vault.frontmatter("basic/Cards/One.md")).not.toHaveProperty("blocks");
+  });
+});
+
+describe("links, read and written the way the vault reads and writes them", () => {
+  /** Two cards with the same file name in different folders, and a parent beside one of them. */
+  function twoChildren() {
+    const made = setup();
+    made.vault.addFile(
+      "basic/Cards/x/Parent.md",
+      card("status: todo", "\n# Parent\n\n## Subtasks\n- [ ] [[Child]]\n"),
+    );
+    made.vault.addFile("basic/Cards/x/Child.md", card("status: todo"));
+    made.vault.addFile("basic/Cards/y/Child.md", card("status: todo"));
+    return made;
+  }
+
+  it("nests the child the vault would open, not neither of them", async () => {
+    const { repo } = twoChildren();
+
+    const board = await repo.loadBoard();
+
+    // The old basename index refused an ambiguous name, and the subcard relationship vanished.
+    expect(board.parentOf["basic/Cards/x/Child.md"]).toBe("basic/Cards/x/Parent.md");
+    expect(board.parentOf["basic/Cards/y/Child.md"]).toBeUndefined();
+  });
+
+  it("writes a subcard link that names exactly one note", async () => {
+    const { app, repo } = twoChildren();
+
+    const childPath = await repo.addSubcard("basic/Cards/x/Parent.md", "Child");
+
+    expect(childPath).toBe("basic/Cards/Child.md");
+    // Three notes are called Child now, so a bare `[[Child]]` would be a link this plugin could
+    // not read back to the note it just created.
+    expect(app.vault.text("basic/Cards/x/Parent.md")).toContain("- [ ] [[basic/Cards/Child]]");
+    const board = await repo.loadBoard();
+    expect(board.parentOf[childPath]).toBe("basic/Cards/x/Parent.md");
+  });
+
+  it("leaves a subcard link bare when its name is the only one", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Parent.md", card("status: todo"));
+
+    await repo.addSubcard("basic/Cards/Parent.md", "Child");
+
+    expect(app.vault.text("basic/Cards/Parent.md")).toContain("- [ ] [[Child]]");
+  });
+
+  it("stores a relationship as a link to the card the name reaches from this note", async () => {
+    const { app, repo } = twoChildren();
+
+    await repo.addRelation("basic/Cards/x/Parent.md", "blocks", "Child");
+
+    expect(app.vault.frontmatter("basic/Cards/x/Parent.md")["blocks"]).toEqual([
+      "[[basic/Cards/x/Child]]",
+    ]);
+    // The cache lags a write by a tick, exactly as it does in a real vault.
+    app.metadataCache.catchUp("basic/Cards/x/Parent.md");
+    const board = await repo.loadBoard();
+    expect(board.cards["basic/Cards/x/Parent.md"]?.relations?.[0]?.path).toBe(
+      "basic/Cards/x/Child.md",
+    );
+  });
+
+  it("keeps a target naming no note exactly as it was typed", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+
+    await repo.addRelation("basic/Cards/One.md", "blocks", "Not a note yet");
+
+    expect(app.vault.frontmatter("basic/Cards/One.md")["blocks"]).toEqual(["[[Not a note yet]]"]);
+  });
+
+  it("keeps an anchor and an alias the caller wrote", async () => {
+    const { app, repo } = twoChildren();
+
+    await repo.addRelation("basic/Cards/x/Parent.md", "blocks", "Child#Notes|see this");
+
+    expect(app.vault.frontmatter("basic/Cards/x/Parent.md")["blocks"]).toEqual([
+      "[[Child#Notes|see this]]",
+    ]);
   });
 });
 
