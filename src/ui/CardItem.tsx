@@ -393,7 +393,14 @@ function CardItemInner({
             title="Open note"
             onClick={(e) => {
               e.stopPropagation();
-              actions.openNote(notePath);
+              actions.openNote(notePath, e.nativeEvent);
+            }}
+            // A middle click on a button is an auxclick, never a click, so "open in a new tab" —
+            // the one Obsidian gesture that needs no modifier — would otherwise never arrive.
+            onAuxClick={(e) => {
+              if (e.button !== 1) return;
+              e.stopPropagation();
+              actions.openNote(notePath, e.nativeEvent);
             }}
           >
             <Icon name="external-link" size={15} />

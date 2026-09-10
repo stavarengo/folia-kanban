@@ -19,7 +19,8 @@ import {
   WorkspaceLeaf,
   type App,
 } from "obsidian";
-import { KanbanView, VIEW_TYPE_KANBAN } from "./view";
+import { KanbanView } from "./view";
+import { VIEW_TYPE_KANBAN } from "./viewType";
 import type { FileOp } from "./model/pathOps";
 import { remapPath } from "./model/pathOps";
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
@@ -157,6 +158,10 @@ export default class FoliaKanbanPlugin extends Plugin {
     );
 
     this.addRibbonIcon("layout-grid", "Open Folia Kanban board", () => void this.activateView());
+    // Half of a hover preview. The other half is the `hover-link` event the detail panel's rendered
+    // markdown fires (src/obsidian/vaultRepo.ts); neither half does anything without the other, and
+    // both must name the same source or Page preview's own on/off setting stops governing ours.
+    this.registerHoverLinkSource(VIEW_TYPE_KANBAN, { display: "Folia Kanban", defaultMod: true });
     this.addCommand({
       id: "folia-open-kanban-board",
       name: "Open board",

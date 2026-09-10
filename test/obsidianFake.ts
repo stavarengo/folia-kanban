@@ -12,6 +12,7 @@
 // independently, because the adapter's freshness rules (read the text, not the cache) only mean
 // something when a test can make the two disagree the way a real vault does mid-write.
 
+import type { PaneType } from "obsidian";
 import { parse, stringify } from "yaml";
 
 /** Obsidian's own `normalizePath`: tidy separators only — `.` and `..` are left for callers. */
@@ -54,6 +55,23 @@ export class Component {
     this.loaded = false;
   }
 }
+
+/**
+ * Obsidian's reading of a click's modifiers, mirrored from the shipped app (1.13.7): a middle
+ * click and a Mod click both mean a new tab, Mod+Alt a split, Mod+Alt+Shift a new window, and
+ * anything else `false` — which `getLeaf` reads as "the current one". Written out here only
+ * because the fake has to answer something; production never reimplements it, it calls Obsidian.
+ * Mod is Ctrl or Cmd: the real one picks by platform, and a test has no platform worth picking.
+ */
+export const Keymap = {
+  isModEvent(evt?: MouseEvent | KeyboardEvent | null): "tab" | "split" | "window" | boolean {
+    if (!evt) return false;
+    if (evt instanceof MouseEvent && evt.button === 1) return "tab";
+    if (!evt.ctrlKey && !evt.metaKey) return false;
+    if (!evt.altKey) return "tab";
+    return evt.shiftKey ? "window" : "split";
+  },
+};
 
 export class FileSystemAdapter {
   constructor(private basePath: string) {}
@@ -487,12 +505,20 @@ export class FakeApp {
   readonly fileManager = new FakeFileManager(this.vault);
   /** Every note `openCard` asked the workspace to open. */
   readonly opened: string[] = [];
+  /** Where each of those opens was asked to land, in `getLeaf`'s own vocabulary, same order. */
+  readonly openedIn: (PaneType | boolean)[] = [];
+  /** Every workspace event the adapter fired, so a test can read what it said. */
+  readonly triggered: { name: string; args: unknown[] }[] = [];
   readonly workspace = {
-    getLeaf: (_newLeaf: boolean) => ({
+    getLeaf: (newLeaf: PaneType | boolean) => ({
       openFile: (file: TFile) => {
         this.opened.push(file.path);
+        this.openedIn.push(newLeaf);
         return Promise.resolve();
       },
     }),
+    trigger: (name: string, ...args: unknown[]) => {
+      this.triggered.push({ name, args });
+    },
   };
 }

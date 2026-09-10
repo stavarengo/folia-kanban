@@ -410,8 +410,12 @@ export class FakeRepo implements CardRepository {
     return this.vaultBasePath === null ? null : `${this.vaultBasePath}/${path}`;
   }
 
-  async openCard(path: string): Promise<void> {
+  /** The click each `openCard` carried, same order as `opened` — undefined where it carried none. */
+  readonly openedWith: (MouseEvent | undefined)[] = [];
+
+  async openCard(path: string, evt?: MouseEvent): Promise<void> {
     this.opened.push(path);
+    this.openedWith.push(evt);
   }
 
   /**

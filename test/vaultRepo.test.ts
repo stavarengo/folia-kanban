@@ -838,6 +838,91 @@ describe("the rest of the vault surface", () => {
     expect(app.opened).toEqual(["basic/Cards/One.md"]);
   });
 
+  it("sends a modified open where the modifier asked, and a plain one to the current tab", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    const click = (init: MouseEventInit) => new MouseEvent("click", init);
+
+    await repo.openCard("basic/Cards/One.md");
+    await repo.openCard("basic/Cards/One.md", click({ button: 0 }));
+    await repo.openCard("basic/Cards/One.md", click({ button: 1 }));
+    await repo.openCard("basic/Cards/One.md", click({ ctrlKey: true }));
+    await repo.openCard("basic/Cards/One.md", click({ metaKey: true }));
+    await repo.openCard("basic/Cards/One.md", click({ ctrlKey: true, altKey: true }));
+    await repo.openCard(
+      "basic/Cards/One.md",
+      click({ ctrlKey: true, altKey: true, shiftKey: true }),
+    );
+
+    expect(app.openedIn).toEqual([false, false, "tab", "tab", "tab", "split", "window"]);
+    expect(app.opened).toEqual(Array(7).fill("basic/Cards/One.md"));
+  });
+
+  it("tells Page preview about a rendered internal link the pointer reaches", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    const cleanup = repo.renderMarkdown(el, "irrelevant", "basic/Cards/One.md");
+    // What Obsidian's renderer leaves behind for an internal link, down to the nested <em> the
+    // pointer is actually over — the handler has to climb to the anchor to find the link text.
+    el.innerHTML = '<a class="internal-link" data-href="Two" href="Two"><em>Two</em></a>';
+    const inner = el.querySelector("em") as HTMLElement;
+    inner.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    const hover = app.triggered.filter((t) => t.name === "hover-link");
+    expect(hover).toHaveLength(1);
+    expect(hover[0]?.args[0]).toMatchObject({
+      source: "folia-kanban-view",
+      hoverParent: repo,
+      linktext: "Two",
+      sourcePath: "basic/Cards/One.md",
+      targetEl: el.querySelector("a"),
+    });
+
+    cleanup();
+    el.remove();
+  });
+
+  it("says nothing about a hover that is not over a rendered internal link", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    const cleanup = repo.renderMarkdown(el, "irrelevant", "basic/Cards/One.md");
+    el.innerHTML = '<a href="https://example.com">out</a><span>plain</span>';
+    el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    el.querySelector("span")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    expect(app.triggered.filter((t) => t.name === "hover-link")).toHaveLength(0);
+
+    cleanup();
+    el.remove();
+  });
+
+  it("says a link once per hover however often its container was re-rendered", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const hover = () => {
+      el.innerHTML = '<a class="internal-link" data-href="Two">Two</a>';
+      el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      return app.triggered.filter((t) => t.name === "hover-link");
+    };
+
+    // Both orders a caller can produce: re-rendering after the cleanup, and (the sloppier one the
+    // renderer already tolerates elsewhere) re-rendering straight over a render still in flight.
+    repo.renderMarkdown(el, "first", "basic/Cards/One.md")();
+    repo.renderMarkdown(el, "second", "basic/Cards/One.md");
+    const cleanup = repo.renderMarkdown(el, "third", "basic/Cards/Two.md");
+    expect(hover()).toHaveLength(1);
+    // The latest render's note is the one its links resolve against.
+    expect(hover()[1]).toMatchObject({ args: [{ sourcePath: "basic/Cards/Two.md" }] });
+
+    cleanup();
+    el.remove();
+  });
+
   it("renders markdown into the element and takes it back on cleanup", async () => {
     const { repo } = setup();
     const el = document.createElement("div");

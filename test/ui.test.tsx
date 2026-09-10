@@ -1896,6 +1896,57 @@ describe("card context menu", () => {
     return { repo, menu: await screen.findByRole("menu") };
   };
 
+  it("carries the click's modifiers to the repository from every Open-note affordance", async () => {
+    // The board cannot read a modifier itself (which key is "Mod" is the platform's business, and
+    // that lives behind the port), so what it owes is the click. These assertions are about the
+    // event arriving intact — where each one sends the note is the adapter's test.
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    await user.keyboard("{Control>}");
+    await user.click(within(card).getByLabelText('Open note for "Alpha"'));
+    await user.keyboard("{/Control}");
+    expect(repo.opened).toEqual(["Tasks/Alpha.md"]);
+    expect(repo.openedWith[0]).toMatchObject({ ctrlKey: true });
+
+    // A middle click reaches a button as auxclick, never as click.
+    fireEvent(
+      within(card).getByLabelText('Open note for "Alpha"'),
+      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
+    );
+    expect(repo.openedWith[1]).toMatchObject({ button: 1 });
+    // ...and it must not also select the card, the way a plain click on the face would.
+    expect(screen.queryByTestId("card-detail")).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    const menu = await screen.findByRole("menu");
+    await user.keyboard("{Control>}");
+    await user.click(within(menu).getByRole("menuitem", { name: /Open note/ }));
+    await user.keyboard("{/Control}");
+    expect(repo.openedWith[2]).toMatchObject({ ctrlKey: true });
+
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.keyboard("{Control>}");
+    await user.click(within(detail).getByLabelText("Open note"));
+    await user.keyboard("{/Control}");
+    expect(repo.openedWith[3]).toMatchObject({ ctrlKey: true });
+  });
+
+  it("still opens in the current tab when nothing was held down", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+
+    await user.click(within(card).getByLabelText('Open note for "Alpha"'));
+
+    expect(repo.opened).toEqual(["Tasks/Alpha.md"]);
+    expect(repo.openedWith[0]).toMatchObject({ ctrlKey: false, metaKey: false, button: 0 });
+  });
+
   it("opens a card menu with the expected items on right-click", async () => {
     const { menu } = await openCardMenu("First");
     expect(within(menu).getByRole("menuitem", { name: /Open details/ })).toBeInTheDocument();

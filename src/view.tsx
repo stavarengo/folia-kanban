@@ -5,8 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { App as BoardApp, type BoardHost } from "./ui/App";
 import { VaultRepository } from "./obsidian/vaultRepo";
 import type { KanbanSettings, SettingsPatch } from "./settings";
-
-export const VIEW_TYPE_KANBAN = "folia-kanban-view";
+import { VIEW_TYPE_KANBAN } from "./viewType";
 
 /**
  * The board. It is a `FileView` rather than a plain `ItemView` so the leaf genuinely owns the

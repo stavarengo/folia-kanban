@@ -1,7 +1,8 @@
-import type { App } from "obsidian";
+import type { App, HoverParent, HoverPopover } from "obsidian";
 import {
   Component,
   FileSystemAdapter,
+  Keymap,
   MarkdownRenderer,
   TFile,
   TFolder,
@@ -23,6 +24,7 @@ import type { CardMutation } from "../model/board";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "../viewMode";
+import { VIEW_TYPE_KANBAN } from "../viewType";
 import { attachPropertySuggest } from "./propertySuggest";
 import { buildBoard, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
@@ -102,13 +104,26 @@ interface ResolvedBoardConfig extends BoardConfig {
   cardFolderExisting: string[];
 }
 
-export class VaultRepository implements CardRepository {
+/**
+ * The note each rendered markdown container's links resolve against. Keyed by the container so one
+ * listener per container is enough however many times its content is re-rendered, and weak so an
+ * unmounted panel takes its entry with it.
+ */
+const hoverSources = new WeakMap<HTMLElement, string>();
+
+export class VaultRepository implements CardRepository, HoverParent {
   private recentWrites = new Map<string, number>();
   /**
    * Where the last load found this board's cards (`<cardFolder>/`), so `onChange` can tell a
    * metadata-cache catch-up that concerns this board from one anywhere else in the vault.
    */
   private cardFolderPrefix: string | null = null;
+
+  /**
+   * Page preview parks the popover it opened for this board here (the `HoverParent` contract), so
+   * a second hover replaces the first instead of stacking previews over each other.
+   */
+  hoverPopover: HoverPopover | null = null;
 
   constructor(
     private app: App,
@@ -776,8 +791,49 @@ export class VaultRepository implements CardRepository {
     return dest;
   }
 
-  async openCard(path: string): Promise<void> {
-    await this.app.workspace.getLeaf(false).openFile(this.file(path));
+  async openCard(path: string, evt?: MouseEvent): Promise<void> {
+    // `Keymap.isModEvent` is the whole of Obsidian's own answer to "where did this click want the
+    // note": false for a plain click, "tab" for Mod or a middle click, "split" for Mod+Alt,
+    // "window" for Mod+Alt+Shift — and `getLeaf` takes exactly that. Deciding it here rather than
+    // in the UI keeps the platform question (Mod is Cmd on macOS, Ctrl elsewhere) with the only
+    // layer allowed to ask Obsidian. `openFile` rather than `openLinkText`: the file is already
+    // resolved, and re-resolving a name would be free to land on a different note.
+    await this.app.workspace.getLeaf(Keymap.isModEvent(evt)).openFile(this.file(path));
+  }
+
+  /**
+   * Give the container's rendered internal links the hover preview every other link in Obsidian
+   * has. Page preview stays silent until the view is a registered source (`src/main.ts`) AND the
+   * view tells it about the link, which is what the event below does.
+   *
+   * The listener is bound to the container once and outlives the individual renders, because the
+   * container does: re-registering per render would stack a second listener onto the same element
+   * whenever a caller re-renders without running the previous cleanup, and every hover would then
+   * fire twice. `hoverSources` carries the note the links resolve against, refreshed on every
+   * render, and doubles as the record of which containers are already listening.
+   */
+  private watchForLinkHovers(el: HTMLElement, sourcePath: string): void {
+    const listening = hoverSources.has(el);
+    hoverSources.set(el, sourcePath);
+    if (listening) return;
+    el.addEventListener("mouseover", (event: MouseEvent) => {
+      // `closest`, because the pointer may be over a `<code>` or an `<em>` nested inside the
+      // anchor; `data-href` before `href`, because that is where Obsidian keeps the link as
+      // written, before it resolved it to a path.
+      const link = (event.target as HTMLElement | null)?.closest("a.internal-link");
+      if (!(link instanceof HTMLElement)) return;
+      const linktext = link.getAttribute("data-href") ?? link.getAttribute("href");
+      const source = hoverSources.get(el);
+      if (!linktext || source === undefined) return;
+      this.app.workspace.trigger("hover-link", {
+        event,
+        source: VIEW_TYPE_KANBAN,
+        hoverParent: this,
+        targetEl: link,
+        linktext,
+        sourcePath: source,
+      });
+    });
   }
 
   renderMarkdown(el: HTMLElement, markdown: string, sourcePath: string): () => void {
@@ -790,6 +846,7 @@ export class VaultRepository implements CardRepository {
     let cancelled = false;
     const c = new Component();
     c.load();
+    this.watchForLinkHovers(el, sourcePath);
     const tmp = el.cloneNode(false) as HTMLElement;
     void MarkdownRenderer.render(this.app, markdown, tmp, sourcePath, c)
       .then(() => {

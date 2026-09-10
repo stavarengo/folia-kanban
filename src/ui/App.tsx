@@ -534,7 +534,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           }
         })();
       },
-      openNote: (path) => void repo.openCard(path),
+      openNote: (path, evt) => void repo.openCard(path, evt),
       copyPath: (path, form) => {
         const text = pathForm(path, form, boardRef.current?.config.path ?? "", repo);
         if (text === null) {

@@ -155,8 +155,15 @@ export interface CardRepository {
    */
   absolutePath(path: string): string | null;
 
-  /** Open a card note in the workspace. */
-  openCard(path: string): Promise<void>;
+  /**
+   * Open a card note in the workspace. `evt` is the click that asked for it, passed on so the host
+   * can honour the modifier keys the rest of the app honours — a new tab, a split, a new window,
+   * or a middle click. It is a DOM `MouseEvent` rather than a decision made by the caller on
+   * purpose: which key means "modifier" is the platform's business, and only the host knows the
+   * platform. Without an event the note replaces whatever the workspace considers current, which
+   * is what an unmodified click has always done.
+   */
+  openCard(path: string, evt?: MouseEvent): Promise<void>;
 
   /**
    * Render markdown into `el` using the host's engine (Obsidian's MarkdownRenderer in the vault

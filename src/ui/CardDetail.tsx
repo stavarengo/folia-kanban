@@ -1501,7 +1501,11 @@ export function CardDetail({
             className="folia-icon-btn"
             aria-label="Open note"
             title="Open note in Obsidian"
-            onClick={() => void repo.openCard(path)}
+            onClick={(e) => void repo.openCard(path, e.nativeEvent)}
+            onAuxClick={(e) => {
+              if (e.button !== 1) return;
+              void repo.openCard(path, e.nativeEvent);
+            }}
           >
             <Icon name="external-link" />
           </button>

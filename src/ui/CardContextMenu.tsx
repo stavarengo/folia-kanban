@@ -115,19 +115,22 @@ export function CardContextMenu({
     items[next]?.focus();
   };
 
+  // The click reaches the action itself, not only the fact that it happened: "Open note" is a
+  // navigation, and a navigation carries the modifier keys that say where it should land. Actions
+  // with nowhere to send it simply ignore the argument.
   const item = (
     label: string,
     icon: IconName,
-    onClick: () => void,
+    onClick: (evt: MouseEvent) => void,
     opts?: { disabled?: boolean; danger?: boolean },
   ) => (
     <button
       className={"folia-menu-item" + (opts?.danger ? " folia-menu-danger" : "")}
       role="menuitem"
       disabled={opts?.disabled}
-      onClick={() => {
+      onClick={(e) => {
         actioned.current = true;
-        onClick();
+        onClick(e.nativeEvent);
         onClose();
       }}
     >
@@ -208,7 +211,7 @@ export function CardContextMenu({
               "user",
               () => void a.setAssignee(path, toggleAssignee(assignees, me)),
             )}
-          {item("Open note", "external-link", () => a.openNote(path))}
+          {item("Open note", "external-link", (evt) => a.openNote(path, evt))}
 
           <div className="folia-menu-divider" />
           <span className="folia-menu-label">Priority</span>

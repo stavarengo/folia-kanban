@@ -177,8 +177,13 @@ export interface BoardActions {
   complete(path: string): void;
   /** Trash the card's note (after confirmation in the UI). */
   remove(path: string): void;
-  /** Open the underlying note in an Obsidian tab. */
-  openNote(path: string): void;
+  /**
+   * Open the underlying note in an Obsidian tab. Hand on the click that asked for it (React's
+   * `nativeEvent`) so the host can honour the modifier keys — a new tab, a split, a new window.
+   * The board cannot read a modifier itself: which key counts as one depends on the platform, and
+   * that answer lives behind the repository port.
+   */
+  openNote(path: string, evt?: MouseEvent): void;
   /**
    * Put one representation of a card's file path on the clipboard and say so in a toast. Which
    * representation is useful depends on where it will be pasted, hence the four forms: the
