@@ -261,20 +261,19 @@ jobs:
       url: ${{ steps.publish.outputs.url }}
 
     steps:
-      # The only checkout in this pipeline that keeps its credentials: release-it
-      # pushes the release commit and the tag with GITHUB_TOKEN. A GITHUB_TOKEN
-      # push starts no workflow, which is what lets this run own the whole
-      # release instead of handing it to a second one.
-      #
       # main, not github.sha: .release-it.json requires the branch and its
       # upstream, and a detached HEAD has neither. The guard below turns that
       # into the "did main move while approval waited" check.
+      #
+      # Still no persisted credentials, even though this is the job that pushes.
+      # The push token is injected in the release step alone, so it is not in
+      # .git/config while package lifecycle scripts run during install.
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || 'main' }}
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Guard the commit being released
         shell: bash
@@ -326,7 +325,13 @@ jobs:
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
         env:
           VERSION: ${{ needs.plan.outputs.version }}
+          PUSH_TOKEN: ${{ github.token }}
         run: |
+          # Inject the push token only here, never during dependency install, so
+          # it is absent from .git/config while package code runs. A GITHUB_TOKEN
+          # push starts no workflow, which is what lets this run own the whole
+          # release instead of handing it to a second one.
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # The version that was approved, handed back to release-it, so the

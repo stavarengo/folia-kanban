@@ -4,7 +4,7 @@ Maintainer notes: how a release is cut, what checks it against the Obsidian comm
 
 ## Cutting a release
 
-Everything lives in one workflow, `.github/workflows/pipeline.yml`, and one run of it does the whole job on one commit. The jobs are chained with `needs`, so what gets published is what passed `pnpm verify` a few minutes earlier in the same run, plus release-it's version bump on top of it — no workflow triggers another, and no green tick from somewhere else is taken on trust.
+Everything lives in one workflow, `.github/workflows/pipeline.yml`, and one run of it does the whole job. The jobs are chained with `needs`, so what gets published is what passed `pnpm verify` a few minutes earlier in the same run, plus release-it's version bump on top of it — no workflow triggers another, and no green tick from somewhere else is taken on trust.
 
 1. **verify** and **scan** run in parallel on every push to `main`, every pull request and every manual dispatch. `verify` is the full `pnpm verify` (it builds, and the build is kept as the run's `dist` artifact); `scan` is Obsidian's own action, described below.
 2. **plan** runs on `main` only, after both. It decides whether the commits since the last tag contain anything worth releasing, and asks release-it for the version number. When there is nothing to release the run ends green with a line saying so, and nobody is asked to approve anything.
