@@ -1153,11 +1153,12 @@ export function CardDetail({
     const panel = panelRef.current;
     let panelWidth = panel?.getBoundingClientRect().width ?? 0;
     const observer = new ResizeObserver((entries) => {
-      if (panel && entries.length > 0 && entries.every((e) => e.target === panel)) {
-        const width = panel.getBoundingClientRect().width;
-        if (width === panelWidth) return;
-        panelWidth = width;
-      }
+      const width = panel?.getBoundingClientRect().width ?? 0;
+      const panelOnly =
+        panel != null && entries.length > 0 && entries.every((e) => e.target === panel);
+      const grewOrShrank = width !== panelWidth;
+      panelWidth = width;
+      if (panelOnly && !grewOrShrank) return;
       measure();
     });
     if (root) observer.observe(root);

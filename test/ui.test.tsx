@@ -48,8 +48,13 @@ function fakeHost() {
         onSlash = null;
       };
     },
-    /** Fire the board's handler the way the view's keymap scope does. */
-    slash: (target: EventTarget | null, mods: Partial<KeyboardEventInit> = {}) => {
+    /**
+     * Fire the board's handler the way the view's keymap scope does, and answer the port's own
+     * question: did the board take this key? The real view inverts that for Obsidian, whose
+     * `KeymapEventListener` reads `false` as "cancel this key" — the opposite polarity, and the
+     * reason nothing here should be read as an assertion about the Obsidian contract.
+     */
+    boardTakes: (target: EventTarget | null, mods: Partial<KeyboardEventInit> = {}) => {
       const event = new KeyboardEvent("keydown", { key: "/", ...mods });
       Object.defineProperty(event, "target", { value: target });
       return onSlash?.(event) ?? false;
@@ -2418,7 +2423,7 @@ describe("search filter (single source of truth)", () => {
     // is exactly the case the shortcut exists for — and tells the host it took the key.
     let took = false;
     act(() => {
-      took = host.slash(document.body);
+      took = host.boardTakes(document.body);
     });
     expect(took).toBe(true);
     expect(document.activeElement).toBe(search);
@@ -2443,6 +2448,36 @@ describe("search filter (single source of truth)", () => {
     expect(host.bound()).toBe(false);
   });
 
+  it("gives the '/' back when a board that had loaded fails to reload", async () => {
+    // The error screen replaces the board's chrome without clearing the board itself, so a guard
+    // that only asks whether a board was ever loaded would leave the key registered for a search
+    // box that is no longer rendered — and Obsidian would cancel every "/" the user pressed.
+    const host = fakeHost();
+    const repo = makeRepo();
+    render(
+      <App
+        repo={repo}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host}
+      />,
+    );
+    await screen.findByText("Alpha");
+    expect(host.bound()).toBe(true);
+
+    repo.failLoadWith = "card folder is a file";
+    act(() => repo.notify());
+    await screen.findByText(/Couldn’t load the board/);
+    expect(host.bound()).toBe(false);
+
+    // And takes it back once the board can be read again.
+    repo.failLoadWith = null;
+    act(() => repo.notify());
+    await screen.findByText("Alpha");
+    expect(host.bound()).toBe(true);
+  });
+
   it("takes the Shift-typed '/' too, which is the only one some layouts have", async () => {
     const host = fakeHost();
     render(
@@ -2459,7 +2494,7 @@ describe("search filter (single source of truth)", () => {
     // On a German layout "/" is Shift+7, so Shift is not a reason to decline.
     let took = false;
     act(() => {
-      took = host.slash(document.body, { shiftKey: true });
+      took = host.boardTakes(document.body, { shiftKey: true });
     });
     expect(took).toBe(true);
     expect(document.activeElement).toBe(search);
@@ -2481,7 +2516,7 @@ describe("search filter (single source of truth)", () => {
     // Declining is what makes the host let the key through to the input the user is typing in.
     let took = true;
     act(() => {
-      took = host.slash(search);
+      took = host.boardTakes(search);
     });
     expect(took).toBe(false);
     expect(document.activeElement).not.toBe(search);

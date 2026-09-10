@@ -259,6 +259,12 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     );
   }, [board]);
 
+  // Whether the board's own chrome is on screen at all — the two renders below stand in for it,
+  // one while the first load is in flight and one when a load has failed, and neither has a root
+  // or a search box. A boolean rather than the board object so a reload, which builds a new board
+  // every time, does not churn everything keyed on this.
+  const boardShown = board !== null && error === null;
+
   // Obsidian's status bar is fixed to the bottom of its window and the workspace runs underneath
   // it, so the columns and the side detail panel reserve its height to keep their last content out
   // from behind it. The bar belongs to the board's OWN window, which is why this reads the root's
@@ -267,7 +273,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   // reservation true when its height changes, rather than freezing it at the first board load.
   useEffect(() => {
     const root = rootRef.current;
-    if (!board || !root) return;
+    if (!boardShown || !root) return;
     let bar: Element | null = null;
     let barHeight: ResizeObserver | null = null;
     const apply = () => {
@@ -292,13 +298,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     // hears that the board is somewhere else now — but the root gets a new box on the way, which
     // is the one signal that outlives the move. Re-asking which bar this window has, rather than
     // re-measuring the old one, is what makes a board keep the right clearance in either window.
+    // That the move does resize the root, and that the observation survives the change of document,
+    // were both confirmed against Obsidian 1.13.7 rather than assumed.
     const place = new ResizeObserver(resolve);
     place.observe(root);
     return () => {
       place.disconnect();
       barHeight?.disconnect();
     };
-  }, [board]);
+  }, [boardShown]);
 
   const onMove = useCallback(
     async (activeId: string, overId: string) => {
@@ -880,13 +888,14 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   // embedding without a leaf) simply has no shortcut.
   // "/" focuses the search box, as the placeholder advertises. The host owns when the key is this
   // board's — only it knows which leaf has focus — and the board owns whether it wants that one.
-  // Bound only once a board has loaded, because that is when the box exists: an unbound host
-  // claims no "/" at all, so a board still loading leaves the key alone. Declining does not hand
-  // the key on to another shortcut; it only means Obsidian won't cancel it, so the field the user
-  // is typing in still gets its slash. A board with no host (a test, an embedding with no leaf)
+  // Bound only while there is a box to focus, because that is the only way to leave the key alone:
+  // once the host has the key registered, declining it does NOT pass it to another shortcut, it
+  // only stops Obsidian cancelling it, which is enough for the field the user is typing in to
+  // receive its own slash but not enough for a hotkey bound to "/" to fire. Unbinding is what
+  // takes the registration away entirely. A board with no host (a test, an embedding with no leaf)
   // simply has no shortcut.
   useEffect(() => {
-    if (!board) return;
+    if (!boardShown) return;
     return host?.bindSearchShortcut((event) => {
       const el = event.target as HTMLElement | null;
       const tag = el?.tagName;
@@ -895,7 +904,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       searchRef.current?.focus();
       return true;
     });
-  }, [host, board]);
+  }, [host, boardShown]);
 
   if (error) return <div className="folia-error">Couldn’t load the board: {error}</div>;
   if (!board) return <div className="folia-loading">Loading board…</div>;
