@@ -66,7 +66,7 @@ Then prove it before trusting it: the next release run has to get its tag pushed
 
 Read the bypass for what it is, too: it authorises the GitHub Actions identity, not this one workflow. It stops a person creating a version tag by hand, which is the point; it cannot stop some future workflow in this repository from doing it.
 
-**And one thing to check:** any required status check on `main` or on pull requests that names the old workflow. The check context is `<workflow name> / <job name>`, and the workflow's name changed from `CI` to `Pipeline`, so a rule still asking for `CI / Verify` waits for a check nothing will ever report. Point it at `Pipeline / Verify` instead.
+**And one thing to check:** any required status check on `main` or on pull requests. The workflow's name changed from `CI` to `Pipeline`, and the two job ids changed with it, so a rule that was written against the old identity may now be waiting for a check nothing reports. The job display names are deliberately unchanged (`Verify`, `Obsidian community scan`), which should be enough for a rule keyed on those — but open the branch rule or ruleset and confirm the checks it lists are still being reported, rather than assuming it.
 
 **And one thing to delete:** the `FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN` repository secret. The pipeline pushes with `GITHUB_TOKEN`, so that personal access token is no longer read by anything and should be removed from the repository's secrets and revoked in the account's developer settings.
 

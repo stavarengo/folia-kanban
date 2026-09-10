@@ -259,11 +259,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # One release at a time for the whole repository. Two approved runs both
-    # arriving here would otherwise race on the same base commit; queued this
-    # way, the second reaches its guard, sees that main has moved, and stops.
+    # One release at a time, and one republish of a given tag at a time, in
+    # separate groups. A group holds one running job and one pending job, and a
+    # third arrival drops the pending one — which is fine for an ordinary
+    # release (nothing has happened yet, and the commits are still there for the
+    # next run) and would not be for a deliberate republish, so a republish
+    # never shares a queue with anything but another attempt at the same tag.
     concurrency:
-      group: release-${{ github.repository }}
+      group: release-${{ github.repository }}-${{ inputs.tag || 'main' }}
       cancel-in-progress: false
 
     permissions:
@@ -496,7 +499,12 @@ jobs:
           # release is what makes the republish path a recovery rather than a
           # second attempt at the same create.
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # Back to a draft while its assets are replaced. --clobber swaps
+            # three files one at a time, so a release left public through that
+            # is a release someone can read with a new main.js beside an old
+            # manifest.json — and if one upload fails, it stays that way.
             echo "Reusing the existing GitHub release for $TAG."
+            gh release edit "$TAG" --draft=true
           else
             args=("$TAG" --title "$TAG" --draft)
 
@@ -515,7 +523,6 @@ jobs:
 
           url=$(gh release view "$TAG" --json url --jq .url)
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Released [$TAG]($url)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the Obsidian plugin assets
         env:
@@ -530,8 +537,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.resolve.outputs.tag }}
+          URL: ${{ steps.publish.outputs.url }}
           PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
-        run: gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE"
+        run: |
+          gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE"
+          # The summary says "released" here and nowhere earlier, so it cannot
+          # claim a release that a failed upload left as a draft.
+          echo "Released [$TAG]($URL)" >> "$GITHUB_STEP_SUMMARY"
 
   announce:
     name: Announce
