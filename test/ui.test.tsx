@@ -41,6 +41,7 @@ function makeRepo() {
  *  lets a test fire it at a chosen target, the way the view's keymap scope does. */
 function fakeHost() {
   let onSlash: ((event: KeyboardEvent) => boolean) | null = null;
+  let placement: (() => void) | null = null;
   return {
     bindSearchShortcut(handler: (event: KeyboardEvent) => boolean) {
       onSlash = handler;
@@ -60,6 +61,14 @@ function fakeHost() {
       return onSlash?.(event) ?? false;
     },
     bound: () => onSlash !== null,
+    onPlacementChange(cb: () => void) {
+      placement = cb;
+      return () => {
+        placement = null;
+      };
+    },
+    /** Stand in for the leaf being moved, split, or otherwise put somewhere new. */
+    moved: () => act(() => placement?.()),
   };
 }
 
@@ -401,6 +410,37 @@ describe("status bar clearance", () => {
     render_(makeRepo());
     await screen.findByText("Alpha");
     expect(clearance()).toBe("0px");
+  });
+
+  it("follows a move to a window of the very same size, which resizes nothing", async () => {
+    // A ResizeObserver reports box changes, not a change of document, so a move into an
+    // identically sized window is silent. The host's placement signal is what covers that.
+    const host = fakeHost();
+    addStatusBar(document, 25);
+    render(
+      <App
+        repo={makeRepo()}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host}
+      />,
+    );
+    await screen.findByText("Alpha");
+    const root = document.querySelector(".folia-root") as HTMLElement;
+    expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("31px");
+
+    const home = root.parentElement!;
+    const frame = document.createElement("iframe");
+    document.body.appendChild(frame);
+    const popout = frame.contentDocument!;
+    try {
+      popout.body.appendChild(popout.adoptNode(root));
+      host.moved();
+      expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
+    } finally {
+      home.appendChild(document.adoptNode(root));
+    }
   });
 
   it("re-asks which bar the window has when the board is moved to another one", async () => {

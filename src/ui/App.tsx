@@ -122,6 +122,14 @@ export interface BoardHost {
    * key back: while nothing is bound, the host claims no `/` at all.
    */
   bindSearchShortcut(onSlash: (event: KeyboardEvent) => boolean): () => void;
+
+  /**
+   * Call back whenever the leaf's placement changes — moved to another window, split, closed
+   * elsewhere. The board cannot see this for itself: its DOM is carried across a move without a
+   * re-render, and a resize is only a proxy for it, silent when the new place happens to be the
+   * same size. Returns the unsubscribe function.
+   */
+  onPlacementChange(cb: () => void): () => void;
 }
 
 interface Props {
@@ -295,18 +303,18 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     };
     resolve();
     // "Move to new window" carries the board's DOM across without re-rendering it, so React never
-    // hears that the board is somewhere else now — but the root gets a new box on the way, which
-    // is the one signal that outlives the move. Re-asking which bar this window has, rather than
-    // re-measuring the old one, is what makes a board keep the right clearance in either window.
-    // That the move does resize the root, and that the observation survives the change of document,
-    // were both confirmed against Obsidian 1.13.7 rather than assumed.
+    // hears that the board is somewhere else now. The host says when the leaf has been placed
+    // somewhere new, which is the signal that does not depend on the destination being a different
+    // size from the source; the root's own box is watched too, for the resizes that are not moves.
     const place = new ResizeObserver(resolve);
     place.observe(root);
+    const offPlacement = host?.onPlacementChange(resolve);
     return () => {
       place.disconnect();
+      offPlacement?.();
       barHeight?.disconnect();
     };
-  }, [boardShown]);
+  }, [boardShown, host]);
 
   const onMove = useCallback(
     async (activeId: string, overId: string) => {
