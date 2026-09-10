@@ -4289,6 +4289,40 @@ describe("the detail panel reports a failed write", () => {
     expect(within(detail).getByLabelText("New card title")).toHaveValue("Nowhere");
   });
 
+  it("refuses to give a checklist line a column a lane would not draw it in", async () => {
+    const user = userEvent.setup();
+    // A placed checklist line stands in a column exactly as a card does, so the same rule holds:
+    // a bare line carries no `area`, so the Research lane would never draw it.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Alpha\n\n## Subtasks\n- [ ] Buy soil\n",
+        },
+      },
+    );
+    const before = repo.files.get("Tasks/Alpha.md")?.body;
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+
+    await user.selectOptions(
+      await within(detail).findByLabelText("Column for Buy soil"),
+      "research",
+    );
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Alpha.md")?.body).toBe(before);
+  });
+
   it("rehomes a deleted column's cards to a plain column, never into a lane", async () => {
     const user = userEvent.setup();
     // Deleting Todo would otherwise hand its cards to its neighbour, Research — a lane whose rule

@@ -5,6 +5,7 @@ import {
   columnOf,
   filterVisiblePaths,
   findDoneColumn,
+  makeTodoPath,
   moveColumn,
   moveSubtask,
   parseTodoPath,
@@ -682,6 +683,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       moveTodo: (path, index, columnId) => {
         const b = boardRef.current;
         if (!b) return;
+        // A placed checklist line stands in a column exactly as a card does, so a lane may no more
+        // take one by hand. Judged on the line's own tile when it already has one — it can carry
+        // inline fields a rule reads — and otherwise on the bare line the claim is about to mint.
+        if (columnId !== null) {
+          const line = subtaskRef(b, path, index);
+          const todo =
+            b.cards[makeTodoPath(path, index)] ?? prospectiveCard(line?.text ?? "", columnId);
+          if (refusedByLane(columnId, todo)) return;
+        }
         const mut = moveSubtask(b, path, index, columnId);
         if (!mut) return;
         void (async () => {
