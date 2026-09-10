@@ -107,6 +107,25 @@ describe("a card's body tags", () => {
     expect(board.cards["basic/Cards/One.md"]?.frontmatter.status).toBe("todo");
     expect(board.cards["basic/Cards/One.md"]?.bodyTags).toBeUndefined();
   });
+
+  it("arrive on the board when the cache catches up after the load, without any other change", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card("status: todo", "\nTaking this #home tonight.\n"));
+    vi.useFakeTimers();
+    const reload = vi.fn();
+    // A board opened while Obsidian is still filling its cache loads with no body tags at all.
+    expect((await repo.loadBoard()).cards["basic/Cards/One.md"]?.bodyTags).toBeUndefined();
+    const off = repo.onChange(reload);
+
+    app.metadataCache.setTags("basic/Cards/One.md", ["#home"]);
+    app.metadataCache.catchUp("basic/Cards/One.md");
+    vi.advanceTimersByTime(150);
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect((await repo.loadBoard()).cards["basic/Cards/One.md"]?.bodyTags).toEqual(["home"]);
+    off();
+    vi.useRealTimers();
+  });
 });
 
 describe("card-folder resolution against a live vault", () => {
@@ -869,21 +888,30 @@ describe("telling our own writes apart from someone else's (onChange)", () => {
     off();
   });
 
-  it("reloads when the metadata cache catches up on a file we wrote, and not on any other", async () => {
+  it("reloads when the metadata cache catches up on a card, and not on a note elsewhere", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/Ours.md", card("status: todo", "\n# Ours\n"));
-    app.vault.addFile("basic/Cards/Theirs.md", card("status: todo", "\n# Theirs\n"));
+    app.vault.addFile("Elsewhere/Note.md", card("status: todo", "\n# Note\n"));
+    await repo.loadBoard();
     const reload = vi.fn();
     const off = repo.onChange(reload);
 
-    app.metadataCache.catchUp("basic/Cards/Theirs.md");
+    // Nothing this board draws depends on a note outside its card folder, and the vault events
+    // already cover the ones that change.
+    app.metadataCache.catchUp("Elsewhere/Note.md");
     vi.advanceTimersByTime(150);
     expect(reload).not.toHaveBeenCalled();
+
+    // A card, though, keeps its body tags in this cache and nowhere else, so its catch-up is news
+    // whoever wrote the file.
+    app.metadataCache.catchUp("basic/Cards/Ours.md");
+    vi.advanceTimersByTime(150);
+    expect(reload).toHaveBeenCalledTimes(1);
 
     await repo.setDescription("basic/Cards/Ours.md", "ours");
     app.metadataCache.catchUp("basic/Cards/Ours.md");
     vi.advanceTimersByTime(150);
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(2);
 
     off();
   });

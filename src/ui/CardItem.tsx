@@ -534,5 +534,8 @@ export const CardItem = memo(
     claimsOf(a.card) === claimsOf(b.card) &&
     a.card.frontmatter.status === b.card.frontmatter.status &&
     (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
+    // Body tags come from the metadata cache as a fresh array each load, so this compares their
+    // contents; by reference every card would look changed on every reload.
+    (a.card.bodyTags ?? []).join("\n") === (b.card.bodyTags ?? []).join("\n") &&
     sameStats(a.card.stats, b.card.stats),
 );

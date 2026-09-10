@@ -104,6 +104,11 @@ interface ResolvedBoardConfig extends BoardConfig {
 
 export class VaultRepository implements CardRepository {
   private recentWrites = new Map<string, number>();
+  /**
+   * Where the last load found this board's cards (`<cardFolder>/`), so `onChange` can tell a
+   * metadata-cache catch-up that concerns this board from one anywhere else in the vault.
+   */
+  private cardFolderPrefix: string | null = null;
 
   constructor(
     private app: App,
@@ -260,6 +265,7 @@ export class VaultRepository implements CardRepository {
           ? `Card folder "${config.cardFolderRaw}" matches both "${config.cardFolderExisting[0]}" and "${config.cardFolderExisting[1]}". Using "${config.cardFolder}" — write the path as "./…" to always mean the one beside this board note.`
           : undefined;
     const prefix = folderPath + "/";
+    this.cardFolderPrefix = prefix;
     const files = this.app.vault
       .getMarkdownFiles()
       // Skip the board note and the per-context config notes (#14) — `_context.md` is a folder
@@ -823,11 +829,18 @@ export class VaultRepository implements CardRepository {
       this.app.vault.on("delete", (f) => fireVault(f.path)),
       this.app.vault.on("rename", (f) => fireVault(f.path)),
     ];
-    // The metadataCache catches up a tick after our own processFrontMatter write; reconcile
-    // then (only for files we just wrote) so an in-app move/edit can't visually snap back to
-    // its old slot while the cache is stale. External edits are handled by the vault events.
+    // The metadataCache catches up a tick after our own processFrontMatter write; reconcile then
+    // so an in-app move/edit can't visually snap back to its old slot while the cache is stale.
+    // Any card in this board's folder counts, not only the files we wrote, because a card's body
+    // tags exist nowhere but this cache: a board opened while Obsidian was still filling it
+    // would otherwise draw every card right except its tags, and stay that way until some
+    // unrelated vault change happened along. The 150ms debounce collapses the opening burst into
+    // one reload. Files outside the folder are left to the vault events.
     const metaRef = this.app.metadataCache.on("changed", (f) => {
-      if (this.recentWrites.has(f.path)) schedule();
+      const prefix = this.cardFolderPrefix;
+      if (this.recentWrites.has(f.path) || (prefix !== null && f.path.startsWith(prefix))) {
+        schedule();
+      }
     });
     return () => {
       if (timer !== null) window.clearTimeout(timer);

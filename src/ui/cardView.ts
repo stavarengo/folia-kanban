@@ -266,17 +266,8 @@ export function cardUrgency(
   return u === "overdue" || u === "today" || u === "soon" ? u : null;
 }
 
-/**
- * Every tag the board credits a card with: its `area`, its frontmatter `tags`, and the tags
- * Obsidian read out of the note's body (`Card.bodyTags`, filled by the adapter — this file cannot
- * import `obsidian`). Obsidian counts a `#tag` written in the text as a tag of the note, so a card
- * tagged that ordinary way has to answer the board's `tag:` filter too.
- *
- * The body set is appended, and only a body tag that repeats one already listed is dropped
- * (case-insensitively, the way Obsidian treats tag names). Frontmatter values are never deduped
- * against each other: a card with no body tags reads exactly as it did before.
- */
-function tagValues(card: Card): string[] {
+/** The card's own `area` and `tags` properties, in that order. */
+function frontmatterTagValues(card: Card): string[] {
   const fm = card.frontmatter;
   const out: string[] = [];
   if (typeof fm.area === "string" && fm.area) out.push(fm.area);
@@ -286,14 +277,36 @@ function tagValues(card: Card): string[] {
   } else if (typeof fmTags === "string" && fmTags) {
     out.push(fmTags);
   }
-  const seen = new Set(out.map((t) => t.toLowerCase()));
-  for (const t of card.bodyTags ?? []) {
+  return out;
+}
+
+/**
+ * The tags Obsidian read out of the note's text that the frontmatter does not already list,
+ * compared case-insensitively the way Obsidian compares tag names. Frontmatter values are never
+ * deduped against each other: a card with no body tags reads exactly as it did before.
+ */
+function bodyOnlyTagValues(card: Card): string[] {
+  const body = card.bodyTags ?? [];
+  if (body.length === 0) return [];
+  const seen = new Set(frontmatterTagValues(card).map((t) => t.toLowerCase()));
+  const out: string[] = [];
+  for (const t of body) {
     const key = t.toLowerCase();
     if (t === "" || seen.has(key)) continue;
     seen.add(key);
     out.push(t);
   }
   return out;
+}
+
+/**
+ * Every tag the board credits a card with: its `area`, its frontmatter `tags`, then the tags
+ * Obsidian read out of the note's body (`Card.bodyTags`, filled by the adapter — this file cannot
+ * import `obsidian`). Obsidian counts a `#tag` written in the text as a tag of the note, so a card
+ * tagged that ordinary way has to answer the board's `tag:` filter too.
+ */
+function tagValues(card: Card): string[] {
+  return [...frontmatterTagValues(card), ...bodyOnlyTagValues(card)];
 }
 
 type DueFilter = "" | "overdue" | "soon";
@@ -880,8 +893,16 @@ export function cardChips(
       title: "Priority",
     });
   }
+  // The body tags come last, and say so: they are the ones the detail panel's `tags` property
+  // cannot edit, so a reader wondering where a chip came from is told where to go and change it.
+  const fmTagCount = frontmatterTagValues(card).length;
   for (const [i, tag] of tagValues(card).entries()) {
-    chips.push({ key: "tag-" + i, label: tag, tone: "muted", title: "Tag" });
+    chips.push({
+      key: "tag-" + i,
+      label: tag,
+      tone: "muted",
+      title: i < fmTagCount ? "Tag" : "Tag (written in the note's body)",
+    });
   }
   for (const [i, name] of assigneeValues(card).entries()) {
     chips.push({
