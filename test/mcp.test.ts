@@ -1051,6 +1051,40 @@ describe("a column filled by a rule rather than by status", () => {
     expect(moved.warning).toMatch(/this server cannot see/);
   });
 
+  // A note whose status was typed by hand can still name a lane that will not draw it. The board
+  // shows it in the first plain column; get_card has to say the same thing get_board's listing does,
+  // or one server gives two answers about one card.
+  it("gives one answer about a card whose status names a lane that will not have it", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "priority:high" },
+        ],
+      },
+      { "Tasks/Stray.md": { fm: { status: "research", order: 1 }, body: "" } },
+      () => "all",
+      () => "",
+    );
+    const host = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path: string) => (path === "Board.md" ? repo : null),
+    };
+    const board = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { id: string; cards: { path: string }[] }[];
+    };
+    expect(board.columns.find((c) => c.id === "todo")?.cards.map((c) => c.path)).toEqual([
+      "Tasks/Stray.md",
+    ]);
+    expect(board.columns.find((c) => c.id === "research")?.cards).toEqual([]);
+    const one = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Stray.md",
+    })) as { column: string };
+    expect(one.column).toBe("todo");
+  });
+
   it("says nothing extra about a move into an ordinary column", async () => {
     const { host } = laned();
     const moved = (await call(host, "move_card", {

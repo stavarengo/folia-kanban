@@ -8,7 +8,6 @@
 
 import {
   judgeCard,
-  matchCard,
   parseFilter,
   type Filter,
   type FilterVerdict,
@@ -47,11 +46,6 @@ export function laneOf(board: Board, columnId: string): Lane | null {
   return column ? asLane(column) : null;
 }
 
-/** Does this lane draw that card? The one question every caller here comes down to. */
-function laneDraws(lane: Lane, card: Card, ctx: MatchContext): boolean {
-  return matchCard(card, lane.filter, ctx);
-}
-
 /** How a column would treat a card: the lane it is, and that lane's verdict on the card. */
 export interface LaneCheck {
   lane: Lane;
@@ -66,7 +60,12 @@ export function laneVerdict(
   ctx: MatchContext,
 ): LaneCheck | null {
   const lane = laneOf(board, columnId);
-  return lane ? { lane, verdict: judgeCard(card, lane.filter, ctx) } : null;
+  // Judged as the write would leave the card, not as it is now: filing a card into a column sets
+  // its `status`, and a rule may read exactly that (`status:`, and the `due:` token's done check).
+  // Asking about the card as it stands would refuse a move that is about to become valid, and wave
+  // through one that is about to stop being.
+  const filed = { ...card, frontmatter: { ...card.frontmatter, status: columnId } };
+  return lane ? { lane, verdict: judgeCard(filed, lane.filter, ctx) } : null;
 }
 
 /**
@@ -113,24 +112,37 @@ export function fallbackColumnOf(board: Board): string | undefined {
   return board.config.columns.find((c) => !c.filter)?.id;
 }
 
-/** Every card standing in a column of its own, in board order. A lane pulls its population here. */
-function standingPaths(board: Board): string[] {
-  return board.config.columns
-    .flatMap((c) => board.columns[c.id] ?? [])
-    .filter((p) => board.cards[p]);
+/**
+ * Every card standing in a column of its own, in board order, with the column it stands in. A lane
+ * pulls its population from here, and the walk happens once rather than once per path.
+ */
+function standing(board: Board): { path: string; columnId: string }[] {
+  const out: { path: string; columnId: string }[] = [];
+  for (const column of board.config.columns) {
+    for (const path of board.columns[column.id] ?? []) {
+      if (board.cards[path]) out.push({ path, columnId: column.id });
+    }
+  }
+  return out;
 }
 
-/** Cards sitting in a lane's bucket that no lane draws — the ones {@link fallbackColumnOf} takes in. */
+/**
+ * Cards sitting in a lane's bucket that no lane will draw — the ones {@link fallbackColumnOf} takes
+ * in. Only a card every lane actively REJECTS counts: a lane whose rule this caller cannot evaluate
+ * ({@link judgeCard} says `unknown`) may well be drawing the card, and moving it to the fallback
+ * column on a guess would report a position nobody can see.
+ */
 export function strandedLanePaths(board: Board, ctx: MatchContext): string[] {
   const lanes = lanesOf(board);
   if (lanes.length === 0) return [];
   const laneIds = new Set(lanes.map((l) => l.columnId));
-  return standingPaths(board).filter((path) => {
-    const card = board.cards[path];
-    const column = board.config.columns.find((c) => (board.columns[c.id] ?? []).includes(path));
-    if (!card || !column || !laneIds.has(column.id)) return false;
-    return !lanes.some((lane) => laneDraws(lane, card, ctx));
-  });
+  return standing(board)
+    .filter(({ path, columnId }) => {
+      if (!laneIds.has(columnId)) return false;
+      const card = board.cards[path];
+      return card != null && lanes.every((lane) => judgeCard(card, lane.filter, ctx) === "rejects");
+    })
+    .map(({ path }) => path);
 }
 
 /**
@@ -145,10 +157,17 @@ export function strandedLanePaths(board: Board, ctx: MatchContext): string[] {
 export function drawnPaths(board: Board, columnId: string, ctx: MatchContext): string[] {
   const lane = laneOf(board, columnId);
   if (lane) {
-    return standingPaths(board).filter((p) => {
-      const card = board.cards[p];
-      return card != null && laneDraws(lane, card, ctx);
-    });
+    return standing(board)
+      .filter(({ path, columnId: from }) => {
+        const card = board.cards[path];
+        if (card == null) return false;
+        const verdict = judgeCard(card, lane.filter, ctx);
+        // `unknown` is a rule this caller cannot read. A card standing in this lane's own bucket
+        // stays listed under it — that is where its `status` puts it and the board may well be
+        // drawing it — while a card from elsewhere is not claimed on a guess.
+        return verdict === "matches" || (verdict === "unknown" && from === columnId);
+      })
+      .map(({ path }) => path);
   }
   const own = (board.columns[columnId] ?? []).filter((p) => board.cards[p]);
   if (fallbackColumnOf(board) !== columnId) return own;
@@ -178,4 +197,26 @@ export function prospectiveCard(
     frontmatter: { type: "task", status: columnId, created: dateOnly(), ...fields },
     childLinks: [],
   };
+}
+
+/**
+ * Where a card whose tile sits in `columnId` is actually drawn. The same column when that column is
+ * plain or is a lane whose rule reaches the card; the fallback column when the card's own bucket is
+ * a lane that will not have it; `null` when nothing draws it at all.
+ *
+ * `get_card` and `get_board` would otherwise disagree about such a card — one reading `status`, the
+ * other reading the board — and one server giving two answers about one card is worse than either.
+ */
+export function drawnInColumn(
+  board: Board,
+  columnId: string,
+  path: string,
+  ctx: MatchContext,
+): string | null {
+  const column = board.config.columns.find((c) => c.id === columnId);
+  if (!column) return null;
+  if (!column.filter) return column.id;
+  return drawnPaths(board, column.id, ctx).includes(path)
+    ? column.id
+    : (fallbackColumnOf(board) ?? null);
 }

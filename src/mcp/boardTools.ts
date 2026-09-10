@@ -5,7 +5,8 @@
 
 import { z } from "zod";
 import { boardMatchContext } from "../model/board";
-import { drawnPaths } from "../model/lanes";
+import { drawnInColumn, drawnPaths } from "../model/lanes";
+import type { MatchContext } from "../model/filter";
 import type { Board, Card } from "../model/types";
 import {
   boardArg,
@@ -63,7 +64,7 @@ const getBoard = tool({
   name: "get_board",
   title: "Read a board",
   description:
-    "A board's columns and the cards in each, in the order the board shows them — the same cards the person looking at the board sees. Cards nested under another card are reported on their parent, not in the columns. A column carrying a `filter` rule is an auto-populated lane, filled by that rule rather than by a card's status; it is marked with a `lane` note saying so.",
+    "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns. A column carrying a `filter` rule is an auto-populated lane, filled by that rule rather than by a card's status; its rule is resolved here, and it is marked with a `lane` note saying what that means and where the answer can still be incomplete.",
   input: z.object({ board: boardArg }),
   readOnly: true,
   run: async (host, args) => {
@@ -103,16 +104,31 @@ const getBoard = tool({
  * leaves both out, so such a term matches nothing here.
  */
 const LANE_NOTE =
-  "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card listed here may also appear in its own status column. `cards` above is that rule resolved, not this column's status bucket — moving a card out of a lane is not how you change what it is.";
+  "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card listed here may also appear in its own status column. `cards` above is that rule resolved, not this column's status bucket — moving a card out of a lane is not how you change what it is. One gap: a rule naming `unread:` or `assignee:me` reads state that lives with the person at the board and not on the card, so this server cannot resolve it; for such a lane the listing falls back to the cards whose status names it.";
+
+/**
+ * The column the board draws a card in. `landedColumn` finds the bucket its tile stands in, which
+ * for a lane's bucket is not where the board puts it — so the rule is resolved on top, and this
+ * tool agrees with `get_board`'s listing rather than reporting the card's raw `status`.
+ */
+function shownColumn(board: Board, path: string, ctx: MatchContext): string | null {
+  const at = landedColumn(board, path);
+  return at === null ? null : drawnInColumn(board, at, path, ctx);
+}
 
 /** A checklist line standing in a column of its own has no note; say where its text actually is. */
-function todoCard(board: Board, path: string, card: Card): Record<string, unknown> {
+function todoCard(
+  board: Board,
+  path: string,
+  card: Card,
+  ctx: MatchContext,
+): Record<string, unknown> {
   const ref = card.todoRef;
   return {
     kind: "todo",
     path,
     title: card.title,
-    column: landedColumn(board, path),
+    column: shownColumn(board, path, ctx),
     note: ref?.parentPath,
     subtaskIndex: ref?.index,
     claimedColumn: ref?.claim,
@@ -131,14 +147,15 @@ const getCard = tool({
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveCardPath(board, args.card);
     const card = board.cards[path];
-    if (card?.todoRef) return todoCard(board, path, card);
+    const ctx = boardMatchContext(board);
+    if (card?.todoRef) return todoCard(board, path, card, ctx);
     const body = await repo.readBody(path);
     return {
       kind: "note",
       path,
       title: card?.title,
       titleSource: card?.titleSource,
-      column: landedColumn(board, path),
+      column: shownColumn(board, path, ctx),
       frontmatter: card?.frontmatter,
       context: card?.context,
       parent: board.parentOf[path],

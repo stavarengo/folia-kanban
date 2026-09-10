@@ -346,7 +346,13 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       if (!b) return;
       const resolved = resolveDrop(b, activeId, overId);
       const dragged = b.cards[activeId];
-      if (resolved && dragged && refusedByLane(resolved.columnId, dragged)) return;
+      if (resolved && dragged && refusedByLane(resolved.columnId, dragged)) {
+        // Board holds the make-room gap open across the drop and clears it when a reloaded board
+        // arrives, so a refusal still has to reload: that is what puts the card back where it was
+        // rather than leaving it in a gap no column draws.
+        await load();
+        return;
+      }
       try {
         await moveCardOver(repo, b, { activeId, overId });
       } catch (e) {

@@ -21,7 +21,7 @@ import {
   type Filter,
   type MatchContext,
 } from "../model/filter";
-import { drawnPaths } from "../model/lanes";
+import { drawnPaths, fallbackColumnOf } from "../model/lanes";
 import { groupAndSortCards } from "./cardView";
 import { COLUMN_COLORS } from "./columnColors";
 
@@ -257,9 +257,12 @@ export function Column({
     [board, column.id, matchCtx],
   );
   const ownPaths = cardPaths.filter((p) => board.cards[p]);
-  const stranded = columnFilter
-    ? []
-    : modelPaths.filter((p) => !(board.columns[column.id] ?? []).includes(p));
+  // Only the fallback column is ever given cards from outside its own bucket, so no other column
+  // pays for the comparison.
+  const isFallback = !columnFilter && fallbackColumnOf(board) === column.id;
+  const stranded = isFallback
+    ? modelPaths.filter((p) => !(board.columns[column.id] ?? []).includes(p))
+    : [];
   const lanePaths = columnFilter
     ? modelPaths
     : stranded.length

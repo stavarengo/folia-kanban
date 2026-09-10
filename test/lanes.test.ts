@@ -141,6 +141,51 @@ describe("filing a card into a column", () => {
     expect(laneRefusal(board, "mine", any, { ...ctx, me: "alex" })).toContain("assignee:me");
   });
 
+  // The write sets `status`, and a rule may read exactly that. Judging the card as it stands today
+  // answers about a card that will not exist once the move lands.
+  it("judges the card as the move will leave it, not as it is now", () => {
+    const byStatus: BoardConfig = {
+      ...base,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "queue", title: "Queue", filter: "status:queue" },
+      ],
+    };
+    const board = buildBoard(byStatus, [card("X", { status: "todo" })]);
+    // Reading the card as it stands, `status:queue` fails and the move would be refused — but the
+    // move is what makes it true, and the lane draws the card the moment it lands.
+    expect(laneRefusal(board, "queue", board.cards["Tasks/X.md"]!, ctx)).toBeNull();
+  });
+
+  it("does not wave through a move that its own status was the only reason to allow", () => {
+    const byStatus: BoardConfig = {
+      ...base,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "queue", title: "Queue", filter: "status:todo" },
+      ],
+    };
+    const board = buildBoard(byStatus, [card("X", { status: "todo" })]);
+    // The card matches `status:todo` right now; moving it to Queue is what stops it matching.
+    expect(laneRefusal(board, "queue", board.cards["Tasks/X.md"]!, ctx)).toContain("status:todo");
+  });
+
+  it("leaves a card alone when the lane's rule is one this caller cannot read", () => {
+    const perReader: BoardConfig = {
+      ...base,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "inbox", title: "Inbox", filter: "unread:comments" },
+      ],
+    };
+    const board = buildBoard(perReader, [card("Msg", { status: "inbox" })]);
+    // Without a reader the rule cannot be judged, so the card is not declared stranded and not
+    // moved to the fallback column on a guess — it stays listed under the lane its status names.
+    expect(strandedLanePaths(board, ctx)).toEqual([]);
+    expect(drawnPaths(board, "inbox", ctx)).toEqual(["Tasks/Msg.md"]);
+    expect(drawnPaths(board, "todo", ctx)).toEqual([]);
+  });
+
   it("judges a card that does not exist yet by what create_card would write", () => {
     expect(laneRefusal(b, "research", prospectiveCard("New", "research"), ctx)).toContain(
       "area:research",
