@@ -29,6 +29,7 @@
     "@release-it/conventional-changelog": {
       "preset": {
         "name": "conventionalcommits",
+        "preMajor": true,
         "types": [
           {
             "type": "feat",
@@ -77,8 +78,7 @@
         ]
       },
       "infile": "CHANGELOG.md",
-      "header": "# Changelog",
-      "ignoreRecommendedBump": true
+      "header": "# Changelog"
     }
   }
 }

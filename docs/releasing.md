@@ -4,10 +4,12 @@ Maintainer notes: how a release is cut, what checks it against the Obsidian comm
 
 ## Cutting a release
 
-1. Run the **Create Release** workflow (`workflow_dispatch`, `main` only). It runs `pnpm ci:release` — release-it bumps `manifest.json`/`versions.json`/`package.json`, writes the `CHANGELOG.md` section from the Conventional Commits since the last tag, commits, and pushes the tag.
+1. Run the **Create Release** workflow (`workflow_dispatch`, `main` only). It runs `pnpm ci:release` — release-it reads the Conventional Commits since the last tag to decide the increment, bumps `manifest.json`/`versions.json`/`package.json`, writes the `CHANGELOG.md` section from those commits, commits, and pushes the tag.
 2. The tag push triggers **Release**, which refuses anything that is not plain semver or not reachable from `origin/main`, then tests, builds, attests build provenance, creates the GitHub release with that changelog section as its notes, and uploads `main.js`, `manifest.json` and `styles.css`.
 
 Both steps are ours end to end: nothing is drafted for a human to publish by hand.
+
+The increment comes from the commits, so a commit that breaks compatibility must carry the `!` in its header, whatever its type (`feat(mcp)!: require the subtask text`); a `BREAKING CHANGE:` footer is optional, for when the subject alone does not say what a user has to change. `.release-it.json` keeps `preMajor: true` until someone decides on `1.0.0`; that release is dispatched with an explicit version and drops the flag in the same change.
 
 `manifest.json`'s `minAppVersion` moved to **1.11.4** on 2026-09-10, for `App.secretStorage` (see `docs/decisions.md`). The `versions.json` row that records it is written by the next release, not by hand: `scripts/bump-plugin-version.mjs` does `versions[version] = minAppVersion` on every bump, so whatever version ships first after that change gets the `1.11.4` row automatically. Nothing below it needs rewriting — Obsidian reads the file to find the newest plugin version an older app can still run, and every release up to `0.0.20` genuinely ran on `1.7.2`, so a user still on that app is correctly sent to `0.0.20`. Rewriting those rows to the new floor would tell them no version runs at all.
 
