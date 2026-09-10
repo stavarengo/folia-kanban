@@ -60,12 +60,13 @@ export function laneVerdict(
   ctx: MatchContext,
 ): LaneCheck | null {
   const lane = laneOf(board, columnId);
+  if (!lane) return null;
   // Judged as the write would leave the card, not as it is now: filing a card into a column sets
   // its `status`, and a rule may read exactly that (`status:`, and the `due:` token's done check).
   // Asking about the card as it stands would refuse a move that is about to become valid, and wave
   // through one that is about to stop being.
   const filed = { ...card, frontmatter: { ...card.frontmatter, status: columnId } };
-  return lane ? { lane, verdict: judgeCard(filed, lane.filter, ctx) } : null;
+  return { lane, verdict: judgeCard(filed, lane.filter, ctx) };
 }
 
 /**
