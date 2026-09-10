@@ -158,6 +158,26 @@ function renderStateful(
   return render(<Stateful />);
 }
 
+/**
+ * jsdom has no PointerEvent, and RTL's pointer `fireEvent` drops the init props (button, shiftKey),
+ * so a listener keyed on the middle button would never see one. Native MouseEvents at the
+ * pointer-named types carry those props, and a real PointerEvent is a MouseEvent anyway.
+ */
+const dispatchPointer = (el: HTMLElement, type: string, init: MouseEventInit) =>
+  el.dispatchEvent(new MouseEvent(type, { bubbles: true, ...init }));
+
+/**
+ * The events a middle click really produces: the pointer press and release, then the `auxclick` a
+ * middle release makes — a middle button never produces a `click`. The pointer half matters,
+ * because the board pans on a middle-button drag and a bare `auxclick` never reaches the listener
+ * that decides whether a press is a pan.
+ */
+const middleClick = (el: HTMLElement) => {
+  dispatchPointer(el, "pointerdown", { button: 1, clientX: 0 });
+  dispatchPointer(el, "pointerup", { button: 1, clientX: 0 });
+  fireEvent(el, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+};
+
 describe("board rendering", () => {
   it("renders columns with the right cards and counts; subcards are not top-level", async () => {
     render_(makeRepo());
@@ -1673,11 +1693,6 @@ describe("board pan-scroll", () => {
   // jsdom has no layout, so board.scrollLeft always reads back 0 — we can only assert the
   // is-pan-scrolling class lifecycle here. The click-hijack suppression and actual scroll offset
   // need the live test-vault verification (compat-clicks / pointer capture aren't simulated in jsdom).
-  // jsdom has no PointerEvent and RTL's pointer fireEvent drops the init props (shiftKey/button), so
-  // we dispatch native MouseEvents — jsdom does carry shiftKey/button on those — at the pointer-named
-  // event types the board's native listeners are bound to.
-  const dispatchPointer = (el: HTMLElement, type: string, init: MouseEventInit) =>
-    el.dispatchEvent(new MouseEvent(type, { bubbles: true, ...init }));
 
   it("toggles is-pan-scrolling on a shift pan and clears it on pointerup", async () => {
     render_(makeRepo());
@@ -1701,13 +1716,19 @@ describe("board pan-scroll", () => {
     dispatchPointer(board, "pointerup", { clientX: 100 });
   });
 
-  it("middle-button pans regardless of mode", async () => {
+  it("middle-button pans regardless of mode, and over a card too", async () => {
     render_(makeRepo());
-    await screen.findByText("Alpha");
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     const board = document.querySelector(".folia-board") as HTMLElement;
     dispatchPointer(board, "pointerdown", { button: 1, clientX: 100 });
     expect(board).toHaveClass("is-pan-scrolling");
     dispatchPointer(board, "pointerup", { clientX: 100 });
+    expect(board).not.toHaveClass("is-pan-scrolling");
+
+    // The exemption for a control is exactly that — a control. A card is still pannable surface.
+    dispatchPointer(card, "pointerdown", { button: 1, clientX: 100 });
+    expect(board).toHaveClass("is-pan-scrolling");
+    dispatchPointer(card, "pointerup", { clientX: 100 });
     expect(board).not.toHaveClass("is-pan-scrolling");
   });
 
@@ -1911,21 +1932,24 @@ describe("card context menu", () => {
     expect(repo.opened).toEqual(["Tasks/Alpha.md"]);
     expect(repo.openedWith[0]).toMatchObject({ ctrlKey: true });
 
-    // A middle click reaches a button as auxclick, never as click.
-    fireEvent(
-      within(card).getByLabelText('Open note for "Alpha"'),
-      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
-    );
+    // The whole middle-click gesture, not a bare auxclick: the board pans on a middle-button drag,
+    // and a press that never reaches the pan listener would let this pass with the pan still armed.
+    const openNote = within(card).getByLabelText('Open note for "Alpha"');
+    const board = document.querySelector(".folia-board") as HTMLElement;
+    dispatchPointer(openNote, "pointerdown", { button: 1, clientX: 0 });
+    // The board pans on a middle-button drag. A press aimed at this button is not that drag, and
+    // the check has to happen here: the release ends any pan and would hide the evidence.
+    expect(board).not.toHaveClass("is-pan-scrolling");
+    dispatchPointer(openNote, "pointerup", { button: 1, clientX: 0 });
+    fireEvent(openNote, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+
     expect(repo.openedWith[1]).toMatchObject({ button: 1 });
     // ...and it must not also select the card, the way a plain click on the face would.
     expect(screen.queryByTestId("card-detail")).not.toBeInTheDocument();
 
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     const menu = await screen.findByRole("menu");
-    fireEvent(
-      within(menu).getByRole("menuitem", { name: /Open note/ }),
-      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
-    );
+    middleClick(within(menu).getByRole("menuitem", { name: /Open note/ }));
     expect(repo.openedWith[2]).toMatchObject({ button: 1 });
 
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
@@ -1959,14 +1983,8 @@ describe("card context menu", () => {
     // "Open in a new tab" is the only thing a middle click can mean, so an item that changes or
     // deletes the card must not fire from it — a stray middle click would be irreversible.
     const { repo, menu } = await openCardMenu("First");
-    fireEvent(
-      within(menu).getByRole("menuitem", { name: /Delete card/ }),
-      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
-    );
-    fireEvent(
-      within(menu).getByRole("menuitem", { name: /Mark done/ }),
-      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
-    );
+    middleClick(within(menu).getByRole("menuitem", { name: /Delete card/ }));
+    middleClick(within(menu).getByRole("menuitem", { name: /Mark done/ }));
 
     expect(repo.files.has("Tasks/First.md")).toBe(true);
     expect(repo.files.get("Tasks/First.md")?.fm["status"]).toBe("todo");

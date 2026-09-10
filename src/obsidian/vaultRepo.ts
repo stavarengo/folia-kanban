@@ -119,6 +119,9 @@ const hoverSources = new WeakMap<
   { app: App; repo: VaultRepository; sourcePath: string }
 >();
 
+/** Containers already listening. Separate from `hoverSources`, which a cleanup empties. */
+const hoverListening = new WeakSet<HTMLElement>();
+
 export class VaultRepository implements CardRepository, HoverParent {
   private recentWrites = new Map<string, number>();
   /**
@@ -817,20 +820,23 @@ export class VaultRepository implements CardRepository, HoverParent {
    * The listener is bound to the container once and outlives the individual renders, because the
    * container does: re-registering per render would stack a second listener onto the same element
    * whenever a caller re-renders without running the previous cleanup, and every hover would then
-   * fire twice. `hoverSources` carries the note the links resolve against, refreshed on every
-   * render, and doubles as the record of which containers are already listening.
+   * fire twice. `hoverSources` carries who the container answers for, refreshed on every render and
+   * dropped by the cleanup, so a hover after teardown says nothing.
    */
   private watchForLinkHovers(el: HTMLElement, sourcePath: string): void {
-    const listening = hoverSources.has(el);
     hoverSources.set(el, { app: this.app, repo: this, sourcePath });
-    if (listening) return;
+    if (hoverListening.has(el)) return;
+    hoverListening.add(el);
     el.addEventListener("mouseover", (event: MouseEvent) => {
       // `closest`, because the pointer may be over a `<code>` or an `<em>` nested inside the
       // anchor; `data-href` before `href`, because that is where Obsidian keeps the link as
       // written, before it resolved it to a path.
       const link = (event.target as HTMLElement | null)?.closest("a.internal-link");
       if (!(link instanceof HTMLElement)) return;
-      const linktext = link.getAttribute("data-href") ?? link.getAttribute("href");
+      // `data-href` is where Obsidian's renderer keeps the link as written, before resolving it.
+      // Only that: an `href` on a rendered internal link is already resolved and percent-encoded,
+      // so falling back to it would ask Page preview to look up something nobody wrote.
+      const linktext = link.getAttribute("data-href");
       const owner = hoverSources.get(el);
       if (!linktext || !owner) return;
       owner.app.workspace.trigger("hover-link", {
@@ -865,6 +871,10 @@ export class VaultRepository implements CardRepository, HoverParent {
     return () => {
       cancelled = true;
       c.unload();
+      // The listener stays (the container may render again into the same element), but it answers
+      // from this record — dropping it is what makes a torn-down render stop naming a repository
+      // whose links are gone, and lets the element release its hold on that repository.
+      if (hoverSources.get(el)?.repo === this) hoverSources.delete(el);
       el.innerHTML = "";
     };
   }

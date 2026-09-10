@@ -923,6 +923,20 @@ describe("the rest of the vault surface", () => {
     el.remove();
   });
 
+  it("says nothing about a link hovered after the render that put it there was torn down", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    const cleanup = repo.renderMarkdown(el, "gone", "basic/Cards/One.md");
+    cleanup();
+    el.innerHTML = '<a class="internal-link" data-href="Two">Two</a>';
+    el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    expect(app.triggered.filter((t) => t.name === "hover-link")).toEqual([]);
+    el.remove();
+  });
+
   it("names the repository that rendered last, not the one that bound the listener", async () => {
     // A renamed board note rebuilds the repository while React keeps the very same element, so the
     // container outlives its repository. Page preview must be handed the live one.

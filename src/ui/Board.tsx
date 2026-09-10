@@ -162,7 +162,8 @@ export function Board({
   //    fight over the same pointer.
   //  - "empty": a plain left-drag pans, but only when the press lands on the empty board background
   //    (not a card/column/interactive element); over a card a plain left-drag is a card drag. Shift is
-  //    not required. Middle-button drag still pans from anywhere in both modes.
+  //    not required. Middle-button drag still pans from anywhere in both modes, except on a
+  //    button, where the middle click is that button's own (see `onControl`).
   // The effect reads the live mode each press via panModeRef, so toggling the setting takes effect
   // without re-binding listeners.
   const boardRef = useRef<HTMLDivElement>(null);
@@ -189,8 +190,14 @@ export function Board({
       );
     };
 
+    // A control is something the press was aimed at. The middle button pans over cards and columns
+    // on purpose, but a middle click on a button is that button's gesture — Folia's "Open note"
+    // reads it as "open in a new tab", and panning it away at the same time serves nobody.
+    const onControl = (e: PointerEvent) =>
+      !!(e.target as HTMLElement | null)?.closest("button, a, input, textarea, [role='button']");
+
     const shouldPan = (e: PointerEvent) => {
-      if (e.button === 1) return true; // middle-button always pans
+      if (e.button === 1) return !onControl(e); // middle-button pans, except on a control
       if (e.button !== 0) return false;
       if (panModeRef.current === "shift") return e.shiftKey;
       return isEmptyBackground(e); // "empty" mode: plain left-drag on bare background
@@ -249,12 +256,15 @@ export function Board({
     board.addEventListener("pointerup", end);
     board.addEventListener("pointercancel", end);
     board.addEventListener("click", onClickCapture, { capture: true });
+    // A middle-button pan emits `auxclick`, never `click`, so the same suppression needs both.
+    board.addEventListener("auxclick", onClickCapture, { capture: true });
     return () => {
       board.removeEventListener("pointerdown", onPointerDown);
       board.removeEventListener("pointermove", onPointerMove);
       board.removeEventListener("pointerup", end);
       board.removeEventListener("pointercancel", end);
       board.removeEventListener("click", onClickCapture, { capture: true });
+      board.removeEventListener("auxclick", onClickCapture, { capture: true });
     };
   }, []);
 

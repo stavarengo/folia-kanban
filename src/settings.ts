@@ -22,7 +22,7 @@ export interface KanbanSettings {
   /** How the board pans horizontally.
    *  - "shift": Shift+drag (or middle-button drag) pans from anywhere, incl. over cards/columns (default).
    *  - "empty": plain left-drag pans, but only from an empty board-background area; cards/columns keep
-   *    plain drag for their own interactions. (Middle-button drag still pans from anywhere.) */
+   *    plain drag for their own interactions. (Middle-button drag still pans from anywhere but a button.) */
   boardPan: "shift" | "empty";
   /** Which view a board note opens in when it is opened as a file (explorer, link, search,
    *  quick switcher, restored tab). A note's own `folia-view` property overrides it. */
