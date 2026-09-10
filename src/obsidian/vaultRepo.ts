@@ -114,7 +114,10 @@ interface ResolvedBoardConfig extends BoardConfig {
  * board note being renamed rebuilds the repository while React keeps the very same element, and a
  * listener closed over the old one would hand Page preview a dead board and a stale path.
  */
-const hoverSources = new WeakMap<HTMLElement, { repo: VaultRepository; sourcePath: string }>();
+const hoverSources = new WeakMap<
+  HTMLElement,
+  { app: App; repo: VaultRepository; sourcePath: string }
+>();
 
 export class VaultRepository implements CardRepository, HoverParent {
   private recentWrites = new Map<string, number>();
@@ -131,7 +134,7 @@ export class VaultRepository implements CardRepository, HoverParent {
   hoverPopover: HoverPopover | null = null;
 
   constructor(
-    readonly app: App,
+    private app: App,
     private boardPath: string,
     /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
     public getHistoryScope: () => HistoryScope = () => "moves",
@@ -819,7 +822,7 @@ export class VaultRepository implements CardRepository, HoverParent {
    */
   private watchForLinkHovers(el: HTMLElement, sourcePath: string): void {
     const listening = hoverSources.has(el);
-    hoverSources.set(el, { repo: this, sourcePath });
+    hoverSources.set(el, { app: this.app, repo: this, sourcePath });
     if (listening) return;
     el.addEventListener("mouseover", (event: MouseEvent) => {
       // `closest`, because the pointer may be over a `<code>` or an `<em>` nested inside the
@@ -830,7 +833,7 @@ export class VaultRepository implements CardRepository, HoverParent {
       const linktext = link.getAttribute("data-href") ?? link.getAttribute("href");
       const owner = hoverSources.get(el);
       if (!linktext || !owner) return;
-      owner.repo.app.workspace.trigger("hover-link", {
+      owner.app.workspace.trigger("hover-link", {
         event,
         source: VIEW_TYPE_KANBAN,
         hoverParent: owner.repo,
