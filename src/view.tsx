@@ -29,7 +29,7 @@ export class KanbanView extends FileView {
   private root: Root | null = null;
   private repo: VaultRepository | null = null;
   private repoPath: string | null = null;
-  private onSlash: ((target: EventTarget | null) => boolean) | null = null;
+  private onSlash: ((event: KeyboardEvent) => boolean) | null = null;
 
   /**
    * Stable across renders on purpose: the board binds its shortcut in an effect keyed on this
@@ -55,9 +55,10 @@ export class KanbanView extends FileView {
     // with two boards open side by side, the other one never sees the key. The app scope is the
     // parent so every global hotkey still resolves while a board is focused.
     this.scope = new Scope(this.app.scope);
-    // Returning false is what tells Obsidian to swallow the key; the board declines it while the
-    // user is typing, and then the field gets its own slash.
-    this.scope.register([], "/", (evt) => this.onSlash?.(evt.target) !== true);
+    // `null` modifiers rather than none: a layout where "/" is typed with Shift still types a "/",
+    // and the board reads the modifiers itself. Returning false is what tells Obsidian to swallow
+    // the key, so declining leaves it to the field the user is typing in.
+    this.scope.register(null, "/", (evt) => this.onSlash?.(evt) !== true);
   }
 
   getViewType(): string {

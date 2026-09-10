@@ -859,7 +859,8 @@ export function CardDetail({
   // adopts it (min-height) and the panel doesn't jump on preview↔edit toggle. Null = no carry-over.
   const [preservedDescHeight, setPreservedDescHeight] = useState<number | null>(null);
   // Viewport-derived ceiling for the rendered preview so a long description scrolls internally
-  // instead of pushing the panel past the screen. Re-measured on mount and window resize.
+  // instead of pushing the panel past the screen. Re-measured whenever the board or the panel is
+  // resized, not only when a window is.
   const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
   // One datalist for every relationship field: they all offer the same cards.
@@ -1128,12 +1129,14 @@ export function CardDetail({
   // Cap the rendered preview to the space between its top and the viewport bottom (leaving a small
   // gutter), but never below a readable floor. Works across split/float/modal: it measures the
   // preview's own on-screen position, so the modal's max-height and the side panel's scroll both
-  // resolve to a sensible ceiling. Re-runs on mount, when the preview (re)appears, and whenever the
-  // board's box changes size — dragging a split divider or collapsing a sidebar moves the preview
-  // without resizing any window, so a `resize` listener would sleep through it. Observing the board
-  // root rather than the preview keeps this out of a feedback loop: the root's size is not a
-  // function of the height being set here. `useBoardWindow()` is the pop-out's viewport, not the
-  // focused window's.
+  // resolve to a sensible ceiling. `useBoardWindow()` is the pop-out's viewport, not the focused
+  // window's.
+  //
+  // Two boxes move the preview without any window resizing, and a `resize` listener sleeps through
+  // both: the board's own, when a split divider is dragged or a sidebar collapses, and the panel's,
+  // when its left border is dragged narrow enough to wrap the header above the preview. The panel
+  // is watched for its WIDTH alone, because in the float and modal presentations its height follows
+  // the very ceiling being set here, and answering that would be a loop.
   useLayoutEffect(() => {
     if (isCreate || editingDesc) return;
     const measure = () => {
@@ -1148,8 +1151,18 @@ export function CardDetail({
     const root = boardRootRef.current;
     if (!root) return;
     measure();
-    const observer = new ResizeObserver(measure);
+    const panel = panelRef.current;
+    let panelWidth = panel?.getBoundingClientRect().width ?? 0;
+    const observer = new ResizeObserver((entries) => {
+      if (panel && entries.length > 0 && entries.every((e) => e.target === panel)) {
+        const width = panel.getBoundingClientRect().width;
+        if (width === panelWidth) return;
+        panelWidth = width;
+      }
+      measure();
+    });
     observer.observe(root);
+    if (panel) observer.observe(panel);
     return () => observer.disconnect();
   }, [isCreate, editingDesc, path, body, win, boardRootRef]);
 
@@ -1226,7 +1239,7 @@ export function CardDetail({
   // right edge so it works whether the panel is a flex sibling (split) or right-docked (float).
   const onResizeStart = (e: ReactPointerEvent) => {
     e.preventDefault();
-    const right = panelRef.current?.getBoundingClientRect().right ?? window.innerWidth;
+    const right = panelRef.current?.getBoundingClientRect().right ?? win.innerWidth;
     (e.target as Element).setPointerCapture(e.pointerId);
     let latest = clampWidth(right - e.clientX);
     const onMove = (ev: PointerEvent) => {

@@ -115,11 +115,12 @@ function pathForm(
  */
 export interface BoardHost {
   /**
-   * Hand the host the board's `/` handler. It is called with the element the key was typed at and
-   * returns whether the board took the key, which is the host's cue to suppress it. Returns the
-   * unbind function.
+   * Hand the host the board's `/` handler. It is called with the keypress and returns whether the
+   * board took it, which is the host's cue to suppress it. Every key the host can match is offered,
+   * modifiers included, because which physical combination types a `/` depends on the layout —
+   * on a German keyboard it is `Shift+7`. Returns the unbind function.
    */
-  bindSearchShortcut(onSlash: (target: EventTarget | null) => boolean): () => void;
+  bindSearchShortcut(onSlash: (event: KeyboardEvent) => boolean): () => void;
 }
 
 interface Props {
@@ -846,12 +847,17 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   // embedding without a leaf) simply has no shortcut.
   useEffect(
     () =>
-      host?.bindSearchShortcut((target) => {
-        const el = target as HTMLElement | null;
+      host?.bindSearchShortcut((event) => {
+        if (event.metaKey || event.ctrlKey || event.altKey) return false;
+        const el = event.target as HTMLElement | null;
         const tag = el?.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
           return false;
-        searchRef.current?.focus();
+        // No box to focus while the board is still loading or has failed to load. Declining leaves
+        // the key to whatever else would have had it, rather than swallowing it for nothing.
+        const box = searchRef.current;
+        if (!box) return false;
+        box.focus();
         return true;
       }),
     [host],

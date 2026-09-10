@@ -40,15 +40,20 @@ function makeRepo() {
 /** Stands in for `KanbanView`'s side of the `BoardHost` port: holds the board's `/` handler and
  *  lets a test fire it at a chosen target, the way the view's keymap scope does. */
 function fakeHost() {
-  let onSlash: ((target: EventTarget | null) => boolean) | null = null;
+  let onSlash: ((event: KeyboardEvent) => boolean) | null = null;
   return {
-    bindSearchShortcut(handler: (target: EventTarget | null) => boolean) {
+    bindSearchShortcut(handler: (event: KeyboardEvent) => boolean) {
       onSlash = handler;
       return () => {
         onSlash = null;
       };
     },
-    slash: (target: EventTarget | null) => onSlash?.(target) ?? false,
+    /** Fire the board's handler the way the view's keymap scope does. */
+    slash: (target: EventTarget | null, mods: Partial<KeyboardEventInit> = {}) => {
+      const event = new KeyboardEvent("keydown", { key: "/", ...mods });
+      Object.defineProperty(event, "target", { value: target });
+      return onSlash?.(event) ?? false;
+    },
     bound: () => onSlash !== null,
   };
 }
@@ -299,15 +304,19 @@ describe("card detail — priority", () => {
 });
 
 describe("card detail — description preview height", () => {
-  /** Swap in a ResizeObserver that a test can fire, and hand back what it was pointed at. */
+  /** Swap in a ResizeObserver a test can fire, and record everything it was pointed at. */
   function captureResizeObserver() {
     const original = globalThis.ResizeObserver;
-    const seen: { target?: Element; fire?: () => void } = {};
+    const seen: { targets: Element[]; fire?: (targets: Element[]) => void } = { targets: [] };
     globalThis.ResizeObserver = class {
       constructor(private cb: ResizeObserverCallback) {}
       observe(target: Element) {
-        seen.target = target;
-        seen.fire = () => this.cb([], this as unknown as ResizeObserver);
+        seen.targets.push(target);
+        seen.fire = (targets) =>
+          this.cb(
+            targets.map((t) => ({ target: t }) as ResizeObserverEntry),
+            this as unknown as ResizeObserver,
+          );
       }
       unobserve(): void {}
       disconnect(): void {}
@@ -315,30 +324,85 @@ describe("card detail — description preview height", () => {
     return { seen, restore: () => (globalThis.ResizeObserver = original) };
   }
 
-  it("re-measures when the board's own box changes, not only when the window resizes", async () => {
-    const { seen, restore } = captureResizeObserver();
-    try {
-      const user = userEvent.setup();
-      render_(makeRepo());
-      await user.click(await screen.findByText("Alpha"));
-      const detail = await screen.findByTestId("card-detail");
-      const preview = detail.querySelector(".folia-desc-view") as HTMLElement;
-      // The board root is what is watched: a split drag resizes it without touching the window, and
-      // its size never depends on the height being measured here, so there is no feedback loop.
-      expect(seen.target).toBe(document.querySelector(".folia-root"));
+  /** Open Alpha's panel with the observer captured, and hand back the pieces a test measures. */
+  async function openWithObserver() {
+    const captured = captureResizeObserver();
+    const user = userEvent.setup();
+    render_(makeRepo());
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    return {
+      ...captured,
+      preview: detail.querySelector(".folia-desc-view") as HTMLElement,
+      panel: detail as HTMLElement,
+      root: document.querySelector(".folia-root") as HTMLElement,
+      maxH: () =>
+        (detail.querySelector(".folia-desc-view") as HTMLElement).style.getPropertyValue(
+          "--folia-desc-max-h",
+        ),
+    };
+  }
 
-      const before = preview.style.getPropertyValue("--folia-desc-max-h");
-      // jsdom reports every rect as zero, so the measurement is `innerHeight - 0 - 24`. Shrinking
-      // the window and firing the observer stands in for a divider drag moving the preview.
-      const height = window.innerHeight;
-      try {
-        Object.defineProperty(window, "innerHeight", { configurable: true, value: 500 });
-        act(() => seen.fire?.());
-        expect(preview.style.getPropertyValue("--folia-desc-max-h")).toBe("476px");
-        expect(preview.style.getPropertyValue("--folia-desc-max-h")).not.toBe(before);
-      } finally {
-        Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
-      }
+  /** jsdom has no layout, so the measurement is `innerHeight - 0 - 24`. Moving the window height
+   *  stands in for whatever moved the preview, since the assertion is only whether it re-ran. */
+  function withWindowHeight(value: number, fn: () => void) {
+    const height = window.innerHeight;
+    Object.defineProperty(window, "innerHeight", { configurable: true, value });
+    try {
+      fn();
+    } finally {
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+    }
+  }
+
+  it("re-measures when the board's own box changes, not only when the window resizes", async () => {
+    const { seen, restore, root, panel, maxH } = await openWithObserver();
+    try {
+      // A split drag resizes the root without touching the window; the panel's own border drag
+      // resizes only the panel. Both are watched, and neither is the preview itself, whose size IS
+      // the value being set here — observing that would be a feedback loop.
+      expect(seen.targets).toContain(root);
+      expect(seen.targets).toContain(panel);
+
+      const before = maxH();
+      withWindowHeight(500, () => {
+        act(() => seen.fire?.([root]));
+      });
+      expect(maxH()).toBe("476px");
+      expect(maxH()).not.toBe(before);
+    } finally {
+      restore();
+    }
+  });
+
+  it("answers a panel resize only when its width moved, since its height follows the cap", async () => {
+    const { seen, restore, panel, maxH } = await openWithObserver();
+    try {
+      const before = maxH();
+      // The panel growing taller is the panel reacting to the cap. Answering it would loop.
+      withWindowHeight(500, () => {
+        act(() => seen.fire?.([panel]));
+      });
+      expect(maxH()).toBe(before);
+
+      // A narrower panel can wrap the header above the preview and move it, so that is answered.
+      Object.defineProperty(panel, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({
+          width: 280,
+          height: 0,
+          top: 0,
+          left: 0,
+          right: 280,
+          bottom: 0,
+          x: 0,
+          y: 0,
+        }),
+      });
+      withWindowHeight(500, () => {
+        act(() => seen.fire?.([panel]));
+      });
+      expect(maxH()).toBe("476px");
     } finally {
       restore();
     }
@@ -2232,6 +2296,51 @@ describe("search filter (single source of truth)", () => {
     let took = false;
     act(() => {
       took = host.slash(document.body);
+    });
+    expect(took).toBe(true);
+    expect(document.activeElement).toBe(search);
+  });
+
+  it("a modified '/' is not the shortcut, and neither is one with no box to focus yet", async () => {
+    const host = fakeHost();
+    const broken = makeRepo();
+    broken.failLoadWith = "card folder is a file";
+    const failed = render(
+      <App
+        repo={broken}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host}
+      />,
+    );
+    // A board that never loaded has no search box, so the key must fall through rather than be
+    // swallowed for a focus that cannot happen.
+    await screen.findByText(/Couldn’t load the board/);
+    expect(host.slash(document.body)).toBe(false);
+    failed.unmount();
+
+    const host2 = fakeHost();
+    render(
+      <App
+        repo={makeRepo()}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={host2}
+      />,
+    );
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards");
+
+    // "/" on a German layout is Shift+7, so Shift is not a reason to decline; Ctrl/Alt/Meta are.
+    for (const mods of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+      expect(host2.slash(document.body, mods)).toBe(false);
+      expect(document.activeElement).not.toBe(search);
+    }
+    let took = false;
+    act(() => {
+      took = host2.slash(document.body, { shiftKey: true });
     });
     expect(took).toBe(true);
     expect(document.activeElement).toBe(search);
