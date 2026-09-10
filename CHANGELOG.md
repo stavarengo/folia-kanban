@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/stavarengo/folia-kanban/compare/0.1.0...0.2.0) (2026-09-10)
+
+### ⚠ BREAKING CHANGES
+
+* **mcp:** add_comment now requires an `author` argument. A client calling it without one gets a schema error, so every caller has to pass the name its comments should be signed with.
+
+### Features
+
+* **mcp:** sign an agent's comment with the name the agent gives ([969958a](https://github.com/stavarengo/folia-kanban/commit/969958a651514315bb8577e63e13e6229b6f3d35))
+
+### Documentation
+
+* **backlog:** file the lint and dependency findings, and the hook decision ([f1ae54f](https://github.com/stavarengo/folia-kanban/commit/f1ae54fecbabf1250bfe2a2727e7b1e2c3e82774))
+* **backlog:** file the release-path and verify-chain findings ([8be3445](https://github.com/stavarengo/folia-kanban/commit/8be344552baea37f1b2a7a9236e74d4fc81c464c))
+
 ## [0.1.0](https://github.com/stavarengo/folia-kanban/compare/0.0.20...0.1.0) (2026-09-10)
 
 ### ⚠ BREAKING CHANGES
