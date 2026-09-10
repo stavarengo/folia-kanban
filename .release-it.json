@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/release-it/schema/release-it.json",
   "git": {
-    "requireCleanWorkingDir": false,
     "requireBranch": "main",
     "requireUpstream": true,
     "requireCommits": true,

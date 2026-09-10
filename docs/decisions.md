@@ -78,7 +78,7 @@ The toast is deliberately not part of this. It paints `color: #fff` on `--folia-
 
 ## The community-directory action's release mode
 
-**Decided 2026-08-26. Releases stay on release-it plus the repository's own Release workflow.**
+**Decided 2026-08-26. Releases stay on release-it plus the repository's own pipeline.**
 
 Obsidian's [`obsidianmd/obsidian-workflows`](https://github.com/obsidianmd/obsidian-workflows) action offers a release mode and a reusable `release.yml`. It creates a draft release for a human to publish, and it knows nothing about this repository's rules: a tag must be plain semver and reachable from `origin/main`, and the release notes come from the changelog section release-it wrote. Adopting it would replace an end-to-end pipeline with a draft and a second copy of checks CI already runs on the same commit. Its scanner half is still used, in PR mode, for drift detection (see `docs/releasing.md`).
 

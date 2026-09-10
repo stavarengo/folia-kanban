@@ -14,7 +14,7 @@
     "dev:examplesVault": "OUT_DIR=examples/.obsidian/plugins/folia-kanban node esbuild.config.mjs",
     "release:bump-plugin-version": "node scripts/bump-plugin-version.mjs",
     "ci:release": "release-it --ci",
-    "dev:helpers:release": "release-it",
+    "dev:helpers:release": "node scripts/dispatch-release.mjs",
     "doctor:check": "node scripts/doctor.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

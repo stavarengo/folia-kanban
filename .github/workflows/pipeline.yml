@@ -1,0 +1,502 @@
+name: Pipeline
+
+# One run, one commit, from verify to announce. The jobs are chained with
+# `needs`, so the release that gets published is the one whose exact commit
+# passed `pnpm verify` in the same run — nothing is inferred from a green tick
+# on another workflow, and no job triggers another workflow as a side effect.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Republish an existing tag (leave empty to release from main)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pull-request runs are worth nothing, so cancel them. A run on
+  # main is never cancelled: it may be the one holding a half-finished release.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Verify
+    # A republish dispatch publishes a tag that was already verified when it was
+    # cut. The state of main is not what it is about, and a red main must not
+    # block the recovery path.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tag == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify
+
+      # `pnpm verify` builds. Keeping that build lets anyone inspect what this
+      # commit produces; the release job still rebuilds, because the bump
+      # changes manifest.json after this job has run.
+      - name: Upload the built plugin
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # Obsidian's own action, running the community directory's real scanner rulesets
+  # with the tool versions the directory pins — which the local reproduction in
+  # `pnpm verify` (`obsidian-scan:check`) cannot, since it shares this repo's ESLint
+  # major and its own caniuse data. Floating on `v1` on purpose, so it tracks the
+  # scanner rather than a snapshot of it.
+  #
+  # NOT a gate on lint findings, and cannot be made into one: the action reports
+  # every scanner finding as a warning and only calls setFailed on `error` severity,
+  # and stylelint exits 0 on its own warnings so those reach the log but not even an
+  # annotation. There is no strictness input. What is left at `error` severity here,
+  # with the build switched off below: manifest/versions.json schema, a missing
+  # README or LICENSE, and a failed install of the scanner's own temp deps (a network
+  # flake — rerun it). The gate on lint findings is `obsidian-scan:check`, which
+  # fails on any of them.
+  # Read this job's log when the two should agree and you want to know if the
+  # scanner has moved — findings here that the local pass missed mean it has.
+  scan:
+    name: Obsidian community scan
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tag == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      # The action is npm-only (`npm ci`/`npm install`), and this repo has no
+      # package-lock.json. Installing first makes it skip its own install — it
+      # bails out when node_modules exists — so its type-aware ESLint pass sees
+      # the pnpm-pinned tree, not a freshly resolved one. The two lint passes
+      # install their own pinned tools in a temp dir either way.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scan
+        uses: obsidianmd/obsidian-workflows@v1
+        with:
+          type: plugin
+          mode: pr
+          # Off by default outside release mode; without it this only reruns our
+          # own `pnpm lint`, not the scanner's rulesets.
+          scanner-lint: true
+          # The verify job already builds. Building here would only add a second
+          # copy of styles.css under dist/ for stylelint to report twice — its
+          # ignoreFiles is inert the way the action invokes it.
+          build: "false"
+
+  plan:
+    name: Plan the release
+    needs: [verify, scan]
+    if: ${{ github.ref == 'refs/heads/main' && !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      releasable: ${{ steps.plan.outputs.releasable }}
+
+    steps:
+      # Full history and tags: both halves of the plan read the commits since
+      # the last tag.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Decide whether there is a release, and which version
+        id: plan
+        shell: bash
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match '*.*.*' 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            range="$previous..HEAD"
+            since="$previous"
+          else
+            range="HEAD"
+            since="the first commit"
+          fi
+
+          # release-it cannot answer "is there anything to release": the
+          # conventionalcommits preset's whatBump floors at patch for any commit
+          # at all, so `--release-version` prints a number even for a
+          # docs-only batch. The commits answer that question here; the version
+          # itself still comes from release-it, so preMajor and the preset stay
+          # in one place.
+          subjects=$(git log --format=%s "$range")
+          bodies=$(git log --format=%B "$range")
+          releasable=false
+          if grep -qE '^(feat|fix)(\([^)]*\))?!?:' <<<"$subjects" \
+            || grep -qE '^[a-zA-Z]+(\([^)]*\))?!:' <<<"$subjects" \
+            || grep -qE '^BREAKING[ -]CHANGE:' <<<"$bodies"; then
+            releasable=true
+          fi
+
+          version=""
+          if [ "$releasable" = true ]; then
+            # Prints the next version and writes nothing. It still enforces
+            # .release-it.json's git requirements, which is why this job runs on
+            # a checkout of main rather than a detached commit.
+            version=$(pnpm exec release-it --release-version --ci | tail -n 1)
+            echo "Next version: $version" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Nothing to release: no feat, fix or breaking-change commit since $since." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          {
+            echo "releasable=$releasable"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+  # A no-op that exists only to carry the `release` environment's gate: the run
+  # stops here until a required reviewer approves it in the Actions UI. The
+  # reviewer rule itself is a repository setting, not something this file can
+  # declare — see docs/releasing.md.
+  approve:
+    name: Approve the release
+    needs: plan
+    if: ${{ needs.plan.outputs.releasable == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+
+    steps:
+      - name: Record the approval
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: echo "Approved the release of $VERSION from ${GITHUB_SHA}."
+
+  release:
+    name: Release
+    needs: [verify, scan, plan, approve]
+    # Two ways in. The republish path skips verify, scan, plan and approve, so
+    # their results are not part of its condition; the normal path requires all
+    # four. `!cancelled()` rather than `always()`: a cancelled run must not
+    # release.
+    if: >-
+      ${{ !cancelled()
+      && ((github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      || (needs.verify.result == 'success'
+      && needs.scan.result == 'success'
+      && needs.plan.outputs.releasable == 'true'
+      && needs.approve.result == 'success')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    outputs:
+      version: ${{ steps.resolve.outputs.tag }}
+      url: ${{ steps.publish.outputs.url }}
+
+    steps:
+      # The only checkout in this pipeline that keeps its credentials: release-it
+      # pushes the release commit and the tag with GITHUB_TOKEN. A GITHUB_TOKEN
+      # push starts no workflow, which is what lets this run own the whole
+      # release instead of handing it to a second one.
+      #
+      # main, not github.sha: .release-it.json requires the branch and its
+      # upstream, and a detached HEAD has neither. The guard below turns that
+      # into the "did main move while approval waited" check.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || 'main' }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Guard the commit being released
+        shell: bash
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          git fetch --no-tags origin main
+
+          if [ -n "$TAG_INPUT" ]; then
+            # Plain semver only (no "v" prefix) — matches manifest.version and
+            # the release-it tag contract.
+            if [[ ! "$TAG_INPUT" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::'$TAG_INPUT' is not a plain semver release tag (e.g. 1.2.3)."
+              exit 1
+            fi
+            # Only republish tags whose commit is on main, so a stray tag on an
+            # unmerged or forked commit cannot reach the directory.
+            if ! git merge-base --is-ancestor "$TAG_INPUT^{commit}" FETCH_HEAD; then
+              echo "::error::Tag '$TAG_INPUT' is not reachable from origin/main; refusing to republish."
+              exit 1
+            fi
+            echo "Republishing the existing tag $TAG_INPUT."
+          else
+            head=$(git rev-parse HEAD)
+            remote=$(git rev-parse FETCH_HEAD)
+            if [ "$head" != "$GITHUB_SHA" ] || [ "$remote" != "$GITHUB_SHA" ]; then
+              echo "::error::main moved on after this run started. This run verified $GITHUB_SHA, origin/main is now $remote. Nothing has been changed; start a new run on the new main — this pipeline never rebases and never releases a commit it did not verify."
+              exit 1
+            fi
+            echo "Releasing $GITHUB_SHA, still the tip of origin/main."
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump, write the changelog, commit, tag and push
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm ci:release
+
+      - name: Resolve the released version
+        id: resolve
+        shell: bash
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if [ -n "$TAG_INPUT" ]; then
+            tag="$TAG_INPUT"
+          else
+            # release-it wrote this version into package.json and manifest.json
+            # and tagged the commit with the same string.
+            tag=$(node -p "require('./package.json').version")
+          fi
+
+          case "$tag" in
+            *-*) prerelease=true ;;
+            *) prerelease=false ;;
+          esac
+
+          {
+            echo "tag=$tag"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+      # The bump rewrote manifest.json, so the dist/ the verify job built is one
+      # version behind. What gets attested and uploaded is built here, from the
+      # commit the tag points at.
+      - name: Build the plugin
+        run: pnpm build
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/main.js
+            dist/styles.css
+            dist/manifest.json
+
+      - name: Extract the release notes from the changelog
+        id: notes
+        shell: bash
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          # release-it writes one CHANGELOG.md section per tag from the
+          # Conventional Commits since the previous tag. Take that section's
+          # body (heading excluded, the release title already carries the tag).
+          # --generate-notes is not usable here: it summarises merged pull
+          # requests, and this repository lands commits straight on main.
+          notes="$RUNNER_TEMP/release-notes.md"
+          : > "$notes"
+
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="$TAG" '
+              /^#+ / {
+                match($0, /^#+/)
+                level = RLENGTH
+                if (found) {
+                  # A heading at the version level (or above) ends the section;
+                  # deeper ones are its own "### Features"-style subsections.
+                  if (level <= found) { exit }
+                  print
+                  next
+                }
+                line = $0
+                gsub(/[][()<>\/]/, " ", line)
+                n = split(line, field, / +/)
+                for (i = 1; i <= n; i++) {
+                  if (field[i] == tag) { found = level; break }
+                }
+                next
+              }
+              found { print }
+            ' CHANGELOG.md > "$notes"
+          fi
+
+          if [ -s "$notes" ] && grep -q '[^[:space:]]' "$notes"; then
+            echo "file=$notes" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No CHANGELOG.md section for $TAG; releasing without notes."
+            echo "file=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or reuse the GitHub release
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+          NOTES: ${{ steps.notes.outputs.file }}
+        run: |
+          # Reusing an existing release is what makes the republish path a
+          # recovery rather than a second attempt at the same create.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Reusing the existing GitHub release for $TAG."
+          else
+            args=("$TAG" --title "$TAG")
+
+            if [ -n "$NOTES" ]; then
+              args+=(--notes-file "$NOTES")
+            else
+              args+=(--notes "")
+            fi
+
+            if [ "$PRERELEASE" = true ]; then
+              args+=(--prerelease)
+            fi
+
+            gh release create "${args[@]}"
+          fi
+
+          url=$(gh release view "$TAG" --json url --jq .url)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Released [$TAG]($url)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the Obsidian plugin assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: gh release upload "$TAG" dist/main.js dist/manifest.json dist/styles.css --clobber
+
+  announce:
+    name: Announce
+    needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # The community portal has no public or unauthenticated trigger; this is
+      # the maintainer's own account-page request, replayed with a stored session
+      # cookie. It is a nudge, not a gate: the listing also picks the release up
+      # on its own within about a day, so nothing here fails the run.
+      - name: Ask the community portal to re-check the release
+        id: portal
+        shell: bash
+        env:
+          PORTAL_COOKIE: ${{ secrets.OBSIDIAN_PORTAL_COOKIE }}
+        run: |
+          if [ -z "${PORTAL_COOKIE:-}" ]; then
+            answer="skipped, no OBSIDIAN_PORTAL_COOKIE secret is set"
+          else
+            body="$RUNNER_TEMP/portal-response"
+            status=$(curl --silent --location --output "$body" --write-out '%{http_code}' \
+              --header "Cookie: $PORTAL_COOKIE" \
+              https://community.obsidian.md/account/plugins/folia-kanban/check-release) || status="000"
+
+            # Only ever classify the response. It is an authenticated account
+            # page, so its body never reaches the log or the message below.
+            if grep -qi 'refreshed in the last few minutes' "$body"; then
+              answer="in cooldown, the portal refreshed this entry a few minutes ago"
+            elif grep -qi 'name="password"' "$body"; then
+              answer="the stored cookie has expired, the portal answered with its login page"
+            elif [ "$status" = "200" ]; then
+              answer="asked, the portal accepted the re-check"
+            elif [ "$status" = "401" ] || [ "$status" = "403" ]; then
+              answer="the stored cookie was rejected (HTTP $status), refresh OBSIDIAN_PORTAL_COOKIE"
+            elif [ "$status" = "000" ]; then
+              answer="the portal could not be reached"
+            else
+              answer="unexpected portal answer (HTTP $status)"
+            fi
+          fi
+
+          echo "Portal: $answer"
+          echo "answer=$answer" >> "$GITHUB_OUTPUT"
+
+      - name: Send the Telegram message
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VERSION: ${{ needs.release.outputs.version }}
+          URL: ${{ needs.release.outputs.url }}
+          PORTAL: ${{ steps.portal.outputs.answer }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set."
+            exit 0
+          fi
+
+          text=$(printf 'folia-kanban %s is released.\n%s\nCommunity portal: %s' "$VERSION" "$URL" "$PORTAL")
+
+          if ! curl --silent --fail --output /dev/null --request POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text"; then
+            echo "::warning::The Telegram notification failed; the release itself is published."
+          fi
