@@ -145,7 +145,13 @@ export function CardContextMenu({
         // A middle click reaches a button as auxclick, and on a navigation it means "new tab" —
         // but only on a navigation. An item that changes or deletes the card must not fire from a
         // gesture nobody aimed at it.
-        onAuxClick={opts?.navigates ? (e) => e.button === 1 && run(e) : undefined}
+        onAuxClick={
+          opts?.navigates
+            ? (e) => {
+                if (e.button === 1) run(e);
+              }
+            : undefined
+        }
       >
         <Icon name={icon} size={14} /> {label}
       </button>
