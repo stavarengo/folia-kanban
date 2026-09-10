@@ -105,11 +105,16 @@ interface ResolvedBoardConfig extends BoardConfig {
 }
 
 /**
- * The note each rendered markdown container's links resolve against. Keyed by the container so one
- * listener per container is enough however many times its content is re-rendered, and weak so an
- * unmounted panel takes its entry with it.
+ * Who a rendered markdown container's link hovers belong to right now: the repository that last
+ * rendered into it, and the note its links resolve against. Keyed by the container, so one listener
+ * per container is enough however many times its content is re-rendered, and weak so an unmounted
+ * panel takes its entry with it.
+ *
+ * The owner is looked up rather than captured, because the container outlives the repository: the
+ * board note being renamed rebuilds the repository while React keeps the very same element, and a
+ * listener closed over the old one would hand Page preview a dead board and a stale path.
  */
-const hoverSources = new WeakMap<HTMLElement, string>();
+const hoverSources = new WeakMap<HTMLElement, { repo: VaultRepository; sourcePath: string }>();
 
 export class VaultRepository implements CardRepository, HoverParent {
   private recentWrites = new Map<string, number>();
@@ -126,7 +131,7 @@ export class VaultRepository implements CardRepository, HoverParent {
   hoverPopover: HoverPopover | null = null;
 
   constructor(
-    private app: App,
+    readonly app: App,
     private boardPath: string,
     /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
     public getHistoryScope: () => HistoryScope = () => "moves",
@@ -814,7 +819,7 @@ export class VaultRepository implements CardRepository, HoverParent {
    */
   private watchForLinkHovers(el: HTMLElement, sourcePath: string): void {
     const listening = hoverSources.has(el);
-    hoverSources.set(el, sourcePath);
+    hoverSources.set(el, { repo: this, sourcePath });
     if (listening) return;
     el.addEventListener("mouseover", (event: MouseEvent) => {
       // `closest`, because the pointer may be over a `<code>` or an `<em>` nested inside the
@@ -823,15 +828,15 @@ export class VaultRepository implements CardRepository, HoverParent {
       const link = (event.target as HTMLElement | null)?.closest("a.internal-link");
       if (!(link instanceof HTMLElement)) return;
       const linktext = link.getAttribute("data-href") ?? link.getAttribute("href");
-      const source = hoverSources.get(el);
-      if (!linktext || source === undefined) return;
-      this.app.workspace.trigger("hover-link", {
+      const owner = hoverSources.get(el);
+      if (!linktext || !owner) return;
+      owner.repo.app.workspace.trigger("hover-link", {
         event,
         source: VIEW_TYPE_KANBAN,
-        hoverParent: this,
+        hoverParent: owner.repo,
         targetEl: link,
         linktext,
-        sourcePath: source,
+        sourcePath: owner.sourcePath,
       });
     });
   }

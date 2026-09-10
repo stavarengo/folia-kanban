@@ -923,6 +923,30 @@ describe("the rest of the vault surface", () => {
     el.remove();
   });
 
+  it("names the repository that rendered last, not the one that bound the listener", async () => {
+    // A renamed board note rebuilds the repository while React keeps the very same element, so the
+    // container outlives its repository. Page preview must be handed the live one.
+    const first = setup();
+    const second = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    first.repo.renderMarkdown(el, "before", "basic/Cards/One.md")();
+    const cleanup = second.repo.renderMarkdown(el, "after", "basic/Cards/Two.md");
+    el.innerHTML = '<a class="internal-link" data-href="Three">Three</a>';
+    el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    expect(first.app.triggered).toEqual([]);
+    expect(second.app.triggered).toHaveLength(1);
+    expect(second.app.triggered[0]?.args[0]).toMatchObject({
+      hoverParent: second.repo,
+      sourcePath: "basic/Cards/Two.md",
+    });
+
+    cleanup();
+    el.remove();
+  });
+
   it("renders markdown into the element and takes it back on cleanup", async () => {
     const { repo } = setup();
     const el = document.createElement("div");

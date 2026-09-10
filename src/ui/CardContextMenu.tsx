@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { samePriority } from "../model/priorities";
 import { priorityOptions, priorityTone, sameAssignee, toggleAssignee } from "./cardView";
@@ -122,21 +129,28 @@ export function CardContextMenu({
     label: string,
     icon: IconName,
     onClick: (evt: MouseEvent) => void,
-    opts?: { disabled?: boolean; danger?: boolean },
-  ) => (
-    <button
-      className={"folia-menu-item" + (opts?.danger ? " folia-menu-danger" : "")}
-      role="menuitem"
-      disabled={opts?.disabled}
-      onClick={(e) => {
-        actioned.current = true;
-        onClick(e.nativeEvent);
-        onClose();
-      }}
-    >
-      <Icon name={icon} size={14} /> {label}
-    </button>
-  );
+    opts?: { disabled?: boolean; danger?: boolean; navigates?: boolean },
+  ) => {
+    const run = (e: ReactMouseEvent) => {
+      actioned.current = true;
+      onClick(e.nativeEvent);
+      onClose();
+    };
+    return (
+      <button
+        className={"folia-menu-item" + (opts?.danger ? " folia-menu-danger" : "")}
+        role="menuitem"
+        disabled={opts?.disabled}
+        onClick={run}
+        // A middle click reaches a button as auxclick, and on a navigation it means "new tab" —
+        // but only on a navigation. An item that changes or deletes the card must not fire from a
+        // gesture nobody aimed at it.
+        onAuxClick={opts?.navigates ? (e) => e.button === 1 && run(e) : undefined}
+      >
+        <Icon name={icon} size={14} /> {label}
+      </button>
+    );
+  };
 
   return createPortal(
     <div
@@ -211,7 +225,7 @@ export function CardContextMenu({
               "user",
               () => void a.setAssignee(path, toggleAssignee(assignees, me)),
             )}
-          {item("Open note", "external-link", (evt) => a.openNote(path, evt))}
+          {item("Open note", "external-link", (evt) => a.openNote(path, evt), { navigates: true })}
 
           <div className="folia-menu-divider" />
           <span className="folia-menu-label">Priority</span>

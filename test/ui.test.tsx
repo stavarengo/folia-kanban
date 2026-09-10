@@ -1922,20 +1922,28 @@ describe("card context menu", () => {
 
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     const menu = await screen.findByRole("menu");
+    fireEvent(
+      within(menu).getByRole("menuitem", { name: /Open note/ }),
+      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
+    );
+    expect(repo.openedWith[2]).toMatchObject({ button: 1 });
+
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    const menu2 = await screen.findByRole("menu");
     await user.keyboard("{Control>}");
-    await user.click(within(menu).getByRole("menuitem", { name: /Open note/ }));
+    await user.click(within(menu2).getByRole("menuitem", { name: /Open note/ }));
     await user.keyboard("{/Control}");
-    expect(repo.openedWith[2]).toMatchObject({ ctrlKey: true });
+    expect(repo.openedWith[3]).toMatchObject({ ctrlKey: true });
 
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     await user.keyboard("{Control>}");
     await user.click(within(detail).getByLabelText("Open note"));
     await user.keyboard("{/Control}");
-    expect(repo.openedWith[3]).toMatchObject({ ctrlKey: true });
+    expect(repo.openedWith[4]).toMatchObject({ ctrlKey: true });
   });
 
-  it("still opens in the current tab when nothing was held down", async () => {
+  it("opens on an unmodified click exactly as it always did", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
@@ -1945,6 +1953,24 @@ describe("card context menu", () => {
 
     expect(repo.opened).toEqual(["Tasks/Alpha.md"]);
     expect(repo.openedWith[0]).toMatchObject({ ctrlKey: false, metaKey: false, button: 0 });
+  });
+
+  it("leaves a middle click alone on the menu items that are not a navigation", async () => {
+    // "Open in a new tab" is the only thing a middle click can mean, so an item that changes or
+    // deletes the card must not fire from it — a stray middle click would be irreversible.
+    const { repo, menu } = await openCardMenu("First");
+    fireEvent(
+      within(menu).getByRole("menuitem", { name: /Delete card/ }),
+      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
+    );
+    fireEvent(
+      within(menu).getByRole("menuitem", { name: /Mark done/ }),
+      new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }),
+    );
+
+    expect(repo.files.has("Tasks/First.md")).toBe(true);
+    expect(repo.files.get("Tasks/First.md")?.fm["status"]).toBe("todo");
+    expect(screen.getByRole("menu")).toBe(menu);
   });
 
   it("opens a card menu with the expected items on right-click", async () => {
