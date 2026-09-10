@@ -4252,6 +4252,58 @@ describe("the detail panel reports a failed write", () => {
     expect(await screen.findByText("disk is full")).toHaveClass("folia-toast-error");
   });
 
+  /** Todo · Research (a lane on `area:research`) · Done, holding one card that fails the rule. */
+  const lanedRepo = () =>
+    new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      { "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" } },
+    );
+
+  it("refuses the detail add-card flow into a lane too, not just the inline composer", async () => {
+    const user = userEvent.setup();
+    const repo = lanedRepo();
+    const created: string[] = [];
+    const realCreate = repo.createCard.bind(repo);
+    repo.createCard = async (title: string, status: string) => {
+      created.push(title);
+      return realCreate(title, status);
+    };
+    render_(repo, { ...DEFAULT_SETTINGS, addCardFlow: "detail" });
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+
+    await user.click(screen.getByLabelText("Add card to Research"));
+    const detail = await screen.findByTestId("card-detail");
+    await user.type(within(detail).getByLabelText("New card title"), "Nowhere");
+    await user.click(within(detail).getByRole("button", { name: "Create" }));
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(created).toEqual([]);
+    // The form stays put, exactly as it does after any other refused create.
+    expect(within(detail).getByLabelText("New card title")).toHaveValue("Nowhere");
+  });
+
+  it("rehomes a deleted column's cards to a plain column, never into a lane", async () => {
+    const user = userEvent.setup();
+    // Deleting Todo would otherwise hand its cards to its neighbour, Research — a lane whose rule
+    // Alpha fails, which is exactly the status nothing may write.
+    const repo = lanedRepo();
+    render_(repo);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("done"));
+  });
+
   it("refuses to add a card to a lane whose rule the new card cannot satisfy, and writes nothing", async () => {
     const user = userEvent.setup();
     // Research is filled by `area:research`, and an added card carries no area — so the card would

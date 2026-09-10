@@ -217,7 +217,15 @@ export function drawnInColumn(
   const column = board.config.columns.find((c) => c.id === columnId);
   if (!column) return null;
   if (!column.filter) return column.id;
-  return drawnPaths(board, column.id, ctx).includes(path)
-    ? column.id
-    : (fallbackColumnOf(board) ?? null);
+  const card = board.cards[path];
+  if (!card) return null;
+  const own = laneOf(board, column.id);
+  // Its own lane keeps it unless that lane actively rejects it, on the same terms as the listing.
+  if (own && judgeCard(card, own.filter, ctx) !== "rejects") return column.id;
+  // Rejected there, but every lane pulls from every bucket — another lane's rule may well reach
+  // this card, and that is where the board draws it. Only when none do is it the fallback's.
+  const elsewhere = lanesOf(board).find(
+    (lane) => lane.columnId !== column.id && judgeCard(card, lane.filter, ctx) === "matches",
+  );
+  return elsewhere?.columnId ?? fallbackColumnOf(board) ?? null;
 }

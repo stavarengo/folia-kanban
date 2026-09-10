@@ -26,6 +26,7 @@ import { descriptionRefusal } from "../model/card";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
 import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model/properties";
+import { prospectiveCard } from "../model/lanes";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
@@ -1296,6 +1297,12 @@ export function CardDetail({
       creatingRef.current = true;
       void (async () => {
         try {
+          // The same refusal the inline composer and a drag get: a lane draws by its rule, so a
+          // card it would not draw is never written, whichever flow asked for it.
+          if (actions.refusedByLane(createColumn, prospectiveCard(t, createColumn))) {
+            creatingRef.current = false;
+            return;
+          }
           const newPath = await repo.createCard(t, createColumn);
           onCreated?.(newPath);
           // On success this branch unmounts (createColumn→null), so no need to reset the guard.

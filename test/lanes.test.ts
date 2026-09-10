@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildBoard } from "../src/model/board";
 import {
+  drawnInColumn,
   drawnPaths,
   fallbackColumnOf,
   laneOf,
@@ -98,6 +99,36 @@ describe("what a column draws", () => {
     const b = buildBoard(allLanes, [card("Stranded", { status: "research", area: "home" })]);
     expect(strandedLanePaths(b, ctx)).toEqual(["Tasks/Stranded.md"]);
     expect(drawnPaths(b, "research", ctx)).toEqual([]);
+  });
+});
+
+describe("which column a card is drawn in", () => {
+  // Every lane pulls from every bucket, so the lane a card's status happens to name is not the only
+  // one that can draw it. Asking only that lane would send a card the board plainly shows in Lane B
+  // off to the fallback column.
+  const twoLanes: BoardConfig = {
+    ...base,
+    columns: [
+      { id: "todo", title: "Todo" },
+      { id: "laneA", title: "Lane A", filter: "area:aaa" },
+      { id: "laneB", title: "Lane B", filter: "area:bbb" },
+    ],
+  };
+
+  it("names the lane that actually draws it, not the one its status names", () => {
+    const b = buildBoard(twoLanes, [card("Cross", { status: "laneA", area: "bbb" })]);
+    expect(drawnPaths(b, "laneB", ctx)).toEqual(["Tasks/Cross.md"]);
+    expect(drawnInColumn(b, "laneA", "Tasks/Cross.md", ctx)).toBe("laneB");
+  });
+
+  it("names the fallback column when no lane will draw it", () => {
+    const b = buildBoard(twoLanes, [card("Stray", { status: "laneA", area: "home" })]);
+    expect(drawnInColumn(b, "laneA", "Tasks/Stray.md", ctx)).toBe("todo");
+  });
+
+  it("names a plain column as itself", () => {
+    const b = buildBoard(twoLanes, [card("Plain", { status: "todo" })]);
+    expect(drawnInColumn(b, "todo", "Tasks/Plain.md", ctx)).toBe("todo");
   });
 });
 

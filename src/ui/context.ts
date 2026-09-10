@@ -173,6 +173,12 @@ export interface BoardActions {
    * writes the detail panel makes itself, which otherwise have no path to that toast.
    */
   reportError(e: unknown): void;
+  /**
+   * Would filing a card into `columnId` leave it drawn nowhere? A lane draws by its rule and owns
+   * nothing, so a card the rule rejects must not be written there. Says why and returns true when
+   * it refused; every path that sets a card's column asks this before writing.
+   */
+  refusedByLane(columnId: string, card: Card): boolean;
   /** Move a card to the board's "done" column, if one exists. */
   complete(path: string): void;
   /** Trash the card's note (after confirmation in the UI). */

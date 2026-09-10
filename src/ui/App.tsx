@@ -539,6 +539,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         setFocusTitleOverride(true);
       },
       reportError,
+      refusedByLane,
       complete: (path) => {
         if (!doneColumnId) return;
         const title = boardRef.current?.cards[path]?.title ?? "Card";
@@ -784,8 +785,13 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         if (cols.length <= 1) return; // keep at least one column
         const idx = cols.findIndex((c) => c.id === id);
         if (idx < 0) return;
-        const neighbor = cols[idx - 1] ?? cols[idx + 1];
-        if (!neighbor) return;
+        // A lane owns no card — it draws by its rule — so rehoming into one would set a `status`
+        // the lane may refuse, and the cards would surface in the fallback column with nothing said.
+        // The nearest column that is not a lane is the only honest neighbour.
+        const neighbor =
+          [...cols.slice(0, idx)].reverse().find((c) => !c.filter) ??
+          cols.slice(idx + 1).find((c) => !c.filter);
+        if (!neighbor) return; // every other column is a lane: nowhere to rehome them honestly
         const orphans = b.columns[id] ?? [];
         void (async () => {
           // Reassign this column's items to a neighbour so none are orphaned — cards through their
@@ -838,6 +844,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       setPriorityAndReload,
       showToast,
       reportError,
+      refusedByLane,
       settings.addCardOpenMode,
       board?.config.columns,
       onUpdateSettings,
