@@ -1,5 +1,5 @@
 {
-  "$description": "NEW category. Captures the z-index ladder currently raw in src/styles.css (values 1, 2, 30, 50, 55, 60, 70, 80, 90) as a named scale by stacking role. The --folia-* z-index vars are now defined in the .folia-scope token block; these tokens are byte-matched against it.",
+  "$description": "The stacking ladder, in two groups. The in-board rungs are Folia's own numbers: every surface that uses one renders inside the workspace leaf, which Obsidian isolates into its own stacking context, so they are only ever compared with each other. The app rungs belong to the surfaces Folia portals to the document body, which land in the root stacking context next to Obsidian's own overlays; those read Obsidian's --layer-* scale directly, so the plugin sits in the app's order by reference rather than by a number that happens to match.",
   "z-index": {
     "$type": "number",
     "base": {
@@ -22,21 +22,19 @@
       "$value": "55",
       "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-scrim" } }
     },
-    "menu": {
-      "$value": "60",
-      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-menu" } }
-    },
     "popover": {
       "$value": "70",
       "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-popover" } }
     },
-    "modal": {
-      "$value": "80",
-      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-modal" } }
+    "app-menu": {
+      "$description": "Menus portalled to <body>: the column popover and the card context menu. Obsidian's own menu rung.",
+      "$value": "var(--layer-menu)",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-app-menu" } }
     },
-    "top": {
-      "$value": "90",
-      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-top" } }
+    "app-modal": {
+      "$description": "Dialogs portalled to <body>: the edit-column modal. Obsidian's own modal rung.",
+      "$value": "var(--layer-modal)",
+      "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-app-modal" } }
     }
   }
 }

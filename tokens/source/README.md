@@ -6,15 +6,15 @@ Machine-readable source of truth for the design tokens of `folia-kanban`. One fi
 
 | File | Category | Live in `styles.css` block? |
 | --- | --- | --- |
-| `color.tokens.json` | semantic colors + priority ramp + `column` product palette | semantic + priority: yes · `scrim`: new · `column`: checked vs `src/ui/columnColors.ts` |
-| `typography.tokens.json` | font-size + font-weight scale | **NEW** — no var yet |
+| `color.tokens.json` | semantic colors + priority ramp + `column` product palette | semantic + priority + `scrim`: yes · `column`: checked vs `src/ui/columnColors.ts` |
+| `typography.tokens.json` | font-size + font-weight scale | yes |
 | `spacing.tokens.json` | spacing | yes |
-| `radius.tokens.json` | corner radius | sm/md/lg/xl: yes · `pill`: new |
-| `shadow.tokens.json` | elevation + focus ring | card/card-hover/overlay/pop: yes · `ring`/`panel`: new |
+| `radius.tokens.json` | corner radius | yes |
+| `shadow.tokens.json` | elevation + focus ring | yes |
 | `motion.tokens.json` | duration + easing | yes |
 | `size.tokens.json` | layout / hit-target | yes |
-| `zindex.tokens.json` | z-index ladder | **NEW** — no var yet |
-| `opacity.tokens.json` | standalone UI opacity | **NEW** — no var yet |
+| `zindex.tokens.json` | in-board rungs + the two rungs anchored on Obsidian's `--layer-*` scale | yes |
+| `opacity.tokens.json` | standalone UI opacity | yes |
 
 ## Naming rules
 
@@ -40,4 +40,4 @@ A check script (to be wired into CI + pre-commit) asserts two directions:
 1. **JSON ↔ `styles.css`** — for every token with `$extensions.folia.live: true`, the script reads the `.folia-scope { … }` block in `src/styles.css`, finds the declaration named by `$extensions.folia.cssVar`, and asserts its value byte-matches the token's `$value` (using `resolvedValue` when the `$value` is a `{ref}`). It also asserts no live `--folia-*` declaration in the block is missing from the JSON. This is a bijection over the **live subset only**.
 2. **`color.column` ↔ `src/ui/columnColors.ts`** — the script asserts the 8 `color.column.*` hexes equal, in order, the `COLUMN_COLORS` array exported by `src/ui/columnColors.ts`. That file is the single source of truth for the palette and is already imported by `src/ui/ColumnEditModal.tsx`, `src/ui/ColumnMenu.tsx`, and `src/ui/Column.tsx` (the palette is no longer duplicated across those files), so this half of the check is ready to run.
 
-Tokens with `live: false` (all of `typography`/`zindex`/`opacity`, plus `radius.pill`, `shadow.ring`, `shadow.panel`, `color.scrim`) are **not** part of the bijection. They are the just-created *home* for values that still live raw in `styles.css`; the check does not assert them against the block until the corresponding `--folia-*` var is adopted in CSS. Adopting a var flips its token to `live: true`, at which point direction 1 begins enforcing it.
+Every token that describes a `--folia-*` var now carries `live: true`, so the bijection covers the whole block; the only tokens outside it are `color.primitive.*` (sources referenced by other tokens, never declared as vars of their own) and `color.column.*` (verified by direction 2). A token added ahead of its var carries `live: false` and stays out of the bijection until the var is adopted in CSS, at which point flipping the flag puts direction 1 in charge of it.

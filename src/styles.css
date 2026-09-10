@@ -111,16 +111,24 @@
   --folia-font-weight-medium: 500;
   --folia-font-weight-semibold: 600;
 
-  /* z-index ladder */
+  /* z-index — in-board rungs. Every surface using one of these renders inside the workspace leaf,
+     and Obsidian gives `.workspace-leaf` `contain: strict` + `isolation: isolate`, so the leaf is
+     its own stacking context: these numbers are read only against each other and can never meet
+     the app's overlays. They are Folia's to choose. */
   --folia-z-index-base: 1;
   --folia-z-index-raised: 2;
   --folia-z-index-sticky: 30;
   --folia-z-index-toast: 50;
   --folia-z-index-scrim: 55;
-  --folia-z-index-menu: 60;
   --folia-z-index-popover: 70;
-  --folia-z-index-modal: 80;
-  --folia-z-index-top: 90;
+
+  /* z-index — surfaces portalled to <body>. Those leave the leaf and land in the root stacking
+     context, side by side with Obsidian's own notices, menus, tooltips and modals, so they read
+     off the app's `--layer-*` scale instead of a parallel ladder of private numbers that could
+     only tie or win by coincidence. A Folia menu therefore sits exactly where an Obsidian menu
+     sits, and the edit-column dialog exactly where an Obsidian modal sits. */
+  --folia-z-index-app-menu: var(--layer-menu);
+  --folia-z-index-app-modal: var(--layer-modal);
 
   /* opacity */
   --folia-opacity-muted: 0.7;
@@ -533,7 +541,7 @@
 /* ------------------------------------------------------------------ column menu popover */
 .folia-menu {
   position: fixed;
-  z-index: var(--folia-z-index-menu);
+  z-index: var(--folia-z-index-app-menu);
   width: 224px;
   max-height: min(440px, calc(100vh - 24px));
   overflow-y: auto;
@@ -650,9 +658,10 @@
 
 /* ------------------------------------------------------------------ card context menu (right-click) */
 .folia-card-context {
-  /* Above cards (z 2), the float detail panel (z 55) and the modal backdrop (z 70). Stacking holds
-     because the menu is portalled to <body> and the board containers create no stacking context. */
-  z-index: var(--folia-z-index-modal);
+  /* No z-index of its own: the element also carries `.folia-menu`, so it sits on the app's menu
+     rung with every other Folia menu. It clears the in-board surfaces (the float panel, the detail
+     modal backdrop) for free, because those are trapped inside the workspace leaf's stacking
+     context while this menu is portalled to <body>, above the leaf entirely. */
   /* Sized to its longest label ("Copy path relative to board folder") instead of a fixed width that
      clipped it. The clamp keeps a wide priority row wrapping rather than stretching the menu, and
      the stable gutter stops the scrollbar — this menu is tall enough to scroll — from sitting on
@@ -2036,7 +2045,7 @@
 .folia-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: var(--folia-z-index-top);
+  z-index: var(--folia-z-index-app-modal);
   display: grid;
   place-items: center;
   padding: 24px;

@@ -10,8 +10,9 @@
 //   Direction 2 — the color.column.* hexes equal, in order, the COLUMN_COLORS array
 //   exported from src/ui/columnColors.ts.
 //
-// Tokens with live:false (typography, z-index, opacity, radius.pill, shadow.ring,
-// shadow.panel, color.scrim) are NOT checked against the CSS — they have no var yet.
+// A token marked live:false is one written ahead of its CSS var; it stays out of direction 1
+// until the var exists. Today none are: only color.primitive.* (referenced, never declared) and
+// color.column.* (direction 2) sit outside the bijection.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";

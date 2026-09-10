@@ -156,7 +156,7 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [20260829.14](../../backlog/20260829.14.a-pale-accent-paints-white-text-on-a-light-button.md) | Bug: a pale accent paints white text on a near-white button | 02-01 |
 | [20260829.15](../../backlog/20260829.15.folia-reads-the-themes-colours-through-its-own-fallbacks.md) | Theme colour read through Folia's own fallbacks and mixes | 02-02, 02-03, 02-04, 02-05, 02-06, 02-07, 02-08, 02-20, 02-24, 02-31 |
 | [20260829.16](../../backlog/20260829.16.the-folia-token-layer-is-a-second-design-system.md) | The `--folia-*` layer as a second design system | 02-11, 02-12, 02-13, 02-15, 02-21, 02-22, 02-23, 02-26, 02-27, 02-28, 02-44 |
-| [20260829.17](../../backlog/20260829.17.obsidians-tooltip-paints-over-an-open-folia-menu.md) | Bug: two z-index ladders in one numeric space, five collisions | 02-25 |
+| 20260829.17 (fixed, entry closed) | Bug: two z-index ladders in one numeric space, five collisions | 02-25 |
 | [20260829.18](../../backlog/20260829.18.the-boards-components-are-drawn-beside-the-apps-component-variables.md) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
 | [20260829.19](../../backlog/20260829.19.the-raw-value-audit-is-blind-to-most-of-what-it-polices.md) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
 | 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
