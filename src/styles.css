@@ -133,9 +133,13 @@
      app: a notice (60), a menu (65) and a tooltip (70) all draw over a modal (50), which is why
      a tooltip for a control inside a dialog is legible and a menu opened from one is usable.
      Folia's surfaces now inherit that, so the edit-column dialog no longer outranks the app's
-     own overlays the way a private 90 used to. */
-  --folia-z-index-app-menu: var(--layer-menu);
-  --folia-z-index-app-modal: var(--layer-modal);
+     own overlays the way a private 90 used to.
+
+     The fallbacks are the failure mode, not a second opinion: `z-index` does not inherit, so an
+     unresolved `var()` computes to `auto` and would drop a dialog behind the ribbon and the status
+     bar. The numbers repeat what the scale says today and are only ever read if it goes missing. */
+  --folia-z-index-app-menu: var(--layer-menu, 65);
+  --folia-z-index-app-modal: var(--layer-modal, 50);
 
   /* opacity */
   --folia-opacity-muted: 0.7;

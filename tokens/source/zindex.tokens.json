@@ -28,12 +28,14 @@
     },
     "app-menu": {
       "$description": "Menus portalled to <body>: the column popover and the card context menu. Obsidian's own menu rung.",
-      "$value": "var(--layer-menu)",
+      "$type": "string",
+      "$value": "var(--layer-menu, 65)",
       "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-app-menu" } }
     },
     "app-modal": {
       "$description": "Dialogs portalled to <body>: the edit-column modal. Obsidian's own modal rung.",
-      "$value": "var(--layer-modal)",
+      "$type": "string",
+      "$value": "var(--layer-modal, 50)",
       "$extensions": { "folia": { "live": true, "cssVar": "--folia-z-index-app-modal" } }
     }
   }

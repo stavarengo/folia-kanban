@@ -11,6 +11,14 @@
 // (`--folia-statusbar-clearance` today) with the static fallback for everything underneath. So those
 // portals must not carry it.
 //
+// Leaving the root costs a second thing, and this check counts it too. Obsidian isolates each
+// `.workspace-leaf` (`contain: strict`, `isolation: isolate`), so a surface that stays inside the
+// board is compared only with its siblings and may use Folia's own rungs freely. A surface
+// portalled to the document body leaves that bubble and lands beside Obsidian's notices, menus,
+// tooltips and modals, where a private number can only tie or win by accident. So a body-portalled
+// surface must take its `z-index` from the app's `--layer-*` scale — directly, or through one of
+// the `--folia-z-index-app-*` aliases that name the rung it sits on.
+//
 // Which side a portal is on is therefore a real question, and this check refuses to guess: only two
 // container shapes are recognised, a document body (outside) and the board root ref (inside).
 // Anything else is reported as unclassifiable rather than defaulted, because BOTH defaults are
@@ -30,6 +38,8 @@ const SCOPE = "folia-scope";
 const INSIDE_ROOT = [/^rootRef\.current$/];
 /** Container expressions that name a document body, always outside the board root. */
 const OUTSIDE_ROOT = [/(^|\.)body$/];
+/** `z-index` values a body-portalled surface may take: the app's scale, or an alias naming a rung of it. */
+const APP_RUNG = /^var\(\s*(--layer-[a-z-]+|--folia-z-index-app-[a-z-]+)\b/;
 
 /**
  * Characters after which a `'` can legitimately open a JS string. In JSX TEXT an apostrophe is just
@@ -202,6 +212,29 @@ if (!/^\.folia-scope\s*\{/m.test(css)) {
   errors.push(`[${CSS_FILE}] no .folia-scope rule — the token block must hang off the scope class`);
 }
 
+/**
+ * Every `z-index` a stylesheet rule sets, keyed by each class its selector names. A surface wears
+ * several classes and any of their rules can decide its rung, so the check reads them all rather
+ * than guessing which rule wins.
+ */
+function zIndexByClass(text) {
+  const byClass = new Map();
+  for (const rule of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = rule[1];
+    const declared = [...rule[2].matchAll(/(?:^|;)\s*z-index\s*:\s*([^;}]+)/g)].map((m) =>
+      m[1].trim(),
+    );
+    if (declared.length === 0) continue;
+    for (const cls of selector.matchAll(/\.([A-Za-z0-9_-]+)/g)) {
+      const list = byClass.get(cls[1]) ?? [];
+      list.push(...declared);
+      byClass.set(cls[1], list);
+    }
+  }
+  return byClass;
+}
+const zIndexes = zIndexByClass(css);
+
 for (const file of (await sourceFiles(SRC_DIR)).sort()) {
   const src = await readFile(file, "utf8");
   for (const m of src.matchAll(/createPortal\s*\(/g)) {
@@ -257,6 +290,17 @@ for (const file of (await sourceFiles(SRC_DIR)).sort()) {
         `[${where}] portals outside the board root without \`${SCOPE}\` on its root element, so ` +
           `every --folia-* token resolves to nothing inside it. Add the class (classes: "${classes}").`,
       );
+    }
+    for (const cls of classes.match(/[A-Za-z0-9_-]+/g) ?? []) {
+      for (const value of zIndexes.get(cls) ?? []) {
+        if (APP_RUNG.test(value)) continue;
+        errors.push(
+          `[${where}] \`.${cls}\` sets \`z-index: ${value}\`, but this surface is portalled to the ` +
+            `document body, where it is stacked against Obsidian's own overlays. Read the app's ` +
+            `scale instead — \`var(--layer-…)\` or a \`--folia-z-index-app-*\` alias — so the order ` +
+            `is a decision rather than a coincidence.`,
+        );
+      }
     }
   }
 }
