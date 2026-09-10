@@ -327,10 +327,18 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           PUSH_TOKEN: ${{ github.token }}
         run: |
-          # Inject the push token only here, never during dependency install, so
-          # it is absent from .git/config while package code runs. A GITHUB_TOKEN
-          # push starts no workflow, which is what lets this run own the whole
-          # release instead of handing it to a second one.
+          # Inject the push token only here, and take it out again on the way
+          # out, so it is in .git/config for this step and no other — not while
+          # package lifecycle scripts run during install, and not while the
+          # build that follows runs repository code. A GITHUB_TOKEN push starts
+          # no workflow, which is what lets this run own the whole release
+          # instead of handing it to a second one.
+          #
+          # What this does not do, and no arrangement inside one job can: the
+          # job's own contents:write token exists for the whole job, and any
+          # action it runs can read it without being handed it. The boundary
+          # here is the configured git credential, not the token itself.
+          trap 'git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"' EXIT
           git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
