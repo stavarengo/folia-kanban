@@ -112,9 +112,10 @@
   --folia-font-weight-semibold: 600;
 
   /* z-index — in-board rungs. Every surface using one of these renders inside the workspace leaf,
-     and Obsidian gives `.workspace-leaf` `contain: strict` + `isolation: isolate`, so the leaf is
-     its own stacking context: these numbers are read only against each other and can never meet
-     the app's overlays. They are Folia's to choose. */
+     and app.css gives `.workspace-leaf` `contain: strict` + `isolation: isolate`, so the leaf is a
+     stacking context of its own: these numbers are only ever compared with each other, never with
+     the app's. An app overlay is above the whole leaf whatever number it carries. They are
+     Folia's to choose. */
   --folia-z-index-base: 1;
   --folia-z-index-raised: 2;
   --folia-z-index-sticky: 30;
@@ -126,7 +127,13 @@
      context, side by side with Obsidian's own notices, menus, tooltips and modals, so they read
      off the app's `--layer-*` scale instead of a parallel ladder of private numbers that could
      only tie or win by coincidence. A Folia menu therefore sits exactly where an Obsidian menu
-     sits, and the edit-column dialog exactly where an Obsidian modal sits. */
+     sits, and the edit-column dialog exactly where an Obsidian modal sits.
+
+     Reading the scale means accepting what it says, and it says a dialog is not the top of the
+     app: a notice (60), a menu (65) and a tooltip (70) all draw over a modal (50), which is why
+     a tooltip for a control inside a dialog is legible and a menu opened from one is usable.
+     Folia's surfaces now inherit that, so the edit-column dialog no longer outranks the app's
+     own overlays the way a private 90 used to. */
   --folia-z-index-app-menu: var(--layer-menu);
   --folia-z-index-app-modal: var(--layer-modal);
 
