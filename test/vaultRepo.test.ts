@@ -858,6 +858,39 @@ describe("the rest of the vault surface", () => {
     expect(app.opened).toEqual(Array(7).fill("basic/Cards/One.md"));
   });
 
+  it("previews a link the renderer itself produced, not one a test planted", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    repo.renderMarkdown(el, "see [[Two]] for the rest", "basic/Cards/One.md");
+    MarkdownRenderer.finishAll();
+    await vi.waitFor(() => expect(el.querySelector("a.internal-link")).not.toBeNull());
+    el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    const hover = app.triggered.filter((t) => t.name === "hover-link");
+    expect(hover).toHaveLength(1);
+    expect(hover[0]?.args[0]).toMatchObject({ linktext: "Two", sourcePath: "basic/Cards/One.md" });
+    el.remove();
+  });
+
+  it("keeps answering for the newest render when an older render's cleanup runs late", async () => {
+    const { app, repo } = setup();
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    const stale = repo.renderMarkdown(el, "old", "basic/Cards/One.md");
+    repo.renderMarkdown(el, "new", "basic/Cards/Two.md");
+    stale();
+    el.innerHTML = '<a class="internal-link" data-href="Three">Three</a>';
+    el.querySelector("a")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+
+    const hover = app.triggered.filter((t) => t.name === "hover-link");
+    expect(hover).toHaveLength(1);
+    expect(hover[0]?.args[0]).toMatchObject({ sourcePath: "basic/Cards/Two.md" });
+    el.remove();
+  });
+
   it("tells Page preview about a rendered internal link the pointer reaches", async () => {
     const { app, repo } = setup();
     const el = document.createElement("div");

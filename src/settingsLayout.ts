@@ -135,7 +135,7 @@ export const SETTING_COPY = {
   },
   boardPan: {
     name: "Horizontal drag",
-    desc: "How to pan the board sideways. Shift+drag pans from anywhere, including over cards; click and drag pans only from empty board space, leaving cards and columns free to be dragged themselves. Middle-button drag always pans, except on a button, where the middle click is that button's own.",
+    desc: "How to pan the board sideways. Shift+drag pans from anywhere, including over cards; click and drag pans only from empty board space, leaving cards and columns free to be dragged themselves. Middle-button drag always pans.",
   },
   boardSetupCommands: {
     name: "Board setup in the command palette",

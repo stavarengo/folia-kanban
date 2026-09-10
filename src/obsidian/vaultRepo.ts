@@ -116,7 +116,7 @@ interface ResolvedBoardConfig extends BoardConfig {
  */
 const hoverSources = new WeakMap<
   HTMLElement,
-  { app: App; repo: VaultRepository; sourcePath: string }
+  { render: object; app: App; repo: VaultRepository; sourcePath: string }
 >();
 
 /** Containers already listening. Separate from `hoverSources`, which a cleanup empties. */
@@ -825,8 +825,8 @@ export class VaultRepository implements CardRepository, HoverParent {
    * fire twice. `hoverSources` carries who the container answers for, refreshed on every render and
    * dropped by the cleanup, so a hover after teardown says nothing.
    */
-  private watchForLinkHovers(el: HTMLElement, sourcePath: string): void {
-    hoverSources.set(el, { app: this.app, repo: this, sourcePath });
+  private watchForLinkHovers(el: HTMLElement, sourcePath: string, render: object): void {
+    hoverSources.set(el, { render, app: this.app, repo: this, sourcePath });
     if (hoverListening.has(el)) return;
     hoverListening.add(el);
     el.addEventListener("mouseover", (event: MouseEvent) => {
@@ -862,7 +862,9 @@ export class VaultRepository implements CardRepository, HoverParent {
     let cancelled = false;
     const c = new Component();
     c.load();
-    this.watchForLinkHovers(el, sourcePath);
+    // `c` doubles as this render's identity: the cleanup below must only retire the record while it
+    // is still this render's, never a later one's.
+    this.watchForLinkHovers(el, sourcePath, c);
     const tmp = el.cloneNode(false) as HTMLElement;
     void MarkdownRenderer.render(this.app, markdown, tmp, sourcePath, c)
       .then(() => {
@@ -876,7 +878,7 @@ export class VaultRepository implements CardRepository, HoverParent {
       // The listener stays (the container may render again into the same element), but it answers
       // from this record — dropping it is what makes a torn-down render stop naming a repository
       // whose links are gone, and lets the element release its hold on that repository.
-      if (hoverSources.get(el)?.repo === this) hoverSources.delete(el);
+      if (hoverSources.get(el)?.render === c) hoverSources.delete(el);
       el.innerHTML = "";
     };
   }

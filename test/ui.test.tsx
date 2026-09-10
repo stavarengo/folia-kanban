@@ -1716,20 +1716,18 @@ describe("board pan-scroll", () => {
     dispatchPointer(board, "pointerup", { clientX: 100 });
   });
 
-  it("middle-button pans regardless of mode, and over a card too", async () => {
+  it("middle-button pans regardless of mode, from a card and from a control alike", async () => {
     render_(makeRepo());
     const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     const board = document.querySelector(".folia-board") as HTMLElement;
-    dispatchPointer(board, "pointerdown", { button: 1, clientX: 100 });
-    expect(board).toHaveClass("is-pan-scrolling");
-    dispatchPointer(board, "pointerup", { clientX: 100 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
-
-    // The exemption for a control is exactly that — a control. A card is still pannable surface.
-    dispatchPointer(card, "pointerdown", { button: 1, clientX: 100 });
-    expect(board).toHaveClass("is-pan-scrolling");
-    dispatchPointer(card, "pointerup", { clientX: 100 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    // Nothing on the board is exempt from a middle-button drag: what separates a drag from a click
+    // is the movement, and the click suppression below reads that, not where the press landed.
+    for (const from of [board, card, within(card).getByLabelText('Open note for "Alpha"')]) {
+      dispatchPointer(from, "pointerdown", { button: 1, clientX: 100 });
+      expect(board).toHaveClass("is-pan-scrolling");
+      dispatchPointer(from, "pointerup", { clientX: 100 });
+      expect(board).not.toHaveClass("is-pan-scrolling");
+    }
   });
 
   it("empty mode pans a plain left-press on bare background but not over a column/card", async () => {
@@ -1934,15 +1932,10 @@ describe("card context menu", () => {
 
     // The whole middle-click gesture, not a bare auxclick: the board pans on a middle-button drag,
     // and a press that never reaches the pan listener would let this pass with the pan still armed.
+    // The whole gesture, not a bare auxclick: the board arms a pan on any middle press, so a
+    // middle click reaches this button only because the press never became a drag.
     const openNote = within(card).getByLabelText('Open note for "Alpha"');
-    const board = document.querySelector(".folia-board") as HTMLElement;
-    dispatchPointer(openNote, "pointerdown", { button: 1, clientX: 0 });
-    // The board pans on a middle-button drag. A press aimed at this button is not that drag, and
-    // the check has to happen here: the release ends any pan and would hide the evidence.
-    expect(board).not.toHaveClass("is-pan-scrolling");
-    dispatchPointer(openNote, "pointerup", { button: 1, clientX: 0 });
-    fireEvent(openNote, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
-
+    middleClick(openNote);
     expect(repo.openedWith[1]).toMatchObject({ button: 1 });
     // ...and it must not also select the card, the way a plain click on the face would.
     expect(screen.queryByTestId("card-detail")).not.toBeInTheDocument();
@@ -1965,6 +1958,23 @@ describe("card context menu", () => {
     await user.click(within(detail).getByLabelText("Open note"));
     await user.keyboard("{/Control}");
     expect(repo.openedWith[4]).toMatchObject({ ctrlKey: true });
+  });
+
+  it("pans instead of opening when the middle button was dragged, not clicked", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
+    const openNote = within(card).getByLabelText('Open note for "Alpha"');
+    const board = document.querySelector(".folia-board") as HTMLElement;
+
+    dispatchPointer(openNote, "pointerdown", { button: 1, clientX: 300 });
+    expect(board).toHaveClass("is-pan-scrolling");
+    dispatchPointer(board, "pointermove", { clientX: 200 });
+    dispatchPointer(board, "pointerup", { clientX: 200 });
+    fireEvent(openNote, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+
+    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(repo.opened).toEqual([]);
   });
 
   it("opens on an unmodified click exactly as it always did", async () => {

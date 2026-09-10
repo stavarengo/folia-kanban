@@ -106,7 +106,21 @@ export const MarkdownRenderer = {
         markdown,
         el,
         finish: () => {
-          el.appendChild(el.ownerDocument.createTextNode(markdown));
+          // Obsidian renders `[[a wikilink]]` as an anchor carrying the link as written in
+          // `data-href`. Modelled because that anchor is what the hover-preview path reads; the
+          // rest of the markdown stays plain text, which is all any other test asks of it.
+          for (const part of markdown.split(/(\[\[[^\]]+\]\])/)) {
+            const link = /^\[\[([^\]]+)\]\]$/.exec(part);
+            if (!link?.[1]) {
+              if (part) el.appendChild(el.ownerDocument.createTextNode(part));
+              continue;
+            }
+            const a = el.ownerDocument.createElement("a");
+            a.className = "internal-link";
+            a.setAttribute("data-href", link[1]);
+            a.textContent = link[1];
+            el.appendChild(a);
+          }
           resolve();
         },
       });

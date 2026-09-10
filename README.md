@@ -293,7 +293,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
 
 - **Boards and board notes**
   - **Open board notes as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
-  - **Horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans, except when the press lands on a button — there the middle click belongs to that button.
+  - **Horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
   - **Board setup in the command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
   - **Board setup in the file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
   - **Board setup in the editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
