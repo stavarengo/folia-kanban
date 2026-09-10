@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "ea4c96303d6bb414",
+        "id": "678598666d38f870",
         "type": "tabs",
         "children": [
           {
-            "id": "d9fe89b8bee20be0",
+            "id": "e187bf3435ae4c0b",
             "type": "leaf",
             "state": {
               "type": "folia-kanban-view",
               "state": {
-                "boardPath": "feature-showcase/Showcase Board.md"
+                "file": "feature-showcase/Showcase Board.md"
               },
               "icon": "layout-grid",
               "title": "Showcase Board - Folia Kanban"
@@ -33,25 +33,12 @@
         "type": "tabs",
         "children": [
           {
-            "id": "14b016e3ae38b9f5",
-            "type": "leaf",
-            "state": {
-              "type": "file-explorer",
-              "state": {
-                "sortOrder": "alphabetical",
-                "autoReveal": false
-              },
-              "icon": "lucide-folder-closed",
-              "title": "Files"
-            }
-          },
-          {
             "id": "6a95ba02d1e2a469",
             "type": "leaf",
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "tag:profiling",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -182,8 +169,22 @@
       "bases:Create new base": false
     }
   },
-  "active": "d9fe89b8bee20be0",
+  "active": "e187bf3435ae4c0b",
   "lastOpenFiles": [
+    "feature-showcase/Cards/Plan the v1.0 launch.md",
+    "basic/Cards/Duplicate.md",
+    "basic/Cards/alpha/Owner.md",
+    "basic/Cards/beta/Duplicate.md",
+    "basic/Cards/alpha/Duplicate.md",
+    "basic/Cards/beta",
+    "basic/Cards/alpha",
+    "ZZTmp/a/Src.md",
+    "ZZTmp/b/Dup.md",
+    "ZZTmp/a/Dup.md",
+    "ZZTmp/b",
+    "ZZTmp/a",
+    "ZZTmp",
+    "feature-showcase/Cards/Stale line probe.md",
     "README.md.tmp.1065.9bde952e5e53",
     "README.md",
     "feature-showcase/README.md",
