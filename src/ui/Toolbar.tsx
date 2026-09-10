@@ -1,7 +1,7 @@
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from "react";
 import { Icon, type IconName } from "./icons";
 
-import { hasToken, toggleToken, type FilterKey } from "./cardView";
+import { hasToken, toggleToken, type FilterKey } from "../model/filter";
 
 interface Props {
   /** The single source of truth: the raw search query string (#9). */

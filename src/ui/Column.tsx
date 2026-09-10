@@ -15,13 +15,13 @@ import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
 import { useBoardActions, useMatchContext, useSettings, useSubitemsCollapse } from "./context";
 import {
-  groupAndSortCards,
   isEmptyFilter,
   matchCard,
   parseFilter,
   type Filter,
   type MatchContext,
-} from "./cardView";
+} from "../model/filter";
+import { groupAndSortCards } from "./cardView";
 import { COLUMN_COLORS } from "./columnColors";
 
 // Render a card's subtree of genuinely-nested children as a bordered group. Recursive: each child

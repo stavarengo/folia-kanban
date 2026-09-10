@@ -379,3 +379,10 @@ export interface Board {
    */
   cardFolderWarning?: string;
 }
+
+/** How many links of one type a card shows in each direction (see `relationCounts` in board.ts). */
+export interface RelationCount {
+  type: RelationTypeDef;
+  out: number;
+  in: number;
+}

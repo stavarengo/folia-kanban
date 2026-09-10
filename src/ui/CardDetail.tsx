@@ -29,13 +29,8 @@ import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
 import { DETAIL_WIDTH_MAX, DETAIL_WIDTH_MIN, seenMarkerFor } from "../settings";
-import {
-  assigneeValues,
-  boardAssignees,
-  priorityOptions,
-  sameAssignee,
-  toggleAssignee,
-} from "./cardView";
+import { assigneeValues, boardAssignees, sameAssignee, toggleAssignee } from "../model/assignees";
+import { priorityOptions } from "./cardView";
 import {
   useBoardActions,
   useBoardDocument,

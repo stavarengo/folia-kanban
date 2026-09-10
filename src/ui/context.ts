@@ -1,11 +1,11 @@
 import { createContext, useContext, useMemo, type RefObject } from "react";
-import type { RelationCount } from "../model/board";
+import type { RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
 import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
-import type { MatchContext } from "./cardView";
+import type { MatchContext } from "../model/filter";
 
 /**
  * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to

@@ -8,7 +8,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { samePriority } from "../model/priorities";
-import { priorityOptions, priorityTone, sameAssignee, toggleAssignee } from "./cardView";
+import { sameAssignee, toggleAssignee } from "../model/assignees";
+import { priorityOptions, priorityTone } from "./cardView";
 import { useBoardActions, useBoardDocument, useBoardWindow, useSettings } from "./context";
 import { Icon, type IconName } from "./icons";
 

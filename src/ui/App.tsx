@@ -37,7 +37,8 @@ import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
-import { boardPriorities, matchCard, parseFilter, type MatchContext } from "./cardView";
+import { matchCard, parseFilter, type MatchContext } from "../model/filter";
+import { boardPriorities } from "./cardView";
 
 /** Stable empty contexts map (#14) so the provider value identity doesn't churn pre-load. */
 const EMPTY_CONTEXTS = {} as const;

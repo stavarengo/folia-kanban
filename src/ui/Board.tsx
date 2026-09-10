@@ -31,7 +31,8 @@ import {
 import { Column } from "./Column";
 import { AddColumn } from "./AddColumn";
 import { useBoardActions, useSettings } from "./context";
-import { cardChips, priorityTone, type Filter } from "./cardView";
+import type { Filter } from "../model/filter";
+import { cardChips, priorityTone } from "./cardView";
 
 // The pan gesture and the card-drag sensor share the same pointer, so exactly one must claim a given
 // press. The live pan mode (settings.boardPan) decides which — but dnd-kit instantiates the sensor

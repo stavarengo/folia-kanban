@@ -3,7 +3,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
 import type { UnreadState } from "../model/unread";
-import { assigneeValues, cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
+import { assigneeValues } from "../model/assignees";
+import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
 import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
 import {
   useBoardActions,

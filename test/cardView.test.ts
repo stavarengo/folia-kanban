@@ -1,26 +1,29 @@
 import { describe, it, expect } from "vitest";
 import {
   priorityTone,
-  dueInfo,
   cardUrgency,
   cardMatches,
+  groupAndSortCards,
+  boardPriorities,
+  priorityOptions,
+  cardChips,
+} from "../src/ui/cardView";
+import {
+  assigneeValues,
+  boardAssignees,
+  sameAssignee,
+  toggleAssignee,
+} from "../src/model/assignees";
+import {
   parseFilter,
   matchCard,
   matchQuery,
   isEmptyFilter,
   EMPTY_FILTER,
-  groupAndSortCards,
   hasToken,
   toggleToken,
-  boardPriorities,
-  priorityOptions,
-  assigneeValues,
-  boardAssignees,
-  sameAssignee,
-  toggleAssignee,
-  cardChips,
-} from "../src/ui/cardView";
-import { dateOnly, stamp } from "../src/model/dates";
+} from "../src/model/filter";
+import { dateOnly, dueInfo, stamp } from "../src/model/dates";
 import { BLOCKS } from "../src/model/relationships";
 import type { Card } from "../src/model/types";
 

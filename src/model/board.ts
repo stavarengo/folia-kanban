@@ -12,6 +12,7 @@ import type {
   ColumnDef,
   ContextConfig,
   RelationDirection,
+  RelationCount,
   RelationLink,
   RelationType,
   RelationTypeDef,
@@ -579,13 +580,6 @@ export function buildBoard(
     // (the detail panel, a checklist tick, an MCP tool) can bind the same link to another card.
     resolveLink: resolve,
   };
-}
-
-/** How many links of one type a card shows in each direction (see {@link relationCounts}). */
-export interface RelationCount {
-  type: RelationTypeDef;
-  out: number;
-  in: number;
 }
 
 /**
