@@ -75,3 +75,11 @@ So the mechanism is the app's, and reading the variable flat is how a plugin joi
 The toast is deliberately not part of this. It paints `color: #fff` on `--folia-success` or `--folia-danger`, fills that come from the theme's green and red rather than from the accent, and Obsidian's nearest equivalent, `.notice`, hard-codes `color: #FAFAFA` on a fixed dark background for the same reason. Routing the toast through `--folia-on-accent` would let an unrelated appearance setting flip its label to black on green.
 
 **What would change this:** Obsidian branching between the two variables in CSS, or dropping the inline-body override in favour of something a plugin has to read for itself. The check is one line in the running app — set a pale accent in Settings → Appearance and read `document.body.getAttribute('style')`; if `--text-on-accent` is no longer rewritten there, this decision is stale and the contrast failure is real again.
+
+## The community-directory action's release mode
+
+**Decided 2026-08-26. Releases stay on release-it plus the repository's own Release workflow.**
+
+Obsidian's [`obsidianmd/obsidian-workflows`](https://github.com/obsidianmd/obsidian-workflows) action offers a release mode and a reusable `release.yml`. It creates a draft release for a human to publish, and it knows nothing about this repository's rules: a tag must be plain semver and reachable from `origin/main`, and the release notes come from the changelog section release-it wrote. Adopting it would replace an end-to-end pipeline with a draft and a second copy of checks CI already runs on the same commit. Its scanner half is still used, in PR mode, for drift detection (see `docs/releasing.md`).
+
+**What would change this:** the action learning to publish rather than draft, or the directory starting to require its release mode for listed plugins.
