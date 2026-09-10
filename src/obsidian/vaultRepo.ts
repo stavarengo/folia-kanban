@@ -132,7 +132,9 @@ export class VaultRepository implements CardRepository, HoverParent {
 
   /**
    * Page preview parks the popover it opened for this board here (the `HoverParent` contract), so
-   * a second hover replaces the first instead of stacking previews over each other.
+   * a second hover replaces the first instead of stacking previews over each other. A repository is
+   * not a `Component`, so it cannot unload the popover — checked live and it does not have to: the
+   * popover closes itself when its link goes, whether the panel closed or the board's tab did.
    */
   hoverPopover: HoverPopover | null = null;
 
