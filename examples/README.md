@@ -29,7 +29,7 @@ Welcome! This folder is a ready-to-open **Obsidian vault** with a few example bo
 | **Next Up** | object column with a custom `color` |
 | **In Progress** | a soft **WIP limit** of 2 — it holds 3 cards plus one placed subtask, so the header nudges (alert icon, never blocks) — plus `sort: priority` (A → B → D, top to bottom) |
 | **In Review** | `group: due` — cards bucket into Overdue / Today / Soon / Later / No due date |
-| **⭐ A-priority lane** | a `filter: "priority:a"` **lane** — it pulls every A-priority card from *all* columns, regardless of status. A lane is a view, not an owner: a card can appear here *and* in its real column at once. |
+| **⭐ A-priority lane** | a `filter: "priority:a"` **lane** — it pulls every A-priority card from *all* columns, regardless of status. A lane is a view, not an owner: a card can appear here *and* in its real column at once, and dragging a non-A card into it is refused (the card snaps back and a message names the rule) rather than filing it where nothing would draw it. Give a card priority A and it joins the lane by itself. |
 | **Parked** | `parked: true` + `opacity: 0.45` + `hoverOpacity: 0.95` — a faded "someday" lane that brightens on hover |
 | **Done** | done column; past-due cards here stay neutral (done is never "overdue") |
 
@@ -116,7 +116,7 @@ The three boards in `title-modes/` share one `Cards/` folder and differ in one l
 - A card joins a column by `status` matching a column **`id`** exactly (case-sensitive); an unknown/missing status lands in the first column.
 - The tile usually shows the **filename**, but a card whose filename is a slug (or that carries its own `title:` key) shows a different title — see the two title-source cards above. The board note's `card-title` property (`auto` / `filename` / `heading`) sets the policy; `[[wikilinks]]` always match the **filename**, never the displayed title.
 - A subcard (`- [ ] [[Child]]`) is pulled out of its own column and shown nested under its parent.
-- A column `filter:` **replaces** its status bucket (it's a lane). The `context:` search token matches the **folder name**. A lane filtering on `unread:` shows each reader their own set, since read-state is per install, not in the notes.
+- A column `filter:` **replaces** its status bucket (it's a lane), and a lane takes no card by hand: a drop it does not match is refused, and so is `move_card` / `create_card` through the MCP server. The `context:` search token matches the **folder name**. A lane filtering on `unread:` shows each reader their own set, since read-state is per install, not in the notes.
 
 ## Learn more
 

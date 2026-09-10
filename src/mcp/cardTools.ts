@@ -3,8 +3,9 @@
 // checkbox syncing and the fractional ordering it would have got from a person dragging it.
 
 import { z } from "zod";
-import { columnOf } from "../model/board";
-import type { Board } from "../model/types";
+import { boardMatchContext, columnOf } from "../model/board";
+import { laneMismatch, laneVerdict, prospectiveCard } from "../model/lanes";
+import type { Board, Card } from "../model/types";
 import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
 import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
@@ -105,21 +106,28 @@ function refuseArrayForScalarKey(key: string, value: unknown): void {
 }
 
 /**
- * A warning for a write that lands a card in a column with a filter rule, or `undefined` when there
- * is nothing to warn about.
+ * A column with a `filter` rule is a lane: the board fills it from that rule, not from a card's
+ * status, so setting a card's status to it does not put the card in the lane. A card the rule
+ * rejects would claim a column no view draws it in — the board's fallback column keeps it on
+ * screen, but not where the caller asked for it, and the caller would never know.
  *
- * Such a column is a lane: the board fills it from the rule, not from `status`. Setting a card's
- * status to that column therefore does not put it in the lane, and because a card is only ever
- * drawn in its own status column, one that does not match the rule is drawn nowhere at all. The
- * board view has the same wart and accepts it, because a person dragging a card watches it happen;
- * an agent gets no such feedback, so it is told. Refusing outright would be the other option, but
- * the rule cannot be evaluated from here — it would refuse the moves that are perfectly fine along
- * with the ones that are not.
+ * So the write is refused with the rule quoted, rather than performed and warned about. The one
+ * thing that is not grounds to refuse is a rule this server cannot fully evaluate: `unread:` reads
+ * which comments a person has seen and `assignee:me` the name only the board view is told, and
+ * blocking a legitimate move over a rule you cannot read is worse than the write it prevents. Those
+ * keep the warning this tool has always returned.
  */
-function laneWarning(board: Board, columnId: string): string | undefined {
-  const filter = board.config.columns.find((c) => c.id === columnId)?.filter;
-  if (!filter) return undefined;
-  return `Column "${columnId}" is filled by the rule \`${filter}\`, not by a card's status. This card now claims that column, but the board only draws it there if it matches the rule — check it with get_board, and set the fields the rule asks for if it has gone missing.`;
+function refuseLaneMismatch(board: Board, columnId: string, card: Card, next: string): void {
+  const check = laneVerdict(board, columnId, card, boardMatchContext(board));
+  if (check?.verdict !== "rejects") return;
+  throw new ToolError(`${laneMismatch(check.lane, card)} ${next}`);
+}
+
+/** What remains to be said about a lane whose rule this server cannot fully evaluate. */
+function laneWarning(board: Board, columnId: string, card: Card): string | undefined {
+  const check = laneVerdict(board, columnId, card, boardMatchContext(board));
+  if (check?.verdict !== "unknown") return undefined;
+  return `Column "${columnId}" is filled by the rule \`${check.lane.rule}\`, not by a card's status, and part of that rule reads state this server cannot see — which comments a person has read, or who "me" is. The board draws this card there only if it really matches; check it with get_board.`;
 }
 
 /**
@@ -234,8 +242,20 @@ const createCard = tool({
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     requireColumn(board, args.column);
-    // Before the note exists, so a refused description does not leave an empty card behind.
+    // Both refusals run before the note exists, so neither leaves an empty card behind. The lane is
+    // put to the card `createCard` is about to write: a rule asking for a field this call has no way
+    // to set is a rule the new card cannot satisfy.
     if (args.description !== undefined) refuseUnsafeDescription(args.description);
+    const willBe = prospectiveCard(args.title, args.column, {
+      ...(args.priority === undefined ? {} : { priority: args.priority }),
+      ...(args.due === undefined ? {} : { due: args.due }),
+    });
+    refuseLaneMismatch(
+      board,
+      args.column,
+      willBe,
+      "No card was created. Create it in a column with no rule of its own and give it what the rule asks for with update_card, or pass the fields the rule wants to this call.",
+    );
     const path = await repo.createCard(args.title, args.column);
     // The note exists from here on. A field write that fails afterwards must not be reported as
     // "create_card failed", because an agent hearing that creates the card again and the board
@@ -251,7 +271,7 @@ const createCard = tool({
         `Card "${path}" was created in "${args.column}", but filling in its fields failed: ${e instanceof Error ? e.message : String(e)}. The card is on the board — finish it with update_card rather than creating it again.`,
       );
     }
-    const warning = laneWarning(board, args.column);
+    const warning = laneWarning(board, args.column, willBe);
     return { path, column: args.column, ...(warning === undefined ? {} : { warning }) };
   },
 });
@@ -277,6 +297,15 @@ const moveCard = tool({
     requireColumn(board, args.column);
     const path = resolveCardPath(board, args.card);
     refuseSlotForChecklistLine(board, path, args);
+    const card = board.cards[path];
+    if (card) {
+      refuseLaneMismatch(
+        board,
+        args.column,
+        card,
+        "Nothing was moved. Give the card what the rule asks for with update_card first, or move it to a column with no rule of its own.",
+      );
+    }
     const moved = await moveCardTo(repo, board, {
       path,
       columnId: args.column,
@@ -289,7 +318,7 @@ const moveCard = tool({
     }
     const after = await repo.loadBoard();
     const slot = (after.columns[args.column] ?? []).indexOf(path);
-    const warning = laneWarning(board, args.column);
+    const warning = card ? laneWarning(board, args.column, card) : undefined;
     return {
       path,
       column: landedColumn(after, path),

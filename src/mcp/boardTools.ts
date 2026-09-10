@@ -4,6 +4,8 @@
 // and all.
 
 import { z } from "zod";
+import { boardMatchContext } from "../model/board";
+import { drawnPaths } from "../model/lanes";
 import type { Board, Card } from "../model/types";
 import {
   boardArg,
@@ -61,11 +63,12 @@ const getBoard = tool({
   name: "get_board",
   title: "Read a board",
   description:
-    "A board's columns and the cards in each, in the order the board shows them. Cards nested under another card are reported on their parent, not in the columns. A column carrying a `filter` rule is an auto-populated lane whose drawn contents this server cannot resolve; it is marked with a `lane` note saying so.",
+    "A board's columns and the cards in each, in the order the board shows them — the same cards the person looking at the board sees. Cards nested under another card are reported on their parent, not in the columns. A column carrying a `filter` rule is an auto-populated lane, filled by that rule rather than by a card's status; it is marked with a `lane` note saying so.",
   input: z.object({ board: boardArg }),
   readOnly: true,
   run: async (host, args) => {
     const { board } = await openBoard(host, args.board);
+    const ctx = boardMatchContext(board);
     return {
       board: {
         path: board.config.path,
@@ -79,7 +82,7 @@ const getBoard = tool({
         title: col.title,
         limit: col.limit,
         filter: col.filter,
-        cards: (board.columns[col.id] ?? []).map((p) => cardSummary(board, p)),
+        cards: drawnPaths(board, col.id, ctx).map((p) => cardSummary(board, p)),
         ...(col.filter ? { lane: LANE_NOTE } : {}),
       })),
     };
@@ -89,16 +92,18 @@ const getBoard = tool({
 /**
  * What a column with a `filter` rule is, said to the caller rather than left to be inferred.
  *
- * Such a column is an auto-populated lane: the board draws every top-level card matching the rule,
- * from anywhere on the board, regardless of the card's own `status`. That matching happens in the
- * board view, above the port this server is allowed to reach, so the tools cannot resolve the rule
- * and `cards` here is the column's plain status bucket instead. The two are different sets, and a
- * caller told only the bucket would conclude a lane was empty when the person looking at the board
- * can see cards in it. Saying so is the honest answer until lane membership lives in the model
- * where both callers can ask the same question — `docs/ai/backlog/20260828.04` tracks that.
+ * Such a column is a lane: `cards` above is the rule resolved against every card standing in a
+ * column, which is what the board draws, and not the column's own status bucket — the two are
+ * different sets, and a card may be drawn in several lanes at once. Saying so is what keeps a
+ * caller from reading the listing as ownership and concluding that moving a card out of a lane is
+ * the way to change what it is.
+ *
+ * The one thing this listing can still get wrong is a rule naming `unread:` or `assignee:me`,
+ * which read state that lives with the person at the board and not on the card. `boardMatchContext`
+ * leaves both out, so such a term matches nothing here.
  */
 const LANE_NOTE =
-  "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card here may also appear in its own status column. `cards` below lists this column's status bucket, which is not the same set — resolve `filter` yourself if you need the lane as drawn.";
+  "This column has a filter rule, so the board fills it with every card matching that rule wherever it lives, and a card listed here may also appear in its own status column. `cards` above is that rule resolved, not this column's status bucket — moving a card out of a lane is not how you change what it is.";
 
 /** A checklist line standing in a column of its own has no note; say where its text actually is. */
 function todoCard(board: Board, path: string, card: Card): Record<string, unknown> {

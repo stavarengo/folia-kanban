@@ -4252,6 +4252,37 @@ describe("the detail panel reports a failed write", () => {
     expect(await screen.findByText("disk is full")).toHaveClass("folia-toast-error");
   });
 
+  it("refuses to add a card to a lane whose rule the new card cannot satisfy, and writes nothing", async () => {
+    const user = userEvent.setup();
+    // Research is filled by `area:research`, and an added card carries no area — so the card would
+    // claim a column that will not draw it. The add is refused with the rule named, before any note
+    // is created.
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      { "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" } },
+    );
+    const created: string[] = [];
+    const realCreate = repo.createCard.bind(repo);
+    repo.createCard = async (title: string, status: string) => {
+      created.push(title);
+      return realCreate(title, status);
+    };
+    render_(repo);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+
+    await user.click(screen.getByLabelText("Add card to Research"));
+    await user.type(screen.getByLabelText("New card title"), "Nowhere{Enter}");
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(created).toEqual([]);
+  });
+
   it("shows the error toast when the detail create flow fails, and keeps the form for a retry", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

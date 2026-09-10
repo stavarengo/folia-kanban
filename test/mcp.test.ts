@@ -979,38 +979,76 @@ describe("a column filled by a rule rather than by status", () => {
     };
   }
 
-  // The board draws `A` in Research because it matches the rule, but that matching lives in the
-  // board view, above the port these tools read through. The listing here is the status bucket,
-  // which for a lane is a different set — so it says so rather than letting an agent read an empty
-  // `cards` as an empty lane.
-  it("says the listing is the status bucket, not the lane the board draws", async () => {
+  // The board draws `A` in Research because it matches the rule. That rule now lives below the port
+  // these tools read through, so the listing is the lane as drawn rather than the status bucket —
+  // `A` appears in Research though its own status says `todo`, and in Todo too, because a lane
+  // draws a card without owning it.
+  it("lists a lane as the board draws it, not as its status bucket", async () => {
     const { host } = laned();
     const result = (await call(host, "get_board", { board: "Board.md" })) as {
-      columns: { id: string; filter?: string; lane?: string; cards: unknown[] }[];
+      columns: { id: string; filter?: string; lane?: string; cards: { path: string }[] }[];
     };
     const research = result.columns.find((c) => c.id === "research");
     expect(research?.filter).toBe("priority:high");
     expect(research?.lane).toMatch(/filter rule/);
-    expect(research?.cards).toEqual([]);
-    // A plain column says nothing of the sort, because for it the two sets are the same.
+    expect(research?.cards.map((c) => c.path)).toEqual(["Tasks/A.md"]);
+    // A plain column says nothing of the sort, because for it the rule and the bucket are one set.
     expect(result.columns.find((c) => c.id === "todo")?.lane).toBeUndefined();
+    expect(result.columns.find((c) => c.id === "todo")?.cards.map((c) => c.path)).toEqual([
+      "Tasks/A.md",
+      "Tasks/B.md",
+    ]);
   });
 
-  it("warns a write that claims a lane, because status is not what puts a card there", async () => {
-    const { host } = laned();
-    const created = (await call(host, "create_card", {
-      board: "Board.md",
-      title: "Invisible",
-      column: "research",
-    })) as { warning?: string };
-    expect(created.warning).toMatch(/only draws it there if it matches the rule/);
+  it("refuses a write that would claim a lane the card does not match, and writes nothing", async () => {
+    const { host, repo } = laned();
+    const before = JSON.stringify([...repo.files.entries()]);
+    await expect(
+      call(host, "create_card", { board: "Board.md", title: "Invisible", column: "research" }),
+    ).rejects.toThrow(/does not match it. No card was created/);
 
+    await expect(
+      call(host, "move_card", { board: "Board.md", card: "Tasks/B.md", column: "research" }),
+    ).rejects.toThrow(/does not match it. Nothing was moved/);
+    expect(JSON.stringify([...repo.files.entries()])).toEqual(before);
+  });
+
+  it("allows the write when the card does match the lane's rule", async () => {
+    const { host } = laned();
+    const moved = (await call(host, "move_card", {
+      board: "Board.md",
+      card: "Tasks/A.md",
+      column: "research",
+    })) as { warning?: string; column: string };
+    expect(moved.warning).toBeUndefined();
+    expect(moved.column).toBe("research");
+  });
+
+  // `unread:` reads which comments a person has seen, which is not on the card and not on the
+  // board — so the server cannot judge this rule, does not refuse over it, and says why.
+  it("warns instead of refusing when the rule reads state the server cannot see", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "unseen", title: "Unseen", filter: "unread:comments" },
+        ],
+      },
+      { "Tasks/B.md": { fm: { status: "todo", order: 1 }, body: "" } },
+      () => "all",
+      () => "",
+    );
+    const host = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path: string) => (path === "Board.md" ? repo : null),
+    };
     const moved = (await call(host, "move_card", {
       board: "Board.md",
       card: "Tasks/B.md",
-      column: "research",
+      column: "unseen",
     })) as { warning?: string };
-    expect(moved.warning).toMatch(/filled by the rule/);
+    expect(moved.warning).toMatch(/this server cannot see/);
   });
 
   it("says nothing extra about a move into an ordinary column", async () => {

@@ -47,8 +47,8 @@ export function laneOf(board: Board, columnId: string): Lane | null {
   return column ? asLane(column) : null;
 }
 
-/** Does this lane draw that card? The one question the board view and `get_board` both ask. */
-export function laneDraws(lane: Lane, card: Card, ctx: MatchContext): boolean {
+/** Does this lane draw that card? The one question every caller here comes down to. */
+function laneDraws(lane: Lane, card: Card, ctx: MatchContext): boolean {
   return matchCard(card, lane.filter, ctx);
 }
 

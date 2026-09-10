@@ -18,6 +18,8 @@ import type {
   RelationTypeDef,
   SubItem,
 } from "./types";
+import { dateOnly } from "./dates";
+import type { MatchContext } from "./filter";
 import { fallbackColumnOf } from "./lanes";
 import { BLOCKS, readInverse, readRelations } from "./relationships";
 
@@ -689,6 +691,20 @@ export function nestedCards(board: Board): NestedCard[] {
     out.push({ path, column: effectiveColumnOf(path), parentPath });
   }
   return out;
+}
+
+/**
+ * Everything a filter can be judged by without a reader in front of it: today, the board's done
+ * column, and its blocking counts. What it leaves out is what only the board view knows — which
+ * comments this reader has seen (`unread:`) and who "me" is (`assignee:me`) — so a rule naming
+ * either reads as `unknown` rather than as a "no" (see `judgeCard`).
+ *
+ * This is the context anything reading through the port uses, the MCP server being the one that
+ * matters, so that a lane resolves there the same way it does on screen.
+ */
+export function boardMatchContext(board: Board, today = dateOnly()): MatchContext {
+  const doneColumnId = findDoneColumn(board.config.columns);
+  return { today, doneColumnId, relations: relationCounts(board, doneColumnId) };
 }
 
 /** What the UI knows and the model cannot work out for itself, injected into `filterVisiblePaths`. */
