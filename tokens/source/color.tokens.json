@@ -38,6 +38,7 @@
     "on-accent": {
       "$value": "var(--text-on-accent, #fff)",
       "$type": "color",
+      "$description": "Foreground for accent and danger fills. Read flat, exactly as Obsidian's own `button.mod-cta` reads it: Obsidian never branches between `--text-on-accent` and `--text-on-accent-inverted` in CSS, it rewrites `--text-on-accent` to point at the inverted one in the inline style of `<body>` when the user's accent is light. The override therefore only reaches declarations that inherit from `<body>`, which is why this one belongs in the `.folia-scope` block and nowhere higher.",
       "$extensions": { "folia": { "cssVar": "--folia-on-accent", "live": true } }
     },
     "danger": {

@@ -87,6 +87,26 @@
   --folia-prio-3: var(--color-yellow, #c2a312);
   --folia-prio-4: var(--color-blue, #5b8def);
   --folia-accent: var(--interactive-accent);
+  /* Read flat, on purpose. Obsidian publishes two variables for text on an accent fill —
+     `--text-on-accent` for a dark accent, `--text-on-accent-inverted` for a light one — and app.css
+     defines them once, on `body`, as `white` and `black`. No button rule branches between them —
+     `button.mod-cta` sets `--text-color: var(--text-on-accent)` and stops there, and in 1.13.7 the
+     only rule in the whole stylesheet naming the inverted one is a Canvas group label. The choice
+     happens at runtime instead. When the user picks a light accent, Obsidian writes
+     `--text-on-accent: var(--text-on-accent-inverted)` into the INLINE style of `<body>`, next to
+     the `--accent-h/s/l` triple it derives from the setting (verified in 1.13.7: a pale yellow
+     accent turned both `button.mod-cta` and Folia's own primary button black-on-yellow, and a
+     popout opened after it carried the same override). So reading `--text-on-accent` alone is not
+     a missing case: it is how a plugin stays in step with the app, and with a theme that overrides
+     either variable.
+     What this depends on is the DECLARATION SITE, not the value: the override lives on `<body>`, so
+     it only reaches rules that inherit from it. This block does, because `.folia-scope` is always a
+     descendant of a body (see the header note, and scripts/check-portal-scope.mjs, which keeps it
+     that way through every portal). Moved to `:root`/`html` — body's parent — the same declaration
+     would miss the override, fall through to the white fallback below and freeze there for good,
+     visible only to users with a pale accent. That move fails `pnpm tokens:check`, which requires
+     every live token to be declared in this block and nowhere else — the guard is real, but it
+     guards the site, so it only means anything if the reason is written down. Here it is. */
   --folia-on-accent: var(--text-on-accent, #fff);
   --folia-danger: var(--color-red, #e5534b);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
