@@ -58,6 +58,27 @@ function fakeHost() {
   };
 }
 
+/**
+ * Render the board into a second window, the way Obsidian's pop-out puts a leaf in one. An iframe
+ * is the only two-window shape jsdom has, and it is enough: its document has a real `defaultView`
+ * with an `innerHeight` of its own, while `activeDocument` (the setup file points it at the main
+ * one) keeps standing for the window that has focus.
+ */
+function renderInSecondWindow(repo: FakeRepo, innerHeight: number) {
+  const frame = document.createElement("iframe");
+  document.body.appendChild(frame);
+  const doc = frame.contentDocument!;
+  const view = doc.defaultView!;
+  Object.defineProperty(view, "innerHeight", { configurable: true, value: innerHeight });
+  const container = doc.createElement("div");
+  doc.body.appendChild(container);
+  const result = render(
+    <App repo={repo} settings={DEFAULT_SETTINGS} onUpdateSettings={() => {}} today="2026-06-13" />,
+    { container, baseElement: doc.body },
+  );
+  return { ...result, doc, view, frame };
+}
+
 const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
   render(<App repo={repo} settings={settings} onUpdateSettings={() => {}} today="2026-06-13" />);
 
@@ -340,19 +361,13 @@ describe("status bar clearance", () => {
   });
 
   it("reads the bar from the board's own window, not from whichever one has focus", async () => {
-    // `activeDocument` follows focus, so a board in a pop-out would otherwise measure the main
-    // window's bar and reserve room for something its own window does not have.
-    const focusedElsewhere = document.implementation.createHTMLDocument("other window");
-    addStatusBar(focusedElsewhere, 25);
-    const realActive = activeDocument;
-    Object.assign(globalThis, { activeDocument: focusedElsewhere });
-    try {
-      render_(makeRepo());
-      await screen.findByText("Alpha");
-      expect(clearance()).toBe("0px");
-    } finally {
-      Object.assign(globalThis, { activeDocument: realActive });
-    }
+    // The pop-out case: the focused window has a status bar, the board's own window has none. The
+    // board must reserve nothing, not the 32px the old fallback wrote whenever it found no bar.
+    addStatusBar(document, 25);
+    const { doc, findByText } = renderInSecondWindow(makeRepo(), 800);
+    await findByText("Alpha");
+    const root = doc.querySelector(".folia-root") as HTMLElement;
+    expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
   });
 });
 
@@ -407,6 +422,19 @@ describe("card detail — description preview height", () => {
       Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
     }
   }
+
+  it("caps the preview by the board's own window, not the one that has focus", async () => {
+    // The pop-out case for the preview: measured against the main window's much taller viewport,
+    // the cap would let the description run off the bottom of the pop-out.
+    const user = userEvent.setup();
+    const { doc, findByText } = renderInSecondWindow(makeRepo(), 600);
+    await findByText("Alpha");
+    await user.click(await findByText("Alpha"));
+    const preview = doc.querySelector(".folia-desc-view") as HTMLElement;
+    // jsdom reports every rect as zero, so this is that window's height less the 24px gutter.
+    expect(preview.style.getPropertyValue("--folia-desc-max-h")).toBe("576px");
+    expect(window.innerHeight).not.toBe(600);
+  });
 
   it("re-measures when the board's own box changes, not only when the window resizes", async () => {
     const { seen, restore, root, panel, maxH } = await openWithObserver();
@@ -2354,11 +2382,13 @@ describe("search filter (single source of truth)", () => {
     expect(document.activeElement).toBe(search);
   });
 
-  it("a modified '/' is not the shortcut, and neither is one with no box to focus yet", async () => {
+  it("claims no '/' at all while there is no search box to focus", async () => {
+    // A scope match is final in Obsidian: a registered key that the handler declines is still not
+    // passed on. So a board that cannot use the key must not be bound for it in the first place.
     const host = fakeHost();
     const broken = makeRepo();
     broken.failLoadWith = "card folder is a file";
-    const failed = render(
+    render(
       <App
         repo={broken}
         settings={DEFAULT_SETTINGS}
@@ -2367,33 +2397,27 @@ describe("search filter (single source of truth)", () => {
         host={host}
       />,
     );
-    // A board that never loaded has no search box, so the key must fall through rather than be
-    // swallowed for a focus that cannot happen.
     await screen.findByText(/Couldn’t load the board/);
-    expect(host.slash(document.body)).toBe(false);
-    failed.unmount();
+    expect(host.bound()).toBe(false);
+  });
 
-    const host2 = fakeHost();
+  it("takes the Shift-typed '/' too, which is the only one some layouts have", async () => {
+    const host = fakeHost();
     render(
       <App
         repo={makeRepo()}
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        host={host2}
+        host={host}
       />,
     );
     await screen.findByText("Alpha");
     const search = screen.getByLabelText("Search cards");
-
-    // "/" on a German layout is Shift+7, so Shift is not a reason to decline; Ctrl/Alt/Meta are.
-    for (const mods of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
-      expect(host2.slash(document.body, mods)).toBe(false);
-      expect(document.activeElement).not.toBe(search);
-    }
+    // On a German layout "/" is Shift+7, so Shift is not a reason to decline.
     let took = false;
     act(() => {
-      took = host2.slash(document.body, { shiftKey: true });
+      took = host.slash(document.body, { shiftKey: true });
     });
     expect(took).toBe(true);
     expect(document.activeElement).toBe(search);

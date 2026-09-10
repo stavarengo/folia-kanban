@@ -1129,8 +1129,7 @@ export function CardDetail({
   // Cap the rendered preview to the space between its top and the viewport bottom (leaving a small
   // gutter), but never below a readable floor. Works across split/float/modal: it measures the
   // preview's own on-screen position, so the modal's max-height and the side panel's scroll both
-  // resolve to a sensible ceiling. `useBoardWindow()` is the pop-out's viewport, not the focused
-  // window's.
+  // resolve to a sensible ceiling.
   //
   // Two boxes move the preview without any window resizing, and a `resize` listener sleeps through
   // both: the board's own, when a split divider is dragged or a sidebar collapses, and the panel's,
@@ -1141,16 +1140,16 @@ export function CardDetail({
     if (isCreate || editingDesc) return;
     const measure = () => {
       const el = descViewRef.current;
-      if (!el) return;
+      // The preview's own window, which in a pop-out is the pop-out's rather than the focused one.
+      // Asked of the element being measured, so the two can never disagree.
+      const view = el?.ownerDocument.defaultView;
+      if (!el || !view) return;
       const top = el.getBoundingClientRect().top;
-      const avail = win.innerHeight - top - 24; // 24px gutter to the viewport edge
+      const avail = view.innerHeight - top - 24; // 24px gutter to the viewport edge
       setDescMaxHeight(Math.max(160, Math.round(avail)));
     };
-    // Nothing to measure against before the root is mounted — and `useBoardWindow()` still answers
-    // with the focused window until it is, which is the wrong viewport for a board in a pop-out.
-    const root = boardRootRef.current;
-    if (!root) return;
     measure();
+    const root = boardRootRef.current;
     const panel = panelRef.current;
     let panelWidth = panel?.getBoundingClientRect().width ?? 0;
     const observer = new ResizeObserver((entries) => {
@@ -1161,10 +1160,10 @@ export function CardDetail({
       }
       measure();
     });
-    observer.observe(root);
+    if (root) observer.observe(root);
     if (panel) observer.observe(panel);
     return () => observer.disconnect();
-  }, [isCreate, editingDesc, path, body, win, boardRootRef]);
+  }, [isCreate, editingDesc, path, body, boardRootRef]);
 
   // Leaving the editor (save/cancel/navigation) drops any carried-over preview height so the
   // preview returns to the viewport-measured behavior.

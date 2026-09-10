@@ -29,18 +29,24 @@ export class KanbanView extends FileView {
   private root: Root | null = null;
   private repo: VaultRepository | null = null;
   private repoPath: string | null = null;
-  private onSlash: ((event: KeyboardEvent) => boolean) | null = null;
-
   /**
    * Stable across renders on purpose: the board binds its shortcut in an effect keyed on this
    * object, so a new one on every re-render would unbind and rebind on every settings change.
    */
   private readonly host: BoardHost = {
     bindSearchShortcut: (onSlash) => {
-      this.onSlash = onSlash;
-      return () => {
-        if (this.onSlash === onSlash) this.onSlash = null;
-      };
+      const scope = this.scope;
+      if (!scope) return () => {};
+      // Both ways a keyboard types a plain "/": bare, and with Shift, which is how a German layout
+      // does it. Deliberately not `null` modifiers, which would match Mod+/ as well and take that
+      // combination away from whatever the user has bound to it.
+      const take: KeymapEventListener = (evt) => onSlash(evt) !== true;
+      const registered = [scope.register([], "/", take), scope.register(["Shift"], "/", take)];
+      // Registered on bind rather than for the life of the view, because a scope match is final:
+      // Obsidian stops looking the moment a registered key matches, whatever the handler returns.
+      // A view that leaves "/" registered while it has no search box to focus — still loading,
+      // failed to load, a tab with no board note yet — would silently eat the key.
+      return () => registered.forEach((handler) => scope.unregister(handler));
     },
   };
 
@@ -53,16 +59,9 @@ export class KanbanView extends FileView {
     super(leaf);
     // A view scope runs only while its leaf has focus, which is what makes "/" belong to one board:
     // with two boards open side by side, the other one never sees the key. The app scope is the
-    // parent so every global hotkey still resolves while a board is focused.
+    // parent so every global hotkey still resolves while a board is focused. It starts empty; the
+    // board fills it through `host` for exactly as long as it has a search box.
     this.scope = new Scope(this.app.scope);
-    // Both ways a keyboard types a plain "/": bare, and with Shift, which is how a German layout
-    // does it. Not `null`: a scope match is final, with no "I did not want this after all" return,
-    // so registering every modifier would shadow whatever the user has bound to Mod+/ for as long
-    // as a board is focused. Returning false is what tells Obsidian to swallow the key, so
-    // declining leaves it to the field the user is typing in.
-    const takeSlash: KeymapEventListener = (evt) => this.onSlash?.(evt) !== true;
-    this.scope.register([], "/", takeSlash);
-    this.scope.register(["Shift"], "/", takeSlash);
   }
 
   getViewType(): string {

@@ -115,11 +115,11 @@ function pathForm(
  */
 export interface BoardHost {
   /**
-   * Hand the host the board's `/` handler. It is called with the keypress and returns whether the
-   * board took it, which is the host's cue to suppress it. The whole event rather than its target,
-   * because which physical combination types a `/` depends on the layout — `Shift+7` on a German
-   * keyboard — so the board reads the modifiers rather than assuming none. Returns the unbind
-   * function.
+   * Hand the host the board's `/` handler, for as long as there is a search box to focus. The host
+   * decides which keypresses are a `/` — which physical combination types one depends on the
+   * layout — and when they belong to this board; the board decides whether it wants each one, and
+   * says so by returning true, which is the host's cue to suppress the key. Unbinding gives the
+   * key back: while nothing is bound, the host claims no `/` at all.
    */
   bindSearchShortcut(onSlash: (event: KeyboardEvent) => boolean): () => void;
 }
@@ -858,23 +858,24 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   // this board's — only it knows which leaf has focus — and the board decides whether it wants it,
   // which it doesn't while the user is typing in a field. A board with no host (a test, any
   // embedding without a leaf) simply has no shortcut.
-  useEffect(
-    () =>
-      host?.bindSearchShortcut((event) => {
-        if (event.metaKey || event.ctrlKey || event.altKey) return false;
-        const el = event.target as HTMLElement | null;
-        const tag = el?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
-          return false;
-        // No box to focus while the board is still loading or has failed to load. Declining leaves
-        // the key to whatever else would have had it, rather than swallowing it for nothing.
-        const box = searchRef.current;
-        if (!box) return false;
-        box.focus();
-        return true;
-      }),
-    [host],
-  );
+  // "/" focuses the search box, as the placeholder advertises. The host owns when the key is this
+  // board's — only it knows which leaf has focus — and the board owns whether it wants that one.
+  // Bound only once a board has loaded, because that is when the box exists: an unbound host
+  // claims no "/" at all, so a board still loading leaves the key alone. Declining does not hand
+  // the key on to another shortcut; it only means Obsidian won't cancel it, so the field the user
+  // is typing in still gets its slash. A board with no host (a test, an embedding with no leaf)
+  // simply has no shortcut.
+  useEffect(() => {
+    if (!board) return;
+    return host?.bindSearchShortcut((event) => {
+      const el = event.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
+        return false;
+      searchRef.current?.focus();
+      return true;
+    });
+  }, [host, board]);
 
   if (error) return <div className="folia-error">Couldn’t load the board: {error}</div>;
   if (!board) return <div className="folia-loading">Loading board…</div>;
