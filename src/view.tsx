@@ -1,5 +1,5 @@
 import type { TFile, WorkspaceLeaf } from "obsidian";
-import { FileView, Scope } from "obsidian";
+import { FileView, Scope, type KeymapEventListener } from "obsidian";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App as BoardApp, type BoardHost } from "./ui/App";
@@ -55,10 +55,14 @@ export class KanbanView extends FileView {
     // with two boards open side by side, the other one never sees the key. The app scope is the
     // parent so every global hotkey still resolves while a board is focused.
     this.scope = new Scope(this.app.scope);
-    // `null` modifiers rather than none: a layout where "/" is typed with Shift still types a "/",
-    // and the board reads the modifiers itself. Returning false is what tells Obsidian to swallow
-    // the key, so declining leaves it to the field the user is typing in.
-    this.scope.register(null, "/", (evt) => this.onSlash?.(evt) !== true);
+    // Both ways a keyboard types a plain "/": bare, and with Shift, which is how a German layout
+    // does it. Not `null`: a scope match is final, with no "I did not want this after all" return,
+    // so registering every modifier would shadow whatever the user has bound to Mod+/ for as long
+    // as a board is focused. Returning false is what tells Obsidian to swallow the key, so
+    // declining leaves it to the field the user is typing in.
+    const takeSlash: KeymapEventListener = (evt) => this.onSlash?.(evt) !== true;
+    this.scope.register([], "/", takeSlash);
+    this.scope.register(["Shift"], "/", takeSlash);
   }
 
   getViewType(): string {

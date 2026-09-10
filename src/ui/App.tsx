@@ -116,9 +116,10 @@ function pathForm(
 export interface BoardHost {
   /**
    * Hand the host the board's `/` handler. It is called with the keypress and returns whether the
-   * board took it, which is the host's cue to suppress it. Every key the host can match is offered,
-   * modifiers included, because which physical combination types a `/` depends on the layout —
-   * on a German keyboard it is `Shift+7`. Returns the unbind function.
+   * board took it, which is the host's cue to suppress it. The whole event rather than its target,
+   * because which physical combination types a `/` depends on the layout — `Shift+7` on a German
+   * keyboard — so the board reads the modifiers rather than assuming none. Returns the unbind
+   * function.
    */
   bindSearchShortcut(onSlash: (event: KeyboardEvent) => boolean): () => void;
 }
