@@ -487,8 +487,14 @@ const setSubtask = tool({
     // without which a subcard's checkbox is ticked and the child note left where it was — the one
     // thing this tool promises not to do — and its own `[status:: …]` claim, which is what deciding
     // where the work now belongs is read from.
+    let laneRefused: string | null;
     try {
-      await setSubtaskDone(repo, board, { path, line, done: args.done });
+      laneRefused = await setSubtaskDone(repo, board, {
+        path,
+        line,
+        done: args.done,
+        ctx: boardMatchContext(board),
+      });
     } catch (e) {
       // The note changed between this call's own read and its write — rarer than a stale index.
       // The refused write did not land; when the tick got through and only its column claim was
@@ -496,7 +502,17 @@ const setSubtask = tool({
       if (e instanceof StaleLineError) throw new ToolError(e.message);
       throw e;
     }
-    return { path, index: args.index, text: args.text, done: args.done };
+    return {
+      path,
+      index: args.index,
+      text: args.text,
+      done: args.done,
+      ...(laneRefused === null
+        ? {}
+        : {
+            warning: `${laneRefused} The box is ticked; the card keeps the column it was in, because a lane draws by its rule and would not have shown it.`,
+          }),
+    };
   },
 });
 

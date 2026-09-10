@@ -264,11 +264,15 @@ export function Column({
   // A lane's whole population is the model's answer. A plain column keeps the bucket the prop
   // carries — that is the one a drag in flight shows relocated — and the fallback column adds the
   // cards the model gives it from outside that bucket.
+  // A stranded card is never in this column's bucket, so `applyReloc` cannot take it out for the
+  // duration of a drag the way it does for an ordinary card. Dropping it here by hand is what keeps
+  // one card from rendering in two columns at once under one sortable id.
+  const draggingPath = dragReloc ? splitCardDragId(dragReloc.activeId).path : null;
   const stranded = useMemo(() => {
     if (!isFallback) return [];
     const own = new Set(board.columns[column.id] ?? []);
-    return modelPaths.filter((p) => !own.has(p));
-  }, [board, column.id, isFallback, modelPaths]);
+    return modelPaths.filter((p) => !own.has(p) && p !== draggingPath);
+  }, [board, column.id, isFallback, modelPaths, draggingPath]);
   const lanePaths = columnFilter
     ? modelPaths
     : stranded.length

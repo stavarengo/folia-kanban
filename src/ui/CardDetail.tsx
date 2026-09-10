@@ -34,6 +34,7 @@ import { assigneeValues, boardAssignees, sameAssignee, toggleAssignee } from "..
 import { priorityOptions } from "./cardView";
 import {
   useBoardActions,
+  useMatchContext,
   useBoardDocument,
   useBoardRootRef,
   useBoardWindow,
@@ -802,6 +803,7 @@ export function CardDetail({
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
+  const matchCtx = useMatchContext();
   // The panel can live in a pop-out window; `activeDocument` follows focus, so focus bookkeeping
   // and the outside-click/drag listeners name the board's own document instead.
   const doc = useBoardDocument();
@@ -1822,12 +1824,22 @@ export function CardDetail({
                   checked={s.done}
                   aria-label={`Toggle ${s.text}`}
                   onChange={() =>
-                    void mutate(() =>
+                    void mutate(async () => {
                       // The board's own toggle, called rather than copied: a line that claims a
                       // column has its claim moved with its checkbox, so the two never tell
                       // different stories, and a refusal of either half is worded there once.
-                      setSubtaskDone(repo, board, { path, line: s, done: !s.done }),
-                    )
+                      const refused = await setSubtaskDone(repo, board, {
+                        path,
+                        line: s,
+                        done: !s.done,
+                        ctx: matchCtx,
+                      });
+                      if (refused !== null) {
+                        actions.reportError(
+                          new Error(`${refused} The box is ticked; its column is unchanged.`),
+                        );
+                      }
+                    })
                   }
                 />
                 {s.kind === "card" && s.link ? (

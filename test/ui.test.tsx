@@ -3229,6 +3229,44 @@ describe("cross-column make-room (live relocation gap)", () => {
     await user.keyboard("{Escape}"); // clean up the active drag
   });
 
+  it("draws a stranded card once while it is being dragged, not in two columns at once", async () => {
+    // Alpha's status names the Research lane, which will not draw it, so the fallback column shows
+    // it — a card no bucket contains. The relocation that opens the gap can only remove a card from
+    // a bucket, so the fallback has to let go of it by hand or two tiles claim one sortable id.
+    placeCards();
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "doing", title: "Doing" },
+          { id: "research", title: "Research", filter: "area:research" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "research", area: "home", order: 1 },
+          body: "\n# Alpha\n",
+        },
+      },
+    );
+    render_(repo);
+    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    expect(cardsIn("Todo")).toEqual(["Tasks/Alpha.md"]); // the fallback column drew it
+    main.focus();
+    await user.keyboard("{ }");
+    await crossIntoDoing(user);
+
+    await waitFor(() => expect(cardsIn("Doing")).toContain("Tasks/Alpha.md"));
+    expect(
+      document.querySelectorAll('[data-path="Tasks/Alpha.md"][data-testid="card"]'),
+    ).toHaveLength(1);
+    expect(cardsIn("Todo")).not.toContain("Tasks/Alpha.md");
+
+    await user.keyboard("{Escape}");
+  });
+
   it("refuses a drop into a lane the card does not match, and snaps the card back", async () => {
     // The headline gesture: Doing carries a rule Alpha fails, so the drop writes nothing, says why,
     // and the card returns to Todo rather than staying in the make-room gap the drag opened.

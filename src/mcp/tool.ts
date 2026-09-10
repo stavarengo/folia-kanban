@@ -156,6 +156,17 @@ export function resolveNotePath(board: Board, ref: string): string {
  * their parent's column, so that is what to report.
  */
 export function landedColumn(board: Board, path: string): string | null {
+  const standing = landedOn(board, path);
+  return standing === null ? null : columnOf(board, standing);
+}
+
+/**
+ * The card whose tile actually shows `path` — itself when it has one, else the ancestor it is drawn
+ * inside. A lane's rule is asked about THAT card, never about the nested one: a nested card stands
+ * in no bucket, so a rule would find nothing to pull and the answer would be a column the board
+ * does not draw it in.
+ */
+export function landedOn(board: Board, path: string): string | null {
   const seen = new Set<string>();
   let at: string | undefined = path;
   // Up the nesting until something has a tile: a child of a child drawn inside a grandparent is
@@ -164,8 +175,7 @@ export function landedColumn(board: Board, path: string): string | null {
   // but `parentOf` does link both ways across one, so `seen` keeps a board that changed underneath
   // this from turning a wrong assumption into a hang.
   while (at !== undefined && !seen.has(at)) {
-    const tiled = columnOf(board, at);
-    if (tiled !== null) return tiled;
+    if (columnOf(board, at) !== null) return at;
     seen.add(at);
     at = board.placedOf[at] ?? board.parentOf[at] ?? parseTodoPath(at)?.parentPath;
   }

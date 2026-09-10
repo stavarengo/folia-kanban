@@ -35,9 +35,17 @@ function asLane(column: ColumnDef): Lane | null {
   };
 }
 
+// A board's rules parsed once. Keyed on the column list the board was built from, which is a new
+// array per load and never mutated, so a reloaded board reparses and a re-render does not.
+const laneCache = new WeakMap<readonly ColumnDef[], Lane[]>();
+
 /** The board's lane columns, in board order. Empty for a board whose columns are all plain. */
 function lanesOf(board: Board): Lane[] {
-  return board.config.columns.map(asLane).filter((l): l is Lane => l !== null);
+  const cached = laneCache.get(board.config.columns);
+  if (cached) return cached;
+  const lanes = board.config.columns.map(asLane).filter((l): l is Lane => l !== null);
+  laneCache.set(board.config.columns, lanes);
+  return lanes;
 }
 
 /** The lane `columnId` is, or null when that column is plain (or is no column of this board). */
@@ -237,18 +245,22 @@ export function prospectiveCard(
 }
 
 /**
- * Is this card drawn anywhere on the board? False only for one it would show nowhere at all.
+ * Is a card STANDING IN `standsIn` drawn anywhere on the board? False only for one the board would
+ * show nowhere at all. Asked only about a card with a tile: a nested card stands in no bucket, and
+ * its visibility is its parent's question, not this one's.
  *
  * The tally asks this rather than resolving lane rules itself: two answers to "does a lane draw
  * this" is how a toolbar comes to say "0 of 1" beside a tile the user can plainly see.
  */
-export function isDrawnSomewhere(board: Board, path: string, ctx: MatchContext): boolean {
-  const standsIn = board.config.columns.find((c) => (board.columns[c.id] ?? []).includes(path));
-  if (!standsIn) return false;
+export function isDrawnSomewhere(
+  board: Board,
+  path: string,
+  standsIn: string,
+  ctx: MatchContext,
+): boolean {
   const card = board.cards[path];
   if (!card) return false;
   return (
-    drawnBy(lanesOf(board), card, standsIn.id, ctx).length > 0 ||
-    fallbackColumnOf(board) !== undefined
+    drawnBy(lanesOf(board), card, standsIn, ctx).length > 0 || fallbackColumnOf(board) !== undefined
   );
 }

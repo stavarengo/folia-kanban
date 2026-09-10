@@ -677,7 +677,16 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
               throw new Error(`"${path}" no longer has the subtask that was clicked.`);
             // Ticking a box is also a statement about where the work belongs, for a line that
             // claims a column, so the claim is kept in step with the checkbox.
-            await setSubtaskDone(repo, b, { path, line, done });
+            const ctx = matchCtxRef.current;
+            const refused = await setSubtaskDone(repo, b, {
+              path,
+              line,
+              done,
+              ...(ctx ? { ctx } : {}),
+            });
+            if (refused !== null) {
+              showToast(`${refused} The box is ticked; its column is unchanged.`, "error");
+            }
           } catch (e) {
             reportError(e);
           } finally {

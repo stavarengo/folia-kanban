@@ -4,14 +4,14 @@
 // and all.
 
 import { z } from "zod";
-import { boardMatchContext } from "../model/board";
+import { boardMatchContext, columnOf } from "../model/board";
 import { drawnInColumn, drawnPaths } from "../model/lanes";
 import type { MatchContext } from "../model/filter";
 import type { Board, Card } from "../model/types";
 import {
   boardArg,
   cardArg,
-  landedColumn,
+  landedOn,
   openBoard,
   resolveCardPath,
   tool,
@@ -112,8 +112,12 @@ const LANE_NOTE =
  * tool agrees with `get_board`'s listing rather than reporting the card's raw `status`.
  */
 function shownColumn(board: Board, path: string, ctx: MatchContext): string | null {
-  const at = landedColumn(board, path);
-  return at === null ? null : drawnInColumn(board, at, path, ctx);
+  // `landedOn` is the card with the tile — this one, or the ancestor it is drawn inside. The rule
+  // is asked about that card, because that is the one standing in a bucket for a lane to pull.
+  const standing = landedOn(board, path);
+  if (standing === null) return null;
+  const at = columnOf(board, standing);
+  return at === null ? null : drawnInColumn(board, at, standing, ctx);
 }
 
 /** A checklist line standing in a column of its own has no note; say where its text actually is. */

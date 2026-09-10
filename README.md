@@ -160,6 +160,8 @@ Which is why a lane will not take a card you drag into it. A plain column owns t
 
 If a note already carries a `status` naming a lane it does not match — typed by hand, or written before this was refused — the board draws it in your first ordinary column rather than losing it.
 
+Two rules read something that is not on the card: `unread:` is per reader, and `assignee:me` needs a name in **Your name**. A lane built on either keeps the cards whose `status` names it, rather than deciding against them on an answer nobody gave — so an `assignee:me` lane on an install with no name set still shows what was put there, and nothing is refused on that rule.
+
 ## Who is working on this
 
 A card carries an `assignee` in its frontmatter, and that is the whole mechanism — a plain key in a plain note, so a colleague, a script or an agent sets it by writing the name, exactly as you do:

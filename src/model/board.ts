@@ -753,7 +753,7 @@ export function filterVisiblePaths(board: Board, rules: FilterVisibility): Set<s
   const drawnInItsBucket = (path: string): boolean => {
     const col = columnOfPath[path];
     if (col === undefined || !laneColumnIdSet.has(col)) return true;
-    return isDrawnSomewhere(board, path, rules.ctx);
+    return isDrawnSomewhere(board, path, col, rules.ctx);
   };
   const memo = new Map<string, boolean>();
   const visible = (path: string): boolean => {

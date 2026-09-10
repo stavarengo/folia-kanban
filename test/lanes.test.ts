@@ -141,7 +141,7 @@ describe("the tally and the board agree", () => {
     const b = buildBoard(allLanes, [card("Msg", { status: "mine" })]);
     expect(fallbackColumnOf(b)).toBeUndefined();
     expect(drawnPaths(b, "mine", ctx)).toEqual(["Tasks/Msg.md"]);
-    expect(isDrawnSomewhere(b, "Tasks/Msg.md", ctx)).toBe(true);
+    expect(isDrawnSomewhere(b, "Tasks/Msg.md", "mine", ctx)).toBe(true);
   });
 
   it("does not count one no column draws", () => {
@@ -151,7 +151,7 @@ describe("the tally and the board agree", () => {
     };
     const b = buildBoard(allLanes, [card("Stray", { status: "urgent", priority: "low" })]);
     expect(drawnPaths(b, "urgent", ctx)).toEqual([]);
-    expect(isDrawnSomewhere(b, "Tasks/Stray.md", ctx)).toBe(false);
+    expect(isDrawnSomewhere(b, "Tasks/Stray.md", "urgent", ctx)).toBe(false);
   });
 });
 

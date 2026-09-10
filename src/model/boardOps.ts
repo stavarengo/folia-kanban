@@ -6,6 +6,8 @@
 // have had to reinvent it, and the two would have drifted. Everything that moves a card goes
 // through here now, so the board view and the MCP server order cards by the same arithmetic.
 
+import type { MatchContext } from "./filter";
+import { laneRefusal } from "./lanes";
 import type { Board, SubItem } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
@@ -65,8 +67,8 @@ export async function moveCardOver(
 export async function setSubtaskDone(
   repo: CardRepository,
   board: Board,
-  target: { path: string; line: SubItem; done: boolean },
-): Promise<void> {
+  target: { path: string; line: SubItem; done: boolean; ctx?: MatchContext },
+): Promise<string | null> {
   const { path, line, done } = target;
   await repo.toggleSubtask(path, line, done);
   // The follow-up is decided from the same reading of the line the tick was, so the two halves can
@@ -77,7 +79,16 @@ export async function setSubtaskDone(
   // the moment between them can have the second refused on its own, and that says so rather than
   // leaving the caller to find a ticked box with a claim that never moved.
   const sync = syncSubtaskClaim(board, path, line, done);
-  if (!sync) return;
+  if (!sync) return null;
+  // The second half files the child into a column, and a lane owns no card: one whose rule the
+  // child fails must not be written, or ticking a box would strand somebody else's note. The tick
+  // itself stands — it is what the click meant — and the reason comes back for the caller to say.
+  const claimed = sync.setFrontmatter?.["status"];
+  const child = board.cards[sync.path];
+  if (target.ctx && child && typeof claimed === "string" && claimed !== "") {
+    const why = laneRefusal(board, claimed, child, target.ctx);
+    if (why !== null) return why;
+  }
   try {
     await repo.applyMove(sync);
   } catch (e) {
@@ -86,6 +97,7 @@ export async function setSubtaskDone(
       `${e.message} The checkbox was written; keeping the line's own column claim in step with it was not, so the line says two things until the next edit.`,
     );
   }
+  return null;
 }
 
 /**

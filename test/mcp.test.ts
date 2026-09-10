@@ -1085,6 +1085,85 @@ describe("a column filled by a rule rather than by status", () => {
     expect(one.column).toBe("todo");
   });
 
+  // A nested subcard stands in no bucket of its own — it is drawn inside its parent, wherever the
+  // parent is drawn. Asking a lane's rule about it would find nothing to pull and answer with the
+  // fallback column, which get_board's listing does not contain.
+  it("puts a nested subcard where its parent is drawn, lane or not", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "priority:high" },
+        ],
+      },
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "research", priority: "high", order: 1 },
+          body: "\n## Subtasks\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: {}, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    const host = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path: string) => (path === "Board.md" ? repo : null),
+    };
+    const one = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Child.md",
+    })) as { column: string };
+    expect(one.column).toBe("research");
+
+    const board = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { id: string; cards: { path: string }[] }[];
+    };
+    expect(board.columns.find((c) => c.id === "todo")?.cards).toEqual([]);
+    expect(board.columns.find((c) => c.id === "research")?.cards.map((c) => c.path)).toEqual([
+      "Tasks/Parent.md",
+    ]);
+  });
+
+  it("ticks a subtask box without filing the child into a lane that refuses it", async () => {
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "done", title: "Done", filter: "priority:high" },
+        ],
+      },
+      {
+        "Tasks/Parent.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n- [ ] [[Child]]\n",
+        },
+        "Tasks/Child.md": { fm: { status: "todo", priority: "low" }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    const host = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path: string) => (path === "Board.md" ? repo : null),
+    };
+    const res = (await call(host, "set_subtask_done", {
+      board: "Board.md",
+      card: "Tasks/Parent.md",
+      index: 0,
+      text: "[[Child]]",
+      done: true,
+    })) as { done: boolean; warning?: string };
+
+    expect(res.done).toBe(true);
+    expect(res.warning).toMatch(/does not match it/);
+    // The box is ticked; the child keeps the column it was in rather than claiming the lane.
+    expect(repo.files.get("Tasks/Child.md")?.fm["status"]).toBe("todo");
+    expect(repo.files.get("Tasks/Parent.md")?.body).toContain("- [x] [[Child]]");
+  });
+
   it("says nothing extra about a move into an ordinary column", async () => {
     const { host } = laned();
     const moved = (await call(host, "move_card", {
