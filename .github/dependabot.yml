@@ -1,5 +1,8 @@
 version: 2
 
+# Two ecosystems, for two different reasons — the workflow actions below, and
+# pnpm-lock.yaml after them.
+#
 # The actions in pipeline.yml are pinned to commit SHAs, which is what stops a
 # compromised tag from moving under us — and what would otherwise freeze them
 # forever, security fixes included. This is the other half: Dependabot proposes
@@ -20,5 +23,35 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+    labels:
+      - dependencies
+
+  # pnpm-lock.yaml, which no workflow fails over: the pull-request OSV scan only
+  # blocks a vulnerability the change itself introduces, and the release job only
+  # blocks one in what the bundle ships. Alerts watch the graph without this
+  # entry; what this entry adds is the pull request that acts on one — the weekly
+  # version update, and the shape a security update takes, the switch for those
+  # being a repository setting this file cannot carry. See docs/releasing.md.
+  #
+  # Two prefixes, because the plan job only counts `feat` and `fix` as releasable.
+  # A runtime dependency is bundled into main.js, so bumping one changes what
+  # people are running and should be able to cut a release on its own; a dev
+  # dependency changes nothing they install, and `chore` leaves main at "nothing
+  # to release" until something else earns one.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+    # The dev tooling is most of the tree and none of it can release, so it
+    # arrives as one pull request a week rather than thirty-odd; a runtime bump
+    # is a `fix` somebody may want to release on its own and stays separate.
+    groups:
+      development-dependencies:
+        dependency-type: development
+        patterns:
+          - "*"
     labels:
       - dependencies

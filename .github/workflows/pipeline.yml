@@ -543,6 +543,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Only what the bundle ships reaches a user, so `--prod` is the whole
+      # point: a dev-only advisory is something to fix, not a reason to hold a
+      # release, and a release blocked by one is a release nobody can cut.
+      # `--audit-level=high` is where the exit code flips as well as what gets
+      # printed: without it a moderate advisory would stop a release too, and
+      # below the threshold the log keeps only a count.
+      #
+      # Skipped on the republish path, for the reason the verify job is: that
+      # path re-uploads a build that was already released, and an advisory filed
+      # since then is not something re-uploading it can fix. Failing here would
+      # only close the recovery path at the moment it is needed.
+      - name: Audit the runtime dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+        run: pnpm audit --prod --audit-level=high
+
       # Optional, and only for the push below. A tag ruleset that restricts
       # creations applies to GITHUB_TOKEN as well, and the built-in GitHub
       # Actions identity cannot be put on a ruleset's bypass list — a GitHub App
