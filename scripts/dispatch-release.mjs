@@ -249,7 +249,10 @@ const review = async () => {
   const since = previous ?? "the first commit";
   const commits = git(["log", "--format=%h %s", range]);
   const subjects = git(["log", "--format=%s", range]);
-  const bodies = git(["log", "--format=%B", range]);
+  // The body alone, not %B: a subject that opens with "BREAKING CHANGE:" is a
+  // header to the parser and carries no note, so it is not a breaking change to
+  // release-it and must not be one here either.
+  const bodies = git(["log", "--format=%b", range]);
   const releasable =
     RELEASABLE_SUBJECT.test(subjects) ||
     BREAKING_SUBJECT.test(subjects) ||

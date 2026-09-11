@@ -263,8 +263,12 @@ jobs:
           # pattern allows — so a commit this calls releasable is a commit
           # release-it will also read as one. The same three tests live in
           # scripts/dispatch-release.mjs.
+          # %b, the body alone: %B would include the subject, and a commit whose
+          # *subject* is "BREAKING CHANGE: …" is a header to the parser, with no
+          # note in it and no breaking bump — so counting it here would promise
+          # a major and release whatever patch release-it fell back to.
           subjects=$(git log --format=%s "$range")
-          bodies=$(git log --format=%B "$range")
+          bodies=$(git log --format=%b "$range")
           releasable=false
           if grep -qE '^(feat|fix)(\([^)]*\))?!?: ' <<<"$subjects" \
             || grep -qE '^[0-9A-Za-z_]*(\([^)]*\))?!: ' <<<"$subjects" \
