@@ -109,6 +109,33 @@ const confirm = async (question) => {
   return answer.trim().toLowerCase() === "y";
 };
 
+// "host/owner/repo" for a remote, whatever spelling it arrives in: an https
+// URL, an scp-style `git@host:owner/repo`, or an ssh:// one. The host is half
+// of the answer — a mirror or another forge can carry the same owner/repo and
+// is not the repository gh would dispatch — and anything userinfo carries is
+// dropped, so a URL with a token in it cannot end up in an error message.
+// undefined for anything that is not a two-segment repository path.
+const remoteIdentity = (url) => {
+  const scp = /^(?:[^@/]+@)?([^/:]+):(?!\/)(.+)$/.exec(url);
+  const { host, path } = scp
+    ? { host: scp[1], path: scp[2] }
+    : (() => {
+        try {
+          const parsed = new URL(url);
+          return { host: parsed.host, path: parsed.pathname };
+        } catch {
+          return { host: undefined, path: "" };
+        }
+      })();
+  if (host === undefined) return undefined;
+  const segments = path
+    .replace(/\.git$/, "")
+    .split("/")
+    .filter((segment) => segment !== "");
+  if (segments.length !== 2) return undefined;
+  return `${host}/${segments.join("/")}`.toLowerCase();
+};
+
 // Everything the plan job would work out, worked out here first. Skipped for a
 // republish: that path publishes a tag that already exists, so there is no
 // version to choose and no commit range to read.
@@ -133,11 +160,11 @@ const review = async () => {
   if (named.status !== 0)
     die("Could not read the repository gh is pointing at. Check: gh repo view");
   const { nameWithOwner, url: repoUrl } = JSON.parse(named.stdout);
-  const originUrl = git(["remote", "get-url", "origin"]);
-  const originPath = originUrl.replace(/\.git$/, "").replace(/^.*[/:]([^/:]+\/[^/]+)$/, "$1");
-  if (originPath.toLowerCase() !== nameWithOwner.toLowerCase()) {
+  const origin = remoteIdentity(git(["remote", "get-url", "origin"]));
+  const target = remoteIdentity(repoUrl);
+  if (origin === undefined || origin !== target) {
     die(
-      `gh is pointing at ${nameWithOwner} while origin is ${originPath}, so the plan below would describe one repository and the dispatch would start a release in the other. Unset GH_REPO, or run: gh repo set-default ${originPath}`,
+      `gh is pointing at ${target ?? repoUrl} while origin is ${origin ?? "a remote this cannot read as a repository"}, so the plan below would describe one repository and the dispatch would start a release in the other. Unset GH_REPO, or run: gh repo set-default ${nameWithOwner}`,
     );
   }
 
@@ -288,34 +315,58 @@ console.log(
 
 // The run is queued asynchronously, so it is not listable the instant the
 // dispatch returns.
-const findRun = () => {
+const findRuns = () => {
   // GitHub's dispatch API answers with nothing to correlate on, so "newer than
-  // the snapshot, same actor" is as close as this gets. If that matches more
-  // than one run, say so rather than watch a coin toss.
-  const fresh = listRuns()?.filter((candidate) => candidate.databaseId > highestBefore) ?? [];
-  if (fresh.length > 1) {
-    die(
-      `More than one new run of ${WORKFLOW} appeared, so this cannot tell which one it started:\n${fresh
-        .map((candidate) => `  ${candidate.url}`)
-        .join("\n")}`,
-    );
-  }
-  return fresh[0];
+  // the snapshot, same actor" is as close as this gets. A failed listing is not
+  // an empty one: treated as empty it would read as "not started yet", which is
+  // the answer that lets an unreviewed run through below.
+  const listed = listRuns();
+  if (listed === undefined) return undefined;
+  return listed.filter((candidate) => candidate.databaseId > highestBefore);
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-let dispatched;
-for (let attempt = 0; attempt < 20 && dispatched === undefined; attempt += 1) {
+const abandon = (problem) => {
+  const moved =
+    reviewed !== undefined &&
+    git(["ls-remote", "origin", "refs/heads/main"]).split("\t")[0] !== reviewed;
+  die(
+    `${problem}\n${
+      moved
+        ? `And main has moved since the plan above, so that run may be releasing a commit nobody reviewed. Find it and cancel it: gh run list --workflow ${WORKFLOW}`
+        : `main has not moved since the plan above, so the run that started is the one you approved. Watch it with: gh run list --workflow ${WORKFLOW}`
+    }`,
+  );
+};
+
+let fresh = [];
+for (let attempt = 0; attempt < 20 && fresh.length === 0; attempt += 1) {
   await sleep(2000);
-  dispatched = findRun();
+  const found = findRuns();
+  if (found === undefined) continue;
+  fresh = found;
 }
 
-if (dispatched === undefined) {
-  die(
-    `The run did not appear within 40s. It may still start — watch it with: gh run list --workflow ${WORKFLOW}`,
+if (fresh.length === 0) {
+  abandon(`The run did not appear within 40s, so nothing here can check or cancel it.`);
+}
+
+// One more look before trusting the match: a run that only becomes visible in a
+// later poll would otherwise never be considered, and taking the first sighting
+// would mean checking the reviewed commit against somebody else's dispatch.
+await sleep(4000);
+const confirmed = findRuns() ?? [];
+if (confirmed.length > 0) fresh = confirmed;
+if (fresh.length > 1) {
+  abandon(
+    `More than one new run of ${WORKFLOW} appeared, so this cannot tell which one it started:\n${fresh
+      .map((candidate) => `  ${candidate.url}`)
+      .join("\n")}`,
   );
 }
+
+const dispatched = fresh[0];
 
 console.log(dispatched.url);
 
@@ -330,8 +381,8 @@ if (reviewed !== undefined && dispatched.headSha !== reviewed) {
   die(
     `main moved between the plan above and the dispatch: you approved ${reviewed.slice(0, 7)}, the run started on ${dispatched.headSha.slice(0, 7)}. ${
       cancelled.status === 0
-        ? "That run has been cancelled and nothing was released."
-        : `That run could NOT be cancelled (${cancelled.stderr.trim()}) — cancel it by hand: ${dispatched.url}`
+        ? "That run has been cancelled and nothing was released. (GitHub accepts a cancellation rather than completing it on the spot, so confirm it took: it has minutes of verifying and scanning ahead of the release job.)"
+        : `That run could NOT be cancelled (${cancelled.stderr.trim()}) — it is on its way to releasing a commit nobody reviewed, so cancel it by hand now: ${dispatched.url}`
     }\nRe-run to review the new tip.`,
   );
 }

@@ -13,9 +13,11 @@ name: Pipeline
 # run verifies, scans and plans the tip of main again and then releases it, so
 # what gets published is the commit that passed `pnpm verify` in this same run,
 # with release-it's version bump committed on top of it — nothing is inferred
-# from a green tick on another workflow, and no job triggers another workflow as
-# a side effect. A dispatch with a `tag` input is the republish path, described
-# on the release job.
+# from a green tick on another workflow, and no run hands its release to
+# another. (With the optional release App configured, the release commit does
+# start one more push run, which verifies and stops at "nothing to release";
+# see the token step.) A dispatch with a `tag` input is the republish path,
+# described on the release job.
 on:
   push:
     branches: [main]
@@ -311,6 +313,14 @@ jobs:
       id-token: write
       attestations: write
 
+    # A step's `if` cannot read the `secrets` context, so whether the release
+    # App is configured is carried in as a job-level boolean. Only the answer,
+    # never the credentials: those are handed to the minting step and nowhere
+    # else, so no other step — and nothing a package lifecycle script runs — has
+    # the App's private key in its environment.
+    env:
+      HAS_RELEASE_APP: ${{ secrets.RELEASE_APP_ID != '' && secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+
     outputs:
       version: ${{ steps.resolve.outputs.tag }}
       url: ${{ steps.publish.outputs.url }}
@@ -396,18 +406,41 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Optional, and only for the push below. A tag ruleset that restricts
+      # creations applies to GITHUB_TOKEN as well, and the built-in GitHub
+      # Actions identity cannot be put on a ruleset's bypass list — a GitHub App
+      # can, so the ruleset and this pipeline can only coexist through one. With
+      # both secrets set, release-it pushes as that App; with either missing,
+      # nothing changes and the push is GITHUB_TOKEN's. See docs/releasing.md.
+      - name: Mint the release App's token
+        id: app-token
+        if: ${{ env.HAS_RELEASE_APP == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Bump, write the changelog, commit, tag and push
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
         env:
           VERSION: ${{ needs.plan.outputs.version }}
-          PUSH_TOKEN: ${{ github.token }}
+          # The App's token when there is one, GITHUB_TOKEN otherwise: the
+          # minting step above is skipped without the secrets, and a skipped
+          # step's output is empty.
+          PUSH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
         run: |
           # Inject the push token only here, and take it out again on the way
           # out, so it is in .git/config for this step and no other — not while
           # package lifecycle scripts run during install, and not while the
-          # build that follows runs repository code. A GITHUB_TOKEN push starts
-          # no workflow, which is what lets this run own the whole release
-          # instead of handing it to a second one.
+          # build that follows runs repository code.
+          #
+          # A GITHUB_TOKEN push starts no workflow, which is what lets this run
+          # own the whole release instead of handing it to a second one. An App
+          # token is an ordinary actor and its push does start one: the release
+          # commit sets off another push run of this pipeline, which verifies,
+          # scans, plans and stops at "nothing to release", because `chore` is
+          # not releasable. The tag push starts nothing either way — this
+          # workflow has no tag trigger.
           #
           # What this does not do, and no arrangement inside one job can: the
           # job's own contents:write token exists for the whole job, and any
