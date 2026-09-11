@@ -393,10 +393,6 @@ jobs:
     env:
       HAS_RELEASE_APP: ${{ secrets.RELEASE_APP_CLIENT_ID != '' && secrets.RELEASE_APP_PRIVATE_KEY != '' }}
 
-    outputs:
-      version: ${{ steps.resolve.outputs.tag }}
-      url: ${{ steps.publish.outputs.url }}
-
     steps:
       # Before the checkout, because the checkout is handed this value: a
       # malformed input should be refused by name, not turn into a "ref not
@@ -784,79 +780,3 @@ jobs:
           # The summary says "released" here and nowhere earlier, so it cannot
           # claim a release that a failed upload left as a draft.
           echo "Released [$TAG]($URL)" >> "$GITHUB_STEP_SUMMARY"
-
-  announce:
-    name: Announce
-    needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      # The community portal has no public or unauthenticated trigger; this is
-      # the maintainer's own account-page request, replayed with a stored session
-      # cookie. It is a nudge, not a gate: the listing also picks the release up
-      # on its own within about a day, so nothing here fails the run.
-      - name: Ask the community portal to re-check the release
-        id: portal
-        shell: bash
-        env:
-          PORTAL_COOKIE: ${{ secrets.OBSIDIAN_PORTAL_COOKIE }}
-        run: |
-          if [ -z "${PORTAL_COOKIE:-}" ]; then
-            answer="skipped, no OBSIDIAN_PORTAL_COOKIE secret is set"
-          else
-            body="$RUNNER_TEMP/portal-response"
-            # No --location: a Cookie: set by hand is re-sent on every hop curl
-            # follows, across hosts too (curl drops Authorization there, not
-            # Cookie), and this one is the maintainer's whole portal session.
-            # Nothing is lost by not following — the step only classifies the
-            # answer, and a redirect is itself an answer worth reporting.
-            status=$(curl --silent --output "$body" --write-out '%{http_code}' \
-              --connect-timeout 10 --max-time 60 \
-              --header "Cookie: $PORTAL_COOKIE" \
-              https://community.obsidian.md/account/plugins/folia-kanban/check-release) || status="000"
-
-            # Only ever classify the response. It is an authenticated account
-            # page, so its body never reaches the log or the message below.
-            if grep -qi 'refreshed in the last few minutes' "$body"; then
-              answer="in cooldown, the portal refreshed this entry a few minutes ago"
-            elif grep -qi 'name="password"' "$body"; then
-              answer="the stored cookie has expired, the portal answered with its login page"
-            elif [ "$status" = "200" ]; then
-              answer="asked, the portal accepted the re-check"
-            elif [ "$status" = "401" ] || [ "$status" = "403" ]; then
-              answer="the stored cookie was rejected (HTTP $status), refresh OBSIDIAN_PORTAL_COOKIE"
-            elif [ "$status" = "000" ]; then
-              answer="the portal could not be reached"
-            else
-              answer="unexpected portal answer (HTTP $status)"
-            fi
-          fi
-
-          echo "Portal: $answer"
-          echo "answer=$answer" >> "$GITHUB_OUTPUT"
-
-      - name: Send the Telegram message
-        shell: bash
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          VERSION: ${{ needs.release.outputs.version }}
-          URL: ${{ needs.release.outputs.url }}
-          PORTAL: ${{ steps.portal.outputs.answer }}
-        run: |
-          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
-            echo "Skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set."
-            exit 0
-          fi
-
-          text=$(printf 'folia-kanban %s is released.\n%s\nCommunity portal: %s' "$VERSION" "$URL" "$PORTAL")
-
-          if ! curl --silent --fail --output /dev/null --request POST \
-            --connect-timeout 10 --max-time 30 \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
-            --data-urlencode "text=$text"; then
-            echo "::warning::The Telegram notification failed; the release itself is published."
-          fi
