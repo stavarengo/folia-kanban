@@ -135,11 +135,18 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
+      # No `cache: pnpm` here, unlike the other jobs. This is the one job that
+      # runs an action nobody in this repository controls — `@v1`, floating on
+      # purpose — and the Actions cache is a write channel that action would
+      # otherwise have: caches are scoped by branch, so what a push-to-main run
+      # saves is what a later release run on main restores and installs from.
+      # The saving is a few seconds of install on a job nothing waits for, and
+      # the cost of being wrong about it is a poisoned pnpm store in the job
+      # holding the release credentials. Not a trade worth making.
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-          cache: pnpm
 
       # The action is npm-only (`npm ci`/`npm install`), and this repo has no
       # package-lock.json. Installing first makes it skip its own install — it
@@ -295,11 +302,19 @@ jobs:
           # control characters out, `<`, `>` and `&` as entities (an unclosed
           # `<!--` in a subject would otherwise hide everything after it), and
           # the leading `-` of the list item put back by the format string, so a
-          # subject cannot start its own block. What stays possible is bold or a
-          # link inside one line, which cannot hide or fake another line.
-          git log --format='%s (`%h`)' "$range" \
+          # subject cannot start its own block. Backticks go too, or one in a
+          # subject would pair with the ones this wraps the short hash in and
+          # leave the hash reading as part of the message. What stays possible
+          # is bold or a link inside one line, which cannot hide or fake
+          # another line.
+          #
+          # The hash leads the line out of git and the list item is rebuilt at
+          # the end, so every backtick that survives the escaping is the
+          # workflow's own rather than a subject's.
+          git log --format='%h %s' "$range" \
             | tr -d '\000-\010\013-\037\177' \
-            | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/^/- /' \
+            | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/`/\&#96;/g' \
+            | sed -E 's/^([0-9a-f]+) (.*)$/- \2 (`\1`)/' \
             >> "$GITHUB_STEP_SUMMARY"
           {
             echo
@@ -430,6 +445,31 @@ jobs:
               echo "::error::The checkout is not the commit tag '$TAG_INPUT' points at; refusing to republish."
               exit 1
             fi
+            # ...and only a commit release-it made for this exact version.
+            # Reachability and the manifest are both far weaker than they read:
+            # the bump writes manifest.json once per release, so every commit on
+            # main since the last release carries that release's version, and
+            # every one of them is trivially an ancestor of main. A tag moved
+            # onto today's tip would pass both and republish today's code as an
+            # old version. The release commit's subject is the one thing only
+            # that release produced — .release-it.json's commitMessage with the
+            # version in it — and it names the version, so an older release
+            # commit cannot stand in for a newer one either.
+            #
+            # This is defence in depth, not the defence: it assumes nobody can
+            # push a forged `chore(release)` commit to main, which is the tag
+            # ruleset's "Restrict updates" (and branch protection) to enforce.
+            # See docs/releasing.md.
+            # The template comes from the checked-out tag's own
+            # .release-it.json, so this compares against the rule that was in
+            # force when that release was cut rather than a copy of it here.
+            subject=$(git log -1 --format=%s HEAD)
+            template=$(node -p "require('./.release-it.json').git.commitMessage")
+            expected_subject=${template//\$\{version\}/$TAG_INPUT}
+            if [ "$subject" != "$expected_subject" ]; then
+              echo "::error::Tag '$TAG_INPUT' points at a commit whose subject is '$subject', not '$expected_subject'. Only the release commit this pipeline made for $TAG_INPUT can be republished as $TAG_INPUT — the tag has been moved, or was never cut by this pipeline."
+              exit 1
+            fi
             echo "Republishing the existing tag $TAG_INPUT."
           else
             head=$(git rev-parse HEAD)
@@ -496,6 +536,12 @@ jobs:
         with:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Asked for by name, so the token carries this and not whatever the
+          # installation happens to hold. docs/releasing.md says to create the
+          # App with Contents write and nothing else; without this line that
+          # would be a promise in a document, and widening the App later for
+          # some other reason would quietly widen this token too.
+          permission-contents: write
 
       - name: Bump, write the changelog, commit, tag and push
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
@@ -539,12 +585,25 @@ jobs:
         env:
           TAG_INPUT: ${{ inputs.tag }}
         run: |
+          part='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+          SEMVER="^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-${part}(\.${part})*)?$"
+
           if [ -n "$TAG_INPUT" ]; then
             tag="$TAG_INPUT"
           else
             # release-it wrote this version into package.json and manifest.json
             # and tagged the commit with the same string.
             tag=$(node -p "require('./package.json').version")
+          fi
+
+          # Every other version in this pipeline is tested against that grammar
+          # before it is used, and this was the one that was not. It is what
+          # keeps a version out of `gh release create`'s arguments and out of
+          # .release-it.json's shell hook, and a value with a newline in it
+          # would otherwise be a second line written into $GITHUB_OUTPUT.
+          if [[ ! "$tag" =~ $SEMVER ]]; then
+            echo "::error::'$tag' is not a plain semver version; refusing to publish it."
+            exit 1
           fi
 
           # Obsidian matches a release to a plugin by the version string in the
@@ -554,6 +613,10 @@ jobs:
           # semver-shaped tag, sitting on any commit reachable from main, from
           # being published as if it were a release.
           manifest=$(node -p "require('./manifest.json').version")
+          if [[ ! "$manifest" =~ $SEMVER ]]; then
+            echo "::error::manifest.json says '$manifest', which is not a plain semver version."
+            exit 1
+          fi
           if [ "$manifest" != "$tag" ]; then
             echo "::error::manifest.json says $manifest but the release tag is $tag. Refusing to publish a release Obsidian cannot match."
             exit 1
@@ -716,7 +779,12 @@ jobs:
             answer="skipped, no OBSIDIAN_PORTAL_COOKIE secret is set"
           else
             body="$RUNNER_TEMP/portal-response"
-            status=$(curl --silent --location --output "$body" --write-out '%{http_code}' \
+            # No --location: a Cookie: set by hand is re-sent on every hop curl
+            # follows, across hosts too (curl drops Authorization there, not
+            # Cookie), and this one is the maintainer's whole portal session.
+            # Nothing is lost by not following — the step only classifies the
+            # answer, and a redirect is itself an answer worth reporting.
+            status=$(curl --silent --output "$body" --write-out '%{http_code}' \
               --connect-timeout 10 --max-time 60 \
               --header "Cookie: $PORTAL_COOKIE" \
               https://community.obsidian.md/account/plugins/folia-kanban/check-release) || status="000"

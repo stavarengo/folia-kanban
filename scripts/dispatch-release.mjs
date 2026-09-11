@@ -311,6 +311,11 @@ if (tag === undefined) {
   reviewed = { head: outcome.head, version: outcome.version };
 }
 
+// A republish is dispatched against the tag itself (see below), and GitHub
+// files the run under that ref's name, so the listing has to ask for the same
+// one it started.
+let dispatchRef = tag === undefined ? "main" : `refs/tags/${tag}`;
+
 const listRuns = () => {
   const listed = gh([
     "run",
@@ -318,7 +323,7 @@ const listRuns = () => {
     "--workflow",
     WORKFLOW,
     "--branch",
-    "main",
+    dispatchRef === "main" ? "main" : tag,
     "--event",
     "workflow_dispatch",
     "--user",
@@ -335,22 +340,47 @@ const listRuns = () => {
 // identifies our own run without comparing this machine's clock to GitHub's.
 const before = listRuns();
 if (before === undefined) die(`Could not list runs of ${WORKFLOW}. Check: gh repo view`);
-const highestBefore = before.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
+let highestBefore = before.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
 
-const run = ["workflow", "run", WORKFLOW, "--ref", "main"];
-if (tag !== undefined) run.push("--field", `tag=${tag}`);
-if (reviewed !== undefined) {
-  run.push(
-    "--field",
-    `expected_sha=${reviewed.head}`,
-    "--field",
-    `expected_version=${reviewed.version}`,
+const dispatchArgs = (ref) => {
+  const args = ["workflow", "run", WORKFLOW, "--ref", ref];
+  if (tag !== undefined) args.push("--field", `tag=${tag}`);
+  if (reviewed !== undefined) {
+    args.push(
+      "--field",
+      `expected_sha=${reviewed.head}`,
+      "--field",
+      `expected_version=${reviewed.version}`,
+    );
+  }
+  return args;
+};
+
+// A republish runs against the tag, not against main. The run's own commit is
+// what the provenance attestation records as the source, and a republish
+// dispatched against main would sign today's tip as the source of a build from
+// a months-old tag. Everything the run does with main it does by fetching
+// origin/main explicitly, so this changes nothing but that record.
+let dispatch = gh(dispatchArgs(dispatchRef));
+
+// GitHub reads the workflow file from the ref it is dispatched against, so a
+// tag cut before this pipeline existed has no pipeline.yml to run. Those can
+// only be republished against main, where the attestation names main's tip.
+if (dispatch.status !== 0 && tag !== undefined && /not found|404/i.test(dispatch.stderr)) {
+  console.log(
+    `The ${tag} tag has no ${WORKFLOW} on it — it predates this pipeline — so the republish goes against main instead. Its build provenance will record the tip of main as the source commit rather than the tag's own.`,
   );
+  dispatchRef = "main";
+  // The snapshot above was taken on the tag's ref, so it says nothing about
+  // which runs already exist on main.
+  const onMain = listRuns();
+  if (onMain === undefined) die(`Could not list runs of ${WORKFLOW}. Check: gh repo view`);
+  highestBefore = onMain.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
+  dispatch = gh(dispatchArgs(dispatchRef));
 }
 
-const dispatch = gh(run);
 if (dispatch.status !== 0) {
-  die(`Could not dispatch ${WORKFLOW} on main:\n${dispatch.stderr.trim()}`);
+  die(`Could not dispatch ${WORKFLOW} on ${dispatchRef}:\n${dispatch.stderr.trim()}`);
 }
 console.log(
   tag === undefined ? "Dispatched a release from main." : `Dispatched a republish of ${tag}.`,
