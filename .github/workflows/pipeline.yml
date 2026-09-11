@@ -258,7 +258,7 @@ jobs:
           bodies=$(git log --format=%B "$range")
           releasable=false
           if grep -qE '^(feat|fix)(\([^)]*\))?!?: ' <<<"$subjects" \
-            || grep -qE '^[0-9A-Za-z_]+(\([^)]*\))?!: ' <<<"$subjects" \
+            || grep -qE '^[0-9A-Za-z_]*(\([^)]*\))?!: ' <<<"$subjects" \
             || grep -qE '^BREAKING[ -]CHANGE:' <<<"$bodies"; then
             releasable=true
           fi
@@ -457,6 +457,12 @@ jobs:
             # changelog from whichever tag is nearest now. A tag landing in
             # between leaves the version pinned by the check above and silently
             # narrows the notes, so the boundary has to be the same one.
+            #
+            # Fetching tags first, because release-it does: its own `git fetch`
+            # follows new tags into this history before it reads the latest one.
+            # Asking `git describe` about the tags this runner happened to clone
+            # would be checking an older world than the one release-it works in.
+            git fetch --tags --force origin
             nearest=$(git describe --tags --abbrev=0 --match '*.*.*' --exclude '*-*' 2>/dev/null || true)
             if [ "$nearest" != "$PLANNED_PREVIOUS" ]; then
               echo "::error::The plan measured from '${PLANNED_PREVIOUS:-the first commit}' and the nearest release tag is now '${nearest:-none}'. A tag landed while this run was working; the changelog would not be the one that was planned. Nothing has been changed; dispatch again."

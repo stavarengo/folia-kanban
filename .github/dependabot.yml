@@ -3,7 +3,14 @@ version: 2
 # The actions in pipeline.yml are pinned to commit SHAs, which is what stops a
 # compromised tag from moving under us — and what would otherwise freeze them
 # forever, security fixes included. This is the other half: Dependabot proposes
-# the new SHA as a pull request, which runs verify and scan like any other.
+# the new SHA as a pull request.
+#
+# Expect one manual step on each of those. docs/releasing.md asks for an Actions
+# allow-list naming the pinned SHAs, and a pull request cannot run an action the
+# allow-list does not name yet — so the bump's own run fails until that list is
+# updated with the same SHA. That is the cost of the narrow allow-list, and it
+# fails with a clear message rather than quietly.
+#
 # `obsidianmd/obsidian-workflows@v1` floats on purpose and is not pinned, so
 # there is nothing here for it to bump.
 updates:

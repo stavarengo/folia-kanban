@@ -88,7 +88,7 @@ const TAG = new RegExp(
 // type grammar and the space after the colon are the changelog preset's, so
 // this and release-it read the same subjects the same way.
 const RELEASABLE_SUBJECT = /^(?:feat|fix)(?:\([^)]*\))?!?: /m;
-const BREAKING_SUBJECT = /^\w+(?:\([^)]*\))?!: /m;
+const BREAKING_SUBJECT = /^\w*(?:\([^)]*\))?!: /m;
 const BREAKING_BODY = /^BREAKING[ -]CHANGE:/m;
 
 const { tag, yes } = parseArgs(process.argv.slice(2));
@@ -141,6 +141,7 @@ const remoteIdentity = (url) => {
       })();
   if (host === undefined) return undefined;
   const segments = path
+    .replace(/\/+$/, "")
     .replace(/\.git$/, "")
     .split("/")
     .filter((segment) => segment !== "");
