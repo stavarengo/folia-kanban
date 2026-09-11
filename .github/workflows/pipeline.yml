@@ -290,7 +290,11 @@ jobs:
     # Only a dispatch ever reaches this job: the dispatch is the decision to
     # release, so a push run stops at plan however releasable it is. Two ways in
     # from there. The republish path skips verify, scan and plan, so their
-    # results are not part of its condition; the normal path requires all three.
+    # results are not part of its condition; the normal path requires all three,
+    # plan's own result included and not only its output — a status function in
+    # this expression switches off the implicit success() that would otherwise
+    # hold this job back, so a plan job that wrote `releasable=true` and then
+    # failed on the way out would look like a green plan here.
     # `!cancelled()` rather than `always()`: a cancelled run must not release.
     if: >-
       ${{ !cancelled()
@@ -298,6 +302,7 @@ jobs:
       && (inputs.tag != ''
       || (needs.verify.result == 'success'
       && needs.scan.result == 'success'
+      && needs.plan.result == 'success'
       && needs.plan.outputs.releasable == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
