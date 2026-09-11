@@ -1,10 +1,21 @@
 name: Pipeline
 
-# One run, from verify to announce. The jobs are chained with `needs`, so what
-# gets published is the commit that passed `pnpm verify` in this same run, with
-# release-it's version bump committed on top of it — nothing is inferred from a
-# green tick on another workflow, and no job triggers another workflow as a side
-# effect.
+# One workflow, two shapes of run.
+#
+# A push or pull-request run verifies, scans and — on main — plans: it says in
+# the run summary which version the next release would carry and which commits
+# it would carry, then ends. It never releases, so it never waits for anyone and
+# never leaves a run parked.
+#
+# A release is a `workflow_dispatch` with an empty `tag` input, normally started
+# by `pnpm dev:helpers:release`, which prints the same plan locally and asks for
+# confirmation first. Dispatching is the approval; there is no second gate. That
+# run verifies, scans and plans the tip of main again and then releases it, so
+# what gets published is the commit that passed `pnpm verify` in this same run,
+# with release-it's version bump committed on top of it — nothing is inferred
+# from a green tick on another workflow, and no job triggers another workflow as
+# a side effect. A dispatch with a `tag` input is the republish path, described
+# on the release job.
 on:
   push:
     branches: [main]
@@ -23,10 +34,12 @@ permissions:
 concurrency:
   # Pull-request runs share a group per branch and supersede each other, since
   # only the latest commit matters. Every other run gets a group of its own, so
-  # nothing queues behind anything: a run parked at the approval gate must not
-  # hold up the verification of later pushes, and a queued republish must not be
-  # dropped when an unrelated push arrives (GitHub keeps only one pending run
-  # per group). The release itself is serialised by the release job's own group.
+  # nothing queues behind anything. A shared group per ref would be shorter and
+  # is wrong for the two runs that matter: GitHub keeps only one pending run per
+  # group, so a third arrival drops the second, and the run that would be
+  # dropped is a dispatched release or republish someone just asked for — while
+  # a push run it queues behind buys nothing, since a push run no longer
+  # releases. The release itself is serialised by the release job's own group.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -129,6 +142,11 @@ jobs:
           # ignoreFiles is inert the way the action invokes it.
           build: "false"
 
+  # Also the review surface: this job's summary is what a person (or the local
+  # dispatch script, which computes the same thing from origin/main) reads to
+  # decide whether to release. On a push run that is all it is; on a dispatched
+  # release run the decision has already been made and this is the record of
+  # what was decided on.
   plan:
     name: Plan the release
     needs: [verify, scan]
@@ -164,6 +182,8 @@ jobs:
       - name: Decide whether there is a release, and which version
         id: plan
         shell: bash
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           # semver.org's grammar, prerelease identifiers included: an empty or
           # zero-padded identifier is not a version, and a tag that is not a
@@ -181,12 +201,22 @@ jobs:
             echo "::error::The nearest tag, '$previous', is not a plain semver release tag, so where the last release ended cannot be established."
             exit 1
           fi
+
+          # One revision for the range and for the link, so the summary cannot
+          # describe one commit and link another.
+          sha=$(git rev-parse HEAD)
           if [ -n "$previous" ]; then
-            range="$previous..HEAD"
+            range="$previous..$sha"
             since="$previous"
+            link="$REPO_URL/compare/$previous...$sha"
+            link_text="Compare $previous...${sha:0:7}"
           else
-            range="HEAD"
+            range="$sha"
             since="the first commit"
+            # No previous release to compare against, so link the commits
+            # themselves — the same list, on GitHub.
+            link="$REPO_URL/commits/$sha"
+            link_text="Commits up to ${sha:0:7}"
           fi
 
           # release-it cannot answer "is there anything to release": the
@@ -214,56 +244,57 @@ jobs:
               echo "::error::release-it answered '$version', which is not a plain semver version."
               exit 1
             fi
-            echo "Next version: $version" >> "$GITHUB_STEP_SUMMARY"
+            headline="**Next version: $version**"
           else
-            echo "Nothing to release: no feat, fix or breaking-change commit since $since." >> "$GITHUB_STEP_SUMMARY"
+            headline="**Nothing to release:** no feat, fix or breaking-change commit since $since."
           fi
+
+          # The review surface. The commit list is written in both cases, since
+          # it is also what explains a "nothing to release" verdict, and it is
+          # piped straight from git rather than echoed from a variable, so
+          # backslashes in a subject survive.
+          {
+            echo "## Release plan"
+            echo
+            echo "$headline"
+            echo
+            echo "### Commits since $since"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          git log --format='- %s (`%h`)' "$range" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo
+            echo "[$link_text]($link)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           {
             echo "releasable=$releasable"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
-  # A no-op that exists only to carry the `release` environment's gate: the run
-  # stops here until a required reviewer approves it in the Actions UI. The
-  # reviewer rule itself is a repository setting, not something this file can
-  # declare — see docs/releasing.md.
-  approve:
-    name: Approve the release
-    needs: plan
-    if: ${{ needs.plan.outputs.releasable == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: release
-
-    steps:
-      - name: Record the approval
-        env:
-          VERSION: ${{ needs.plan.outputs.version }}
-        run: echo "Approved the release of $VERSION from ${GITHUB_SHA}."
-
   release:
     name: Release
-    needs: [verify, scan, plan, approve]
-    # Two ways in. The republish path skips verify, scan, plan and approve, so
-    # their results are not part of its condition; the normal path requires all
-    # four. `!cancelled()` rather than `always()`: a cancelled run must not
-    # release.
+    needs: [verify, scan, plan]
+    # Only a dispatch ever reaches this job: the dispatch is the decision to
+    # release, so a push run stops at plan however releasable it is. Two ways in
+    # from there. The republish path skips verify, scan and plan, so their
+    # results are not part of its condition; the normal path requires all three.
+    # `!cancelled()` rather than `always()`: a cancelled run must not release.
     if: >-
       ${{ !cancelled()
-      && ((github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      && github.event_name == 'workflow_dispatch'
+      && (inputs.tag != ''
       || (needs.verify.result == 'success'
       && needs.scan.result == 'success'
-      && needs.plan.outputs.releasable == 'true'
-      && needs.approve.result == 'success')) }}
+      && needs.plan.outputs.releasable == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     # One ordinary release at a time, and one republish per tag at a time, in
     # separate groups. A group holds one running job and one pending job, and a
     # third arrival drops the pending one; for an ordinary release that costs
-    # the approval, since nothing in the repository has changed yet and the
-    # commits are still there, while a dropped republish would lose a
+    # nothing but the dispatch, since nothing in the repository has changed yet
+    # and the commits are still there, while a dropped republish would lose a
     # deliberate recovery, so a republish only ever queues behind another
     # attempt at its own tag.
     #
@@ -306,7 +337,9 @@ jobs:
 
       # main, not github.sha: .release-it.json requires the branch and its
       # upstream, and a detached HEAD has neither. The guard below turns that
-      # into the "did main move while approval waited" check. The republish ref
+      # into the "did main move while this run was working" check — a dispatch
+      # still takes minutes to reach here, and someone can push in them. The
+      # republish ref
       # is spelled out in full, so a branch that happens to share the tag's name
       # cannot be checked out in its place.
       #
@@ -384,10 +417,10 @@ jobs:
           git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # The version that was approved, handed back to release-it, so the
-          # approval is an invariant rather than a prediction: release-it works
-          # the increment out again otherwise, and a tag appearing during the
-          # wait would move the answer.
+          # The version the plan job published in this run's summary, handed
+          # back to release-it, so what was reviewed is what is cut: release-it
+          # works the increment out again otherwise, and a tag appearing while
+          # this run was building would move the answer.
           pnpm ci:release --increment "$VERSION"
 
       - name: Resolve the released version

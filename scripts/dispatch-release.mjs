@@ -1,20 +1,25 @@
 #!/usr/bin/env node
-// Starts a release from a developer machine without being able to cut one:
-// it dispatches .github/workflows/pipeline.yml on main and then watches that
-// run. Nothing is bumped, tagged or pushed locally — the runner does all of it,
-// on a commit it has verified in the same run. Run via `pnpm dev:helpers:release`.
+// The console for reviewing and starting a release, without being able to cut
+// one: it shows what the pipeline would release, asks, and then dispatches
+// .github/workflows/pipeline.yml on main and watches that run. Nothing is
+// bumped, tagged or pushed locally — the runner does all of it, on a commit it
+// has verified in the same run. Run via `pnpm dev:helpers:release`.
 //
 // Usage:
-//   pnpm dev:helpers:release              release from the tip of main
-//   pnpm dev:helpers:release --approve    same, and approve the release gate as the gh user
-//   pnpm dev:helpers:release --tag 1.2.3  republish an existing tag
+//   pnpm dev:helpers:release               review the plan, confirm, release from main
+//   pnpm dev:helpers:release --yes         the same without the question, for agents
+//   pnpm dev:helpers:release --tag 1.2.3   republish an existing tag
 //
-// --approve answers the `release` environment's required-reviewer prompt from
-// here, through the same API the Actions UI button calls, so the run needs no
-// click. It only works when the gh user is one of the environment's reviewers;
-// otherwise GitHub refuses and the run keeps waiting in the UI.
+// The dispatch is the approval — the run it starts has no gate and waits for
+// nobody — so the review has to happen before it. What is printed is computed
+// here from `origin/main` after a fetch, the same way the pipeline's plan job
+// computes it on the runner: the last release tag, the commits since it, and
+// the version release-it would choose. That only holds while this checkout is
+// main and level with `origin/main`, which is why the script refuses to show
+// anything otherwise.
 
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 
 const WORKFLOW = "pipeline.yml";
 const GH_MISSING =
@@ -26,25 +31,34 @@ const die = (message) => {
   process.exit(1);
 };
 
-const gh = (args, { inherit = false, input } = {}) => {
+const gh = (args, { inherit = false } = {}) => {
   const result = spawnSync("gh", args, {
     encoding: "utf8",
-    input,
-    stdio: inherit ? "inherit" : [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+    stdio: inherit ? "inherit" : ["ignore", "pipe", "pipe"],
   });
   if (result.error?.code === "ENOENT") die(GH_MISSING);
   if (result.error) die(`gh ${args[0]} failed: ${result.error.message}`);
   return result;
 };
 
-const USAGE = "Usage: pnpm dev:helpers:release [--approve | --tag <existing tag to republish>]";
+const git = (args, { allowFailure = false } = {}) => {
+  const result = spawnSync("git", args, { encoding: "utf8" });
+  if (result.error) die(`git ${args[0]} failed: ${result.error.message}`);
+  if (result.status !== 0) {
+    if (allowFailure) return undefined;
+    die(`git ${args.join(" ")} failed:\n${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
+};
+
+const USAGE = "Usage: pnpm dev:helpers:release [--yes] [--tag <existing tag to republish>]";
 
 const parseArgs = (argv) => {
-  const options = { tag: undefined, approve: false };
+  const options = { tag: undefined, yes: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === "--approve") {
-      options.approve = true;
+    if (arg === "--yes" || arg === "-y") {
+      options.yes = true;
     } else if (arg.startsWith("--tag=")) {
       options.tag = arg.slice("--tag=".length);
     } else if (arg === "--tag" && i + 1 < argv.length) {
@@ -54,8 +68,6 @@ const parseArgs = (argv) => {
       die(USAGE);
     }
   }
-  // A republish is never gated, so there is nothing for --approve to answer.
-  if (options.approve && options.tag !== undefined) die(USAGE);
   return options;
 };
 
@@ -66,7 +78,13 @@ const TAG = new RegExp(
   String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-${IDENTIFIER}(?:\.${IDENTIFIER})*)?$`,
 );
 
-const { tag, approve } = parseArgs(process.argv.slice(2));
+// What the plan job counts as worth releasing, in the same three tests: a feat
+// or fix, any type marked breaking with `!`, or a BREAKING CHANGE footer.
+const RELEASABLE_SUBJECT = /^(?:feat|fix)(?:\([^)]*\))?!?:/m;
+const BREAKING_SUBJECT = /^[a-zA-Z]+(?:\([^)]*\))?!:/m;
+const BREAKING_BODY = /^BREAKING[ -]CHANGE:/m;
+
+const { tag, yes } = parseArgs(process.argv.slice(2));
 if (tag !== undefined && !TAG.test(tag)) {
   die(`"${tag}" is not a plain semver tag (e.g. 1.2.3). The pipeline would refuse it.`);
 }
@@ -77,6 +95,112 @@ if (gh(["auth", "status", "--hostname", "github.com"]).status !== 0) die(GH_UNAU
 const me = gh(["api", "user", "--jq", ".login"]);
 if (me.status !== 0) die(GH_UNAUTHENTICATED);
 const login = me.stdout.trim();
+
+const confirm = async (question) => {
+  if (yes) return true;
+  if (!process.stdin.isTTY) {
+    die(`${question}\nThere is no terminal to ask on. Re-run with --yes to dispatch unattended.`);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(`${question} [y/N] `);
+  rl.close();
+  return answer.trim().toLowerCase() === "y";
+};
+
+// Everything the plan job would work out, worked out here first. Skipped for a
+// republish: that path publishes a tag that already exists, so there is no
+// version to choose and no commit range to read.
+const review = async () => {
+  const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch !== "main") {
+    die(
+      `This checkout is on ${branch}, not main, so what it can show is not what the runner would release. Switch to main and re-run.`,
+    );
+  }
+  if (git(["status", "--porcelain"]) !== "") {
+    die(
+      "The working tree is not clean. release-it refuses to answer with uncommitted changes around, and the runner would release the commit, not the tree. Commit or clean up, then re-run.",
+    );
+  }
+
+  // --tags as well as the branch: `git describe` below reads local tags, and a
+  // stale set would name the wrong last release.
+  git(["fetch", "--tags", "origin", "main"]);
+
+  const head = git(["rev-parse", "HEAD"]);
+  const remote = git(["rev-parse", "FETCH_HEAD"]);
+  if (head !== remote) {
+    die(
+      `main here (${head.slice(0, 7)}) is not origin/main (${remote.slice(0, 7)}), so what it can show is not what the runner would release. Pull or push first, then re-run.`,
+    );
+  }
+
+  // Matches .release-it.json's tagExclude, so this and release-it agree on
+  // where the last release was.
+  const previous = git(
+    ["describe", "--tags", "--abbrev=0", "--match", "*.*.*", "--exclude", "*-*"],
+    {
+      allowFailure: true,
+    },
+  );
+  if (previous !== undefined && !TAG.test(previous)) {
+    die(
+      `The nearest tag, "${previous}", is not a plain semver release tag, so where the last release ended cannot be established.`,
+    );
+  }
+
+  const range = previous === undefined ? head : `${previous}..${head}`;
+  const since = previous ?? "the first commit";
+  const commits = git(["log", "--format=%h %s", range]);
+  const subjects = git(["log", "--format=%s", range]);
+  const bodies = git(["log", "--format=%B", range]);
+  const releasable =
+    RELEASABLE_SUBJECT.test(subjects) ||
+    BREAKING_SUBJECT.test(subjects) ||
+    BREAKING_BODY.test(bodies);
+
+  const repo = gh(["repo", "view", "--json", "url", "--jq", ".url"]);
+  if (repo.status !== 0) die("Could not read the repository URL. Check: gh repo view");
+  const repoUrl = repo.stdout.trim();
+  const link =
+    previous === undefined
+      ? `${repoUrl}/commits/${head}`
+      : `${repoUrl}/compare/${previous}...${head}`;
+
+  console.log(`Commits since ${since}:`);
+  console.log(commits === "" ? "  (none)" : commits.replace(/^/gm, "  "));
+  console.log(`\n${link}\n`);
+
+  if (!releasable) {
+    console.log(
+      `Nothing to release: no feat, fix or breaking-change commit since ${since}. The pipeline would say the same and release nothing, so this is not dispatching a run.`,
+    );
+    process.exit(0);
+  }
+
+  // release-it's own answer, not a guess at it: preMajor and the changelog
+  // preset stay in one place, and this is the number the run will be told to
+  // cut.
+  const printed = spawnSync("pnpm", ["exec", "release-it", "--release-version", "--ci"], {
+    encoding: "utf8",
+  });
+  if (printed.status !== 0) {
+    die(`release-it could not work out the next version:\n${printed.stderr.trim()}`);
+  }
+  const version = printed.stdout.trim().split("\n").at(-1)?.trim() ?? "";
+  if (!TAG.test(version)) {
+    die(`release-it answered "${version}", which is not a plain semver version.`);
+  }
+
+  console.log(`Next version: ${version}${previous === undefined ? "" : ` (was ${previous})`}`);
+
+  return confirm(`Release ${version} from ${head.slice(0, 7)}?`);
+};
+
+if (tag === undefined && !(await review())) {
+  console.log("Nothing dispatched.");
+  process.exit(0);
+}
 
 const listRuns = () => {
   const listed = gh([
@@ -147,51 +271,11 @@ if (dispatched === undefined) {
 }
 
 console.log(dispatched.url);
-
-// The gate is a pending deployment on the run. It appears once the plan job has
-// found something to release, and never appears when there is nothing, so the
-// wait ends either way: on the prompt, or on the run finishing without one.
-const approveGate = async (runId) => {
-  const runsApi = `repos/{owner}/{repo}/actions/runs/${runId}`;
-  for (;;) {
-    const pending = gh(["api", `${runsApi}/pending_deployments`]);
-    const gates = pending.status === 0 ? JSON.parse(pending.stdout) : [];
-    const gate = gates.find((item) => item.environment?.name === "release");
-    if (gate) {
-      const posted = gh(
-        ["api", "--method", "POST", `${runsApi}/pending_deployments`, "--input", "-"],
-        {
-          input: JSON.stringify({
-            environment_ids: [gate.environment.id],
-            state: "approved",
-            comment: `Approved by ${login} through pnpm dev:helpers:release --approve`,
-          }),
-        },
-      );
-      if (posted.status !== 0) {
-        die(
-          `GitHub refused the approval as ${login}. The run keeps waiting in the Actions UI.\n${posted.stderr.trim()}`,
-        );
-      }
-      console.log(`Approved the release gate as ${login}.`);
-      return;
-    }
-    const view = gh(["run", "view", String(runId), "--json", "status"]);
-    if (view.status === 0 && JSON.parse(view.stdout).status === "completed") return;
-    await sleep(5000);
-  }
-};
-
-if (approve) {
-  console.log("Waiting for the release gate, to approve it from here.");
-  await approveGate(dispatched.databaseId);
-} else {
-  console.log(
-    tag === undefined
-      ? "Watching. The run pauses for your approval in the Actions UI before it releases."
-      : "Watching. A republish is not approved again; it runs straight through.",
-  );
-}
+console.log(
+  tag === undefined
+    ? "Watching. It verifies and scans the tip of main again, then releases; it waits for nobody."
+    : "Watching. A republish goes straight to the release job.",
+);
 
 const watched = gh(["run", "watch", String(dispatched.databaseId), "--exit-status"], {
   inherit: true,
