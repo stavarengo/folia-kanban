@@ -416,6 +416,8 @@ console.log(
 // safety-related rests on this identification either way.
 const announced = /https:\/\/\S*\/actions\/runs\/(\d+)\b/.exec(dispatch.stdout + dispatch.stderr);
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const findRuns = () => {
   const listed = listRuns();
   if (listed === undefined) return [];
