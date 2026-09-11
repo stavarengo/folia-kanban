@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.3.0](https://github.com/stavarengo/folia-kanban/compare/0.2.0...0.3.0) (2026-09-11)
+
+### ⚠ BREAKING CHANGES
+
+* drop the announce job
+* release on dispatch only, and review the plan in the run summary
+* the Create Release and Release workflows are gone, and so is
+  the FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN secret they used - the pipeline pushes
+  with GITHUB_TOKEN, and nothing is triggered by a tag push any more. Delete that
+  secret and revoke the token. Releases now wait for an approval on a release
+  environment whose required-reviewer rule is a repository setting, and
+  pnpm dev:helpers:release dispatches the pipeline through the gh CLI instead of
+  running release-it locally, so gh must be installed and authenticated.
+
+### Features
+
+* **release:** let the local script approve the gate as the gh user ([4e60cfe](https://github.com/stavarengo/folia-kanban/commit/4e60cfe8a2c6ffbbb1acb93b29a693b34b9bf48d))
+* **release:** make the runner enforce what the dispatcher approved ([5e3f06a](https://github.com/stavarengo/folia-kanban/commit/5e3f06aa3ffd9a8ed4eb967ab2995c4da99bb1bb))
+
+### Bug Fixes
+
+* **release:** bind the changelog boundary, and read subjects the preset's way ([601b6ee](https://github.com/stavarengo/folia-kanban/commit/601b6ee09d5edfa375350ca8b6c410426097da98))
+* **release:** compare remote hosts without the port ([17ada23](https://github.com/stavarengo/folia-kanban/commit/17ada2324f301c0afcaa457cc04af1220288463b))
+* **release:** hold the dispatched run to the commit that was reviewed ([135405d](https://github.com/stavarengo/folia-kanban/commit/135405d38e7c6e8bbc15316a8b699191a4b3152d))
+* **release:** only republish a commit release-it made, and close the cache channel ([a439dad](https://github.com/stavarengo/folia-kanban/commit/a439dad7969e5838b9114e840dbf05d834069e27))
+* **release:** read the footer out of the body, not the whole message ([ae53832](https://github.com/stavarengo/folia-kanban/commit/ae53832abf2f44ca6416b10fd574da1e90a183dc))
+* **release:** read the tags release-it will read, not the ones we cloned ([1505c6c](https://github.com/stavarengo/folia-kanban/commit/1505c6c90d66021fe3d7219e2ca234538608e2c6))
+* **release:** require plan to have succeeded, and check drift, not the run id ([c47f86e](https://github.com/stavarengo/folia-kanban/commit/c47f86edc7597cdb5f3a2891d35bce1fb1c2cb27))
+* **release:** restore the sleep the fallback polls with ([32d8cf1](https://github.com/stavarengo/folia-kanban/commit/32d8cf19a32f2515c3d3eaa93053a92cd9934af4))
+* **release:** say which repository, and identify the run by the id gh gives back ([9275109](https://github.com/stavarengo/folia-kanban/commit/92751093be1279f1ad2154d815983ca67c14bce8))
+
+### Documentation
+
+* file the release-gate decision, and name the portal's manual release check ([8891f24](https://github.com/stavarengo/folia-kanban/commit/8891f24e81587b93716cbea4fc01a6e296358001))
+* say precisely which two runs can meet on one release ([7301dba](https://github.com/stavarengo/folia-kanban/commit/7301dba415b1c7f604b6978d2515f592cd285657))
+* say which job is serialised, not which run ([9e55155](https://github.com/stavarengo/folia-kanban/commit/9e551554c7d56a4a13fbe4b2ce33a4bba067fcc4))
+
+### Build & Tooling
+
+* draft an existing release while its assets are swapped ([81ffc3d](https://github.com/stavarengo/folia-kanban/commit/81ffc3d5c8c14428e11c343147caa64a889f22c9))
+* drop the announce job ([ac45eff](https://github.com/stavarengo/folia-kanban/commit/ac45eff9019fbd4cb57deb6e4e84464ab636555d))
+* harden the pipeline against what review found ([ccdabab](https://github.com/stavarengo/folia-kanban/commit/ccdababc45bd64a9333486c337a3574ba5841124))
+* keep the push token out of the install step ([509fa6b](https://github.com/stavarengo/folia-kanban/commit/509fa6bad3b00d5eaf10d3a5751abad38577ef86))
+* mint the release token with the app's client id ([984121e](https://github.com/stavarengo/folia-kanban/commit/984121ec2cea0985dcb6e11ffd728ae612c88325))
+* pin the actions, and treat commit subjects as untrusted input ([73ce8f7](https://github.com/stavarengo/folia-kanban/commit/73ce8f7e6465349124903c665e5e53d37d3624a9))
+* push the release with a GitHub App when one is configured ([879d259](https://github.com/stavarengo/folia-kanban/commit/879d259fc9383763c8e007c6e8aefe0308237d5a))
+* release on dispatch only, and review the plan in the run summary ([cc628e6](https://github.com/stavarengo/folia-kanban/commit/cc628e6a4814e6a7c8c50844d7628735fc0ed3cb))
+* replace the release workflows with one pipeline ([852fdf0](https://github.com/stavarengo/folia-kanban/commit/852fdf029231000376dfde959ca6a4399a30741e))
+* say what the release groups actually hold apart ([2b26345](https://github.com/stavarengo/folia-kanban/commit/2b26345b7f395c47fe1def658fb4979e200b58f7))
+* stop the approval gate from holding up main, and bind a republish to its tag ([438bd86](https://github.com/stavarengo/folia-kanban/commit/438bd8644ebf0be6528e39a98777bb25d8e73456))
+* take the push token back out after release-it has used it ([0e66045](https://github.com/stavarengo/folia-kanban/commit/0e66045a9a6ca0441eade6ecaaa80de5109bd107))
+
 ## [0.2.0](https://github.com/stavarengo/folia-kanban/compare/0.1.0...0.2.0) (2026-09-10)
 
 ### ⚠ BREAKING CHANGES
