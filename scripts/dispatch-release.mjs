@@ -84,9 +84,11 @@ const TAG = new RegExp(
 );
 
 // What the plan job counts as worth releasing, in the same three tests: a feat
-// or fix, any type marked breaking with `!`, or a BREAKING CHANGE footer.
-const RELEASABLE_SUBJECT = /^(?:feat|fix)(?:\([^)]*\))?!?:/m;
-const BREAKING_SUBJECT = /^[a-zA-Z]+(?:\([^)]*\))?!:/m;
+// or fix, any type marked breaking with `!`, or a BREAKING CHANGE footer. The
+// type grammar and the space after the colon are the changelog preset's, so
+// this and release-it read the same subjects the same way.
+const RELEASABLE_SUBJECT = /^(?:feat|fix)(?:\([^)]*\))?!?: /m;
+const BREAKING_SUBJECT = /^\w+(?:\([^)]*\))?!: /m;
 const BREAKING_BODY = /^BREAKING[ -]CHANGE:/m;
 
 const { tag, yes } = parseArgs(process.argv.slice(2));
