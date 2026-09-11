@@ -16,7 +16,9 @@
 // computes it on the runner: the last release tag, the commits since it, and
 // the version release-it would choose. That only holds while this checkout is
 // main and level with `origin/main`, which is why the script refuses to show
-// anything otherwise.
+// anything otherwise — and a dispatch names a branch rather than a commit, so
+// the run it started is checked against the reviewed commit afterwards and
+// cancelled if main moved in between.
 
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
@@ -123,8 +125,24 @@ const review = async () => {
     );
   }
 
-  // --tags as well as the branch: `git describe` below reads local tags, and a
-  // stale set would name the wrong last release.
+  // gh does not have to agree with the git remote — GH_REPO and
+  // `gh repo set-default` both retarget it — and everything below reads git
+  // while the dispatch goes through gh. Two repositories would mean a plan
+  // printed from one and a release cut in the other.
+  const named = gh(["repo", "view", "--json", "nameWithOwner,url"]);
+  if (named.status !== 0)
+    die("Could not read the repository gh is pointing at. Check: gh repo view");
+  const { nameWithOwner, url: repoUrl } = JSON.parse(named.stdout);
+  const originUrl = git(["remote", "get-url", "origin"]);
+  const originPath = originUrl.replace(/\.git$/, "").replace(/^.*[/:]([^/:]+\/[^/]+)$/, "$1");
+  if (originPath.toLowerCase() !== nameWithOwner.toLowerCase()) {
+    die(
+      `gh is pointing at ${nameWithOwner} while origin is ${originPath}, so the plan below would describe one repository and the dispatch would start a release in the other. Unset GH_REPO, or run: gh repo set-default ${originPath}`,
+    );
+  }
+
+  // --tags as well as the branch: `git describe` below reads local tags, and
+  // without this a release tag cut since the last fetch would be missing.
   git(["fetch", "--tags", "origin", "main"]);
 
   const head = git(["rev-parse", "HEAD"]);
@@ -149,6 +167,30 @@ const review = async () => {
     );
   }
 
+  // Fetching tags adds, it never removes: a tag that only exists here — a
+  // local experiment, or one deleted from the remote — would still be picked as
+  // the last release, and then everything below describes a range the runner
+  // will not see. So the tag this hangs on has to be on origin, and be the same
+  // object there.
+  if (previous !== undefined) {
+    const listed = git(["ls-remote", "--tags", "origin", `refs/tags/${previous}`]);
+    const remoteTag = listed.split("\n")[0]?.split("\t")[0] ?? "";
+    const localTag = git(["rev-parse", `refs/tags/${previous}`]);
+    if (remoteTag === "") {
+      die(
+        `The tag "${previous}" exists here but not on origin, so this checkout's idea of the last release is not the runner's. Delete it locally (git tag -d ${previous}) or push it, then re-run.`,
+      );
+    }
+    if (
+      remoteTag !== localTag &&
+      remoteTag !== git(["rev-parse", `refs/tags/${previous}^{commit}`])
+    ) {
+      die(
+        `The tag "${previous}" points at a different object here than on origin, so this checkout's idea of the last release is not the runner's. Re-fetch it (git fetch --force origin tag ${previous}), then re-run.`,
+      );
+    }
+  }
+
   const range = previous === undefined ? head : `${previous}..${head}`;
   const since = previous ?? "the first commit";
   const commits = git(["log", "--format=%h %s", range]);
@@ -159,9 +201,6 @@ const review = async () => {
     BREAKING_SUBJECT.test(subjects) ||
     BREAKING_BODY.test(bodies);
 
-  const repo = gh(["repo", "view", "--json", "url", "--jq", ".url"]);
-  if (repo.status !== 0) die("Could not read the repository URL. Check: gh repo view");
-  const repoUrl = repo.stdout.trim();
   const link =
     previous === undefined
       ? `${repoUrl}/commits/${head}`
@@ -194,12 +233,20 @@ const review = async () => {
 
   console.log(`Next version: ${version}${previous === undefined ? "" : ` (was ${previous})`}`);
 
-  return confirm(`Release ${version} from ${head.slice(0, 7)}?`);
+  return { head, confirmed: await confirm(`Release ${version} from ${head.slice(0, 7)}?`) };
 };
 
-if (tag === undefined && !(await review())) {
-  console.log("Nothing dispatched.");
-  process.exit(0);
+// The commit the plan was printed for, kept so the run that starts can be held
+// to it. A dispatch names a branch, never a commit, so GitHub resolves `main`
+// at the moment it creates the run — which is not the moment this printed it.
+let reviewed;
+if (tag === undefined) {
+  const outcome = await review();
+  if (!outcome.confirmed) {
+    console.log("Nothing dispatched.");
+    process.exit(0);
+  }
+  reviewed = outcome.head;
 }
 
 const listRuns = () => {
@@ -217,7 +264,7 @@ const listRuns = () => {
     "--limit",
     "10",
     "--json",
-    "databaseId,url",
+    "databaseId,url,headSha",
   ]);
   return listed.status === 0 ? JSON.parse(listed.stdout) : undefined;
 };
@@ -271,6 +318,24 @@ if (dispatched === undefined) {
 }
 
 console.log(dispatched.url);
+
+// The run is only the release that was reviewed if it started on the reviewed
+// commit. A push landing between the plan above and GitHub creating the run
+// would give the run a newer tip, which the runner's own "main moved" guard
+// cannot catch — that commit is its GITHUB_SHA. Cancelling costs a minute of
+// runner time and nothing else: nothing is pushed until long after this point,
+// and the release job refuses to run in a cancelled run.
+if (reviewed !== undefined && dispatched.headSha !== reviewed) {
+  const cancelled = gh(["run", "cancel", String(dispatched.databaseId)]);
+  die(
+    `main moved between the plan above and the dispatch: you approved ${reviewed.slice(0, 7)}, the run started on ${dispatched.headSha.slice(0, 7)}. ${
+      cancelled.status === 0
+        ? "That run has been cancelled and nothing was released."
+        : `That run could NOT be cancelled (${cancelled.stderr.trim()}) — cancel it by hand: ${dispatched.url}`
+    }\nRe-run to review the new tip.`,
+  );
+}
+
 console.log(
   tag === undefined
     ? "Watching. It verifies and scans the tip of main again, then releases; it waits for nobody."
