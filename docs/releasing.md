@@ -35,10 +35,10 @@ The pipeline leans on it and cannot create it. A fresh fork or a restored reposi
 
 **Do not create that ruleset until the release App below exists.** Rulesets apply to `GITHUB_TOKEN` too, and the pipeline pushes its tag with `GITHUB_TOKEN` by default, so **Restrict creations** would block every release. The obvious escape does not work: the built-in `github-actions[bot]` identity is not offered as a bypass actor in the ruleset UI and cannot be relied on through the API either. What can be bypassed is a GitHub App you own — which is why the release job can push as one.
 
-**The release App, the thing that makes the ruleset survivable.** Create a GitHub App on the `stavarengo` account (**Settings → Developer settings → GitHub Apps → New GitHub App**), give it the repository permission **Contents: read and write** and nothing else, install it on this repository alone, and generate a private key. Then store its two halves as repository secrets: `RELEASE_APP_ID` (the numeric App ID from the App's own settings page) and `RELEASE_APP_PRIVATE_KEY` (the whole `.pem` file, `BEGIN`/`END` lines included).
+**The release App, the thing that makes the ruleset survivable.** Create a GitHub App on the `stavarengo` account (**Settings → Developer settings → GitHub Apps → New GitHub App**), give it the repository permission **Contents: read and write** and nothing else, install it on this repository alone, and generate a private key. Then store its two halves as repository secrets: `RELEASE_APP_CLIENT_ID` (the **Client ID**, the `Iv23…` string on the App's settings page — not the numeric App ID beside it, which the token action now treats as deprecated) and `RELEASE_APP_PRIVATE_KEY` (the whole `.pem` file, `BEGIN`/`END` lines included). Keep the numeric App ID to hand anyway: that is the one the ruleset bypass wants below.
 
 ```bash
-gh secret set RELEASE_APP_ID --repo stavarengo/folia-kanban --body '<App ID>'
+gh secret set RELEASE_APP_CLIENT_ID --repo stavarengo/folia-kanban --body '<Client ID>'
 gh secret set RELEASE_APP_PRIVATE_KEY --repo stavarengo/folia-kanban < release-app.private-key.pem
 ```
 

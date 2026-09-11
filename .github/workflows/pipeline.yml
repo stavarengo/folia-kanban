@@ -329,7 +329,7 @@ jobs:
     # else, so no other step — and nothing a package lifecycle script runs — has
     # the App's private key in its environment.
     env:
-      HAS_RELEASE_APP: ${{ secrets.RELEASE_APP_ID != '' && secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+      HAS_RELEASE_APP: ${{ secrets.RELEASE_APP_CLIENT_ID != '' && secrets.RELEASE_APP_PRIVATE_KEY != '' }}
 
     outputs:
       version: ${{ steps.resolve.outputs.tag }}
@@ -427,7 +427,7 @@ jobs:
         if: ${{ env.HAS_RELEASE_APP == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Bump, write the changelog, commit, tag and push
