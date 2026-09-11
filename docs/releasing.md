@@ -46,7 +46,7 @@ The release job reads nothing but the presence of those two: with both set it mi
 
 One consequence to expect, because it looks like a bug the first time: `GITHUB_TOKEN` pushes deliberately start no workflow run, an App's pushes do. So with the App configured, every release is followed by one extra push run of the pipeline over the `chore(release)` commit, which verifies, scans, plans and ends at "nothing to release" — `chore` is not releasable. The tag push starts nothing in either case; this workflow has no tag trigger.
 
-With the App installed and the secrets set, create the ruleset with that App on its bypass list. In the UI it is offered by name under **Bypass list → Add bypass**. Over the API it is the `Integration` actor with the App's own numeric id (`gh api /repos/stavarengo/folia-kanban/installations --jq '.installations[] | {slug: .app_slug, id: .app_id}'` prints the installed apps and the id to use, which replaces the `000000` below):
+With the App installed and the secrets set, create the ruleset with that App on its bypass list. In the UI it is offered by name under **Bypass list → Add bypass**. Over the API it is the `Integration` actor with the App's own numeric id (`gh api /repos/stavarengo/folia-kanban/installation --jq '{slug: .app_slug, id: .app_id}'` prints the App installed on this repository and the id to use, which replaces the `000000` below):
 
 ```bash
 gh api --method POST repos/stavarengo/folia-kanban/rulesets --input - <<'JSON'
@@ -68,6 +68,32 @@ Read the bypass for what it is, too: it authorises the App, not this one workflo
 **And one thing to check:** any required status check on `main` or on pull requests. The workflow's name changed from `CI` to `Pipeline`, its file from `ci.yml` to `pipeline.yml`, and the scan job's id from `obsidian-scan` to `scan`, so a rule written against the old identity may now be waiting for a check nothing reports. Both job display names are deliberately unchanged (`Verify`, `Obsidian community scan`), and so is the `verify` job's id, which should be enough for a rule keyed on those — but open the branch rule or ruleset and confirm the checks it lists are still being reported, rather than assuming it.
 
 **And one thing to delete:** the `FOLIA_KANBAN_RELEASE_IT_GITHUB_TOKEN` repository secret. The pipeline pushes with `GITHUB_TOKEN`, or with the release App's token, so that personal access token is no longer read by anything and should be removed from the repository's secrets and revoked in the account's developer settings.
+
+### Forks and pull requests
+
+**A pull request from a fork** runs `verify` and `scan` and nothing else. `plan` is `main`-only and `release` only ever runs on a dispatch, so a pull request cannot reach either. Those two jobs get the workflow's top-level `contents: read` token, scoped to this repository and read-only, and no secrets: GitHub does not hand repository secrets to a workflow run triggered by a pull request from a fork, and the workflow never uses `pull_request_target`, the trigger that would run fork code with this repository's secrets and write token. A first-time contributor's run also waits for a maintainer to press **Approve and run** before it starts, which is where the code gets read before it executes.
+
+So the worst a hostile pull request can do is make our own runners execute its code with a read-only token and no credentials. It cannot tag, release, push, read a secret, or reach the release App: none of that is present in the jobs it can start.
+
+**Someone forking the repository** takes the workflow with them. It runs in their fork, on their Actions quota, with their token, and it is their repository it can release to: a dispatch in a fork cuts a tag and a GitHub release in that fork. The announce steps skip themselves there, because `OBSIDIAN_PORTAL_COOKIE`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` do not exist in a fork, and the release App is not installed on it either, so its release pushes with the fork's own `GITHUB_TOKEN`. Nothing a fork does reaches this repository — its tokens are scoped to itself — and nothing it publishes reaches the Obsidian directory, which follows this repository's releases by name.
+
+### Threat model
+
+The pipeline runs other people's code on machines holding this repository's release credentials, which is the `tj-actions/changed-files` shape of problem: a third-party action is compromised upstream, everyone floating on its tag picks the new code up silently, and it reads whatever the job it runs in can reach.
+
+What each job could lose:
+
+- **verify** and **scan**: the repository's own source, a read-only token, no secrets. The scan job is also where the one deliberately unpinned action runs (`obsidianmd/obsidian-workflows@v1`, floating so it tracks the directory's real scanner), so its blast radius is stated rather than eliminated: a read-only token, no secrets, and no output that anything downstream consumes — the release job rebuilds from the tag and never reads this job's artifacts.
+- **plan**: the same read-only token, plus the ability to influence which version the release job is told to cut, since it hands that number on.
+- **release**: `contents: write`, the attestation identity, and — if it is configured — the release App's installation token while the push step runs. This is the job worth protecting.
+- **announce**: a read-only token, plus the portal cookie and the Telegram bot's credentials.
+
+The mitigation is that every third-party action in the release path is pinned to a full commit SHA (`uses: actions/checkout@3d3c42e5… # v7.0.1`), which a tag being moved cannot change, and `.github/dependabot.yml` opens a pull request when a pinned action has a newer release, so the pins keep moving. Dependency install scripts are a second route in, and pnpm closes it: `pnpm-workspace.yaml` allow-lists build scripts per package (`esbuild` yes, `lefthook` no), so a newly compromised dependency's `postinstall` does not run on the runner. This repository's own `prepare` script does run — it is our code.
+
+**Two settings only you can change**, both at **Settings → Actions → General**:
+
+1. **Fork pull request workflows from outside collaborators** → **Require approval for all external contributors** (or the strictest option offered). It puts every fork pull request behind your approval before any runner executes it, rather than only the first one from a given account.
+2. **Actions permissions** → **Allow _stavarengo_, and select non-_stavarengo_, actions and reusable workflows**, with **Allow actions created by GitHub** and **Allow actions by Marketplace verified creators** ticked, and this list in the box: `actions/*`, `pnpm/action-setup@*`, `obsidianmd/obsidian-workflows@*`. That is everything this workflow uses, and it means a pull request cannot introduce a step that runs some other action.
 
 ### Optional secrets the announce step looks for
 

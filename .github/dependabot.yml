@@ -1,0 +1,17 @@
+version: 2
+
+# The actions in pipeline.yml are pinned to commit SHAs, which is what stops a
+# compromised tag from moving under us — and what would otherwise freeze them
+# forever, security fixes included. This is the other half: Dependabot proposes
+# the new SHA as a pull request, which runs verify and scan like any other.
+# `obsidianmd/obsidian-workflows@v1` floats on purpose and is not pinned, so
+# there is nothing here for it to bump.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies

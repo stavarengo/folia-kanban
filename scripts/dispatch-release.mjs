@@ -109,6 +109,11 @@ const confirm = async (question) => {
   return answer.trim().toLowerCase() === "y";
 };
 
+// Text safe to print: every C0 control character and DEL replaced, tabs and
+// newlines kept. Used on anything a commit author wrote, since an escape
+// sequence in a commit subject can repaint the screen it is printed on.
+const printable = (text) => text.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "?");
+
 // "host/owner/repo" for a remote, whatever spelling it arrives in: an https
 // URL, an scp-style `git@host:owner/repo`, or an ssh:// one. The host is half
 // of the answer — a mirror or another forge can carry the same owner/repo and
@@ -149,6 +154,15 @@ const review = async () => {
   if (git(["status", "--porcelain"]) !== "") {
     die(
       "The working tree is not clean. release-it refuses to answer with uncommitted changes around, and the runner would release the commit, not the tree. Commit or clean up, then re-run.",
+    );
+  }
+  // The runner clones the whole history. A shallow clone here would cut the
+  // commit range short at its boundary, and `git describe` would answer "no
+  // previous release" from a history that simply stops — a plan for a different
+  // repository state, printed with the same confidence.
+  if (git(["rev-parse", "--is-shallow-repository"]) === "true") {
+    die(
+      "This is a shallow clone, so the commit range and the version below would be worked out from a history that stops early. Run: git fetch --unshallow, then re-run.",
     );
   }
 
@@ -234,7 +248,11 @@ const review = async () => {
       : `${repoUrl}/compare/${previous}...${head}`;
 
   console.log(`Commits since ${since}:`);
-  console.log(commits === "" ? "  (none)" : commits.replace(/^/gm, "  "));
+  // Commit subjects are written by whoever wrote the commit, and this is a
+  // screen someone is about to approve from. Escape sequences in a subject can
+  // repaint the lines above the prompt, so nothing below C0 reaches the
+  // terminal.
+  console.log(commits === "" ? "  (none)" : printable(commits).replace(/^/gm, "  "));
   console.log(`\n${link}\n`);
 
   if (!releasable) {
@@ -340,24 +358,24 @@ const abandon = (problem) => {
   );
 };
 
+// The whole window, every time, rather than stopping at the first sighting: two
+// dispatches by the same account become listable at their own pace, and the
+// sighting that arrives first is not necessarily this script's run. Waiting the
+// window out and insisting on exactly one candidate is what makes the check
+// below a check on our own run. (A run that only becomes visible after the
+// window still escapes it. GitHub's dispatch API returns nothing to correlate
+// on, so there is no way to close that from here.)
 let fresh = [];
-for (let attempt = 0; attempt < 20 && fresh.length === 0; attempt += 1) {
+for (let attempt = 0; attempt < 20; attempt += 1) {
   await sleep(2000);
   const found = findRuns();
-  if (found === undefined) continue;
-  fresh = found;
+  if (found !== undefined && found.length > fresh.length) fresh = found;
 }
 
 if (fresh.length === 0) {
   abandon(`The run did not appear within 40s, so nothing here can check or cancel it.`);
 }
 
-// One more look before trusting the match: a run that only becomes visible in a
-// later poll would otherwise never be considered, and taking the first sighting
-// would mean checking the reviewed commit against somebody else's dispatch.
-await sleep(4000);
-const confirmed = findRuns() ?? [];
-if (confirmed.length > 0) fresh = confirmed;
 if (fresh.length > 1) {
   abandon(
     `More than one new run of ${WORKFLOW} appeared, so this cannot tell which one it started:\n${fresh
@@ -377,13 +395,30 @@ console.log(dispatched.url);
 // runner time and nothing else: nothing is pushed until long after this point,
 // and the release job refuses to run in a cancelled run.
 if (reviewed !== undefined && dispatched.headSha !== reviewed) {
-  const cancelled = gh(["run", "cancel", String(dispatched.databaseId)]);
+  const moved = `main moved between the plan above and the dispatch: you approved ${reviewed.slice(0, 7)}, the run started on ${dispatched.headSha.slice(0, 7)}.`;
+  const byHand = `Cancel it by hand now, before it reaches the release job: ${dispatched.url}`;
+
+  if (gh(["run", "cancel", String(dispatched.databaseId)]).status !== 0) {
+    die(`${moved} GitHub refused the cancellation. ${byHand}`);
+  }
+
+  // A cancellation is accepted, not applied: GitHub re-evaluates the run and
+  // tells the runners, and only then is the run cancelled. So watch it settle
+  // rather than announce it. There are minutes of verifying and scanning in
+  // front of the release job, which is the margin this is spending.
+  console.log("Cancelling that run.");
+  let status = "";
+  for (let attempt = 0; attempt < 30 && status !== "completed"; attempt += 1) {
+    await sleep(2000);
+    const view = gh(["run", "view", String(dispatched.databaseId), "--json", "status,conclusion"]);
+    if (view.status !== 0) continue;
+    status = JSON.parse(view.stdout).status;
+  }
+
   die(
-    `main moved between the plan above and the dispatch: you approved ${reviewed.slice(0, 7)}, the run started on ${dispatched.headSha.slice(0, 7)}. ${
-      cancelled.status === 0
-        ? "That run has been cancelled and nothing was released. (GitHub accepts a cancellation rather than completing it on the spot, so confirm it took: it has minutes of verifying and scanning ahead of the release job.)"
-        : `That run could NOT be cancelled (${cancelled.stderr.trim()}) — it is on its way to releasing a commit nobody reviewed, so cancel it by hand now: ${dispatched.url}`
-    }\nRe-run to review the new tip.`,
+    status === "completed"
+      ? `${moved} That run is cancelled and nothing was released.\nRe-run to review the new tip.`
+      : `${moved} The cancellation was accepted but the run has not stopped yet, so confirm it did. ${byHand}`,
   );
 }
 
