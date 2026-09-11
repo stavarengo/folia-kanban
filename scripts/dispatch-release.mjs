@@ -16,9 +16,12 @@
 // computes it on the runner: the last release tag, the commits since it, and
 // the version release-it would choose. That only holds while this checkout is
 // main and level with `origin/main`, which is why the script refuses to show
-// anything otherwise — and a dispatch names a branch rather than a commit, so
-// after dispatching it checks that main and the tags are still what the plan
-// was printed from, and cancels the run it started if they are not.
+// anything otherwise. What is approved here is then handed to the run as
+// `expected_sha` and `expected_version`, and the run refuses to release
+// anything else: a dispatch names a branch rather than a commit, so GitHub
+// resolves main when it creates the run, and the run reads the tags when it
+// gets there. Only the run can compare what it is about to release with what
+// somebody read, which is why the enforcement lives there and not here.
 
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
@@ -282,16 +285,17 @@ const review = async () => {
 
   return {
     head,
-    tags: git(["ls-remote", "--tags", "origin"]),
+    version,
     confirmed: await confirm(`Release ${version} from ${head.slice(0, 7)}?`),
   };
 };
 
-// What the plan was worked out from, kept so the run that starts can be held to
-// it. A dispatch names a branch, never a commit, so GitHub resolves `main` when
-// it creates the run — which is not when this printed the plan — and the
-// runner works the version out again from the tags it finds then, so a tag
-// arriving in between moves the answer without moving main.
+// What was approved, handed to the run as `expected_sha` and `expected_version`
+// so the runner can refuse anything else. It is the runner that has to enforce
+// this, not this script: a dispatch names a branch, so GitHub resolves `main`
+// when it creates the run, and the run works the version out from the tags it
+// finds then. Both can differ from what was printed here, and the run is the
+// only side that knows what it is actually about to release.
 let reviewed;
 if (tag === undefined) {
   const outcome = await review();
@@ -299,7 +303,7 @@ if (tag === undefined) {
     console.log("Nothing dispatched.");
     process.exit(0);
   }
-  reviewed = { head: outcome.head, tags: outcome.tags };
+  reviewed = { head: outcome.head, version: outcome.version };
 }
 
 const listRuns = () => {
@@ -330,6 +334,14 @@ const highestBefore = before.reduce((highest, item) => Math.max(highest, item.da
 
 const run = ["workflow", "run", WORKFLOW, "--ref", "main"];
 if (tag !== undefined) run.push("--field", `tag=${tag}`);
+if (reviewed !== undefined) {
+  run.push(
+    "--field",
+    `expected_sha=${reviewed.head}`,
+    "--field",
+    `expected_version=${reviewed.version}`,
+  );
+}
 
 const dispatch = gh(run);
 if (dispatch.status !== 0) {
@@ -341,109 +353,47 @@ console.log(
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Did the repository change under the plan that was approved? This is the check
-// that matters, and it does not depend on identifying the run: GitHub resolved
-// `main` to a commit when it created the run, before this reads the remote, and
-// the runner works the version out from the tags it finds. So if the tip and
-// the tags are still what the plan was printed from, the run that started is a
-// run of what was reviewed, whichever run it turns out to be.
-const drifted = () => {
-  if (reviewed === undefined) return undefined;
-  const tip = git(["ls-remote", "origin", "refs/heads/main"]).split("\t")[0];
-  if (tip !== reviewed.head) {
-    return `main moved between the plan above and the dispatch: you approved ${reviewed.head.slice(0, 7)}, origin/main is now ${tip.slice(0, 7)}.`;
-  }
-  if (git(["ls-remote", "--tags", "origin"]) !== reviewed.tags) {
-    return "A tag appeared between the plan above and the dispatch, so the version the runner works out is no longer the one you approved.";
-  }
-  return undefined;
-};
-
-const drift = drifted();
-
 // The run is queued asynchronously, so it is not listable the instant the
-// dispatch returns.
+// dispatch returns. GitHub's dispatch API answers with nothing to correlate on,
+// so "newer than the snapshot, same actor" is as close as this gets: with two
+// dispatches in flight at once it can pick the other one, which costs the wrong
+// run being watched and nothing more. What was approved is enforced by the run
+// itself, through the expected_sha and expected_version it was dispatched with,
+// so nothing safety-related rests on this identification.
 const findRuns = () => {
-  // GitHub's dispatch API answers with nothing to correlate on, so "newer than
-  // the snapshot, same actor" is as close as this gets. A failed listing is not
-  // an empty one: treated as empty it would read as "not started yet", which is
-  // the answer that would let a run needing cancellation through.
   const listed = listRuns();
-  if (listed === undefined) return undefined;
+  if (listed === undefined) return [];
   return listed.filter((candidate) => candidate.databaseId > highestBefore);
 };
 
-// When something drifted, the window is waited out in full and the answer has
-// to be a single run: the run has to be identified to be cancelled, and the
-// first sighting is not necessarily this script's dispatch when two of them
-// overlap. When nothing drifted, nothing has to be cancelled, so the first
-// sighting is good enough to watch.
 let fresh = [];
-for (let attempt = 0; attempt < 20; attempt += 1) {
+for (let attempt = 0; attempt < 20 && fresh.length === 0; attempt += 1) {
   await sleep(2000);
-  const found = findRuns() ?? [];
-  if (found.length > fresh.length) fresh = found;
-  if (fresh.length > 0 && drift === undefined) break;
+  fresh = findRuns();
 }
 
-const giveUp = (problem) =>
+if (fresh.length !== 1) {
+  const found =
+    fresh.length === 0
+      ? "it did not appear within 40s"
+      : `${fresh.length} new runs appeared and it cannot tell which one is this dispatch:\n${fresh
+          .map((candidate) => `  ${candidate.url}`)
+          .join("\n")}`;
   die(
-    drift === undefined
-      ? `${problem}\nNothing has drifted since the plan above, so the run that started is a run of what you approved. Find it with: gh run list --workflow ${WORKFLOW}`
-      : `${drift}\n${problem}\nThat run is on its way to releasing something nobody reviewed. Find it and cancel it now: gh run list --workflow ${WORKFLOW}`,
-  );
-
-if (fresh.length === 0) giveUp("The run did not appear within 40s.");
-if (fresh.length > 1) {
-  giveUp(
-    `More than one new run of ${WORKFLOW} appeared, so this cannot tell which one it started:\n${fresh
-      .map((candidate) => `  ${candidate.url}`)
-      .join("\n")}`,
+    `Dispatched, but not watching: ${found}.\nThe run is not lost — find it with: gh run list --workflow ${WORKFLOW}${
+      reviewed === undefined
+        ? ""
+        : `\nIt releases ${reviewed.version} from ${reviewed.head.slice(0, 7)} or nothing: it was dispatched with what you approved, and its own guard stops it if main or the tags moved since.`
+    }`,
   );
 }
 
 const dispatched = fresh[0];
 
 console.log(dispatched.url);
-
-// Cancelling costs a run's worth of minutes and nothing else: nothing is pushed
-// until verify and scan are through, and the release job refuses to run in a
-// cancelled run. The head check is the same question asked of the run itself,
-// and it catches the case the remote check cannot see — a run created before a
-// push that has since been undone.
-if (drift !== undefined || (reviewed !== undefined && dispatched.headSha !== reviewed.head)) {
-  const problem =
-    drift ??
-    `The run started on ${dispatched.headSha.slice(0, 7)}, not the ${reviewed.head.slice(0, 7)} you approved.`;
-  const byHand = `Cancel it by hand now, before it reaches the release job: ${dispatched.url}`;
-
-  if (gh(["run", "cancel", String(dispatched.databaseId)]).status !== 0) {
-    die(`${problem} GitHub refused the cancellation. ${byHand}`);
-  }
-
-  // A cancellation is accepted, not applied: GitHub re-evaluates the run and
-  // tells the runners, and only then is the run cancelled. So watch it settle
-  // rather than announce it. There are minutes of verifying and scanning in
-  // front of the release job, which is the margin this is spending.
-  console.log("Cancelling that run.");
-  let status = "";
-  for (let attempt = 0; attempt < 30 && status !== "completed"; attempt += 1) {
-    await sleep(2000);
-    const view = gh(["run", "view", String(dispatched.databaseId), "--json", "status,conclusion"]);
-    if (view.status !== 0) continue;
-    status = JSON.parse(view.stdout).status;
-  }
-
-  die(
-    status === "completed"
-      ? `${problem} That run is cancelled and nothing was released.\nRe-run to review the new tip.`
-      : `${problem} The cancellation was accepted but the run has not stopped yet, so confirm it did. ${byHand}`,
-  );
-}
-
 console.log(
   tag === undefined
-    ? "Watching. It verifies and scans the tip of main again, then releases; it waits for nobody."
+    ? `Watching. It verifies and scans main again, then releases ${reviewed.version} — or stops, if what it finds is no longer what you approved.`
     : "Watching. A republish goes straight to the release job.",
 );
 

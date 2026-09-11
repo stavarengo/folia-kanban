@@ -29,6 +29,24 @@ on:
         description: "Republish an existing tag (leave empty to release from main)"
         required: false
         type: string
+      # What the dispatcher believed it was approving. `pnpm dev:helpers:release`
+      # fills both from the plan it printed and confirmed; the release job then
+      # refuses anything else, which is what turns "the dispatch is the
+      # approval" into something the runner enforces rather than something the
+      # caller hopes for. A dispatch names a branch, so GitHub resolves main
+      # when it creates the run: expected_sha is the only way this run can tell
+      # that the commit it is about to release is the one somebody read about,
+      # and expected_version is the only way it can tell that a tag appearing in
+      # between has not moved the number. Empty means unchecked, which is what a
+      # dispatch from the Actions UI is.
+      expected_sha:
+        description: "The commit the release was approved for (leave empty here)"
+        required: false
+        type: string
+      expected_version:
+        description: "The version the release was approved for (leave empty here)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -382,6 +400,9 @@ jobs:
         shell: bash
         env:
           TAG_INPUT: ${{ inputs.tag }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          PLANNED_VERSION: ${{ needs.plan.outputs.version }}
         run: |
           git fetch --no-tags origin main
 
@@ -404,6 +425,21 @@ jobs:
             remote=$(git rev-parse FETCH_HEAD)
             if [ "$head" != "$GITHUB_SHA" ] || [ "$remote" != "$GITHUB_SHA" ]; then
               echo "::error::main moved on after this run started. This run verified $GITHUB_SHA, origin/main is now $remote. Nothing has been changed; start a new run on the new main — this pipeline never rebases and never releases a commit it did not verify."
+              exit 1
+            fi
+            # What the dispatcher approved, if it said. This is the half the
+            # check above cannot see: main moving *before* GitHub resolved the
+            # dispatch makes the newer commit this run's own GITHUB_SHA, and
+            # everything above then agrees with itself about the wrong commit.
+            if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::This release was approved for $EXPECTED_SHA, and the run is on $GITHUB_SHA — main moved between the approval and the dispatch. Nothing has been changed; review the new main and dispatch again."
+              exit 1
+            fi
+            # And the version, which a tag landing in between moves without
+            # moving main: the plan job works it out from the tags it finds,
+            # which are not the tags the approval was read from.
+            if [ -n "$EXPECTED_VERSION" ] && [ "$EXPECTED_VERSION" != "$PLANNED_VERSION" ]; then
+              echo "::error::This release was approved as $EXPECTED_VERSION, and this run plans $PLANNED_VERSION. Nothing has been changed; review the new plan and dispatch again."
               exit 1
             fi
             echo "Releasing $GITHUB_SHA, still the tip of origin/main."
