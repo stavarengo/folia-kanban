@@ -130,7 +130,9 @@ const remoteIdentity = (url) => {
     : (() => {
         try {
           const parsed = new URL(url);
-          return { host: parsed.host, path: parsed.pathname };
+          // hostname, not host: an explicit port (`ssh://git@github.com:22/…`)
+          // is a way of reaching the same repository, and gh never spells one.
+          return { host: parsed.hostname, path: parsed.pathname };
         } catch {
           return { host: undefined, path: "" };
         }
