@@ -6,7 +6,13 @@
 //
 // Usage:
 //   pnpm dev:helpers:release              release from the tip of main
+//   pnpm dev:helpers:release --approve    same, and approve the release gate as the gh user
 //   pnpm dev:helpers:release --tag 1.2.3  republish an existing tag
+//
+// --approve answers the `release` environment's required-reviewer prompt from
+// here, through the same API the Actions UI button calls, so the run needs no
+// click. It only works when the gh user is one of the environment's reviewers;
+// otherwise GitHub refuses and the run keeps waiting in the UI.
 
 import { spawnSync } from "node:child_process";
 
@@ -20,25 +26,37 @@ const die = (message) => {
   process.exit(1);
 };
 
-const gh = (args, { inherit = false } = {}) => {
+const gh = (args, { inherit = false, input } = {}) => {
   const result = spawnSync("gh", args, {
     encoding: "utf8",
-    stdio: inherit ? "inherit" : ["ignore", "pipe", "pipe"],
+    input,
+    stdio: inherit ? "inherit" : [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
   if (result.error?.code === "ENOENT") die(GH_MISSING);
   if (result.error) die(`gh ${args[0]} failed: ${result.error.message}`);
   return result;
 };
 
-const parseTag = (argv) => {
-  if (argv.length === 0) return undefined;
-  const [first, second] = argv;
-  if (first.startsWith("--tag=")) {
-    if (argv.length === 1) return first.slice("--tag=".length);
-  } else if (first === "--tag" && argv.length === 2) {
-    return second;
+const USAGE = "Usage: pnpm dev:helpers:release [--approve | --tag <existing tag to republish>]";
+
+const parseArgs = (argv) => {
+  const options = { tag: undefined, approve: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--approve") {
+      options.approve = true;
+    } else if (arg.startsWith("--tag=")) {
+      options.tag = arg.slice("--tag=".length);
+    } else if (arg === "--tag" && i + 1 < argv.length) {
+      i += 1;
+      options.tag = argv[i];
+    } else {
+      die(USAGE);
+    }
   }
-  die("Usage: pnpm dev:helpers:release [--tag <existing tag to republish>]");
+  // A republish is never gated, so there is nothing for --approve to answer.
+  if (options.approve && options.tag !== undefined) die(USAGE);
+  return options;
 };
 
 // The same grammar the workflow enforces (and scripts/bump-plugin-version.mjs
@@ -48,7 +66,7 @@ const TAG = new RegExp(
   String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-${IDENTIFIER}(?:\.${IDENTIFIER})*)?$`,
 );
 
-const tag = parseTag(process.argv.slice(2));
+const { tag, approve } = parseArgs(process.argv.slice(2));
 if (tag !== undefined && !TAG.test(tag)) {
   die(`"${tag}" is not a plain semver tag (e.g. 1.2.3). The pipeline would refuse it.`);
 }
@@ -129,11 +147,51 @@ if (dispatched === undefined) {
 }
 
 console.log(dispatched.url);
-console.log(
-  tag === undefined
-    ? "Watching. The run pauses for your approval in the Actions UI before it releases."
-    : "Watching. A republish is not approved again; it runs straight through.",
-);
+
+// The gate is a pending deployment on the run. It appears once the plan job has
+// found something to release, and never appears when there is nothing, so the
+// wait ends either way: on the prompt, or on the run finishing without one.
+const approveGate = async (runId) => {
+  const runsApi = `repos/{owner}/{repo}/actions/runs/${runId}`;
+  for (;;) {
+    const pending = gh(["api", `${runsApi}/pending_deployments`]);
+    const gates = pending.status === 0 ? JSON.parse(pending.stdout) : [];
+    const gate = gates.find((item) => item.environment?.name === "release");
+    if (gate) {
+      const posted = gh(
+        ["api", "--method", "POST", `${runsApi}/pending_deployments`, "--input", "-"],
+        {
+          input: JSON.stringify({
+            environment_ids: [gate.environment.id],
+            state: "approved",
+            comment: `Approved by ${login} through pnpm dev:helpers:release --approve`,
+          }),
+        },
+      );
+      if (posted.status !== 0) {
+        die(
+          `GitHub refused the approval as ${login}. The run keeps waiting in the Actions UI.\n${posted.stderr.trim()}`,
+        );
+      }
+      console.log(`Approved the release gate as ${login}.`);
+      return;
+    }
+    const view = gh(["run", "view", String(runId), "--json", "status"]);
+    if (view.status === 0 && JSON.parse(view.stdout).status === "completed") return;
+    await sleep(5000);
+  }
+};
+
+if (approve) {
+  console.log("Waiting for the release gate, to approve it from here.");
+  await approveGate(dispatched.databaseId);
+} else {
+  console.log(
+    tag === undefined
+      ? "Watching. The run pauses for your approval in the Actions UI before it releases."
+      : "Watching. A republish is not approved again; it runs straight through.",
+  );
+}
 
 const watched = gh(["run", "watch", String(dispatched.databaseId), "--exit-status"], {
   inherit: true,
