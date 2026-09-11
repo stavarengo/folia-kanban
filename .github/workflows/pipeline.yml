@@ -40,11 +40,11 @@ on:
       # between has not moved the number. Empty means unchecked, which is what a
       # dispatch from the Actions UI is.
       expected_sha:
-        description: "The commit the release was approved for (leave empty here)"
+        description: "The commit you are approving — paste it from the plan summary you read; empty means unchecked"
         required: false
         type: string
       expected_version:
-        description: "The version the release was approved for (leave empty here)"
+        description: "The version you are approving — paste it from the same summary; empty means unchecked"
         required: false
         type: string
 
@@ -184,9 +184,11 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       releasable: ${{ steps.plan.outputs.releasable }}
-      # Where this plan measured from. The release job checks it is still the
-      # nearest tag before release-it writes the changelog from it.
+      # Where this plan measured from, by name and by commit. The release job
+      # checks both are still the nearest tag before release-it writes the
+      # changelog from it.
       previous: ${{ steps.plan.outputs.previous }}
+      previous_sha: ${{ steps.plan.outputs.previous_sha }}
 
     steps:
       # Full history and tags: both halves of the plan read the commits since
@@ -255,18 +257,18 @@ jobs:
           # docs-only batch. The commits answer that question here; the version
           # itself still comes from release-it, so preMajor and the preset stay
           # in one place.
-          # The type grammar is the changelog preset's own — `\w*` for the type,
-          # and the space after the colon that its headerPattern requires — so a
-          # subject this calls releasable is a subject release-it will also read
-          # as one, and `ci2!:` or `build_tools!:` count here exactly as they
-          # count there. The same three tests live in
+          # The grammar is the changelog preset's own — `\w*` for the type and
+          # the space after the colon that its headerPattern requires, and for
+          # the footer the optional `* ` bullet and case-insensitivity its notes
+          # pattern allows — so a commit this calls releasable is a commit
+          # release-it will also read as one. The same three tests live in
           # scripts/dispatch-release.mjs.
           subjects=$(git log --format=%s "$range")
           bodies=$(git log --format=%B "$range")
           releasable=false
           if grep -qE '^(feat|fix)(\([^)]*\))?!?: ' <<<"$subjects" \
             || grep -qE '^[0-9A-Za-z_]*(\([^)]*\))?!: ' <<<"$subjects" \
-            || grep -qE '^BREAKING[ -]CHANGE:' <<<"$bodies"; then
+            || grep -qiE '^(\*[[:space:]]+)?BREAKING[ -]CHANGE:' <<<"$bodies"; then
             releasable=true
           fi
 
@@ -321,10 +323,18 @@ jobs:
             echo "[$link_text]($link)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # The commit as well as the name: a tag that is moved keeps its name,
+          # and the name is all the release job would otherwise have to compare.
+          previous_sha=""
+          if [ -n "$previous" ]; then
+            previous_sha=$(git rev-parse "refs/tags/$previous^{commit}")
+          fi
+
           {
             echo "releasable=$releasable"
             echo "version=$version"
             echo "previous=$previous"
+            echo "previous_sha=$previous_sha"
           } >> "$GITHUB_OUTPUT"
 
   release:
@@ -429,6 +439,7 @@ jobs:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
           PLANNED_VERSION: ${{ needs.plan.outputs.version }}
           PLANNED_PREVIOUS: ${{ needs.plan.outputs.previous }}
+          PLANNED_PREVIOUS_SHA: ${{ needs.plan.outputs.previous_sha }}
         run: |
           git fetch --no-tags origin main
 
@@ -507,6 +518,15 @@ jobs:
             if [ "$nearest" != "$PLANNED_PREVIOUS" ]; then
               echo "::error::The plan measured from '${PLANNED_PREVIOUS:-the first commit}' and the nearest release tag is now '${nearest:-none}'. A tag landed while this run was working; the changelog would not be the one that was planned. Nothing has been changed; dispatch again."
               exit 1
+            fi
+            # By commit as well as by name, because a tag that is moved keeps
+            # its name: same string, different boundary, different changelog.
+            if [ -n "$nearest" ]; then
+              nearest_sha=$(git rev-parse "refs/tags/$nearest^{commit}")
+              if [ "$nearest_sha" != "$PLANNED_PREVIOUS_SHA" ]; then
+                echo "::error::Tag '$nearest' pointed at $PLANNED_PREVIOUS_SHA when this run planned and points at $nearest_sha now. It has been moved, so the changelog would be written from a different range. Nothing has been changed."
+                exit 1
+              fi
             fi
             echo "Releasing $GITHUB_SHA, still the tip of origin/main."
           fi
@@ -640,9 +660,13 @@ jobs:
 
       # The subject digests are this build's. The source revision recorded
       # beside them is the run's own GITHUB_SHA, which the action reads from the
-      # event and no input can override: the commit that triggered the run, one
-      # parent below the release commit release-it just made (and, on the
-      # republish path, the tip of main at dispatch time rather than the tag).
+      # event and no input can override, so it is whatever the run was
+      # dispatched against: on the ordinary path the commit that triggered the
+      # run, one parent below the release commit release-it just made; on the
+      # republish path the tag's own commit, because the dispatch names the tag
+      # — except for tags older than this workflow, which have no pipeline.yml
+      # to run and fall back to a dispatch against main, where this records
+      # main's tip. See docs/releasing.md.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

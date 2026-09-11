@@ -89,7 +89,10 @@ const TAG = new RegExp(
 // this and release-it read the same subjects the same way.
 const RELEASABLE_SUBJECT = /^(?:feat|fix)(?:\([^)]*\))?!?: /m;
 const BREAKING_SUBJECT = /^\w*(?:\([^)]*\))?!: /m;
-const BREAKING_BODY = /^BREAKING[ -]CHANGE:/m;
+// The footer grammar is the parser's own: case-insensitive, and an optional
+// `* ` bullet in front, which is how a breaking note written as a bullet point
+// still counts as one.
+const BREAKING_BODY = /^(?:\*\s+)?BREAKING[ -]CHANGE:/im;
 
 const { tag, yes } = parseArgs(process.argv.slice(2));
 if (tag !== undefined && !TAG.test(tag)) {
@@ -149,6 +152,24 @@ const remoteIdentity = (url) => {
   return `${host}/${segments.join("/")}`.toLowerCase();
 };
 
+// Which repository everything below acts on, taken from `origin` and then
+// spelled out on every gh call. gh resolves a repository per command — GH_REPO
+// and `gh repo set-default` retarget some and not others, which is how a plan
+// read from one repository can be dispatched into another that shares its
+// history. Saying it every time removes the question.
+const ORIGIN = remoteIdentity(git(["remote", "get-url", "origin"]));
+if (ORIGIN === undefined) {
+  die("Cannot read `origin` as a GitHub repository, so there is nothing safe to dispatch against.");
+}
+const [originHost, ...originPath] = ORIGIN.split("/");
+if (originHost !== "github.com") {
+  die(
+    `origin is on ${originHost}, and gh is authenticated for github.com, so a dispatch from here would go to a different repository than the one this reads. Nothing to do but point origin at GitHub.`,
+  );
+}
+const REPO = originPath.join("/");
+const REPO_URL = `https://github.com/${REPO}`;
+
 // Everything the plan job would work out, worked out here first. Skipped for a
 // republish: that path publishes a tag that already exists, so there is no
 // version to choose and no commit range to read.
@@ -171,22 +192,6 @@ const review = async () => {
   if (git(["rev-parse", "--is-shallow-repository"]) === "true") {
     die(
       "This is a shallow clone, so the commit range and the version below would be worked out from a history that stops early. Run: git fetch --unshallow, then re-run.",
-    );
-  }
-
-  // gh does not have to agree with the git remote — GH_REPO and
-  // `gh repo set-default` both retarget it — and everything below reads git
-  // while the dispatch goes through gh. Two repositories would mean a plan
-  // printed from one and a release cut in the other.
-  const named = gh(["repo", "view", "--json", "nameWithOwner,url"]);
-  if (named.status !== 0)
-    die("Could not read the repository gh is pointing at. Check: gh repo view");
-  const { nameWithOwner, url: repoUrl } = JSON.parse(named.stdout);
-  const origin = remoteIdentity(git(["remote", "get-url", "origin"]));
-  const target = remoteIdentity(repoUrl);
-  if (origin === undefined || origin !== target) {
-    die(
-      `gh is pointing at ${target ?? repoUrl} while origin is ${origin ?? "a remote this cannot read as a repository"}, so the plan below would describe one repository and the dispatch would start a release in the other. Unset GH_REPO, or run: gh repo set-default ${nameWithOwner}`,
     );
   }
 
@@ -252,8 +257,8 @@ const review = async () => {
 
   const link =
     previous === undefined
-      ? `${repoUrl}/commits/${head}`
-      : `${repoUrl}/compare/${previous}...${head}`;
+      ? `${REPO_URL}/commits/${head}`
+      : `${REPO_URL}/compare/${previous}...${head}`;
 
   console.log(`Commits since ${since}:`);
   // Commit subjects are written by whoever wrote the commit, and this is a
@@ -286,6 +291,19 @@ const review = async () => {
     die(`release-it answered "${version}", which is not a plain semver version.`);
   }
 
+  // release-it fetches before it answers, so its idea of the last release can
+  // be newer than the one the commit list above was measured from. One screen
+  // built from two different tag sets is the one thing worse than a stale one.
+  if (
+    git(["describe", "--tags", "--abbrev=0", "--match", "*.*.*", "--exclude", "*-*"], {
+      allowFailure: true,
+    }) !== previous
+  ) {
+    die(
+      `A tag landed while this was working the version out, so the commits above and the version below no longer describe the same release. Nothing has been dispatched; re-run to see the new plan.`,
+    );
+  }
+
   console.log(`Next version: ${version}${previous === undefined ? "" : ` (was ${previous})`}`);
 
   return {
@@ -311,19 +329,43 @@ if (tag === undefined) {
   reviewed = { head: outcome.head, version: outcome.version };
 }
 
-// A republish is dispatched against the tag itself (see below), and GitHub
-// files the run under that ref's name, so the listing has to ask for the same
-// one it started.
-let dispatchRef = tag === undefined ? "main" : `refs/tags/${tag}`;
+// Which ref the run is dispatched against. A republish runs against the tag
+// itself: the run's own commit is what the provenance attestation records as
+// the source, and a republish dispatched against main would sign today's tip
+// as the source of a build from a months-old tag. Everything the run does with
+// main it does by fetching origin/main explicitly, so this changes nothing
+// else — except that GitHub also reads the workflow file from that ref, so the
+// tag has to carry one. Tags cut before this pipeline existed do not, and are
+// asked about here rather than guessed at from whatever the dispatch API says
+// when it refuses.
+let dispatchRef = "main";
+if (tag !== undefined) {
+  git(["fetch", "--tags", "origin"]);
+  const onTag = git(["cat-file", "-e", `refs/tags/${tag}:.github/workflows/${WORKFLOW}`], {
+    allowFailure: true,
+  });
+  if (onTag === undefined) {
+    console.log(
+      `The ${tag} tag carries no .github/workflows/${WORKFLOW} — it predates this pipeline — so the republish is dispatched against main. Its build provenance records the tip of main as the source commit rather than the tag's own.`,
+    );
+  } else {
+    dispatchRef = `refs/tags/${tag}`;
+  }
+}
+
+// GitHub files a run under the short name of the ref it was dispatched against.
+const runBranch = dispatchRef === "main" ? "main" : tag;
 
 const listRuns = () => {
   const listed = gh([
     "run",
     "list",
+    "--repo",
+    REPO,
     "--workflow",
     WORKFLOW,
     "--branch",
-    dispatchRef === "main" ? "main" : tag,
+    runBranch,
     "--event",
     "workflow_dispatch",
     "--user",
@@ -338,47 +380,23 @@ const listRuns = () => {
 
 // Run ids only ever grow, so "newer than everything that existed a moment ago"
 // identifies our own run without comparing this machine's clock to GitHub's.
+// Only a fallback for the run URL below, which needs none of that.
 const before = listRuns();
-if (before === undefined) die(`Could not list runs of ${WORKFLOW}. Check: gh repo view`);
-let highestBefore = before.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
+if (before === undefined) die(`Could not list runs of ${WORKFLOW} in ${REPO}.`);
+const highestBefore = before.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
 
-const dispatchArgs = (ref) => {
-  const args = ["workflow", "run", WORKFLOW, "--ref", ref];
-  if (tag !== undefined) args.push("--field", `tag=${tag}`);
-  if (reviewed !== undefined) {
-    args.push(
-      "--field",
-      `expected_sha=${reviewed.head}`,
-      "--field",
-      `expected_version=${reviewed.version}`,
-    );
-  }
-  return args;
-};
-
-// A republish runs against the tag, not against main. The run's own commit is
-// what the provenance attestation records as the source, and a republish
-// dispatched against main would sign today's tip as the source of a build from
-// a months-old tag. Everything the run does with main it does by fetching
-// origin/main explicitly, so this changes nothing but that record.
-let dispatch = gh(dispatchArgs(dispatchRef));
-
-// GitHub reads the workflow file from the ref it is dispatched against, so a
-// tag cut before this pipeline existed has no pipeline.yml to run. Those can
-// only be republished against main, where the attestation names main's tip.
-if (dispatch.status !== 0 && tag !== undefined && /not found|404/i.test(dispatch.stderr)) {
-  console.log(
-    `The ${tag} tag has no ${WORKFLOW} on it — it predates this pipeline — so the republish goes against main instead. Its build provenance will record the tip of main as the source commit rather than the tag's own.`,
+const dispatchArgs = ["workflow", "run", WORKFLOW, "--repo", REPO, "--ref", dispatchRef];
+if (tag !== undefined) dispatchArgs.push("--field", `tag=${tag}`);
+if (reviewed !== undefined) {
+  dispatchArgs.push(
+    "--field",
+    `expected_sha=${reviewed.head}`,
+    "--field",
+    `expected_version=${reviewed.version}`,
   );
-  dispatchRef = "main";
-  // The snapshot above was taken on the tag's ref, so it says nothing about
-  // which runs already exist on main.
-  const onMain = listRuns();
-  if (onMain === undefined) die(`Could not list runs of ${WORKFLOW}. Check: gh repo view`);
-  highestBefore = onMain.reduce((highest, item) => Math.max(highest, item.databaseId), 0);
-  dispatch = gh(dispatchArgs(dispatchRef));
 }
 
+const dispatch = gh(dispatchArgs);
 if (dispatch.status !== 0) {
   die(`Could not dispatch ${WORKFLOW} on ${dispatchRef}:\n${dispatch.stderr.trim()}`);
 }
@@ -386,44 +404,52 @@ console.log(
   tag === undefined ? "Dispatched a release from main." : `Dispatched a republish of ${tag}.`,
 );
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// gh prints the created run's URL when GitHub gives it one, which identifies
+// the run exactly — no guessing from the listing, and no chance of watching
+// somebody else's dispatch. It is documented as "if available", so the listing
+// stays as the fallback: the run is queued asynchronously, so it is not
+// listable the instant the dispatch returns, and "newer than the snapshot, same
+// actor" is as close as correlation gets without an id. Two dispatches in
+// flight at once can make that pick the wrong one, which costs the wrong run
+// being watched; what was approved is enforced by the run itself, through the
+// expected_sha and expected_version it was dispatched with, so nothing
+// safety-related rests on this identification either way.
+const announced = /https:\/\/\S*\/actions\/runs\/(\d+)\b/.exec(dispatch.stdout + dispatch.stderr);
 
-// The run is queued asynchronously, so it is not listable the instant the
-// dispatch returns. GitHub's dispatch API answers with nothing to correlate on,
-// so "newer than the snapshot, same actor" is as close as this gets: with two
-// dispatches in flight at once it can pick the other one, which costs the wrong
-// run being watched and nothing more. What was approved is enforced by the run
-// itself, through the expected_sha and expected_version it was dispatched with,
-// so nothing safety-related rests on this identification.
 const findRuns = () => {
   const listed = listRuns();
   if (listed === undefined) return [];
   return listed.filter((candidate) => candidate.databaseId > highestBefore);
 };
 
-let fresh = [];
-for (let attempt = 0; attempt < 20 && fresh.length === 0; attempt += 1) {
-  await sleep(2000);
-  fresh = findRuns();
-}
+let dispatched;
+if (announced) {
+  dispatched = { databaseId: Number(announced[1]), url: announced[0] };
+} else {
+  let fresh = [];
+  for (let attempt = 0; attempt < 20 && fresh.length === 0; attempt += 1) {
+    await sleep(2000);
+    fresh = findRuns();
+  }
 
-if (fresh.length !== 1) {
-  const found =
-    fresh.length === 0
-      ? "it did not appear within 40s"
-      : `${fresh.length} new runs appeared and it cannot tell which one is this dispatch:\n${fresh
-          .map((candidate) => `  ${candidate.url}`)
-          .join("\n")}`;
-  die(
-    `Dispatched, but not watching: ${found}.\nThe run is not lost — find it with: gh run list --workflow ${WORKFLOW}${
-      reviewed === undefined
-        ? ""
-        : `\nIt releases ${reviewed.version} from ${reviewed.head.slice(0, 7)} or nothing: it was dispatched with what you approved, and its own guard stops it if main or the tags moved since.`
-    }`,
-  );
-}
+  if (fresh.length !== 1) {
+    const found =
+      fresh.length === 0
+        ? "it did not appear within 40s"
+        : `${fresh.length} new runs appeared and it cannot tell which one is this dispatch:\n${fresh
+            .map((candidate) => `  ${candidate.url}`)
+            .join("\n")}`;
+    die(
+      `Dispatched, but not watching: ${found}.\nThe run is not lost — find it with: gh run list --repo ${REPO} --workflow ${WORKFLOW}${
+        reviewed === undefined
+          ? ""
+          : `\nIt releases ${reviewed.version} from ${reviewed.head.slice(0, 7)} or nothing: it was dispatched with what you approved, and its own guard stops it if main or the tags moved since.`
+      }`,
+    );
+  }
 
-const dispatched = fresh[0];
+  dispatched = fresh[0];
+}
 
 console.log(dispatched.url);
 console.log(
@@ -432,7 +458,8 @@ console.log(
     : "Watching. A republish goes straight to the release job.",
 );
 
-const watched = gh(["run", "watch", String(dispatched.databaseId), "--exit-status"], {
-  inherit: true,
-});
+const watched = gh(
+  ["run", "watch", String(dispatched.databaseId), "--repo", REPO, "--exit-status"],
+  { inherit: true },
+);
 process.exit(watched.status ?? 1);
