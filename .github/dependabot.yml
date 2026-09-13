@@ -8,14 +8,15 @@ version: 2
 # forever, security fixes included. This is the other half: Dependabot proposes
 # the new SHA as a pull request.
 #
-# Expect one manual step on each of those. docs/releasing.md asks for an Actions
-# allow-list naming the pinned SHAs, and a pull request cannot run an action the
-# allow-list does not name yet — so the bump's own run fails until that list is
-# updated with the same SHA. That is the cost of the narrow allow-list, and it
-# fails with a clear message rather than quietly.
+# No manual step goes with one. The repository's Actions allow-list names whole
+# actions rather than pins — four wildcard patterns, alongside the GitHub-owned
+# and Marketplace-verified allowances — so a new SHA is admitted the moment the
+# pull request opens. Only the tighter list docs/releasing.md offers as an
+# option would cost a settings edit per bump, and that is not what is
+# configured.
 #
 # `obsidianmd/obsidian-workflows@v1` floats on purpose and is not pinned, so
-# there is nothing here for it to bump.
+# there is no SHA under it to move; only a `v2` would ever show up here.
 updates:
   - package-ecosystem: github-actions
     directory: "/"
@@ -23,8 +24,18 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
-    labels:
-      - dependencies
+    # None of these can release, so a week of them is worth one review rather
+    # than one each. Majors stay in the group, unlike the npm one below: these
+    # are a handful of actions, not a tree, so little queues behind one that
+    # needs work.
+    groups:
+      actions:
+        patterns:
+          - "*"
+    # A compromised release is usually pulled within days, so let one age before
+    # we are asked to take it; security updates bypass this.
+    cooldown:
+      default-days: 7
 
   # pnpm-lock.yaml, which no workflow fails over: the pull-request OSV scan only
   # blocks a vulnerability the change itself introduces, and the release job only
@@ -37,7 +48,12 @@ updates:
   # A runtime dependency is bundled into main.js, so bumping one changes what
   # people are running and should be able to cut a release on its own; a dev
   # dependency changes nothing they install, and `chore` leaves main at "nothing
-  # to release" until something else earns one.
+  # to release" until something else earns one. `include: scope` is what keeps
+  # the runtime half readable: a bump lands as `fix(deps): …`, so the Bug Fixes
+  # section says which entries were dependencies and which were somebody fixing
+  # something. The plan job's grammar accepts a scope, so it stays releasable.
+  # `chore(deps-dev)` is hidden from the changelog either way; there the scope
+  # only helps whoever is reading the log.
   - package-ecosystem: npm
     directory: "/"
     schedule:
@@ -45,13 +61,32 @@ updates:
     commit-message:
       prefix: fix
       prefix-development: chore
-    # The dev tooling is most of the tree and none of it can release, so it
-    # arrives as one pull request a week rather than thirty-odd; a runtime bump
-    # is a `fix` somebody may want to release on its own and stays separate.
+      include: scope
+    # The dev tooling is most of the tree and none of it can release, so its
+    # routine bumps arrive as one pull request a week rather than thirty-odd; a
+    # runtime bump is a `fix` somebody may want to release on its own and stays
+    # separate. Majors are left out of the group so one that needs work cannot
+    # hold nineteen green ones behind it. The cost is that a family which only
+    # goes green together — eslint with its plugins, the testing-library pair —
+    # arrives as one pull request each; Dependabot already bundles packages it
+    # can see must move in lockstep, and the rest is a manual merge.
     groups:
       development-dependencies:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
         patterns:
           - "*"
-    labels:
-      - dependencies
+    # A compromised release is usually pulled within days, so let one age before
+    # we are asked to take it; security updates bypass this.
+    cooldown:
+      default-days: 7
+    # `obsidian` is typings, and the version installed here decides which APIs
+    # typecheck — a judgement to make beside manifest.json's minAppVersion, not
+    # a bump to take on a Monday. Note it is not aligned today: the range is
+    # `^1.7.2`, it resolves ahead of the 1.11.4 floor, and this entry holds that
+    # where it is rather than fixing it (docs/ai/backlog/20260913.01). It
+    # silences security updates for the package too, which nothing ships.
+    ignore:
+      - dependency-name: obsidian
