@@ -54,7 +54,7 @@ export interface KanbanSettings {
   /**
    * Read-state for comments, keyed by card path: the marker `seenMarker` builds for the newest
    * comment already seen on that card. Written when its detail panel is open. Never in the note —
-   * "Rafa has read this" is personal to one install, not a fact the vault should carry to everyone
+   * "<User-Name> has seen this" is personal to one install, not a fact the vault should carry to everyone
    * who has the file. A card missing from this map has never been opened on this install, so it
    * falls back to `commentsBaseline`.
    */

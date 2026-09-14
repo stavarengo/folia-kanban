@@ -696,7 +696,7 @@ export function nestedCards(board: Board): NestedCard[] {
 /**
  * Everything a filter can be judged by without a reader in front of it: today, the board's done
  * column, and its blocking counts. What it leaves out is what only the board view knows — which
- * comments this reader has seen (`unread:`) and who "me" is (`assignee:me`) — so a rule naming
+ * comments <User-Name> has seen (`unread:`) and who "me" is (`assignee:me`) — so a rule naming
  * either reads as `unknown` rather than as a "no" (see `judgeCard`).
  *
  * This is the context anything reading through the port uses, the MCP server being the one that

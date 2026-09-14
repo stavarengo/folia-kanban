@@ -1,7 +1,7 @@
 // Unread comments (pure): who wrote a comment, and which ones the reader has not seen yet.
 //
 // Authorship lives in the note (`- _2026-08-21 11:49 @rafa:_ text`) because it is a fact about the
-// comment; read-state does NOT — "has Rafa seen this" is personal to one install, so it lives in
+// comment; read-state does NOT — "has <User-Name> seen this" is personal to one install, so it lives in
 // plugin data (`KanbanSettings.commentsSeen`) keyed by card path, holding the timestamp of the
 // newest comment already seen on that card.
 
