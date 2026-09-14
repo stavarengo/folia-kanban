@@ -241,7 +241,7 @@
 * **backlog:** point the lane cross-reference at its new home ([630eda2](https://github.com/stavarengo/folia-kanban/commit/630eda20b3cfcdc19e38e9981985f1d31408a3e1))
 * **backlog:** put the inferred-name entry on hold ([a3b3587](https://github.com/stavarengo/folia-kanban/commit/a3b3587d4d18d438b47fa056d31488f5172fd487))
 * **backlog:** reconnect the lane entries after the nested-subcard fix ([9738d6a](https://github.com/stavarengo/folia-kanban/commit/9738d6a2e6f0b12a2e0dfd60b72e569f6a9c7763))
-* **backlog:** record Rafa's decisions on the five flagged entries and close the setup race ([f99751a](https://github.com/stavarengo/folia-kanban/commit/f99751af189ac11aed566c488e370e1c884b768e))
+* **backlog:** record the decisions on the five flagged entries and close the setup race ([f99751a](https://github.com/stavarengo/folia-kanban/commit/f99751af189ac11aed566c488e370e1c884b768e))
 * **backlog:** record that 0.0.20 is the release the portal rescan waits for ([047c8f1](https://github.com/stavarengo/folia-kanban/commit/047c8f110caf68cff9cdf0e90658ab8be3f27d4c))
 * **backlog:** record that board reads can land out of order ([517d098](https://github.com/stavarengo/folia-kanban/commit/517d098db6cfb908d868b7df8f0e9a9ecd2c1dda))
 * **backlog:** record the bind-address setting on the MCP entry ([ce84c49](https://github.com/stavarengo/folia-kanban/commit/ce84c4942086210ebfd1c150cc970cf34972be85))

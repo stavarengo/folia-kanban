@@ -1,4 +1,4 @@
-// Runtime decode tests for the vault boundary schemas (blueprint §11/§16/§17). This is what
+// Runtime decode tests for the vault boundary schemas. This is what
 // `pnpm schema:check` runs: it proves the schemas accept real vault data and reject corruption,
 // and that malformed persisted data surfaces instead of being silently swallowed.
 

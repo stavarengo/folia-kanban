@@ -15,7 +15,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./test/setup.ts"],
     include: ["test/**/*.test.{ts,tsx}"],
-    // Blueprint §22: a missing-test run or a stray .only must fail, not pass quietly.
+    // A missing-test run or a stray .only must fail, not pass quietly.
     passWithNoTests: false,
     allowOnly: false,
   },

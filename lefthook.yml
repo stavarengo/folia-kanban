@@ -1,4 +1,4 @@
-# Git hooks are convenience only (blueprint §30). CI and `pnpm verify` are
+# Git hooks are convenience only. CI and `pnpm verify` are
 # authoritative — hooks can be bypassed locally with --no-verify, CI cannot.
 pre-commit:
   parallel: true

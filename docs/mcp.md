@@ -46,9 +46,9 @@ Be clear about how much this buys. Under a wildcard bind any bare-IP origin is a
 
 There is one server per vault. Every tool addresses a board by the vault path of its board note, so several boards in one vault need no extra setup.
 
-## Connecting Claude Code
+## Connecting a client
 
-With the server on and the token copied:
+With the server on and the token copied, register it in your MCP client. For example:
 
 ```sh
 claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Toolchain preflight (blueprint §3). Refuses to let work start on the wrong
+// Toolchain preflight. Refuses to let work start on the wrong
 // runtime or a half-installed tree. Run via `pnpm doctor:check`; it is the first step
 // of `pnpm verify`.
 //

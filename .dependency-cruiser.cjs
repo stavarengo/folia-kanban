@@ -1,5 +1,5 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
-// Architecture boundaries (blueprint §7/§8/§15), adapted to this Obsidian plugin's
+// Architecture boundaries, adapted to this Obsidian plugin's
 // three layers:
 //   model    — pure domain + the CardRepository port; depends on nothing app-specific
 //   obsidian — the Vault adapter that implements the port (the only data/transport layer)

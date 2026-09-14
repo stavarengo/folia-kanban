@@ -7,7 +7,7 @@
 //
 // Usage:
 //   pnpm dev:helpers:release               review the plan, confirm, release from main
-//   pnpm dev:helpers:release --yes         the same without the question, for agents
+//   pnpm dev:helpers:release --yes         the same without the question, for scripts
 //   pnpm dev:helpers:release --tag 1.2.3   republish an existing tag
 //
 // The dispatch is the approval — the run it starts has no gate and waits for

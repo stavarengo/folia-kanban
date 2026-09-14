@@ -1,5 +1,5 @@
 ---
-type: task-afk
+type: task
 status: resolved
 order: 2
 created: 2026-08-20

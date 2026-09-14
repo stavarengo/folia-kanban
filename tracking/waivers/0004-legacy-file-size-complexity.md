@@ -1,12 +1,12 @@
 # Waiver: 0004 — legacy file size + function complexity
 
-> Pre-existing files that exceed the §25 size/complexity limits enabled when the strict
-> agent-control harness landed. The rules are ON for all new code; these files are relaxed
-> until they are split, per the blueprint's existing-project migration order (§35 Phase 3).
+> Pre-existing files that exceed the size/complexity limits enabled when the strict
+> verification guards landed. The rules are ON for all new code; these files are relaxed
+> until they are split, in the migration order below.
 
 | Field | Value |
 | --- | --- |
-| **Rule violated** | ESLint `max-lines` (400), `max-lines-per-function` (80), `complexity` (10) — blueprint §25 |
+| **Rule violated** | ESLint `max-lines` (400), `max-lines-per-function` (80), `complexity` (10) |
 | **Status** | `active` |
 | **Owner** | @stavarengo |
 | **Created date** | 2026-06-18 |
@@ -15,9 +15,9 @@
 
 ## Reason
 
-These files predate the §25 guard. Refactoring all 15 in the same change that introduces the
+These files predate the guard. Refactoring all 15 in the same change that introduces the
 guard would be a large, high-risk diff across the drag-and-drop board, forms, and the parse/model
-core — exactly what the blueprint's §35 warns against ("do not refactor everything at once").
+core — the classic mistake of refactoring everything at once ().
 The guard is enabled now so **new** bloat is blocked; the existing debt is tracked here with an
 exit plan rather than hidden.
 
@@ -61,4 +61,4 @@ Split top-down, removing each file from the `eslint.config.mjs` override as it c
 
 ## Replacement
 
-The §25 ESLint limits become the sole gate once the files are split — no waiver, no override block.
+The ESLint limits become the sole gate once the files are split — no waiver, no override block.

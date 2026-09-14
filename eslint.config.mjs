@@ -68,8 +68,8 @@ export default [
     },
   },
   {
-    // Type-aware linting (blueprint §6): forbid silencing the type system. Scoped to the
-    // blueprint's explicit rule list (not full recommended-type-checked) so the guard stays
+    // Type-aware linting: forbid silencing the type system. Scoped to the
+    // an explicit rule list (not full recommended-type-checked) so the guard stays
     // proportional to a 26-file plugin.
     files: ["src/**/*.{ts,tsx}"],
     plugins: { "@typescript-eslint": tseslint.plugin },
@@ -102,7 +102,7 @@ export default [
     },
   },
   {
-    // Architecture boundary (blueprint §8/§15): the Obsidian API may be imported only by
+    // Architecture boundary: the Obsidian API may be imported only by
     // the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). The domain and
     // the UI go through the CardRepository port (src/model/repo.ts).
     files: ["src/model/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}"],
@@ -122,7 +122,7 @@ export default [
     },
   },
   {
-    // Giant files and god functions are forbidden (blueprint §25). New code must stay within
+    // Giant files and god functions are forbidden. New code must stay within
     // these limits; the pre-existing offenders are tracked under tracking/waivers/0004 and
     // relaxed in the override block below until they are split.
     files: ["src/**/*.{ts,tsx}"],
@@ -135,7 +135,7 @@ export default [
     },
   },
   {
-    // Pre-existing oversized / over-complex files (blueprint §25 + §35 phased migration).
+    // Pre-existing oversized / over-complex files.
     // Tracked debt: see tracking/waivers/0004-legacy-file-size-complexity.md (expiry + plan).
     // Only the three rules these files violate are relaxed; max-params/max-depth stay enforced,
     // and every NEW file remains fully gated by the block above.
@@ -164,7 +164,7 @@ export default [
   },
   ...a11yExceptions,
   {
-    // Tests must not be skipped or focused (blueprint §22).
+    // Tests must not be skipped or focused.
     files: ["test/**/*.{ts,tsx}"],
     plugins: { vitest },
     languageOptions: {

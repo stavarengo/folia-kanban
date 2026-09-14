@@ -1,5 +1,5 @@
 {
-  // Docs linting (blueprint §29). Markdown is owned here, not by Prettier.
+  // Docs linting. Markdown is owned here, not by Prettier.
   "config": {
     "default": true,
     // We do not hard-wrap prose at a fixed column, so line length is not a rule.

@@ -1,4 +1,4 @@
-// Runtime validation at the vault boundary (blueprint §11/§16/§17). Markdown frontmatter is
+// Runtime validation at the vault boundary. Markdown frontmatter is
 // untrusted external input: it is hand-editable, so its shape can drift or be corrupted. These
 // schemas decode it into typed values and surface corruption instead of silently swallowing it.
 

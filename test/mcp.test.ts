@@ -483,7 +483,7 @@ describe("the JSON-RPC layer", () => {
   });
 });
 
-// Everything below was found by an unprimed review of the first version of this server: each one
+// Everything below was found in review of the first version of this server: each one
 // is a way an agent was handed a board that did not match the board.
 describe("the shapes a board can take that a column listing hides", () => {
   /** A parent whose child sits in the same column: the board draws the child inside the parent, so

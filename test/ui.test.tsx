@@ -741,7 +741,7 @@ describe("card detail", () => {
     const detail = await screen.findByTestId("card-detail");
     const comment = await within(detail).findByText("hi there");
     expect(comment).toHaveClass("folia-comment-text");
-    // The Markdown component renders a <div>; the pre-Batch-E code rendered a raw <span>,
+    // The Markdown component renders a <div>; the earlier code rendered a raw <span>,
     // so the tag discriminates that the text now flows through repo.renderMarkdown.
     expect(comment.tagName).toBe("DIV");
   });
