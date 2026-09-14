@@ -147,37 +147,37 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 
 | Entry | Theme | Findings |
 | --- | --- | --- |
-| [20260829.08](../../backlog/20260829.08.the-card-menu-and-the-column-popover-are-a-second-menu-implementation.md) | The card menu and the column popover are a second menu implementation | 01-01, 01-02, 01-14, 06-01, 06-13 |
-| [20260829.09](../../backlog/20260829.09.folia-draws-its-own-dialogs-fields-and-confirmations.md) | Dialog shells, field rows and destructive confirmations, all hand-built | 01-03, 01-04, 01-13, 06-02, 06-03, 06-08 |
-| [20260829.10](../../backlog/20260829.10.thirty-six-tooltips-are-drawn-by-the-browser.md) | Thirty-six tooltips drawn by the browser rather than the app | 01-05, 06-15 |
-| [20260829.11](../../backlog/20260829.11.the-board-draws-its-own-toast.md) | The board's own toast beside the app's notice | 01-07, 06-09 |
-| [20260829.12](../../backlog/20260829.12.every-button-in-the-board-is-drawn-from-scratch.md) | Every button drawn from scratch, and the specificity fight after it | 01-08, 02-30 |
-| [20260829.13](../../backlog/20260829.13.icon-sizes-are-thirty-four-hard-coded-numbers.md) | Icon size decided at 34 call sites instead of by a scale | 01-10, 02-14 |
+| [#17](https://github.com/stavarengo/folia-kanban/issues/17) | The card menu and the column popover are a second menu implementation | 01-01, 01-02, 01-14, 06-01, 06-13 |
+| [#18](https://github.com/stavarengo/folia-kanban/issues/18) | Dialog shells, field rows and destructive confirmations, all hand-built | 01-03, 01-04, 01-13, 06-02, 06-03, 06-08 |
+| [#19](https://github.com/stavarengo/folia-kanban/issues/19) | Thirty-six tooltips drawn by the browser rather than the app | 01-05, 06-15 |
+| [#20](https://github.com/stavarengo/folia-kanban/issues/20) | The board's own toast beside the app's notice | 01-07, 06-09 |
+| [#21](https://github.com/stavarengo/folia-kanban/issues/21) | Every button drawn from scratch, and the specificity fight after it | 01-08, 02-30 |
+| [#22](https://github.com/stavarengo/folia-kanban/issues/22) | Icon size decided at 34 call sites instead of by a scale | 01-10, 02-14 |
 | 20260829.14 (withdrawn / not a bug) | Obsidian rewrites `--text-on-accent` on `<body>` for a light accent and Folia's tokens inherit it, so the board's buttons already turn dark with the app's own | 02-01 |
-| [20260829.15](../../backlog/20260829.15.folia-reads-the-themes-colours-through-its-own-fallbacks.md) | Theme colour read through Folia's own fallbacks and mixes | 02-02, 02-03, 02-04, 02-05, 02-06, 02-07, 02-08, 02-20, 02-24, 02-31 |
-| [20260829.16](../../backlog/20260829.16.the-folia-token-layer-is-a-second-design-system.md) | The `--folia-*` layer as a second design system | 02-11, 02-12, 02-13, 02-15, 02-21, 02-22, 02-23, 02-26, 02-27, 02-28, 02-44 |
+| [#23](https://github.com/stavarengo/folia-kanban/issues/23) | Theme colour read through Folia's own fallbacks and mixes | 02-02, 02-03, 02-04, 02-05, 02-06, 02-07, 02-08, 02-20, 02-24, 02-31 |
+| [#24](https://github.com/stavarengo/folia-kanban/issues/24) | The `--folia-*` layer as a second design system | 02-11, 02-12, 02-13, 02-15, 02-21, 02-22, 02-23, 02-26, 02-27, 02-28, 02-44 |
 | 20260829.17 (fixed, entry closed) | Bug: two z-index ladders in one numeric space — the body-portalled surfaces now read Obsidian's `--layer-*` scale, so a tooltip still covers a Folia menu, exactly as it covers the app's own | 02-25 |
-| [20260829.18](../../backlog/20260829.18.the-boards-components-are-drawn-beside-the-apps-component-variables.md) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
-| [20260829.19](../../backlog/20260829.19.the-raw-value-audit-is-blind-to-most-of-what-it-polices.md) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
+| [#25](https://github.com/stavarengo/folia-kanban/issues/25) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
+| [#26](https://github.com/stavarengo/folia-kanban/issues/26) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
 | 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
 | 20260829.21 (fixed, entry closed) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03 |
-| [20260829.22](../../backlog/20260829.22.folia-parses-files-obsidian-has-already-parsed.md) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 04-19, 07-16 |
+| [#27](https://github.com/stavarengo/folia-kanban/issues/27) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 04-19, 07-16 |
 | 20260829.23 (fixed, entry closed) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
 | 20260829.24 (fixed, entry closed) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
 | 20260829.25 (fixed, entry closed) | Bug: a stale line index applied inside `vault.process` | 04-12 |
-| [20260829.26](../../backlog/20260829.26.any-change-anywhere-in-the-vault-reloads-the-entire-board.md) | Any vault change anywhere reloads the whole board | 04-09 |
-| [20260829.27](../../backlog/20260829.27.the-adapter-takes-the-long-way-round-the-vault-api.md) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |
-| [20260829.28](../../backlog/20260829.28.the-board-takes-over-markdown-opens-by-patching-a-core-prototype.md) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
-| [20260829.29](../../backlog/20260829.29.main-diverges-from-four-workspace-and-settings-conventions.md) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
+| [#28](https://github.com/stavarengo/folia-kanban/issues/28) | Any vault change anywhere reloads the whole board | 04-09 |
+| [#29](https://github.com/stavarengo/folia-kanban/issues/29) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |
+| [#30](https://github.com/stavarengo/folia-kanban/issues/30) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
+| [#31](https://github.com/stavarengo/folia-kanban/issues/31) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
 | 20260829.30 (fixed, entry closed) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
 | 20260829.31 (fixed, entry closed) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
 | 20260829.32 (fixed, entry closed) | The MCP bearer token travelling with the vault | 07-02 |
-| [20260829.33](../../backlog/20260829.33.the-release-path-and-the-directory-guards-do-not-check-what-they-claim.md) | What the release path and the directory guards never check | 07-03, 07-04, 07-12, 07-13, 07-14, 07-15, 07-17 |
-| [20260829.34](../../backlog/20260829.34.the-readme-claims-no-network-requests-and-names-no-third-party-licences.md) | The README's privacy claim, and the missing licence notices | 07-18, 07-19 |
-| [20260829.35](../../backlog/20260829.35.main-ts-is-a-thousand-lines-against-the-review-checklist.md) | `src/main.ts` at 1020 lines, under a waiver that expires | 07-05 |
+| [#32](https://github.com/stavarengo/folia-kanban/issues/32) | What the release path and the directory guards never check | 07-03, 07-04, 07-12, 07-13, 07-14, 07-15, 07-17 |
+| [#33](https://github.com/stavarengo/folia-kanban/issues/33) | The README's privacy claim, and the missing licence notices | 07-18, 07-19 |
+| [#34](https://github.com/stavarengo/folia-kanban/issues/34) | `src/main.ts` at 1020 lines, under a waiver that expires | 07-05 |
 | 20260829.36 (fixed, entry closed) | Bug: board chrome answered for the whole window rather than its own leaf | 06-05, 06-06, 06-11 |
 | 20260829.37 (fixed, entry closed) | Bug: surfaces open in the focused window, not the board's own | 06-04 |
-| [20260829.38](../../backlog/20260829.38.date-handling-is-written-by-hand-beside-the-bundled-moment.md) | Hand-written date arithmetic and formatting, recorded for its trigger | 03-07, 03-08 |
+| [#35](https://github.com/stavarengo/folia-kanban/issues/35) | Hand-written date arithmetic and formatting, recorded for its trigger | 03-07, 03-08 |
 
 ### Already tracked
 
@@ -185,10 +185,10 @@ Four entries already existed for these, and each was extended with what the repo
 
 | Findings | Entry | What was added |
 | --- | --- | --- |
-| 01-06, 01-12, 03-01, 03-05, 06-07, 06-10 | [20260829.06](../../backlog/20260829.06.detail-panel-suggests-in-two-different-ways.md) | The fifth suggesting input the entry never counted — the toolbar's ~80-line hand-built combobox, read as a clear win — plus the search chrome and the substring matching that ride on the same decision |
-| 04-13 | [20260829.04](../../backlog/20260829.04.override-title-commit-rewrites-unrelated-frontmatter-lines.md) | The fact the entry asked to verify, now established: `processFrontMatter` re-serialises the whole block by design, so only the unwritten decision remains open |
-| 05-11 | [20260827.10](../../backlog/20260827.10.separate-state-from-settings-and-design-shared-state.md) | Nothing: that entry is a hard stop whose deliverable is a conversation, and the finding is one more instance of what it already describes. Linked, not resolved |
-| 05-13 | [20260829.03](../../backlog/20260829.03.imperative-settings-tab-has-no-coverage-of-any-kind.md) | The size of the second acceptable outcome (about 110 lines removable at `minAppVersion` 1.13.0) and the input nobody has: the users below 1.13 |
+| 01-06, 01-12, 03-01, 03-05, 06-07, 06-10 | [#16](https://github.com/stavarengo/folia-kanban/issues/16) | The fifth suggesting input the entry never counted — the toolbar's ~80-line hand-built combobox, read as a clear win — plus the search chrome and the substring matching that ride on the same decision |
+| 04-13 | [#15](https://github.com/stavarengo/folia-kanban/issues/15) | The fact the entry asked to verify, now established: `processFrontMatter` re-serialises the whole block by design, so only the unwritten decision remains open |
+| 05-11 | [#12](https://github.com/stavarengo/folia-kanban/issues/12) | Nothing: that entry is a hard stop whose deliverable is a conversation, and the finding is one more instance of what it already describes. Linked, not resolved |
+| 05-13 | [#14](https://github.com/stavarengo/folia-kanban/issues/14) | The size of the second acceptable outcome (about 110 lines removable at `minAppVersion` 1.13.0) and the input nobody has: the users below 1.13 |
 
 ### Dismissed
 
@@ -221,4 +221,4 @@ Both were argued and written down before this report, and are listed here to clo
 
 ### The commissioning entry
 
-Backlog entry `20260829.07`, which asked for this report, is done and has been deleted, per the skill's rule that the backlog holds only open topics. Entry [20260829.06](../../backlog/20260829.06.detail-panel-suggests-in-two-different-ways.md) pointed at it; that link now points at this report rather than at one of the new entries, because 20260829.06 is itself the entry that absorbs the suggesting-inputs theme, and what it needed from 20260829.07 was the evidence, which lives here.
+Backlog entry `20260829.07`, which asked for this report, is done and has been deleted, per the skill's rule that the backlog holds only open topics. Entry [#16](https://github.com/stavarengo/folia-kanban/issues/16) pointed at it; that link now points at this report rather than at one of the new entries, because 20260829.06 is itself the entry that absorbs the suggesting-inputs theme, and what it needed from 20260829.07 was the evidence, which lives here.
