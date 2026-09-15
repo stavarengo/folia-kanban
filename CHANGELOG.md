@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.1](https://github.com/stavarengo/folia-kanban/compare/0.3.0...0.3.1) (2026-09-15)
+
+### Bug Fixes
+
+* **subtasks:** decide a checklist line's column claim against the note, not a stale reading ([120f458](https://github.com/stavarengo/folia-kanban/commit/120f458bb2b8fc433b40fc9b689d295b8d3efeb2)), closes [#36](https://github.com/stavarengo/folia-kanban/issues/36)
+* **subtasks:** say so when a checklist line cannot be given the column that was picked ([48910d4](https://github.com/stavarengo/folia-kanban/commit/48910d43b12f8664f24a4461e86d39cb7b7c089b)), closes [#37](https://github.com/stavarengo/folia-kanban/issues/37)
+
+### Documentation
+
+* **backlog:** link entries to their GitHub issues ([f2a3b86](https://github.com/stavarengo/folia-kanban/commit/f2a3b8698ab6b26d43b14c3d4438254644c9d777))
+* **backlog:** move entries to GitHub issues ([662e87f](https://github.com/stavarengo/folia-kanban/commit/662e87f6b1a630d398a23d03e6eb71dd41df2fac))
+* **backlog:** question the tight allowed-actions list ([e39eb96](https://github.com/stavarengo/folia-kanban/commit/e39eb9656edfe8d153f728d40e66489b38d3ec79))
+* **backlog:** record how the dependency scanner fits the pipeline ([3e8faa8](https://github.com/stavarengo/folia-kanban/commit/3e8faa8d3fd87d726a11387d28693c1c90727216))
+* **backlog:** reword entries for filing as issues ([3fe7b2a](https://github.com/stavarengo/folia-kanban/commit/3fe7b2a988551c22eef058d7a6af6e7cc4d9808b))
+* **releasing:** say where the release App's credentials are kept ([c41a6b9](https://github.com/stavarengo/folia-kanban/commit/c41a6b9363230b3e3523e8131d0393142fec261b))
+* tidy wording in notes and comments ([55b6af4](https://github.com/stavarengo/folia-kanban/commit/55b6af4dfdb535316a35c1ff3afa1a14d51ece11))
+
+### Build & Tooling
+
+* **deps:** reshape the Dependabot pull requests, and correct what the docs claim ([3686538](https://github.com/stavarengo/folia-kanban/commit/36865380c756a84f8262d751e82641289e2cc04b))
+* **deps:** resolve the four dependency advisories ([2442aee](https://github.com/stavarengo/folia-kanban/commit/2442aeec5fceb26c78e3ac75ad15ffc788ad5e70))
+* drop Dependabot version updates ([db9768b](https://github.com/stavarengo/folia-kanban/commit/db9768b958a19513ccf50a7f6991e00a20b76691))
+* report dependency advisories, block them only where they ship ([206d4f1](https://github.com/stavarengo/folia-kanban/commit/206d4f1c33b1dec3b47e7227fa02dc12c5ea5d30))
+
 ## [0.3.0](https://github.com/stavarengo/folia-kanban/compare/0.2.0...0.3.0) (2026-09-11)
 
 ### ⚠ BREAKING CHANGES
