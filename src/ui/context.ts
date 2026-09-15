@@ -223,10 +223,23 @@ export interface BoardActions {
   moveWithinColumn(path: string, dir: -1 | 1): void;
   /** Whether the card can move up/down within its column (false at the respective edge). */
   columnEdges(path: string): { canMoveUp: boolean; canMoveDown: boolean };
-  /** Check or uncheck the index-th checklist item of a card. */
-  toggleTodo(path: string, index: number, done: boolean): void;
-  /** Delete the index-th checklist item of a card. */
-  removeTodo(path: string, index: number): void;
+  /**
+   * The plain todo this board reads at that position, whole — `null` when it draws none there, or
+   * when the line there names a child note instead. What a surface that outlives a board reload
+   * takes when it opens, so the actions it offers can name the line the person raised it on rather
+   * than whatever the position holds by the time they click.
+   */
+  readTodo(path: string, index: number): SubItem | null;
+  /**
+   * Check or uncheck the index-th checklist item of a card.
+   *
+   * `line` is the caller's own reading of that line, when it has one — see {@link moveTodo}. The
+   * tick is written against it, so a position that has since been given to another line is refused
+   * by the note rather than ticked.
+   */
+  toggleTodo(path: string, index: number, done: boolean, line?: SubItem): void;
+  /** Delete the index-th checklist item of a card, named by `line` the same way {@link toggleTodo} is. */
+  removeTodo(path: string, index: number, line?: SubItem): void;
   /**
    * Send the index-th checklist line of `path` to a column of its own, or back to its card's column
    * with `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until

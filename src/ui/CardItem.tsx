@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card, CardStats } from "../model/types";
+import type { Card, CardStats, SubItem } from "../model/types";
 import type { UnreadState } from "../model/unread";
 import { assigneeValues } from "../model/assignees";
 import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
@@ -57,6 +57,11 @@ function CardItemInner({
   const { cardNextTodos } = useSettings();
   const subitems = useSubitemsCollapse();
   const [confirming, setConfirming] = useState(false);
+  // For a placed todo: the checklist line its "Remove todo?" was raised on. The confirm outlives a
+  // board reload the same way the context menu does, and this tile is named by the position of that
+  // line — so a line taken away above it leaves the tile standing, drawn from whatever slid into
+  // the position, with the confirm still asking about what the person clicked.
+  const confirmingLine = useRef<SubItem | null>(null);
   const [menu, setMenu] = useState<ContextTarget | null>(null);
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
@@ -136,14 +141,30 @@ function CardItemInner({
     e.preventDefault();
     e.stopPropagation();
     const todoEl = (e.target as HTMLElement).closest(".folia-card-next-todo");
-    const todoIndex = todoEl ? Number(todoEl.getAttribute("data-todo-index")) : NaN;
-    setMenu(
-      todoRef
-        ? { x: e.clientX, y: e.clientY, kind: "todo", todoIndex: todoRef.index }
-        : todoEl && Number.isFinite(todoIndex)
-          ? { x: e.clientX, y: e.clientY, kind: "todo", todoIndex }
-          : { x: e.clientX, y: e.clientY, kind: "card" },
-    );
+    const rowIndex = todoEl ? Number(todoEl.getAttribute("data-todo-index")) : NaN;
+    // Which checklist line was right-clicked: this tile's own, for a todo placed in a column, or
+    // the surfaced next-todo row the click landed on.
+    const todoIndex = todoRef
+      ? todoRef.index
+      : todoEl && Number.isFinite(rowIndex)
+        ? rowIndex
+        : null;
+    if (todoIndex === null) {
+      setMenu({ x: e.clientX, y: e.clientY, kind: "card" });
+      return;
+    }
+    // Read the line here, while the person is still pointing at it. The menu that opens outlives
+    // board reloads, and a line removed above this one moves every index below it — so the actions
+    // in it must carry the line rather than the place it sat. Read from the board rather than
+    // rebuilt from the tile: a tile is drawn from the line but does not carry all of it back.
+    const line = actions.readTodo(notePath, todoIndex);
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      kind: "todo",
+      todoIndex,
+      ...(line ? { todoLine: line } : {}),
+    });
   };
   // Merge dnd-kit keyboard handling (Space = pick up) with Enter = open.
   const onKeyDown = (e: KeyboardEvent) => {
@@ -412,6 +433,7 @@ function CardItemInner({
             title={todoRef ? "Remove todo" : "Delete card"}
             onClick={(e) => {
               e.stopPropagation();
+              confirmingLine.current = todoRef ? actions.readTodo(notePath, todoRef.index) : null;
               setConfirming(true);
             }}
           >
@@ -432,7 +454,12 @@ function CardItemInner({
               className="folia-btn folia-btn-danger"
               onClick={(e) => {
                 e.stopPropagation();
-                if (todoRef) actions.removeTodo(todoRef.parentPath, todoRef.index);
+                if (todoRef)
+                  actions.removeTodo(
+                    todoRef.parentPath,
+                    todoRef.index,
+                    confirmingLine.current ?? undefined,
+                  );
                 else actions.remove(card.path);
               }}
             >
@@ -461,14 +488,10 @@ function CardItemInner({
               path={notePath}
               // The line's OWN words, not where the tile renders: a checked line sits in the done
               // column whatever it claims, and the menu must not offer to "move" it to the column
-              // it is already showing while quietly rewriting the line to something else. Read off
-              // the tile for a placed todo, and off this card's checklist for a next-todo row
-              // surfaced on it — the same line either way, so the two must not answer differently.
-              todoColumn={
-                todoRef
-                  ? todoRef.claim
-                  : (card.subItems?.find((i) => i.index === menu.todoIndex)?.status ?? "")
-              }
+              // it is already showing while quietly rewriting the line to something else. Off the
+              // same reading every action in this menu is aimed at, so the column it marks and the
+              // column it would replace can never be two different lines' answers.
+              todoColumn={menu.todoLine?.status ?? ""}
               priority={typeof fm.priority === "string" ? fm.priority : ""}
               assignees={assigneeValues(card)}
               isDone={!canComplete}
@@ -498,11 +521,6 @@ function unreadWords(unread: UnreadState): string {
   const news = `${n} unread comment${n === 1 ? "" : "s"}`;
   if (unread.kind !== "reply") return news;
   return n === 1 ? `${news}, a reply to yours` : `${news}, one a reply to yours`;
-}
-
-/** The claims a card's checklist lines make, as one comparable string (see the memo below). */
-function claimsOf(card: Card): string {
-  return (card.subItems ?? []).map((i) => `${i.index}:${i.status ?? ""}`).join("|");
 }
 
 function sameStats(a?: CardStats, b?: CardStats): boolean {
@@ -537,9 +555,6 @@ export const CardItem = memo(
     a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
     a.card.todoRef?.index === b.card.todoRef?.index &&
     a.card.todoRef?.claim === b.card.todoRef?.claim &&
-    // Setting a claim on a todo that stays inline changes neither the stats nor the frontmatter
-    // reference, so without this the row's context menu would go on showing the old column.
-    claimsOf(a.card) === claimsOf(b.card) &&
     a.card.frontmatter.status === b.card.frontmatter.status &&
     (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
     // Body tags come from the metadata cache as a fresh array each load, so this compares their

@@ -2335,10 +2335,11 @@ describe("card context menu", () => {
     expect(repo.files.get("Tasks/First.md")!.body).not.toContain("[status::");
   });
 
-  // A menu opened on a row keeps its position across the reload that takes the row away, and the
-  // column buttons in it read the line from the board — which by then has no such line. Writing
-  // nothing is right; saying nothing is not, because the picker looks to the person like it worked.
-  it("says so when the board can no longer name the todo whose column was picked", async () => {
+  // A menu opened on a row keeps standing across the reload that takes the row away. The column it
+  // was picked for names the line the menu was raised on, so the refusal now comes from the note
+  // itself, in the words every stale-line write is refused in. Writing nothing is right; saying
+  // nothing is not, because the picker looks to the person like it worked.
+  it("says so when the todo whose column was picked is no longer in the note", async () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
@@ -2353,12 +2354,13 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
 
-    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    expect(await screen.findByText(/no longer reads "real two"/)).toHaveClass("folia-toast-error");
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
-  // Same hole on the other button of that menu: sending a line home names no column, and a line
-  // the board cannot find has no home to be sent to either.
+  // Same hole on the other button of that menu: sending a line home names no column, so there is
+  // no claim to replace and nothing for the note to refuse — the board is what has to say the line
+  // has gone.
   it("says so when a todo the board cannot name is sent back to its card", async () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
@@ -2485,6 +2487,213 @@ describe("card context menu", () => {
     expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
     const done = document.querySelector('[data-column="done"]') as HTMLElement;
     await within(done).findByText("Alpha");
+  });
+
+  // #50. A right-click menu names one checklist line, and it stays open across a board reload. So
+  // when a line above goes — another pane, an agent, a sync pull — the line below slides into the
+  // position the menu was raised on, and every action still offered from that menu would land on
+  // it. The line-identity guard cannot notice by itself: the line now sitting there carries its
+  // own words and its own claim, and matches the note exactly. The menu has to carry the reading
+  // it was opened with.
+  const shiftRepo = () =>
+    new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta\n- [ ] gamma\n",
+      },
+    });
+
+  /** Open the todo menu on "beta", then let "alpha" go, which slides "gamma" into beta's place. */
+  const menuOnBetaAfterAlphaGoes = async (repo: FakeRepo) => {
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] beta\n- [ ] gamma\n";
+    act(() => repo.notify());
+    await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
+    return menu;
+  };
+
+  it("will not tick the todo that slid into the place of the one its menu was raised on", async () => {
+    const repo = shiftRepo();
+    const menu = await menuOnBetaAfterAlphaGoes(repo);
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    // Neither line is ticked: not gamma, which nobody clicked, and not beta, which has moved.
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  it("will not remove the todo that slid into the place of the one its menu was raised on", async () => {
+    const repo = shiftRepo();
+    const menu = await menuOnBetaAfterAlphaGoes(repo);
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Remove todo/ }));
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  it("will not give a column to the todo that slid into the place of the one its menu was raised on", async () => {
+    const repo = shiftRepo();
+    const menu = await menuOnBetaAfterAlphaGoes(repo);
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // The three below guard the OTHER half of the rule, which carrying the menu's reading must not
+  // trade away: they pass before this change as well as after it. The column list is a radio group,
+  // and a person clicking the option it already shows as chosen is asking for no change — so there
+  // is none to report, however far the note has drifted under the menu meanwhile. Nothing is
+  // written on any of these paths, so no other line can be touched by the quiet; what would be new
+  // is a message, and a message about a choice nobody made against the note as it now reads.
+  //
+  // Counted rather than inferred from the note, the way the neighbouring silence test counts: a
+  // write that went out and was refused leaves the note untouched too, which is the opposite of
+  // quiet.
+  const countingWrites = (repo: FakeRepo) => {
+    const counted = { n: 0 };
+    const applyMove = repo.applyMove.bind(repo);
+    repo.applyMove = async (m) => {
+      counted.n += 1;
+      return applyMove(m);
+    };
+    return counted;
+  };
+
+  it("stays quiet when a claim arrives under the menu on a todo sent back to its card", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta\n",
+      },
+    });
+    const writes = countingWrites(repo);
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const home = within(menu).getByRole("menuitemradio", { name: "With its card" });
+    // The whole reason this asks for nothing: the line claimed no column when the menu was raised,
+    // so this is the option already chosen, and clicking it says "leave it as I found it".
+    expect(home).toHaveAttribute("aria-checked", "true");
+    // Placed in Doing elsewhere: same words, same position, a claim the person never saw.
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta [status:: doing]\n";
+    act(() => repo.notify());
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    await within(doing).findByText("beta");
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(home);
+
+    await within(doing).findByText("beta");
+    expect(writes.n).toBe(0);
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+    expect(document.querySelector(".folia-toast")).toBeNull();
+  });
+
+  it("stays quiet when a reworded todo is sent to the column it still claims", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] placed [status:: doing]\n",
+      },
+    });
+    const writes = countingWrites(repo);
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    await screen.findByText("First", { selector: ".folia-card-title" });
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    fireEvent.contextMenu(within(doing).getByText("placed"));
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    // Reworded under the open menu, and the board catches up — the one the neighbouring silence
+    // test leaves out, since it never lets the board reload.
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] renamed elsewhere [status:: doing]\n";
+    act(() => repo.notify());
+    await within(doing).findByText("renamed elsewhere");
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+
+    await within(doing).findByText("renamed elsewhere");
+    expect(writes.n).toBe(0);
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+    expect(document.querySelector(".folia-toast")).toBeNull();
+  });
+
+  // Coming home says where a todo shows and never whether the work is over, so a box ticked under
+  // the menu is not the pick failing: the line claims nothing, it is with its card, and that is
+  // exactly what was asked for.
+  it("stays quiet when a todo ticked under the menu is sent back to the card it never left", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta\n",
+      },
+    });
+    const writes = countingWrites(repo);
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] alpha\n- [x] beta\n";
+    act(() => repo.notify());
+    // Ticked elsewhere, so the row leaves the card's outstanding list — the menu stays open on it.
+    await waitFor(() => expect(within(card).queryByText("beta")).toBeNull());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent
+      .setup()
+      .click(within(menu).getByRole("menuitemradio", { name: "With its card" }));
+
+    // The reload behind every exit is what says the action is over; nothing was written into it.
+    await waitFor(() => expect(within(card).queryByText("beta")).toBeNull());
+    expect(writes.n).toBe(0);
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+    expect(document.querySelector(".folia-toast")).toBeNull();
+  });
+
+  // The same shift reaches the tile's own "Remove todo?", which is not a menu but outlives a reload
+  // just as one does: a placed todo's tile is named by the position of its line, so a line taken
+  // away above it leaves the tile standing, redrawn from whatever slid into that position, with the
+  // confirm still open on what the person clicked.
+  it("will not remove the todo that slid into the place of the one its confirm was raised on", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const user = userEvent.setup();
+    const tile = (await screen.findByText("beta")).closest(".folia-card") as HTMLElement;
+    await user.click(within(tile).getByLabelText('Remove todo "beta"'));
+    const confirm = await screen.findByRole("alertdialog", { name: "Remove todo beta?" });
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n";
+    act(() => repo.notify());
+    await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
   it("removes a todo from the todo menu", async () => {

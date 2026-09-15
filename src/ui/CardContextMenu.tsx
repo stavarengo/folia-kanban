@@ -7,6 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import type { SubItem } from "../model/types";
 import { samePriority } from "../model/priorities";
 import { sameAssignee, toggleAssignee } from "../model/assignees";
 import { priorityOptions, priorityTone } from "./cardView";
@@ -19,6 +20,15 @@ export interface ContextTarget {
   kind: "card" | "todo";
   /** Set when kind === "todo": the SubItem.index of the clicked checklist row. */
   todoIndex?: number;
+  /**
+   * Set when kind === "todo": that checklist line as the board read it the moment this menu was
+   * raised. A position alone names a different line as soon as anything above it goes, and this
+   * menu stays open across the reload that would do exactly that — so every action in it carries
+   * the line the person was pointing at, and the note refuses when that line has since moved on.
+   * Absent only when the board could name no line there, which leaves the actions reading by
+   * position as they did before.
+   */
+  todoLine?: SubItem;
 }
 
 interface Props {
@@ -172,13 +182,15 @@ export function CardContextMenu({
       {target.kind === "todo" ? (
         <>
           {item("Mark done", "check-circle", () => {
-            if (target.todoIndex !== undefined) a.toggleTodo(path, target.todoIndex, true);
+            if (target.todoIndex !== undefined)
+              a.toggleTodo(path, target.todoIndex, true, target.todoLine);
           })}
           {item(
             "Remove todo",
             "trash",
             () => {
-              if (target.todoIndex !== undefined) a.removeTodo(path, target.todoIndex);
+              if (target.todoIndex !== undefined)
+                a.removeTodo(path, target.todoIndex, target.todoLine);
             },
             {
               danger: true,
@@ -195,7 +207,8 @@ export function CardContextMenu({
                 aria-checked={c.id === todoColumn}
                 onClick={() => {
                   actioned.current = true;
-                  if (target.todoIndex !== undefined) a.moveTodo(path, target.todoIndex, c.id);
+                  if (target.todoIndex !== undefined)
+                    a.moveTodo(path, target.todoIndex, c.id, target.todoLine);
                   onClose();
                 }}
               >
@@ -209,7 +222,8 @@ export function CardContextMenu({
               title="Show it inside its card again"
               onClick={() => {
                 actioned.current = true;
-                if (target.todoIndex !== undefined) a.moveTodo(path, target.todoIndex, null);
+                if (target.todoIndex !== undefined)
+                  a.moveTodo(path, target.todoIndex, null, target.todoLine);
                 onClose();
               }}
             >

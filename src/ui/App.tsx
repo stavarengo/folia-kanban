@@ -665,15 +665,26 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         const i = list.indexOf(path);
         return { canMoveUp: i > 0, canMoveDown: i >= 0 && i < list.length - 1 };
       },
-      toggleTodo: (path, index, done) => {
+      readTodo: (path, index) => {
+        const b = boardRef.current;
+        const line = b && subtaskRef(b, path, index);
+        // A todo and nothing else. The actions this reading is taken for are the todo actions, and
+        // a line naming a child note is a different thing with a different write behind it — one
+        // that reaches into that other note. None of the callers can point at such a line today;
+        // handing one back would be the way that changes without anybody deciding it.
+        return line && line.kind === "todo" ? line : null;
+      },
+      toggleTodo: (path, index, done, at) => {
         void (async () => {
           try {
-            // The line as this board read it, text and all: the write refuses rather than tick a
-            // position the note has since given to somebody else's todo. A board that cannot name
-            // the line at all is a board this click no longer fits — said out loud, not swallowed,
-            // and followed by the reload that draws what is really there.
+            // The line as it was read, text and all: the write refuses rather than tick a position
+            // the note has since given to somebody else's todo. The caller's own reading when it
+            // has one — a menu read the line when it opened, and it outlives the reload that hands
+            // that position to the line below — and this board's when it does not. A board that
+            // cannot name the line at all is a board this click no longer fits — said out loud, not
+            // swallowed, and followed by the reload that draws what is really there.
             const b = boardRef.current;
-            const line = b && subtaskRef(b, path, index);
+            const line = at ?? (b && subtaskRef(b, path, index));
             if (!b || !line)
               throw new Error(`"${path}" no longer has the subtask that was clicked.`);
             // Ticking a box is also a statement about where the work belongs, for a line that
@@ -740,7 +751,21 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
             // brings the board onto it. Every other pick does reach the write, and a claim that
             // moved is refused there, loudly.
             const mut = moveSubtask(b, path, { index, line: read }, columnId);
-            if (mut) await repo.applyMove(mut);
+            if (!mut) {
+              // "The line already says this", by the reading the choice was made against — and that
+              // stays the answer however far the note has drifted since, because a pick that asks
+              // for no change has none to report and nothing was written for a drifted note to
+              // refuse. What it cannot cover is a position the board holds no line at: there the
+              // reading was not merely older, it was of a row that has gone, and the pick has
+              // nowhere to have landed. Only that is said out loud, and only when the caller's own
+              // reading is what got us past the guard above — the board's could not have.
+              if (subtaskRef(b, path, index)?.kind !== "todo")
+                throw new Error(
+                  `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
+                );
+              return;
+            }
+            await repo.applyMove(mut);
           } catch (e) {
             reportError(e);
           } finally {
@@ -748,11 +773,13 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           }
         })();
       },
-      removeTodo: (path, index) => {
+      removeTodo: (path, index, at) => {
         void (async () => {
           try {
             const b = boardRef.current;
-            const line = b && subtaskRef(b, path, index);
+            // Same two readings, same order, as ticking one: what the caller read, else what this
+            // board draws. The note refuses the delete when the position no longer holds that line.
+            const line = at ?? (b && subtaskRef(b, path, index));
             if (!line)
               throw new Error(
                 `The board no longer draws the todo that was removed from "${path}". Let it reload and try again.`,
