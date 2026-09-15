@@ -1,0 +1,68 @@
+---
+title: "AFTER the hardening: one reading, one chokepoint"
+---
+%%{init: {"flowchart": {"defaultRenderer": "elk", "curve": "basis", "nodeSpacing": 28, "rankSpacing": 60, "padding": 12}}}%%
+flowchart LR
+  subgraph S["Entry surfaces: each captures its reading when it opens"]
+    direction TB
+    menu["Right-click menu<br/>tick · remove · move"]
+    confirm["Tile 'Remove todo?' confirm"]
+    panel["Detail panel row<br/>dropdown · checkbox · ×"]
+    drag["Board drag · tile ✓ complete<br/>(captured at drag start / render)"]
+    mcp["MCP set_subtask_done · move_card<br/>(index · text · occurrence as get_card<br/>reported them; move_card accepts them)"]
+  end
+
+  ref["LineRef, required: no line?, no bare index<br/>index · text · occurrence, claim captured too<br/>occurrence = which of the identical lines,<br/>counted at capture"]
+
+  wl["Write layer<br/>toggleTodo · moveTodo · removeTodo<br/>setSubtaskDone · moveSubtask<br/>(moveCardTo → moveSubtask for a placed todo)<br/>all take at: LineRef"]
+
+  subgraph V["Repository: one resolve-then-write inside Vault.process"]
+    direction TB
+    resolve["resolve(at) against the text being changed<br/>parseSubtasks[index] + count of identical lines above"]
+    check{"text · occurrence still match?<br/>claim too, for a hand-picked column<br/>(ticks leave it to claimInStep)"}
+    write["write the line<br/>(a tick's claim still decided here<br/>by claimInStep)"]
+  end
+
+  ok["lands on the line the person meant"]
+  refused["one StaleLineError message<br/>nothing written · toast / ToolError · reload<br/>(moved · rewritten · claim changed · twin shifted)"]
+  residue["narrow residue: a twin with the same text<br/>(and claim, for a move)<br/>took the exact slot (inserted right above it,<br/>or the meant line deleted with the twin right below)"]
+
+  menu --> ref
+  confirm --> ref
+  panel --> ref
+  drag --> ref
+  mcp --> ref
+  ref --> wl
+  wl --> resolve
+  resolve --> check
+  check -->|no| refused
+  check -->|yes| write
+  write --> ok
+  check -.->|"yes, but it is a twin"| residue
+
+  subgraph K["Legend (same as today)"]
+    direction TB
+    k1["reading captured when the surface opened:<br/>survives a board reload"]
+    k2["reading from the board snapshot at click / drop:<br/>none left"]
+    k3["identical lines: occurrence narrows it,<br/>the exact-slot twin case remains"]
+    k4["refusal: intended behaviour"]
+  end
+
+  classDef green fill:#14331f,stroke:#4ade80,color:#e5e7eb
+  classDef amber fill:#3d2e0c,stroke:#fbbf24,color:#e5e7eb
+  classDef red fill:#461818,stroke:#f87171,color:#e5e7eb
+  classDef blue fill:#152a45,stroke:#60a5fa,color:#e5e7eb
+  classDef plain fill:#1f2430,stroke:#6b7280,color:#e5e7eb
+
+  class menu,confirm,panel,drag,mcp,ref,ok,k1 green
+  class k2 amber
+  class residue,k3 red
+  class refused,k4 blue
+  class wl,resolve,check,write plain
+  style S fill:#11151c,stroke:#30363d,color:#c9d1d9
+  style V fill:#11151c,stroke:#30363d,color:#c9d1d9
+  style K fill:#11151c,stroke:#30363d,color:#c9d1d9
+
+  linkStyle 0,1,2,3,4,5,6,7,9,10 stroke:#4ade80,stroke-width:2px
+  linkStyle 8 stroke:#60a5fa,stroke-width:2px
+  linkStyle 11 stroke:#f87171,stroke-width:2px

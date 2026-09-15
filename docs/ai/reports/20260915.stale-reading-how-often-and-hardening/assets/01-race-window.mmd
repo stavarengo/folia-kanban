@@ -1,0 +1,35 @@
+%%{init: {"sequence": {"mirrorActors": false, "noteAlign": "left"}}}%%
+sequenceDiagram
+  autonumber
+  actor P as Person
+  participant B as Board UI<br/>(snapshot)
+  participant N as Note on disk
+  participant W as Other pane / sync /<br/>MCP agent
+
+  Note over N: 0 "Feed the cat"<br/>1 "Buy milk"<br/>2 "Pay rent"
+  N->>B: loadBoard() → snapshot
+  B->>P: draws "Buy milk" as line 1
+
+  rect rgba(251, 191, 36, 0.14)
+    Note over P,W: INVOLUNTARY WINDOW: the change has landed, the redraw has not
+    W->>N: removes line 0 (Vault.process)
+    Note over N: 0 "Buy milk"<br/>1 "Pay rent"
+    P->>B: ✓ complete on "Buy milk"
+    Note over B: decided from the snapshot:<br/>index 1, text "Buy milk"
+    B->>N: write at index 1
+    N-->>B: vault "modify" → metadataCache "changed"<br/>→ 150 ms debounce → load()
+  end
+  B->>P: redraw from the note
+
+  rect rgba(96, 165, 250, 0.14)
+    Note over P,W: VOLUNTARY WINDOW: a menu or confirm opened before the change outlives the redraw
+    P->>B: right-click "Pay rent" (line 1) → menu opens
+    W->>N: inserts "Water the plants" at line 0
+    Note over N: 0 "Water the plants"<br/>1 "Buy milk"<br/>2 "Pay rent"
+    N-->>B: onChange → load() → board redrawn
+    Note over B: menu still open,<br/>still aimed at line 1
+    P->>B: Remove (seconds or minutes later)
+    B->>N: removeSubtask at index 1
+  end
+
+  Note over P,W: At the write, the note says whether index 1 still reads the way the click meant.<br/>Different text → StaleLineError, nothing written, toast + reload.<br/>Same text (an identical line slid in) → the write lands on the wrong line.
