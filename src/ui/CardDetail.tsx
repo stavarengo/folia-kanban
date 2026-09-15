@@ -1898,7 +1898,9 @@ export function CardDetail({
                           });
                           return;
                         }
-                        actions.moveTodo(path, s.index, value === "" ? null : value);
+                        // The line as this panel read it, not as the board did: what the column
+                        // replaces is the claim shown on this row, and the two readings can differ.
+                        actions.moveTodo(path, s.index, value === "" ? null : value, s);
                       }}
                     >
                       <option value="">With this card</option>

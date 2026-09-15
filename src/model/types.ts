@@ -57,7 +57,26 @@ export interface LineRef {
   index: number;
   /** The entry's text, as that same reader reports it (`SubItem.text`, a comment's `text`). */
   text: string;
+  /**
+   * For a checklist line whose `[status:: …]` claim this write replaces: the claim the caller read
+   * there (`null` — it read none), so the write refuses when the line claims something else by now.
+   * The text alone cannot say it — the field is stripped out of `SubItem.text`, so a claim changed
+   * underneath (another pane, another app, a sync pull) leaves a line reading exactly as it did,
+   * and the value about to go is one nobody at this end ever saw.
+   *
+   * Left out where the claim is not what this write was decided against: removing the line, editing
+   * a comment, ticking a box — a tick's own follow-up is worked out from the note when it lands
+   * (see `claimInStep`), so there is no earlier reading of the claim to hold it to.
+   */
+  claim?: string | null;
 }
+
+/**
+ * How a note's line differs from the {@link LineRef} a caller described: its words, or the
+ * `[status:: …]` claim the caller decided against — which the note still holds, and which is what a
+ * refusal has to name for the person to know whose value was about to go.
+ */
+export type LineDrift = { what: "text" } | { what: "claim"; found: string | null };
 
 type SubItemKind = "todo" | "card";
 

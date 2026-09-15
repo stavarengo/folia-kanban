@@ -720,11 +720,206 @@ describe("field edits and their history lines", () => {
       await expect(
         repo.applyMove({
           path: PATH,
-          setSubtaskStatus: { index: 1, text: "Ship it", status: "doing" },
+          setSubtaskStatus: { index: 1, text: "Ship it", claim: null, status: "doing" },
         }),
       ).rejects.toThrow(/no longer reads "Ship it"/);
 
       expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    // A claim changed underneath leaves the line reading exactly as it did, so the words alone
+    // cannot see it. The write says what the line has to still claim, and the note keeps the value
+    // somebody wrote in the meantime rather than having it replaced by one settled before it.
+    it("refuses a write whose chosen column replaces a claim that has moved since", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n",
+      );
+      app.vault.addFile(
+        PATH,
+        card(FRONTMATTER, "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: review]\n"),
+      );
+      const before = app.vault.text(PATH) ?? "";
+
+      await expect(
+        repo.applyMove({
+          path: PATH,
+          setSubtaskStatus: {
+            index: 0,
+            text: "Write the docs",
+            claim: "doing",
+            status: "done",
+          },
+        }),
+      ).rejects.toThrow(/now claims "review" where this write replaces "doing"/);
+
+      expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    // The write that is NOT held to an earlier reading, because it does not carry one: where the
+    // claim belongs after a tick is worked out here, from the claim the note has at this moment.
+    it("keeps a claim in step from what the note says now, not from what the caller read", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [x] Write the docs [status:: doing]\n",
+      );
+      // Moved to Done by somebody else after the board drew it; the untick has to clear it, which
+      // a decision taken against the older `doing` would not have done.
+      app.vault.addFile(
+        PATH,
+        card(FRONTMATTER, "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: done]\n"),
+      );
+
+      await repo.applyMove({
+        path: PATH,
+        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+      });
+
+      expect(app.vault.text(PATH)).toContain("- [ ] Write the docs\n");
+    });
+
+    it("leaves a note alone entirely when the line already says what the rule would", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: review]\n",
+      );
+      const before = app.vault.text(PATH) ?? "";
+      let writes = 0;
+      app.vault.on("modify", () => writes++);
+
+      // An open box on a line standing outside Done moves no claim: there is nothing to write.
+      await repo.applyMove({
+        path: PATH,
+        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+      });
+
+      expect(app.vault.text(PATH)).toBe(before);
+      expect(writes).toBe(0);
+    });
+
+    // The look that decides whether there is anything to write reads the file, not the display
+    // cache: the cache is allowed to lag, including behind the checkbox the tick itself just wrote,
+    // and a decision taken from it would leave a reopened line still standing in Done.
+    it("decides against the file even when the display cache is behind it", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: done]\n",
+      );
+      // What the box said before this call ticked it — which is all the cache has caught up with.
+      vi.spyOn(app.vault, "cachedRead").mockResolvedValue(
+        card(FRONTMATTER, "\n# One\n\n## Subtasks\n- [x] Write the docs [status:: done]\n"),
+      );
+
+      await repo.applyMove({
+        path: PATH,
+        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+      });
+
+      expect(app.vault.text(PATH)).toContain("- [ ] Write the docs\n");
+    });
+
+    // The look before the write only decides whether to write at all. The claim itself is worked
+    // out again inside `process`, against the very text about to change — the one place nothing can
+    // slip in behind. A note edited in that last moment is what tells the two apart.
+    it("works the claim out again on the text the write is actually changing", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [x] Write the docs [status:: todo]\n",
+      );
+      const process = app.vault.process.bind(app.vault);
+      vi.spyOn(app.vault, "process").mockImplementation(async (file, fn) => {
+        // Reopened from elsewhere between the read and the write: the line's box no longer says
+        // finished, so its claim belongs exactly where it is.
+        app.vault.addFile(
+          PATH,
+          card(FRONTMATTER, "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: todo]\n"),
+        );
+        return process(file, fn);
+      });
+
+      await repo.applyMove({
+        path: PATH,
+        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+      });
+
+      expect(app.vault.text(PATH)).toContain("- [ ] Write the docs [status:: todo]");
+    });
+
+    it("writes nothing when the claim itself goes in that last moment", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [x] Write the docs [status:: todo]\n",
+      );
+      const process = app.vault.process.bind(app.vault);
+      vi.spyOn(app.vault, "process").mockImplementation(async (file, fn) => {
+        // Sent back to living with its card: a line claiming nothing is left claiming nothing,
+        // ticked or not, so the write that was about to place it in Done must place nothing.
+        app.vault.addFile(
+          PATH,
+          card(FRONTMATTER, "\n# One\n\n## Subtasks\n- [x] Write the docs\n"),
+        );
+        return process(file, fn);
+      });
+
+      await repo.applyMove({
+        path: PATH,
+        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+      });
+
+      expect(app.vault.text(PATH)).toContain("- [x] Write the docs\n");
+      expect(app.vault.text(PATH)).not.toContain("[status::");
+    });
+
+    // Deciding the claim here does not make the line's identity anybody else's problem: a position
+    // that has become another line is refused exactly as every other write on a line is.
+    it("still refuses a claim sync aimed at a line the note no longer holds there", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [ ] Write the docs\n- [ ] Ship it [status:: doing]\n",
+      );
+      app.vault.addFile(
+        PATH,
+        card(
+          FRONTMATTER,
+          "\n# One\n\n## Subtasks\n- [ ] Snuck in\n- [ ] Write the docs [status:: doing]\n- [ ] Ship it [status:: doing]\n",
+        ),
+      );
+      const before = app.vault.text(PATH) ?? "";
+
+      await expect(
+        repo.applyMove({
+          path: PATH,
+          syncClaim: { index: 1, text: "Ship it", doneColumn: "done" },
+        }),
+      ).rejects.toThrow(/no longer reads "Ship it"/);
+
+      expect(app.vault.text(PATH)).toBe(before);
+    });
+
+    it("writes when the line still claims what the caller read, and says nothing when it was not asked", async () => {
+      const { app, repo } = repoWithCard(
+        "all",
+        "\n# One\n\n## Subtasks\n- [ ] Write the docs [status:: doing]\n",
+      );
+
+      await repo.applyMove({
+        path: PATH,
+        setSubtaskStatus: {
+          index: 0,
+          text: "Write the docs",
+          claim: "doing",
+          status: "done",
+        },
+      });
+
+      // The claim landed, and the checkbox — which this mutation says nothing about — did not move.
+      expect(app.vault.text(PATH)).toContain("- [ ] Write the docs [status:: done]");
+
+      // Removing the line takes the claim with it, so that write never states one.
+      await repo.removeSubtask(PATH, { index: 0, text: "Write the docs" });
+
+      expect(app.vault.text(PATH)).not.toContain("- [ ] Write the docs");
+      expect(app.vault.text(PATH)).toContain("Subtask removed: Write the docs");
     });
 
     it("refuses to edit or delete a comment that has moved, and writes no history for it", async () => {
@@ -1269,7 +1464,13 @@ describe("applying a move", () => {
 
     await repo.applyMove({
       path: "basic/Cards/One.md",
-      setSubtaskStatus: { index: 0, text: "Write the docs", status: "doing", done: true },
+      setSubtaskStatus: {
+        index: 0,
+        text: "Write the docs",
+        claim: null,
+        status: "doing",
+        done: true,
+      },
     });
 
     expect(app.vault.text("basic/Cards/One.md")).toContain("- [x] Write the docs [status:: doing]");
@@ -1379,7 +1580,7 @@ describe("applying a move", () => {
 
     await repo.applyMove({
       path: "basic/Cards/One.md",
-      setSubtaskStatus: { index: 0, text: "Write the docs", status: null },
+      setSubtaskStatus: { index: 0, text: "Write the docs", claim: "doing", status: null },
     });
 
     // The checkbox is not the move's business: a status-only move must leave it exactly as it was.

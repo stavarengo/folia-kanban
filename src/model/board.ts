@@ -903,8 +903,25 @@ export interface CardMutation {
    * An absent `done` leaves the box exactly as the note has it. Mutually exclusive with
    * `setFrontmatter` — a checklist line has no frontmatter of its own. `text` is what the line said
    * when the board read it, so the write refuses a position that has since become another line.
+   * `claim` is what it claimed then (`null` — nothing), for a `status` chosen against that value:
+   * the write refuses rather than replace a claim somebody has changed in the meantime. Left out by
+   * a write that replaces the claim for a reason of its own rather than in place of what it said.
    */
-  setSubtaskStatus?: { index: number; text: string; status: string | null; done?: boolean };
+  setSubtaskStatus?: {
+    index: number;
+    text: string;
+    claim?: string | null;
+    status: string | null;
+    done?: boolean;
+  };
+  /**
+   * Bring an inline todo's `[status:: …]` claim into step with its own checkbox, by the rule in
+   * {@link claimInStep} — applied to the claim AND the box the note carries when this lands, not to
+   * either as they read when the box was clicked. Both can move in between, and a rule answered
+   * half from now and half from then is how an unticked line ends up claiming Done. Nothing is
+   * written when the rule moves nothing, so a line that needs no follow-up is not rewritten at all.
+   */
+  syncClaim?: { index: number; text: string; doneColumn: string };
   /** Frontmatter keys to remove from `path` — how a subcard's own `status` claim is dropped. */
   unsetFrontmatter?: string[];
   /**
@@ -996,19 +1013,47 @@ export function planDrop(
  * it. That keeps the two ways a todo can say "finished" from disagreeing, since a line sitting in
  * the done column reads as done whether or not anyone ticked its box. Coming home does not touch
  * the checkbox at all — it says where a todo shows, never whether the work is over.
+ *
+ * `at.line` is the caller's own reading of that line, for a caller that has one. The column being
+ * chosen replaces whatever the line claimed, so the claim the write is held to has to be the one
+ * the person was looking at when they chose: the detail panel reads the note itself, and its reading
+ * is not always the board's. Left out, the board's own reading stands in — which is right for
+ * a tile the board itself drew.
  */
+/**
+ * The column a checklist line stands in by its own reading — its claim, with the done column
+ * winning once the line reads as finished, and its card's own column when it claims none this board
+ * draws. The same rule `buildBoard` mints a todo tile by; used where there is no tile to ask,
+ * because the line is one a caller read ahead of the board.
+ */
+function standsIn(board: Board, item: SubItem, home: string | null): string | null {
+  const claim = item.status ?? null;
+  if (claim === null || !board.config.columns.some((c) => c.id === claim)) return home;
+  const doneCol = findDoneColumn(board.config.columns);
+  return (item.done || claim === doneCol) && doneCol !== null ? doneCol : claim;
+}
+
 export function moveSubtask(
   board: Board,
   parentPath: string,
-  index: number,
+  at: { index: number; line?: SubItem },
   toColumnId: string | null,
 ): CardMutation | null {
   const parent = board.cards[parentPath];
+  const { index, line } = at;
   if (!parent) return null;
-  const item = parent.subItems?.find((s) => s.index === index && s.kind === "todo");
+  const drawn = parent.subItems?.find((s) => s.index === index && s.kind === "todo");
+  const item = line?.kind === "todo" && line.index === index ? line : drawn;
   if (!item) return null;
   const home = columnOf(board, parentPath);
-  const from = columnOf(board, makeTodoPath(parentPath, index)) ?? home;
+  // Where the line stands today, for the history line to name. The board's own tile answers that
+  // whenever the line being moved is the one the board drew — it knows about lanes, which no rule
+  // here could work out. A caller reading the note ahead of the board is moving a line the board
+  // has not seen, and then the only honest answer is the one the line itself gives.
+  const from =
+    drawn !== undefined && drawn.status === item.status && drawn.done === item.done
+      ? (columnOf(board, makeTodoPath(parentPath, index)) ?? home)
+      : standsIn(board, item, home);
   const target = toColumnId ?? home;
   // "The column my card is in" and "no claim of my own" name the same place, and only one of them
   // keeps naming it after the card moves. So a move that lands on the card's own column is written
@@ -1031,16 +1076,49 @@ export function moveSubtask(
   if (claim === claimTo && (done === undefined || item.done === done)) {
     return null; // the line already says this
   }
+  // A column chosen by hand replaces whatever the line claimed, so the write may only land on the
+  // value it was chosen against: a claim somebody has moved in the meantime is theirs, and the
+  // person who picked this column never saw it.
   const setSubtaskStatus =
     done === undefined
-      ? { index, text: item.text, status: claimTo }
-      : { index, text: item.text, status: claimTo, done };
+      ? { index, text: item.text, claim, status: claimTo }
+      : { index, text: item.text, claim, status: claimTo, done };
   const label = item.text || "todo";
   return {
     path: parentPath,
     setSubtaskStatus,
     history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
   };
+}
+
+/**
+ * The tile a checklist line would be drawn as, standing in `at.columnId` — what a rule has to be
+ * read against before that claim is written, for a line the board draws no tile for yet or draws
+ * under words the caller's own reading has moved past.
+ *
+ * Minted exactly as `buildBoard` mints a placed todo, down to the parent's own name and context,
+ * because a lane's rule reads those: judged instead against a bare stand-in, a line whose parent
+ * sits in a context would be refused by the very lane that is about to draw it. `null` when the
+ * board knows no such card to take them from.
+ */
+export function prospectiveTodo(
+  board: Board,
+  parentPath: string,
+  at: { index: number; text: string; columnId: string },
+): Card | null {
+  const parent = board.cards[parentPath];
+  if (!parent) return null;
+  const card: Card = {
+    path: makeTodoPath(parentPath, at.index),
+    basename: parent.basename,
+    title: at.text,
+    titleSource: "subtask",
+    frontmatter: { status: at.columnId },
+    childLinks: [],
+    todoRef: { parentPath, index: at.index, claim: at.columnId },
+  };
+  if (parent.context !== undefined) card.context = parent.context;
+  return card;
 }
 
 /**
@@ -1053,26 +1131,45 @@ export function subtaskRef(board: Board, parentPath: string, index: number): Sub
 }
 
 /**
+ * Where a checklist line's `[status:: …]` claim belongs, given the box on that same line.
+ *
+ * A checked box says the work is finished, and finished work belongs in the done column — so a line
+ * that claims a column has its claim moved there rather than left saying something the board no
+ * longer renders. An unchecked one claiming done drops the claim instead of inventing a column
+ * nobody chose: the todo goes back to living with its card, which is where it started. A line
+ * claiming nothing is left alone — ticking a plain todo has never placed it anywhere and must not
+ * start now — and so is every line on a board with no done column, where "finished work belongs in
+ * the done column" names nowhere.
+ *
+ * Both halves come from the line as the note has it when the write is made, never from a reading
+ * taken when a box was clicked: those can be minutes apart, and either half may have moved. Returns
+ * the claim unchanged when there is nothing to move.
+ */
+export function claimInStep(
+  claim: string | null,
+  done: boolean,
+  doneColumn: string | null,
+): string | null {
+  if (claim === null || doneColumn === null) return claim;
+  if (done) return doneColumn;
+  return claim === doneColumn ? null : claim;
+}
+
+/**
  * The follow-up write that keeps a placed todo's claim in step with its checkbox, or `null` when
- * there is nothing to keep in step.
+ * this line can have nothing to keep in step whatever it claims.
  *
- * Ticking a line's box says the work is finished, and finished work belongs in the done column — so
- * a line that claims a column has its claim moved there rather than left saying something the board
- * no longer renders. Unticking one that claims done drops the claim instead of inventing a column
- * nobody chose: the todo goes back to living with its card, which is where it started.
- *
- * A line claiming nothing is left entirely alone. Ticking a plain todo has never placed it
- * anywhere, and it must not start now — and neither does a board with no done column at all, where
- * "finished work belongs in the done column" names nowhere and the claim is left exactly as it is.
+ * For a plain todo that write is {@link claimInStep} applied to the note itself: what the claim
+ * should become depends on what it IS, and every caller's reading of that is older than the write —
+ * so the rule travels to the write and is answered there, rather than an answer settled here
+ * travelling to a line that has moved on. For a line naming a child note the claim lives in the
+ * child's own frontmatter, and that write is decided here, from the board.
  *
  * `line` is the checklist line as the CALLER read it, whole — the panel's own reading of the note,
  * the tool's, or the board's when it is the board that was clicked. Every one of them reads it
  * through `parseSubtasks`, so which branch it takes below is the note's own answer to "is this line
- * a todo or a link to a card", never a caller's guess at it. A line's own claim is written
- * on the line, so it is read from there and never from the board's copy of that position: a board
- * one reload behind would otherwise decide the answer for a line nobody was looking at, or, if it
- * were made to refuse instead, leave an unticked line still claiming Done. The board is asked only
- * what it alone knows — which column means finished, and where a linked child currently stands.
+ * a todo or a link to a card", never a caller's guess at it. The board is asked only what it alone
+ * knows — which column means finished, and where a linked child currently stands.
  */
 export function syncSubtaskClaim(
   board: Board,
@@ -1117,10 +1214,13 @@ export function syncSubtaskClaim(
     if (parentLines.length > 0) mutation.parentLines = parentLines;
     return mutation;
   }
-  if (line.status === undefined) return null; // claims nothing — nothing to keep in step
-  const next = done ? doneCol : line.status === doneCol ? null : line.status;
-  if (next === line.status) return null;
-  return { path: parentPath, setSubtaskStatus: { index, text: line.text, status: next } };
+  // With no done column, `claimInStep` moves nothing whatever the line says, so there is nothing to
+  // ask the note. Every other case goes to the note as the rule it is: neither the claim the caller
+  // read nor the box it just asked for is consulted here, because by the time this is written the
+  // note is the only thing that knows either — and an answer taken half from that reading and half
+  // from the note is how a line ends up with a box and a claim telling different stories.
+  if (doneCol === null) return null;
+  return { path: parentPath, syncClaim: { index, text: line.text, doneColumn: doneCol } };
 }
 
 /**
@@ -1196,6 +1296,12 @@ export function reassignColumn(
     path: todoRef.parentPath,
     // A todo tile's title IS its checklist line's text (that is what `buildBoard` mints it from),
     // which is what the write needs to recognise the line it was told to move.
+    //
+    // No claim is stated: this write does not replace a value it was chosen against, it rehomes a
+    // line out of a column that is going away, and a checked line stands in Done whatever it claims
+    // — so the claim the board read there is not the value this is about. Holding the write to it
+    // would refuse the rehoming of a line whose claim moved, and leave that line claiming a column
+    // that no longer exists once the delete goes through, with nothing left to repeat the edit on.
     setSubtaskStatus: { index: todoRef.index, text: card.title, status: toColumnId },
   };
 }
@@ -1245,7 +1351,7 @@ export function moveCard(
   if (!card) return null;
   const fromStatus = String(card.frontmatter.status ?? "");
   const todoRef = card.todoRef;
-  if (todoRef) return moveSubtask(board, todoRef.parentPath, todoRef.index, toColumnId);
+  if (todoRef) return moveSubtask(board, todoRef.parentPath, { index: todoRef.index }, toColumnId);
   const colCards = (board.columns[toColumnId] ?? [])
     .filter((p) => p !== cardPath)
     .flatMap((p) => {

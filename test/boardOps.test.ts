@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../src/model/boardOps";
-import { columnOf } from "../src/model/board";
+import { columnOf, makeTodoPath, moveSubtask } from "../src/model/board";
 import type { SubItem } from "../src/model/types";
 import type { BoardConfig } from "../src/model/types";
 import { FakeRepo } from "./fakeRepo";
@@ -255,6 +255,215 @@ describe("setSubtaskDone when the note has moved on", () => {
     ).rejects.toThrow(/no longer reads "Draft it"/);
 
     expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+  });
+
+  // The claim half is not decided from the caller's reading at all: it is worked out from the claim
+  // the note carries when the write lands. So a line somebody moved to another column is still sent
+  // to Done by a tick, from wherever it is now.
+  it("ticks a line somebody moved to another column, and sends it to Done from there", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    // Another pane, another app, or a sync pull, after the board drew the line.
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it [status:: review]\n";
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Draft it", "doing"),
+      done: true,
+    });
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] Draft it [status:: done]");
+  });
+
+  // The case a decision taken from the caller's reading gets wrong, and the reason this one is not:
+  // read as claiming Doing, this untick has nothing to keep in step and would leave an unticked
+  // line standing in Done for good. Read from the note, it is a line claiming Done being reopened.
+  it("clears a claim that reached Done after the board read the line", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [x] Draft it [status:: done]\n";
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Draft it", "doing", true),
+      done: false,
+    });
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [ ] Draft it\n");
+    expect((await repo.readBody("Tasks/A.md")).subtasks[0]?.status).toBeUndefined();
+  });
+
+  // The mirror of it: a line that has stopped claiming anything is not placed work, and a tick must
+  // not hand it a column nobody chose. The box is written and the claim left absent.
+  it("ticks a line that has come home since it was read, without placing it anywhere", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it\n";
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Draft it", "doing"),
+      done: true,
+    });
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] Draft it\n");
+    expect(repo.files.get("Tasks/A.md")!.body).not.toContain("[status::");
+  });
+
+  // And a line that has GAINED a claim is kept in step by the same rule, though the reading behind
+  // the click knew of no claim to keep: a finished line goes to Done from wherever it now stands.
+  it("keeps a claim added since the board read the line in step with the box", async () => {
+    const repo = claimedLine();
+    const board = await repo.loadBoard();
+    await repo.addTodo("Tasks/A.md", "Two");
+    repo.files.get("Tasks/A.md")!.body = repo.files
+      .get("Tasks/A.md")!
+      .body.replace("- [ ] Two", "- [ ] Two [status:: doing]");
+
+    await setSubtaskDone(repo, board, { path: "Tasks/A.md", line: todoLine(1, "Two"), done: true });
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] Two [status:: done]");
+  });
+
+  // Both halves of the rule come from the note, not one from the note and one from the click: a box
+  // somebody has flipped back in the moment between the two writes decides the claim, so a tick
+  // whose box no longer stands cannot file the line under Done on its way past.
+  it("follows the box the note has now, not the one the click asked for", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+    const board = await repo.loadBoard();
+    const toggle = repo.toggleSubtask.bind(repo);
+    vi.spyOn(repo, "toggleSubtask").mockImplementation(async (path, at, done) => {
+      await toggle(path, at, done);
+      // Somebody places the todo in Doing — and reopens it — right after the box is written.
+      repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n";
+    });
+
+    await setSubtaskDone(repo, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Draft it"),
+      done: true,
+    });
+
+    // The claim stays where that move put it; a rule half-read from the click would say Done.
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [ ] Draft it [status:: doing]");
+  });
+
+  it("writes no claim at all on a board with no done column", async () => {
+    const noDone = new FakeRepo(
+      { ...config, columns: config.columns.filter((c) => c.id !== "done") },
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+    const board = await noDone.loadBoard();
+    noDone.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it [status:: review]\n";
+
+    await setSubtaskDone(noDone, board, {
+      path: "Tasks/A.md",
+      line: todoLine(0, "Draft it", "doing"),
+      done: true,
+    });
+
+    // "Finished work belongs in the done column" names nowhere here, so the claim is left as it is.
+    expect(noDone.files.get("Tasks/A.md")!.body).toContain("- [x] Draft it [status:: review]");
+  });
+
+  // A line naming a child note keeps its column in the child's own frontmatter, so a field typed
+  // onto such a line is not a claim anybody decided from — and must not refuse the tick.
+  it("ticks a line naming a child note whatever field somebody typed onto it", async () => {
+    const repo = new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] [[B]] [status:: doing]\n",
+        },
+        "Tasks/B.md": { fm: { status: "todo", order: 1 }, body: "" },
+      },
+      () => "all",
+      () => "",
+    );
+    const board = await repo.loadBoard();
+    const line = board.cards["Tasks/A.md"]?.subItems?.[0];
+
+    await setSubtaskDone(repo, board, { path: "Tasks/A.md", line: line!, done: true });
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] [[B]] [status:: doing]");
+    expect((await repo.loadBoard()).cards["Tasks/B.md"]?.frontmatter.status).toBe("done");
+  });
+});
+
+// The other two ways a placed todo changes column: dragging its tile, and picking a column from the
+// detail panel's dropdown. Here the column is chosen by hand rather than worked out from the line,
+// so the value it replaces IS what the person chose against: both name the claim they were shown
+// and refuse rather than write over a value somebody else set in the meantime.
+describe("moving a placed todo whose claim has moved underneath", () => {
+  const placedTodo = () =>
+    new FakeRepo(
+      config,
+      {
+        "Tasks/A.md": {
+          fm: { status: "todo", order: 1 },
+          body: "\n## Subtasks\n\n- [ ] Draft it [status:: doing]\n",
+        },
+      },
+      () => "all",
+      () => "",
+    );
+
+  it("refuses the drag, and leaves the line exactly as the note has it", async () => {
+    const repo = placedTodo();
+    const board = await repo.loadBoard();
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it [status:: review]\n";
+    const before = repo.files.get("Tasks/A.md")!.body;
+
+    // Released over the Done column, the way a finished drag arrives from the board view.
+    await expect(
+      moveCardOver(repo, board, { activeId: makeTodoPath("Tasks/A.md", 0), overId: "done" }),
+    ).rejects.toThrow(/now claims "review" where this write replaces "doing"/);
+
+    expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+  });
+
+  it("refuses the panel's column dropdown the same way", async () => {
+    const repo = placedTodo();
+    const board = await repo.loadBoard();
+    repo.files.get("Tasks/A.md")!.body = "\n## Subtasks\n\n- [ ] Draft it [status:: review]\n";
+    const before = repo.files.get("Tasks/A.md")!.body;
+
+    // What the dropdown does: the same reducer, applied straight to the repository.
+    const mutation = moveSubtask(board, "Tasks/A.md", { index: 0 }, "done");
+    await expect(repo.applyMove(mutation!)).rejects.toThrow(
+      /now claims "review" where this write replaces "doing"/,
+    );
+
+    expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
+  });
+
+  it("still writes when the note claims what the board read there", async () => {
+    const repo = placedTodo();
+    const board = await repo.loadBoard();
+
+    expect(
+      await moveCardTo(repo, board, { path: makeTodoPath("Tasks/A.md", 0), columnId: "done" }),
+    ).toBe(true);
+
+    expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] Draft it [status:: done]");
   });
 });
 

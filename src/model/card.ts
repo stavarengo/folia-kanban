@@ -10,7 +10,7 @@
 // vault.process(file, text => ...).
 
 import { parse as parseYaml } from "yaml";
-import type { CardBody, CardStats, LineRef, SubItem } from "./types";
+import type { CardBody, CardStats, LineDrift, LineRef, SubItem } from "./types";
 import { fencedLines, unclosedFence } from "./fences";
 import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
@@ -406,21 +406,32 @@ export function parseBody(text: string): CardBody {
 }
 
 /**
- * Whether `text` still reads, at that position, the checklist line the caller described. Asked
- * inside the write, against the very text about to be changed: the index was produced by a read
- * that may be minutes old, and a line inserted above it since would silently hand the write
+ * How `text` has moved on from the checklist line the caller described, or `null` when it has not.
+ * Asked inside the write, against the very text about to be changed: the index was produced by a
+ * read that may be minutes old, and a line inserted above it since would silently hand the write
  * somebody else's todo. Compared through `parseSubtasks`, the same reader every caller got its
- * `SubItem.text` from, so a `[status:: …]` field or an indent can never make a line look changed.
+ * `SubItem` from, so an indent can never make a line look changed.
+ *
+ * The words are only half of what names a line, for a write that replaces the `[status:: …]` value
+ * it was chosen against: the field is not part of `SubItem.text`, so a claim changed underneath
+ * reads as the same line by every word this can see. Such a caller says which claim it saw
+ * ({@link LineRef.claim}), and the note keeps a value written since rather than having it replaced
+ * by one nobody at this end ever read. A line naming a child note is the exception the reader itself
+ * makes: `parseSubtasks` reports no claim for one, on either side of this comparison, because such
+ * a line's column lives in the child's own frontmatter.
  */
-export function subtaskStillReads(text: string, at: LineRef): boolean {
-  return parseSubtasks(text)[at.index]?.text === at.text;
+export function subtaskDrift(text: string, at: LineRef): LineDrift | null {
+  const item = parseSubtasks(text)[at.index];
+  if (item?.text !== at.text) return { what: "text" };
+  if (at.claim === undefined) return null;
+  const found = item.status ?? null;
+  return found === at.claim ? null : { what: "claim", found };
 }
 
 /** The same question for a `## Comments` entry, read the way the panel that offered it read it. */
-export function commentStillReads(text: string, at: LineRef): boolean {
-  return (
-    parseTimestamped(splitFrontmatter(text).body, SECTION.comments)[at.index]?.text === at.text
-  );
+export function commentDrift(text: string, at: LineRef): LineDrift | null {
+  const entry = parseTimestamped(splitFrontmatter(text).body, SECTION.comments)[at.index];
+  return entry?.text === at.text ? null : { what: "text" };
 }
 
 export function cardStats(text: string): CardStats {

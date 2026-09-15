@@ -770,6 +770,57 @@ describe("card detail", () => {
     expect(await within(detail).findByText("extra task")).toBeInTheDocument();
   });
 
+  // Picking a column for a todo replaces whatever its line claimed, and what the person picked
+  // against is what the panel was showing. A value somebody else wrote since is theirs: the write
+  // is refused, the note keeps it, and the reason is on screen rather than in the note's history.
+  it("says so instead of writing over a claim changed under the panel's column picker", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] real one [status:: doing]\n",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("First", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    // Edited elsewhere while the panel sat open on its own reading of the line.
+    repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] real one\n";
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await user.selectOptions(within(detail).getByLabelText("Column for real one"), "done");
+
+    expect(await screen.findByText(/now claims no column of its own/)).toHaveClass(
+      "folia-toast-error",
+    );
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // The panel reads the note itself, so its rows can be newer than the board behind them. What the
+  // person picked against is the row they were looking at, and that is what the write is held to.
+  it("holds the column picker to the claim the panel showed, not the board's older one", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] real one [status:: doing]\n",
+      },
+    });
+    render_(repo);
+    const tile = await screen.findByText("First", { selector: ".folia-card-title" });
+    // Moved elsewhere before the panel opens: the panel's own read sees `review`, the board `doing`.
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] real one [status:: review]\n";
+    await user.click(tile);
+    const detail = await screen.findByTestId("card-detail");
+
+    await user.selectOptions(within(detail).getByLabelText("Column for real one"), "done");
+
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[x\] real one \[status:: done\]/),
+    );
+  });
+
   it("gives every subitem the same column picker, whichever kind it is", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
@@ -2231,6 +2282,32 @@ describe("card context menu", () => {
     await waitFor(() =>
       expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[x\] real one \[status:: done\]/),
     );
+  });
+
+  // Where the claim belongs after a tick is worked out from the note as the write lands, so a claim
+  // changed under the drawn board does not send the line to a column decided before that change.
+  it("ticks a line whose claim was changed under the board, against what the note says now", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] real one [status:: doing]\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    await screen.findByText("First", { selector: ".folia-card-title" });
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    // Sent back to living with its card in another pane, while this board sat there drawn.
+    repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] real one\n";
+
+    fireEvent.contextMenu(within(doing).getByText("real one"));
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
+
+    // The box is written; the line is not handed a column nobody put it in.
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[x\] real one\n/),
+    );
+    expect(repo.files.get("Tasks/First.md")!.body).not.toContain("[status::");
   });
 
   it("shows the line's real claim on a next-todo row, not a blank one", async () => {
@@ -4535,6 +4612,83 @@ describe("the detail panel reports a failed write", () => {
 
     expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
     expect(repo.files.get("Tasks/Alpha.md")?.body).toBe(before);
+  });
+
+  // The lane judges the line actually being moved. A line added above since the board was drawn
+  // leaves the board's tile at that index belonging to a different todo, and a rule read from the
+  // other one's words would wave through — or refuse — on somebody else's account.
+  it("judges the lane on the line the panel is moving, not the tile at that index", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "chosen", title: "Chosen", filter: "Alpha" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        // The card sits in Done, so a line claiming Todo is drawn as a tile of its own there.
+        "Tasks/Card.md": {
+          fm: { type: "task", status: "done" },
+          body: "\n# Card\n\n## Subtasks\n- [ ] Alpha [status:: todo]\n",
+        },
+      },
+    );
+    render_(repo);
+    const tile = await screen.findByText("Card", { selector: ".folia-card-title" });
+    // A second todo lands above Alpha, so index 0 is Beta on the note and still Alpha on the board.
+    repo.files.get("Tasks/Card.md")!.body =
+      "\n# Card\n\n## Subtasks\n- [ ] Beta [status:: todo]\n- [ ] Alpha [status:: todo]\n";
+    await user.click(tile);
+    const detail = await screen.findByTestId("card-detail");
+    const before = repo.files.get("Tasks/Card.md")!.body;
+
+    await user.selectOptions(await within(detail).findByLabelText("Column for Beta"), "chosen");
+
+    // The lane's rule is the word "Alpha", which Beta does not match — judged on Beta, not on the
+    // tile the board still has at index 0.
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Card.md")!.body).toBe(before);
+  });
+
+  // And judged as the tile it will BE: a placed todo inherits its card's context and name, so a
+  // lane reading either must see them, or it would refuse the very line it is about to draw.
+  it("judges that line as the tile the board will draw, context and all", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "work", title: "Work", filter: "context:Work" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Work/Card.md": {
+          fm: { type: "task", status: "done" },
+          body: "\n# Card\n\n## Subtasks\n- [ ] Alpha [status:: todo]\n",
+        },
+      },
+    );
+    render_(repo);
+    // The card itself matches the lane too, so it is drawn twice; either tile opens the same panel.
+    const [tile] = await screen.findAllByText("Card", { selector: ".folia-card-title" });
+    // Reworded elsewhere, so the board's tile at index 0 is no longer this line by its words.
+    repo.files.get("Tasks/Work/Card.md")!.body =
+      "\n# Card\n\n## Subtasks\n- [ ] Beta [status:: todo]\n";
+    await user.click(tile!);
+    const detail = await screen.findByTestId("card-detail");
+
+    await user.selectOptions(await within(detail).findByLabelText("Column for Beta"), "work");
+
+    // The line lives in a note under `Work/`, so the lane's rule holds and the claim is written.
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Work/Card.md")!.body).toContain("- [ ] Beta [status:: work]"),
+    );
+    expect(screen.queryByText(/does not match it/)).toBeNull();
   });
 
   it("rehomes a deleted column's cards to a plain column, never into a lane", async () => {

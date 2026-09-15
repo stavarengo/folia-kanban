@@ -17,8 +17,10 @@ import type {
   ColumnDef,
   ContextConfig,
   HistoryScope,
+  LineDrift,
   LineRef,
   RelationType,
+  SubItem,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
@@ -26,7 +28,7 @@ import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "../viewMode";
 import { VIEW_TYPE_KANBAN } from "../viewType";
 import { attachPropertySuggest } from "./propertySuggest";
-import { buildBoard, resolveCardFolder } from "../model/board";
+import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
 import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
 import { dateOnly, stamp } from "../model/dates";
@@ -37,7 +39,7 @@ import {
   appendComment,
   appendHistory,
   cardStats,
-  commentStillReads,
+  commentDrift,
   parseBody,
   parseFrontmatter,
   parseSubtasks,
@@ -49,7 +51,7 @@ import {
   setSubtaskDone,
   setSubtaskStatus as setSubtaskStatusText,
   splitFrontmatter,
-  subtaskStillReads,
+  subtaskDrift,
   updateTimestampedLine,
 } from "../model/card";
 import {
@@ -478,19 +480,19 @@ export class VaultRepository implements CardRepository, HoverParent {
     at: LineRef,
     write: (text: string) => string,
   ): Promise<void> {
-    const stillReads = kind === "subtask" ? subtaskStillReads : commentStillReads;
-    let stale = false;
+    const driftOf = kind === "subtask" ? subtaskDrift : commentDrift;
+    let drift: LineDrift | null = null;
     await this.editBody(path, (t) => {
-      stale = !stillReads(t, at);
-      return stale ? t : write(t);
+      drift = driftOf(t, at);
+      return drift ? t : write(t);
     });
-    if (!stale) return;
+    if (drift === null) return;
     // Nothing was written, so the echo guard this call set on the way in is guarding nothing:
     // dropping it keeps the next change from elsewhere — the very change that made this one
     // refuse — from being swallowed as ours. At worst it costs one extra reload, when an earlier
     // write of ours really did land on this note moments ago.
     this.recentWrites.delete(path);
-    throw staleLine(kind, path, at);
+    throw staleLine(kind, path, at, drift);
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
@@ -503,14 +505,49 @@ export class VaultRepository implements CardRepository, HoverParent {
       // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
       // where a subitem sits, so writing them separately would leave a moment where the board
       // reloads on a line that says two different things.
-      const { index, text, status, done } = mutation.setSubtaskStatus;
-      await this.editLine(mutation.path, "subtask", { index, text }, (t) =>
+      const { index, text, claim, status, done } = mutation.setSubtaskStatus;
+      const at: LineRef = claim === undefined ? { index, text } : { index, text, claim };
+      await this.editLine(mutation.path, "subtask", at, (t) =>
         setSubtaskStatusText(
           done === undefined ? t : setSubtaskDone(t, index, done),
           index,
           status,
         ),
       );
+    }
+    if (mutation.syncClaim) {
+      // Where the claim belongs is worked out HERE, from the claim AND the box the note carries as
+      // the write is made, rather than carried in from a reading taken when the box was clicked:
+      // those can be minutes apart, and either half moving changes the answer. Read once first so a
+      // line the rule moves nowhere is not rewritten at all (the same two looks `parentLines` takes
+      // below), then decided again inside the write, which is the text that actually changes.
+      const { index, text, doneColumn } = mutation.syncClaim;
+      const nextFor = (item: SubItem | undefined): string | null | undefined =>
+        item && claimInStep(item.status ?? null, item.done, doneColumn);
+      // `read`, not `cachedRead`: this look decides whether a write happens, and the display cache
+      // is allowed to lag the file — not least behind the checkbox this very call just wrote.
+      const seen = parseSubtasks(await this.app.vault.read(this.file(mutation.path)))[index];
+      // Skipped only when this IS the caller's line and the rule leaves its claim where it is. A
+      // position that has become somebody else's line goes on into the write, which refuses it —
+      // the tick that was already written is on a line whose claim nobody has kept in step, and
+      // that is the caller's to hear rather than ours to pass over as "nothing to do".
+      //
+      // This look is the same read-then-write `parentLines` takes below, and carries the same
+      // window: a claim that changes between it and the write is answered by the write, but one
+      // that changes after a "nothing to do" read is not seen at all, and the line keeps a claim
+      // the tick would have moved. The alternative is a `process` pass on every tick of every
+      // claimless todo — a write of identical bytes, and the mtime and sync churn that goes with
+      // it — for a window of one await.
+      const settled =
+        seen !== undefined && seen.text === text && nextFor(seen) === (seen.status ?? null);
+      if (!settled) {
+        await this.editLine(mutation.path, "subtask", { index, text }, (t) => {
+          const item = parseSubtasks(t)[index];
+          const was = item?.status ?? null;
+          const next = nextFor(item);
+          return next === undefined || next === was ? t : setSubtaskStatusText(t, index, next);
+        });
+      }
     }
     if (mutation.history) {
       const historyLine = mutation.history;

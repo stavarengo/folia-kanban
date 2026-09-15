@@ -70,7 +70,6 @@ export async function setSubtaskDone(
   target: { path: string; line: SubItem; done: boolean; ctx?: MatchContext },
 ): Promise<string | null> {
   const { path, line, done } = target;
-  await repo.toggleSubtask(path, line, done);
   // The follow-up is decided from the same reading of the line the tick was, so the two halves can
   // never name two different lines, and a board one reload behind cannot decide either of them. For
   // a line naming a child note, `syncSubtaskClaim` still refuses unless the board agrees the line
@@ -78,6 +77,7 @@ export async function setSubtaskDone(
   // must not be enough to move somebody else's card. They are two writes, though: a note edited in
   // the moment between them can have the second refused on its own, and that says so rather than
   // leaving the caller to find a ticked box with a claim that never moved.
+  await repo.toggleSubtask(path, line, done);
   const sync = syncSubtaskClaim(board, path, line, done);
   if (!sync) return null;
   // The second half files the child into a column, and a lane owns no card: one whose rule the

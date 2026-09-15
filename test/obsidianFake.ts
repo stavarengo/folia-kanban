@@ -313,6 +313,15 @@ export class FakeVault extends Events {
     return Promise.resolve(this.texts.get(file.path) ?? "");
   }
 
+  /**
+   * The uncached read, which a real vault answers from the file rather than from its display cache.
+   * Separate here for the same reason it is separate there: a test can make `cachedRead` lag behind
+   * the file, and anything deciding a write must not be fooled by that.
+   */
+  read(file: TFile): Promise<string> {
+    return Promise.resolve(this.texts.get(file.path) ?? "");
+  }
+
   async process(file: TFile, fn: (text: string) => string): Promise<string> {
     const next = fn(this.texts.get(file.path) ?? "");
     this.texts.set(file.path, next);

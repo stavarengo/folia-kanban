@@ -9,6 +9,7 @@ import {
   moveColumn,
   moveSubtask,
   parseTodoPath,
+  prospectiveTodo,
   resolveDrop,
   reassignColumn,
   relationCounts,
@@ -694,19 +695,27 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           }
         })();
       },
-      moveTodo: (path, index, columnId) => {
+      moveTodo: (path, index, columnId, line) => {
         const b = boardRef.current;
         if (!b) return;
+        // The caller's own reading of the line when it has one — the panel reads the note itself —
+        // and the board's when it does not, which is what a tile the board drew was drawn from.
+        const read = line ?? subtaskRef(b, path, index);
         // A placed checklist line stands in a column exactly as a card does, so a lane may no more
         // take one by hand. Judged on the line's own tile when it already has one — it can carry
         // inline fields a rule reads — and otherwise on the bare line the claim is about to mint.
+        // The tile only answers for the line actually being moved: a caller reading the note ahead
+        // of the board can be moving a line the board has at that index under another name, and
+        // judging that one would refuse, or wave through, on somebody else's words.
         if (columnId !== null) {
-          const line = subtaskRef(b, path, index);
+          const tile = b.cards[makeTodoPath(path, index)];
           const todo =
-            b.cards[makeTodoPath(path, index)] ?? prospectiveCard(line?.text ?? "", columnId);
-          if (refusedByLane(columnId, todo)) return;
+            tile && tile.title === read?.text
+              ? tile
+              : prospectiveTodo(b, path, { index, text: read?.text ?? "", columnId });
+          if (todo && refusedByLane(columnId, todo)) return;
         }
-        const mut = moveSubtask(b, path, index, columnId);
+        const mut = moveSubtask(b, path, read ? { index, line: read } : { index }, columnId);
         if (!mut) return;
         void (async () => {
           try {

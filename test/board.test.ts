@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyReloc,
   buildBoard,
+  claimInStep,
   resolveCardFolder,
   columnEffectiveOrders,
   computeDropOrder,
@@ -1309,15 +1310,16 @@ describe("subitems in a column of their own", () => {
       withTodos("Root", { status: "todo" }, [todo("Pinned home", 0, "todo")]),
     ]);
     // It renders with its card, but the line still claims `todo` — sending it home must write.
-    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toMatchObject({
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 0, text: "Pinned home", status: null },
     });
     // Naming that same column is the same request, so it clears the claim rather than restating it:
     // a claim pinning a todo to its card's column would detach the todo the day the card moves.
-    expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")?.setSubtaskStatus).toEqual({
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "todo")?.setSubtaskStatus).toEqual({
       index: 0,
       text: "Pinned home",
+      claim: "todo",
       status: null,
       done: false,
     });
@@ -1325,8 +1327,8 @@ describe("subitems in a column of their own", () => {
 
   it("writes nothing when an unclaimed todo is sent to the column it already shows in", () => {
     const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("Plain", 0)])]);
-    expect(moveSubtask(b, "Tasks/Root.md", 0, "todo")).toBeNull();
-    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "todo")).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toBeNull();
   });
 
   it("leaves a claim alone when the board has no done column to move it to", () => {
@@ -1350,12 +1352,13 @@ describe("subitems in a column of their own", () => {
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [todo("Finished", 0, "done", true)]),
     ]);
-    expect(moveSubtask(b, "Tasks/Root.md", 0, null)?.setSubtaskStatus).toEqual({
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)?.setSubtaskStatus).toEqual({
       index: 0,
       text: "Finished",
+      claim: "done",
       status: null,
     });
-    expect(moveSubtask(b, "Tasks/Root.md", 0, "doing")).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "doing")).toMatchObject({
       setSubtaskStatus: { index: 0, text: "Finished", status: "doing", done: false },
     });
   });
@@ -1417,7 +1420,10 @@ describe("subitems in a column of their own", () => {
     ]);
   });
 
-  it("keeps a claim in step with the checkbox, and only for a line that makes one", () => {
+  // Where the claim belongs after a tick is not settled here: the rule goes to the write, which
+  // answers it from the claim the note carries then. What is settled here is which line, and
+  // whether this board has a done column for the rule to name at all.
+  it("sends the claim rule to the write rather than an answer read off the board", () => {
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [
         todo("Placed", 0, "doing"),
@@ -1425,32 +1431,35 @@ describe("subitems in a column of their own", () => {
         todo("Finished", 2, "done", true),
       ]),
     ]);
-    // Ticking a placed line moves its claim to done, so the tile does not teleport past its words.
     expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Placed", 0, "doing"), true)).toEqual({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, text: "Placed", status: "done" },
+      syncClaim: { index: 0, text: "Placed", doneColumn: "done" },
     });
-    // Un-ticking one that claims done drops the claim: it goes back to living with its card.
     expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Finished", 2, "done", true), false)).toEqual({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 2, text: "Finished", status: null },
+      syncClaim: { index: 2, text: "Finished", doneColumn: "done" },
     });
-    // A line claiming nothing is left alone — ticking a plain todo has never placed it anywhere.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Plain", 1), true)).toBeNull();
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Placed", 0, "doing"), false)).toBeNull(); // still claims doing
+    // A line the board read as claiming nothing gets the same rule, since the note may say
+    // otherwise by now — `claimInStep` is what decides that a claimless line stays claimless.
+    expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Plain", 1), true)).toEqual({
+      path: "Tasks/Root.md",
+      syncClaim: { index: 1, text: "Plain", doneColumn: "done" },
+    });
   });
 
-  // The claim it would carry over is read off the board. A caller naming other words at that
-  // position is not describing the line the board has there, so there is nothing to carry.
-  it("keeps a claim off a line the board never read there", () => {
-    const b = buildBoard(config, [
-      withTodos("Root", { status: "todo" }, [todo("Old one", 0, "doing")]),
-    ]);
-    // A plain todo has since been inserted above, and the caller read the note after that.
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Snuck in", 0), true)).toBeNull();
-    expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Old one", 0, "doing"), true)).toMatchObject({
-      setSubtaskStatus: { index: 0, text: "Old one", status: "done" },
-    });
+  // The rule itself, which the write applies to what the note says at that moment.
+  it("moves a claim to Done on a tick, drops a Done claim on an untick, invents nothing", () => {
+    expect(claimInStep("doing", true, "done")).toBe("done");
+    expect(claimInStep("review", true, "done")).toBe("done");
+    expect(claimInStep("done", false, "done")).toBeNull();
+    // A line claiming nothing was never placed and must not start now, either way.
+    expect(claimInStep(null, true, "done")).toBeNull();
+    expect(claimInStep(null, false, "done")).toBeNull();
+    // A line standing anywhere but Done keeps its column when its box is unticked.
+    expect(claimInStep("doing", false, "done")).toBe("doing");
+    // With no done column, "finished work belongs in Done" names nowhere, so nothing moves.
+    expect(claimInStep("doing", true, null)).toBe("doing");
+    expect(claimInStep("doing", false, null)).toBe("doing");
   });
 
   it("can clear a claim that names no column of this board", () => {
@@ -1458,7 +1467,7 @@ describe("subitems in a column of their own", () => {
     // if the write path ignored it too, no interface could ever remove it.
     const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("X", 0, "Doing")])]);
     expect(b.columns["doing"]).toEqual([]); // not placed: no such column id
-    expect(moveSubtask(b, "Tasks/Root.md", 0, null)).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toMatchObject({
       setSubtaskStatus: { index: 0, text: "X", status: null },
     });
   });
@@ -1470,13 +1479,20 @@ describe("subitems in a column of their own", () => {
     const p = makeTodoPath("Tasks/Root.md", 0);
     expect(moveCard(b, p, "done", 0)).toEqual({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, text: "Write docs", status: "done", done: true },
+      setSubtaskStatus: {
+        index: 0,
+        text: "Write docs",
+        claim: "doing",
+        status: "done",
+        done: true,
+      },
       history: 'Moved subtask "Write docs" from Doing to Done',
     });
     // `todo` is the card's own column, so the line goes back to claiming nothing at all.
     expect(moveCard(b, p, "todo", 0)?.setSubtaskStatus).toEqual({
       index: 0,
       text: "Write docs",
+      claim: "doing",
       status: null,
       done: false,
     });
@@ -1500,6 +1516,8 @@ describe("subitems in a column of their own", () => {
     });
     // No checkbox in the write: a column going away rehomes what it held, it does not decide the
     // work in it is unfinished — deleting the done column must not reopen everything that was in it.
+    // No claim either: this does not replace a value it was chosen against, and holding it to one
+    // would leave a line claiming a column that is about to stop existing.
     expect(reassignColumn(b, makeTodoPath("Tasks/Root.md", 0), "todo")).toEqual({
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 0, text: "Write docs", status: "todo" },

@@ -20,11 +20,12 @@ import {
   cardStats,
   updateTimestampedLine,
   removeTimestampedLine,
-  subtaskStillReads,
-  commentStillReads,
+  subtaskDrift,
+  commentDrift,
   SECTION,
 } from "../src/model/card";
 import { historyAllows } from "../src/model/history";
+import type { LineRef } from "../src/model/types";
 
 const SAMPLE_CARD = `---
 type: task
@@ -1212,6 +1213,9 @@ describe("author names are sanitized into something the line grammar can hold", 
 // which is why the notes below are the awkward ones: CRLF, legacy prefixes, prose, inline fields.
 describe("does the note still read the line the caller described", () => {
   const subtasks = "# C\n\n## Subtasks\n- [ ] one\n- [x] two [status:: doing]\n- [ ] [[Child]]\n";
+  // Most of these ask only whether anything changed; the ones about a claim ask what did.
+  const subtaskStillReads = (text: string, at: LineRef) => subtaskDrift(text, at) === null;
+  const commentStillReads = (text: string, at: LineRef) => commentDrift(text, at) === null;
 
   it("says yes to the line at that index and no to any other", () => {
     expect(subtaskStillReads(subtasks, { index: 0, text: "one" })).toBe(true);
@@ -1236,6 +1240,45 @@ describe("does the note still read the line the caller described", () => {
     const inserted = subtasks.replace("- [ ] one", "- [ ] zero\n- [ ] one");
     expect(subtaskStillReads(inserted, { index: 0, text: "one" })).toBe(false);
     expect(subtaskStillReads(inserted, { index: 1, text: "one" })).toBe(true);
+  });
+
+  // The words alone cannot see a `[status:: …]` value: the reader strips it out of the text, so a
+  // line whose claim somebody changed reads exactly as it did. A write says what the line has to
+  // still claim for its decision to hold, and only then is the difference the line's own to report.
+  it("tells a claim that moved from the same line reading the same way", () => {
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: "doing" })).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: "todo" })).toEqual({
+      what: "claim",
+      found: "doing",
+    });
+    // A line that gained a claim, and one that lost the claim the caller decided from.
+    expect(subtaskDrift(subtasks, { index: 0, text: "one", claim: null })).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: null })).toEqual({
+      what: "claim",
+      found: "doing",
+    });
+    expect(subtaskDrift(subtasks, { index: 0, text: "one", claim: "doing" })).toEqual({
+      what: "claim",
+      found: null,
+    });
+  });
+
+  it("says nothing about a claim the caller never decided from", () => {
+    expect(subtaskDrift(subtasks, { index: 1, text: "two" })).toBeNull();
+  });
+
+  it("leaves a line naming a child note out of it, on both sides", () => {
+    // Such a line's column is the child's own `status`, not this field: the reader reports no claim
+    // for it however the line is written, so a hand-typed field cannot make it look changed.
+    const withField = subtasks.replace("- [ ] [[Child]]", "- [ ] [[Child]] [status:: doing]");
+    expect(subtaskDrift(withField, { index: 2, text: "[[Child]]", claim: null })).toBeNull();
+  });
+
+  it("reads the words first: a line that moved is a moved line, whatever it claims", () => {
+    const inserted = subtasks.replace("- [ ] one", "- [ ] zero\n- [ ] one");
+    expect(subtaskDrift(inserted, { index: 0, text: "one", claim: null })).toEqual({
+      what: "text",
+    });
   });
 
   it("reads comments through their own prefixes — current, legacy and none at all", () => {

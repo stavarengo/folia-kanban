@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type RefObject } from "react";
 import type { RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
-import type { Card, ColumnDef, ContextConfig } from "../model/types";
+import type { Card, ColumnDef, ContextConfig, SubItem } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
 import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
@@ -231,8 +231,13 @@ export interface BoardActions {
    * Send the index-th checklist line of `path` to a column of its own, or back to its card's column
    * with `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until
    * it claims a column, so without this there would be nothing to drag in the first place.
+   *
+   * `line` is the caller's own reading of that line, when it has one. The column replaces whatever
+   * the line claimed, and the claim the write refuses to go over is the one the person was looking
+   * at when they picked — which, for the detail panel, is the note as the panel read it and not as
+   * the board did. A caller showing the board's own tile leaves it out and gets the board's reading.
    */
-  moveTodo(path: string, index: number, columnId: string | null): void;
+  moveTodo(path: string, index: number, columnId: string | null, line?: SubItem): void;
   /**
    * Record (or, with an empty marker, forget) how far the reader has read this card's comments.
    *

@@ -18,7 +18,7 @@ import type {
   RelationType,
 } from "../src/model/types";
 import type { CardMutation } from "../src/model/board";
-import { buildBoard, deriveContext } from "../src/model/board";
+import { buildBoard, claimInStep, deriveContext } from "../src/model/board";
 import {
   SECTION,
   addSubcard,
@@ -26,7 +26,7 @@ import {
   appendComment,
   appendHistory,
   cardStats,
-  commentStillReads,
+  commentDrift,
   parseBody,
   parseSubtasks,
   pendingSubcardLinks,
@@ -36,7 +36,7 @@ import {
   setSubcardDone,
   setSubtaskDone,
   setSubtaskStatus,
-  subtaskStillReads,
+  subtaskDrift,
   updateTimestampedLine,
 } from "../src/model/card";
 
@@ -193,14 +193,31 @@ export class FakeRepo implements CardRepository {
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
     for (const key of mutation.unsetFrontmatter ?? []) delete this.entry(mutation.path).fm[key];
     if (mutation.setSubtaskStatus) {
-      const { index, text, status, done } = mutation.setSubtaskStatus;
+      const { index, text, claim, status, done } = mutation.setSubtaskStatus;
       const e = this.entry(mutation.path);
-      this.requireLine(mutation.path, "subtask", { index, text });
+      this.requireLine(
+        mutation.path,
+        "subtask",
+        claim === undefined ? { index, text } : { index, text, claim },
+      );
       e.body = setSubtaskStatus(
         done === undefined ? e.body : setSubtaskDone(e.body, index, done),
         index,
         status,
       );
+    }
+    if (mutation.syncClaim) {
+      // Mirrors the vault adapter: the claim AND the box are read from what the note says at this
+      // moment, and a line the rule moves nowhere is not rewritten.
+      const { index, text, doneColumn } = mutation.syncClaim;
+      const e = this.entry(mutation.path);
+      const seen = parseSubtasks(e.body)[index];
+      const was = seen?.status ?? null;
+      const next = seen ? claimInStep(was, seen.done, doneColumn) : was;
+      if (seen?.text !== text || next !== was) {
+        this.requireLine(mutation.path, "subtask", { index, text });
+        if (next !== was) e.body = setSubtaskStatus(e.body, index, next);
+      }
     }
     if (mutation.history) {
       const e = this.entry(mutation.path);
@@ -282,8 +299,8 @@ export class FakeRepo implements CardRepository {
   /** The adapter's refusal, in memory: a position that no longer holds the caller's line. */
   private requireLine(path: string, kind: "subtask" | "comment", at: LineRef) {
     const body = this.entry(path).body;
-    const reads = kind === "subtask" ? subtaskStillReads : commentStillReads;
-    if (!reads(body, at)) throw staleLine(kind, path, at);
+    const drift = (kind === "subtask" ? subtaskDrift : commentDrift)(body, at);
+    if (drift) throw staleLine(kind, path, at, drift);
   }
 
   private editRelations(

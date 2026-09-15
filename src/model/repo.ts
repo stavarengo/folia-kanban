@@ -8,6 +8,7 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
+  LineDrift,
   LineRef,
   RelationType,
 } from "./types";
@@ -22,10 +23,29 @@ import type { PropertySuggestion } from "./properties";
  */
 export class StaleLineError extends Error {}
 
+/** A checklist line's column claim, in words — `null` is a line that claims no column of its own. */
+function claimWords(claim: string | null): string {
+  return claim === null ? "no column of its own" : `"${claim}"`;
+}
+
 /** The refusal above, worded for whoever has to act on it. */
-export function staleLine(kind: "subtask" | "comment", path: string, at: LineRef): StaleLineError {
+export function staleLine(
+  kind: "subtask" | "comment",
+  path: string,
+  at: LineRef,
+  drift: LineDrift,
+): StaleLineError {
+  const where = `The ${kind} at index ${at.index} of "${path}"`;
+  // A claim that moved leaves the line reading exactly as the caller described it, so saying it no
+  // longer reads that way would be untrue. What the person needs is the two values: what the line
+  // claims now, and the one this write was about to put in its place.
+  if (drift.what === "claim" && at.claim !== undefined) {
+    return new StaleLineError(
+      `${where} still reads "${at.text}", but the line now claims ${claimWords(drift.found)} where this write replaces ${claimWords(at.claim)} — the note changed since it was read, so nothing was written. Read it again and repeat the edit on what is there now.`,
+    );
+  }
   return new StaleLineError(
-    `The ${kind} at index ${at.index} of "${path}" no longer reads "${at.text}", so that write was refused — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
+    `${where} no longer reads "${at.text}", so that write was refused — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
   );
 }
 
@@ -75,8 +95,14 @@ export interface CardRepository {
    * no frontmatter of its own — the `[status:: …]` field and checkbox of its checklist line in the
    * note named by `mutation.path`. Plus a history line when one is given.
    *
-   * A checklist line is named by what it said as well as where it sat, so this throws
-   * {@link StaleLineError} and writes nothing when the note no longer reads that way there.
+   * A checklist line is named by what it said as well as where it sat, and a write that replaces
+   * the line's own `[status:: …]` claim also names the claim it replaces (see
+   * {@link LineRef.claim}). This throws {@link StaleLineError} and writes nothing when the note no
+   * longer reads that way there, or when that claim is not the one the line carries any more.
+   *
+   * `syncClaim` is the one write decided the other way round — against the claim the note holds
+   * when it lands — so it has nothing earlier to refuse over, and moves nothing when the rule
+   * moves nothing.
    */
   applyMove(mutation: CardMutation): Promise<void>;
 
