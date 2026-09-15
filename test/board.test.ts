@@ -1331,6 +1331,35 @@ describe("subitems in a column of their own", () => {
     expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toBeNull();
   });
 
+  // `null` here answers two unrelated questions, and a caller has to tell them apart: a line that
+  // the supplied reading already puts where it was sent is nothing to write AND nothing to say,
+  // while a board that cannot name the line at all is a choice that could not be carried out and
+  // has to be reported. Naming the line in the call is what separates them — with a card this
+  // board knows and a reading of that row in hand, the only `null` left is the first, and it is
+  // relative to that reading rather than to the note, which only the write itself can speak for.
+  it("separates a line already sent where its reading stands from one the board cannot name", () => {
+    const b = buildBoard(config, [
+      withTodos("Root", { status: "todo" }, [todo("Placed", 0, "doing")]),
+    ]);
+    const line = todo("Placed", 0, "doing");
+    // No card of that name: there is no note to write into, whatever the caller read.
+    expect(moveSubtask(b, "Tasks/Nobody.md", { index: 0, line }, "done")).toBeNull();
+    // A card this board knows, but no line of its own at that position and no reading supplied.
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 4 }, "done")).toBeNull();
+    // A reading is only taken for the position it is about. One describing another row is set
+    // aside for the board's own, and here the board has none there either — so `null` again, and
+    // a caller must not read that as "already where it belongs".
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 1, line }, "done")).toBeNull();
+    // Card known, line named — so this `null` is the line already claiming `doing`, unticked, and
+    // asked for `doing` again.
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0, line }, "doing")).toBeNull();
+    // Every other column, on that same named call, writes.
+    expect(moveSubtask(b, "Tasks/Root.md", { index: 0, line }, "done")).toMatchObject({
+      path: "Tasks/Root.md",
+      setSubtaskStatus: { index: 0, text: "Placed", claim: "doing", status: "done", done: true },
+    });
+  });
+
   it("leaves a claim alone when the board has no done column to move it to", () => {
     const twoCols: BoardConfig = {
       ...config,

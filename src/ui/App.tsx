@@ -696,30 +696,51 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         })();
       },
       moveTodo: (path, index, columnId, line) => {
-        const b = boardRef.current;
-        if (!b) return;
-        // The caller's own reading of the line when it has one — the panel reads the note itself —
-        // and the board's when it does not, which is what a tile the board drew was drawn from.
-        const read = line ?? subtaskRef(b, path, index);
-        // A placed checklist line stands in a column exactly as a card does, so a lane may no more
-        // take one by hand. Judged on the line's own tile when it already has one — it can carry
-        // inline fields a rule reads — and otherwise on the bare line the claim is about to mint.
-        // The tile only answers for the line actually being moved: a caller reading the note ahead
-        // of the board can be moving a line the board has at that index under another name, and
-        // judging that one would refuse, or wave through, on somebody else's words.
-        if (columnId !== null) {
-          const tile = b.cards[makeTodoPath(path, index)];
-          const todo =
-            tile && tile.title === read?.text
-              ? tile
-              : prospectiveTodo(b, path, { index, text: read?.text ?? "", columnId });
-          if (todo && refusedByLane(columnId, todo)) return;
-        }
-        const mut = moveSubtask(b, path, read ? { index, line: read } : { index }, columnId);
-        if (!mut) return;
         void (async () => {
           try {
-            await repo.applyMove(mut);
+            const b = boardRef.current;
+            // The caller's own reading of the line when it has one — the panel reads the note
+            // itself — and the board's when it does not, which is what a tile the board drew was
+            // drawn from. Both the card and a todo at that position have to be there, because the
+            // move is worked out against them: which column the card itself stands in, and what
+            // the line says today. A board holding neither is one this choice no longer fits — a
+            // menu outlives the reload that drops the row it was raised on, and a renamed card is
+            // on the board under its old path for a moment — and that is reported rather than
+            // swallowed, the way ticking and removing a todo report theirs, with the same reload
+            // behind it. (Their own guards are shorter: neither takes a reading from its caller,
+            // so neither can be holding a line for a card the board has not got.)
+            // The reading has to be OF this row, not merely a todo: a caller handing over a line
+            // that sits somewhere else is not naming what is being moved, and the write below
+            // would quietly fall back to the board's own row — or to no row at all.
+            const read = line ?? (b ? subtaskRef(b, path, index) : null);
+            if (!b || !b.cards[path] || read?.kind !== "todo" || read.index !== index)
+              throw new Error(
+                `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
+              );
+            // A placed checklist line stands in a column exactly as a card does, so a lane may no
+            // more take one by hand. Judged on the line's own tile when it already has one — it can
+            // carry inline fields a rule reads — and otherwise on the bare line the claim is about
+            // to mint. The tile only answers for the line actually being moved: a caller reading
+            // the note ahead of the board can be moving a line the board has at that index under
+            // another name, and judging that one would refuse, or wave through, on somebody else's
+            // words.
+            if (columnId !== null) {
+              const tile = b.cards[makeTodoPath(path, index)];
+              const todo =
+                tile && tile.title === read.text
+                  ? tile
+                  : prospectiveTodo(b, path, { index, text: read.text, columnId });
+              if (todo && refusedByLane(columnId, todo)) return;
+            }
+            // The line is named, so the one `null` left here is the line already standing, BY THE
+            // READING THIS CHOICE WAS MADE AGAINST, where it was just sent — which is the reading
+            // the person was looking at when they picked, the panel's row or the menu's ticked
+            // column. They asked for no change and there is none to report; a note that has moved
+            // on underneath is not something their pick failed at, and the reload below is what
+            // brings the board onto it. Every other pick does reach the write, and a claim that
+            // moved is refused there, loudly.
+            const mut = moveSubtask(b, path, { index, line: read }, columnId);
+            if (mut) await repo.applyMove(mut);
           } catch (e) {
             reportError(e);
           } finally {

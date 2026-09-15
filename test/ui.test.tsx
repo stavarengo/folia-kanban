@@ -2335,6 +2335,158 @@ describe("card context menu", () => {
     expect(repo.files.get("Tasks/First.md")!.body).not.toContain("[status::");
   });
 
+  // A menu opened on a row keeps its position across the reload that takes the row away, and the
+  // column buttons in it read the line from the board — which by then has no such line. Writing
+  // nothing is right; saying nothing is not, because the picker looks to the person like it worked.
+  it("says so when the board can no longer name the todo whose column was picked", async () => {
+    const repo = ctxRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="2"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    // "real two" goes away elsewhere — another pane, an agent, a sync pull — and the board catches
+    // up while the menu still stands open on the position that line held.
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [x] done one\n- [ ] real one\n";
+    act(() => repo.notify());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+
+    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // Same hole on the other button of that menu: sending a line home names no column, and a line
+  // the board cannot find has no home to be sent to either.
+  it("says so when a todo the board cannot name is sent back to its card", async () => {
+    const repo = ctxRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="2"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [x] done one\n- [ ] real one\n";
+    act(() => repo.notify());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent
+      .setup()
+      .click(within(menu).getByRole("menuitemradio", { name: "With its card" }));
+
+    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // The other way a column picker writes nothing: the reading it was picked against — here the
+  // ticked column in the menu — already puts the line where it was just sent. The person asked for
+  // no change, so there is none to report; what they still get is the board on the note as it is.
+  it("stays quiet when a todo is sent to the column it already claims, and catches the board up", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] placed [status:: doing]\n",
+      },
+    });
+    // Counted rather than inferred from the note: a write that went out and was refused would
+    // leave the note untouched too, and that is the opposite of quiet.
+    let writes = 0;
+    const applyMove = repo.applyMove.bind(repo);
+    repo.applyMove = async (m) => {
+      writes += 1;
+      return applyMove(m);
+    };
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    await screen.findByText("First", { selector: ".folia-card-title" });
+    const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
+    fireEvent.contextMenu(within(doing).getByText("placed"));
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    // Reworded elsewhere while the board sat drawn, so a board that catches up shows the new words.
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] renamed elsewhere [status:: doing]\n";
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+
+    await within(doing).findByText("renamed elsewhere");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+    expect(writes).toBe(0);
+    // Not the absence of one message but of every one: a success toast would be just as wrong.
+    expect(document.querySelector(".folia-toast")).toBeNull();
+  });
+
+  // The detail panel's own way into the same silence. A rename reaches the board as two events —
+  // the vault's, at once, and the reload behind it — and the panel is deliberately held open on
+  // the new path across that gap. The board has no card there yet, so the move has nothing to be
+  // worked out against, and the pick used to disappear without a word.
+  it("says so when a subtask's column is picked while the board is still behind a rename", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] real one\n",
+      },
+    });
+    renderStateful(repo, DEFAULT_SETTINGS);
+    await user.click(await screen.findByText("First", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    const entry = repo.files.get("Tasks/First.md")!;
+    repo.files.delete("Tasks/First.md");
+    repo.files.set("Tasks/Renamed.md", entry);
+    // Only the vault's half: the board's reload is still in flight, which is the whole window.
+    act(() =>
+      repo.notifyFileOp({ kind: "rename", from: "Tasks/First.md", to: "Tasks/Renamed.md" }),
+    );
+    const before = repo.files.get("Tasks/Renamed.md")!.body;
+
+    await user.selectOptions(await within(detail).findByLabelText("Column for real one"), "doing");
+
+    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Renamed.md")!.body).toBe(before);
+  });
+
+  // A lane takes no line by hand, and that refusal writes nothing and names its rule. What it also
+  // does now is leave the board on the note as it is, the way a card refused mid-drag has always
+  // been put back — so a board that had drifted does not stay drifted because of a refusal.
+  it("leaves the board on what the note says after a lane refuses a todo's column", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "todo", title: "Todo" },
+          { id: "research", title: "Research", filter: "area:research" },
+          { id: "done", title: "Done" },
+        ],
+      },
+      {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Alpha\n\n## Subtasks\n- [ ] Buy soil\n",
+        },
+      },
+    );
+    render_(repo);
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    const detail = await screen.findByTestId("card-detail");
+    expect(
+      within(document.querySelector('[data-column="todo"]') as HTMLElement).getByText("Alpha"),
+    ).toBeInTheDocument();
+    // Sent to Done elsewhere while the board sat drawn: only a reload can move the tile there.
+    repo.files.get("Tasks/Alpha.md")!.fm["status"] = "done";
+    const before = repo.files.get("Tasks/Alpha.md")!.body;
+
+    await user.selectOptions(
+      await within(detail).findByLabelText("Column for Buy soil"),
+      "research",
+    );
+
+    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
+    const done = document.querySelector('[data-column="done"]') as HTMLElement;
+    await within(done).findByText("Alpha");
+  });
+
   it("removes a todo from the todo menu", async () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
