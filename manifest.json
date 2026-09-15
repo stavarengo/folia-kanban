@@ -1,7 +1,7 @@
 {
   "id": "folia-kanban",
   "name": "Folia Kanban",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "minAppVersion": "1.11.4",
   "description": "A real Kanban board with drag-and-drop, nested subcards, comments, and history — every card is a plain Markdown file.",
   "author": "Rafael Stavarengo",

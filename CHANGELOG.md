@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.2](https://github.com/stavarengo/folia-kanban/compare/0.3.1...0.3.2) (2026-09-15)
+
+### Bug Fixes
+
+* **subtasks:** act on the checklist line a right-click menu was raised on ([ebcda15](https://github.com/stavarengo/folia-kanban/commit/ebcda15b211a3f2cd5acbec7b8f79ab0c888b128)), closes [#50](https://github.com/stavarengo/folia-kanban/issues/50)
+
 ## [0.3.1](https://github.com/stavarengo/folia-kanban/compare/0.3.0...0.3.1) (2026-09-15)
 
 ### Bug Fixes
