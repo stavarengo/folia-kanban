@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/stavarengo/folia-kanban/compare/0.3.2...0.4.0) (2026-09-19)
+
+### ⚠ BREAKING CHANGES
+
+* **mcp:** move_card on a checklist line (a `#todo:N` path, or a placed todo named by its text) now requires `line`, exactly as get_board or get_card reported it. Calls that passed only the card are refused.
+
+### Features
+
+* **mcp:** hold move_card of a checklist line to the agent's reading ([e2c4fd1](https://github.com/stavarengo/folia-kanban/commit/e2c4fd1ace70b409f680d8b35139a1c3daa331b0)), closes [#53](https://github.com/stavarengo/folia-kanban/issues/53)
+
+### Bug Fixes
+
+* **subtasks:** hold every checklist-line write to the reading it was decided on ([91fc33d](https://github.com/stavarengo/folia-kanban/commit/91fc33dc51eadca7b771d3f887712d07b388f995)), closes [#51](https://github.com/stavarengo/folia-kanban/issues/51)
+
+### Documentation
+
+* **reports:** estimate how often the stale-reading bug family can happen, with before/after diagrams ([f30180d](https://github.com/stavarengo/folia-kanban/commit/f30180dc91baefc38b0c45b58948ed6c7186ac78)), references [#36](https://github.com/stavarengo/folia-kanban/issues/36) [#37](https://github.com/stavarengo/folia-kanban/issues/37) [#50](https://github.com/stavarengo/folia-kanban/issues/50)
+
 ## [0.3.2](https://github.com/stavarengo/folia-kanban/compare/0.3.1...0.3.2) (2026-09-15)
 
 ### Bug Fixes
