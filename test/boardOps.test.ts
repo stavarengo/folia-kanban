@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../src/model/boardOps";
 import { columnOf, makeTodoPath, moveSubtask } from "../src/model/board";
-import type { SubItem } from "../src/model/types";
-import type { BoardConfig } from "../src/model/types";
+import type { Board, BoardConfig, Card, TodoLine } from "../src/model/types";
 import { FakeRepo } from "./fakeRepo";
 
 const config: BoardConfig = {
@@ -26,6 +25,14 @@ function repoWithThreeTodoCards(): FakeRepo {
   });
 }
 
+/** The card as the board drew it — what a drag or a click hands the move. */
+async function drawn(repo: FakeRepo, path: string): Promise<{ board: Board; card: Card }> {
+  const board = await repo.loadBoard();
+  const card = board.cards[path];
+  if (!card) throw new Error(`no card ${path}`);
+  return { board, card };
+}
+
 describe("moveCardTo", () => {
   it("appends to the target column when no index is given", async () => {
     const repo = new FakeRepo(config, {
@@ -33,20 +40,16 @@ describe("moveCardTo", () => {
       "Tasks/B.md": { fm: { status: "doing", order: 2 }, body: "" },
       "Tasks/C.md": { fm: { status: "todo" }, body: "" },
     });
-    expect(
-      await moveCardTo(repo, await repo.loadBoard(), { path: "Tasks/C.md", columnId: "doing" }),
-    ).toBe(true);
+    const { board: loaded, card } = await drawn(repo, "Tasks/C.md");
+    expect(await moveCardTo(repo, loaded, { card, columnId: "doing" })).toBe(true);
     const board = await repo.loadBoard();
     expect(board.columns["doing"]).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
   });
 
   it("places the card at the given slot, counted with the card itself taken out", async () => {
     const repo = repoWithThreeTodoCards();
-    await moveCardTo(repo, await repo.loadBoard(), {
-      path: "Tasks/C.md",
-      columnId: "todo",
-      index: 0,
-    });
+    const { board, card } = await drawn(repo, "Tasks/C.md");
+    await moveCardTo(repo, board, { card, columnId: "todo", index: 0 });
     expect((await repo.loadBoard()).columns["todo"]).toEqual([
       "Tasks/C.md",
       "Tasks/A.md",
@@ -56,7 +59,8 @@ describe("moveCardTo", () => {
 
   it("writes the same history line the board view used to produce", async () => {
     const repo = repoWithThreeTodoCards();
-    await moveCardTo(repo, await repo.loadBoard(), { path: "Tasks/A.md", columnId: "done" });
+    const { board, card } = await drawn(repo, "Tasks/A.md");
+    await moveCardTo(repo, board, { card, columnId: "done" });
     expect((await repo.readBody("Tasks/A.md")).history.map((h) => h.text)).toEqual([
       "Moved from Todo to Done",
     ]);
@@ -64,18 +68,17 @@ describe("moveCardTo", () => {
 
   it("reports a card the board does not know, and writes nothing", async () => {
     const repo = repoWithThreeTodoCards();
-    const board = await repo.loadBoard();
-    expect(await moveCardTo(repo, board, { path: "Tasks/Ghost.md", columnId: "done" })).toBe(false);
+    const { board, card } = await drawn(repo, "Tasks/A.md");
+    const ghost = { ...card, path: "Tasks/Ghost.md" };
+    expect(await moveCardTo(repo, board, { card: ghost, columnId: "done" })).toBe(false);
   });
 });
 
 describe("moveCardOver", () => {
   it("inserts before the card it was dropped on", async () => {
     const repo = repoWithThreeTodoCards();
-    await moveCardOver(repo, await repo.loadBoard(), {
-      activeId: "Tasks/C.md",
-      overId: "Tasks/A.md",
-    });
+    const { board, card } = await drawn(repo, "Tasks/C.md");
+    await moveCardOver(repo, board, { card, overId: "Tasks/A.md" });
     expect((await repo.loadBoard()).columns["todo"]).toEqual([
       "Tasks/C.md",
       "Tasks/A.md",
@@ -85,25 +88,24 @@ describe("moveCardOver", () => {
 
   it("appends when dropped on a column body", async () => {
     const repo = repoWithThreeTodoCards();
-    await moveCardOver(repo, await repo.loadBoard(), { activeId: "Tasks/A.md", overId: "doing" });
+    const drag = await drawn(repo, "Tasks/A.md");
+    await moveCardOver(repo, drag.board, { card: drag.card, overId: "doing" });
     const board = await repo.loadBoard();
     expect(columnOf(board, "Tasks/A.md")).toBe("doing");
   });
 
   it("reports a drop that resolves to nothing", async () => {
     const repo = repoWithThreeTodoCards();
-    const board = await repo.loadBoard();
-    expect(await moveCardOver(repo, board, { activeId: "Tasks/A.md", overId: "nowhere" })).toBe(
-      false,
-    );
+    const { board, card } = await drawn(repo, "Tasks/A.md");
+    expect(await moveCardOver(repo, board, { card, overId: "nowhere" })).toBe(false);
   });
 });
 
 /** A checklist line as a caller read it: what the panel, the tool and the board all pass in. */
-function todoLine(index: number, text: string, status?: string, done = false): SubItem {
+function todoLine(index: number, text: string, status?: string, done = false): TodoLine {
   return status === undefined
-    ? { kind: "todo", text, done, index }
-    : { kind: "todo", text, done, status, index };
+    ? { kind: "todo", text, done, index, occurrence: 0 }
+    : { kind: "todo", text, done, status, index, occurrence: 0 };
 }
 
 describe("setSubtaskDone", () => {
@@ -211,7 +213,7 @@ describe("setSubtaskDone when the note has moved on", () => {
     );
     const board = await repo.loadBoard();
     // The panel removed Alpha a moment ago; the board has not caught up, the note has.
-    await repo.removeSubtask("Tasks/A.md", { index: 0, text: "Alpha" });
+    await repo.removeSubtask("Tasks/A.md", { index: 0, text: "Alpha", occurrence: 0 });
 
     await setSubtaskDone(repo, board, {
       path: "Tasks/A.md",
@@ -434,7 +436,10 @@ describe("moving a placed todo whose claim has moved underneath", () => {
 
     // Released over the Done column, the way a finished drag arrives from the board view.
     await expect(
-      moveCardOver(repo, board, { activeId: makeTodoPath("Tasks/A.md", 0), overId: "done" }),
+      moveCardOver(repo, board, {
+        card: board.cards[makeTodoPath("Tasks/A.md", 0)]!,
+        overId: "done",
+      }),
     ).rejects.toThrow(/now claims "review" where this write replaces "doing"/);
 
     expect(repo.files.get("Tasks/A.md")!.body).toBe(before);
@@ -447,7 +452,7 @@ describe("moving a placed todo whose claim has moved underneath", () => {
     const before = repo.files.get("Tasks/A.md")!.body;
 
     // What the dropdown does: the same reducer, applied straight to the repository.
-    const mutation = moveSubtask(board, "Tasks/A.md", { index: 0 }, "done");
+    const mutation = moveSubtask(board, "Tasks/A.md", todoLine(0, "Draft it", "doing"), "done");
     await expect(repo.applyMove(mutation!)).rejects.toThrow(
       /now claims "review" where this write replaces "doing"/,
     );
@@ -460,7 +465,10 @@ describe("moving a placed todo whose claim has moved underneath", () => {
     const board = await repo.loadBoard();
 
     expect(
-      await moveCardTo(repo, board, { path: makeTodoPath("Tasks/A.md", 0), columnId: "done" }),
+      await moveCardTo(repo, board, {
+        card: board.cards[makeTodoPath("Tasks/A.md", 0)]!,
+        columnId: "done",
+      }),
     ).toBe(true);
 
     expect(repo.files.get("Tasks/A.md")!.body).toContain("- [x] Draft it [status:: done]");

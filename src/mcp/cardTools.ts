@@ -265,11 +265,13 @@ const moveCard = tool({
         "Nothing was moved. Give the card what the rule asks for with update_card first, or move it to a column with no rule of its own.",
       );
     }
-    const moved = await moveCardTo(repo, board, {
-      path,
-      columnId: args.column,
-      ...(args.position === undefined ? {} : { index: args.position }),
-    });
+    const moved =
+      card !== undefined &&
+      (await moveCardTo(repo, board, {
+        card,
+        columnId: args.column,
+        ...(args.position === undefined ? {} : { index: args.position }),
+      }));
     // Nothing to write is not the same as nothing to report: a checklist line already claiming the
     // column it was asked to move to is exactly where the caller wants it.
     if (!moved && columnOf(board, path) !== args.column) {

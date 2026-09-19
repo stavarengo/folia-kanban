@@ -26,7 +26,7 @@ describe("drag persistence", () => {
     });
     let board = await repo.loadBoard();
     const drop = resolveDrop(board, "Tasks/A.md", "Tasks/C.md")!;
-    const mut = moveCard(board, "Tasks/A.md", drop.columnId, drop.index)!;
+    const mut = moveCard(board, board.cards["Tasks/A.md"]!, drop.columnId, drop.index)!;
     await repo.applyMove(mut);
 
     board = await repo.loadBoard();
@@ -43,7 +43,7 @@ describe("drag persistence", () => {
     });
     let board = await repo.loadBoard();
     const drop = resolveDrop(board, "Tasks/A.md", "done")!; // over the column id
-    const mut = moveCard(board, "Tasks/A.md", drop.columnId, drop.index)!;
+    const mut = moveCard(board, board.cards["Tasks/A.md"]!, drop.columnId, drop.index)!;
     await repo.applyMove(mut);
     board = await repo.loadBoard();
     expect(board.columns["done"]).toEqual(["Tasks/A.md"]);
@@ -148,7 +148,7 @@ describe("history seam — gated by scope (default 'moves' = no extra history)",
     );
     const board = await repo.loadBoard();
     const drop = resolveDrop(board, "Tasks/A.md", "Tasks/C.md")!;
-    await repo.applyMove(moveCard(board, "Tasks/A.md", drop.columnId, drop.index)!);
+    await repo.applyMove(moveCard(board, board.cards["Tasks/A.md"]!, drop.columnId, drop.index)!);
     const body = repo.files.get("Tasks/A.md")!.body;
     expect(body.match(/## History/g)).toHaveLength(1);
     expect(body).toContain("Moved from Todo to Doing");
@@ -238,7 +238,7 @@ describe("subitem drag persistence", () => {
 
     // Now drag it on to Done: the checkbox and the field are written together.
     const drop = resolveDrop(board, todoPath, "done")!;
-    await repo.applyMove(moveCard(board, todoPath, drop.columnId, drop.index)!);
+    await repo.applyMove(moveCard(board, board.cards[todoPath]!, drop.columnId, drop.index)!);
     board = await repo.loadBoard();
     expect(board.columns["done"]).toEqual([todoPath]);
     expect(repo.files.get("Tasks/Root.md")!.body).toContain("- [x] Write the docs [status:: done]");
@@ -250,7 +250,7 @@ describe("subitem drag persistence", () => {
     // And back to the parent's own column: the tile disappears, the todo is open again, and the
     // line stops claiming anything — a claim pinning it to its card's column would pop it back out
     // as its own tile the next time the card itself moved.
-    const back = moveCard(board, todoPath, "todo", 0)!;
+    const back = moveCard(board, board.cards[todoPath]!, "todo", 0)!;
     await repo.applyMove(back);
     board = await repo.loadBoard();
     expect(board.columns["todo"]).toEqual(["Tasks/Root.md"]);
@@ -258,7 +258,7 @@ describe("subitem drag persistence", () => {
     expect(repo.files.get("Tasks/Root.md")!.body).not.toContain("[status::");
 
     // Proof of the point: moving the CARD now takes the todo with it, instead of stranding it.
-    await repo.applyMove(moveCard(board, "Tasks/Root.md", "doing", 0)!);
+    await repo.applyMove(moveCard(board, board.cards["Tasks/Root.md"]!, "doing", 0)!);
     board = await repo.loadBoard();
     expect(board.columns["doing"]).toEqual(["Tasks/Root.md"]);
     expect(board.columns["todo"]).toEqual([]);
@@ -276,7 +276,9 @@ describe("subitem drag persistence", () => {
     expect(board.childrenOf["Tasks/Root.md"]).toEqual(["Tasks/Child.md"]);
 
     const drop = resolveDrop(board, "Tasks/Child.md", "doing")!;
-    await repo.applyMove(moveCard(board, "Tasks/Child.md", drop.columnId, drop.index)!);
+    await repo.applyMove(
+      moveCard(board, board.cards["Tasks/Child.md"]!, drop.columnId, drop.index)!,
+    );
     board = await repo.loadBoard();
     expect(board.columns["doing"]).toEqual(["Tasks/Child.md"]);
     expect(board.childrenOf["Tasks/Root.md"]).toBeUndefined();
@@ -296,7 +298,9 @@ describe("subitem drag persistence", () => {
     expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
 
     const drop = resolveDrop(board, "Tasks/Child.md", "done")!;
-    await repo.applyMove(moveCard(board, "Tasks/Child.md", drop.columnId, drop.index)!);
+    await repo.applyMove(
+      moveCard(board, board.cards["Tasks/Child.md"]!, drop.columnId, drop.index)!,
+    );
     board = await repo.loadBoard();
     expect(repo.files.get("Tasks/Root.md")!.body).toBe(
       body.replace("- [ ] [[Child]]", "- [x] [[Child]]"),
@@ -304,7 +308,7 @@ describe("subitem drag persistence", () => {
     expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(2);
     expect(board.columns["done"]).toEqual(["Tasks/Child.md"]);
 
-    await repo.applyMove(moveCard(board, "Tasks/Child.md", "todo", 0)!);
+    await repo.applyMove(moveCard(board, board.cards["Tasks/Child.md"]!, "todo", 0)!);
     board = await repo.loadBoard();
     expect(repo.files.get("Tasks/Root.md")!.body).toBe(body);
     expect(board.cards["Tasks/Root.md"]!.stats!.checklistDone).toBe(1);
@@ -317,10 +321,12 @@ describe("subitem drag persistence", () => {
       "Tasks/Child.md": { fm: { type: "task", status: "todo" }, body: "\n# Child\n" },
     };
     const quiet = new FakeRepo(config, files);
-    await quiet.applyMove(moveCard(await quiet.loadBoard(), "Tasks/Child.md", "done", 0)!);
+    const quietBoard = await quiet.loadBoard();
+    await quiet.applyMove(moveCard(quietBoard, quietBoard.cards["Tasks/Child.md"]!, "done", 0)!);
     expect(quiet.files.get("Tasks/Root.md")!.body).toBe(body.replace("[ ]", "[x]")); // no history
     const loud = new FakeRepo(config, files, () => "all");
-    await loud.applyMove(moveCard(await loud.loadBoard(), "Tasks/Child.md", "done", 0)!);
+    const loudBoard = await loud.loadBoard();
+    await loud.applyMove(moveCard(loudBoard, loudBoard.cards["Tasks/Child.md"]!, "done", 0)!);
     expect(loud.files.get("Tasks/Root.md")!.body).toContain("Subtask done: [[Child]]");
   });
 
@@ -344,7 +350,8 @@ describe("subitem drag persistence", () => {
       },
       () => "all",
     );
-    const mut = moveCard(await repo.loadBoard(), "Tasks/Child.md", "done", 0)!;
+    const loaded = await repo.loadBoard();
+    const mut = moveCard(loaded, loaded.cards["Tasks/Child.md"]!, "done", 0)!;
     expect(mut.parentLines?.map((p) => p.path)).toEqual(["Tasks/A.md", "Tasks/B.md", "Tasks/C.md"]);
     // Between load and write: A no longer names the child, B is gone.
     const edited = "\n# A\n\n## Subtasks\n- [ ] [[Something else]]\n";

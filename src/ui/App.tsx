@@ -5,15 +5,15 @@ import {
   columnOf,
   filterVisiblePaths,
   findDoneColumn,
-  makeTodoPath,
+  isTodoLine,
   moveColumn,
   moveSubtask,
   parseTodoPath,
-  prospectiveTodo,
   resolveDrop,
   reassignColumn,
   relationCounts,
   subtaskRef,
+  todoTile,
 } from "../model/board";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { laneRefusal, prospectiveCard } from "../model/lanes";
@@ -86,6 +86,15 @@ function applyColumnPatch(c: ColumnDef, patch: ColumnPatch): ColumnDef {
   if (merged.hoverOpacity !== undefined) next.hoverOpacity = merged.hoverOpacity;
   if (merged.parked !== undefined) next.parked = merged.parked;
   return next;
+}
+
+/**
+ * The card a lane's rule is asked about. A checklist line is judged by the tile the person acted on,
+ * since that tile is the reading the move is held to; a note by what the board holds now, since a
+ * note's fields are read afresh by the move itself.
+ */
+function laneSubject(board: BoardModel, card: Card): Card {
+  return card.todoRef ? card : (board.cards[card.path] ?? card);
 }
 
 /** The text one copy form puts on the clipboard; `null` only when the vault has no disk path. */
@@ -343,12 +352,11 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   );
 
   const onMove = useCallback(
-    async (activeId: string, overId: string) => {
+    async (dragged: Card, overId: string) => {
       const b = boardRef.current;
       if (!b) return;
-      const resolved = resolveDrop(b, activeId, overId);
-      const dragged = b.cards[activeId];
-      if (resolved && dragged && refusedByLane(resolved.columnId, dragged)) {
+      const resolved = resolveDrop(b, dragged.path, overId);
+      if (resolved && refusedByLane(resolved.columnId, laneSubject(b, dragged))) {
         // Board holds the make-room gap open across the drop and clears it when a reloaded board
         // arrives, so a refusal still has to reload: that is what puts the card back where it was
         // rather than leaving it in a gap no column draws.
@@ -356,7 +364,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         return;
       }
       try {
-        await moveCardOver(repo, b, { activeId, overId });
+        await moveCardOver(repo, b, { card: dragged, overId });
       } catch (e) {
         // A move can now touch more than one note; what failed in a second note must be seen.
         reportError(e);
@@ -396,15 +404,14 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   );
 
   const moveTo = useCallback(
-    async (path: string, columnId: string): Promise<boolean> => {
+    async (card: Card, columnId: string): Promise<boolean> => {
       const b = boardRef.current;
       if (!b) return false;
-      const card = b.cards[path];
       // Answered, not swallowed: a caller that reports success afterwards must not report it over
       // a refusal that already said the opposite.
-      if (card && refusedByLane(columnId, card)) return false;
+      if (refusedByLane(columnId, laneSubject(b, card))) return false;
       try {
-        await moveCardTo(repo, b, { path, columnId });
+        await moveCardTo(repo, b, { card, columnId });
         return true;
       } finally {
         await load();
@@ -545,12 +552,11 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       },
       reportError,
       refusedByLane,
-      complete: (path) => {
+      complete: (card) => {
         if (!doneColumnId) return;
-        const title = boardRef.current?.cards[path]?.title ?? "Card";
-        void moveTo(path, doneColumnId)
+        void moveTo(card, doneColumnId)
           .then((moved) => {
-            if (moved) showToast(`${title} — done!`);
+            if (moved) showToast(`${card.title} — done!`);
           })
           .catch(reportError);
       },
@@ -637,7 +643,9 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       },
       moveWithinColumn: (path, dir) => {
         const b = boardRef.current;
-        if (!b) return;
+        const card = b?.cards[path];
+        // A checklist line has no slot of its own: its order is its place in its parent's list.
+        if (!b || !card || card.todoRef) return;
         const col = columnOf(b, path);
         if (!col) return;
         const list = b.columns[col] ?? [];
@@ -649,7 +657,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         const dropIndex = i + dir;
         void (async () => {
           try {
-            await moveCardTo(repo, b, { path, columnId: col, index: dropIndex });
+            await moveCardTo(repo, b, { card, columnId: col, index: dropIndex });
           } catch (e) {
             reportError(e);
           } finally {
@@ -672,21 +680,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         // a line naming a child note is a different thing with a different write behind it — one
         // that reaches into that other note. None of the callers can point at such a line today;
         // handing one back would be the way that changes without anybody deciding it.
-        return line && line.kind === "todo" ? line : null;
+        return line && isTodoLine(line) ? line : null;
       },
-      toggleTodo: (path, index, done, at) => {
+      toggleTodo: (path, line, done) => {
         void (async () => {
           try {
-            // The line as it was read, text and all: the write refuses rather than tick a position
-            // the note has since given to somebody else's todo. The caller's own reading when it
-            // has one — a menu read the line when it opened, and it outlives the reload that hands
-            // that position to the line below — and this board's when it does not. A board that
-            // cannot name the line at all is a board this click no longer fits — said out loud, not
-            // swallowed, and followed by the reload that draws what is really there.
+            // The line as the caller read it, text and all: the write refuses rather than tick a
+            // position the note has since given to somebody else's todo.
             const b = boardRef.current;
-            const line = at ?? (b && subtaskRef(b, path, index));
-            if (!b || !line)
-              throw new Error(`"${path}" no longer has the subtask that was clicked.`);
+            if (!b) throw new Error(`"${path}" no longer has the subtask that was clicked.`);
             // Ticking a box is also a statement about where the work belongs, for a line that
             // claims a column, so the claim is kept in step with the checkbox.
             const ctx = matchCtxRef.current;
@@ -706,41 +708,22 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           }
         })();
       },
-      moveTodo: (path, index, columnId, line) => {
+      moveTodo: (path, line, columnId) => {
         void (async () => {
           try {
             const b = boardRef.current;
-            // The caller's own reading of the line when it has one — the panel reads the note
-            // itself — and the board's when it does not, which is what a tile the board drew was
-            // drawn from. Both the card and a todo at that position have to be there, because the
-            // move is worked out against them: which column the card itself stands in, and what
-            // the line says today. A board holding neither is one this choice no longer fits — a
-            // menu outlives the reload that drops the row it was raised on, and a renamed card is
-            // on the board under its old path for a moment — and that is reported rather than
-            // swallowed, the way ticking and removing a todo report theirs, with the same reload
-            // behind it. (Their own guards are shorter: neither takes a reading from its caller,
-            // so neither can be holding a line for a card the board has not got.)
-            // The reading has to be OF this row, not merely a todo: a caller handing over a line
-            // that sits somewhere else is not naming what is being moved, and the write below
-            // would quietly fall back to the board's own row — or to no row at all.
-            const read = line ?? (b ? subtaskRef(b, path, index) : null);
-            if (!b || !b.cards[path] || read?.kind !== "todo" || read.index !== index)
+            // The card has to be there, because the move is worked out against it: which column
+            // the card itself stands in. A board without it is one this choice no longer fits — a
+            // renamed card is on the board under its old path for a moment — and that is reported
+            // rather than swallowed, with the same reload behind it.
+            if (!b || !b.cards[path])
               throw new Error(
                 `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
               );
             // A placed checklist line stands in a column exactly as a card does, so a lane may no
-            // more take one by hand. Judged on the line's own tile when it already has one — it can
-            // carry inline fields a rule reads — and otherwise on the bare line the claim is about
-            // to mint. The tile only answers for the line actually being moved: a caller reading
-            // the note ahead of the board can be moving a line the board has at that index under
-            // another name, and judging that one would refuse, or wave through, on somebody else's
-            // words.
+            // more take one by hand.
             if (columnId !== null) {
-              const tile = b.cards[makeTodoPath(path, index)];
-              const todo =
-                tile && tile.title === read.text
-                  ? tile
-                  : prospectiveTodo(b, path, { index, text: read.text, columnId });
+              const todo = todoTile(b, path, line, columnId);
               if (todo && refusedByLane(columnId, todo)) return;
             }
             // The line is named, so the one `null` left here is the line already standing, BY THE
@@ -750,16 +733,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
             // on underneath is not something their pick failed at, and the reload below is what
             // brings the board onto it. Every other pick does reach the write, and a claim that
             // moved is refused there, loudly.
-            const mut = moveSubtask(b, path, { index, line: read }, columnId);
+            const mut = moveSubtask(b, path, line, columnId);
             if (!mut) {
               // "The line already says this", by the reading the choice was made against — and that
               // stays the answer however far the note has drifted since, because a pick that asks
               // for no change has none to report and nothing was written for a drifted note to
               // refuse. What it cannot cover is a position the board holds no line at: there the
               // reading was not merely older, it was of a row that has gone, and the pick has
-              // nowhere to have landed. Only that is said out loud, and only when the caller's own
-              // reading is what got us past the guard above — the board's could not have.
-              if (subtaskRef(b, path, index)?.kind !== "todo")
+              // nowhere to have landed. Only that is said out loud.
+              if (subtaskRef(b, path, line.index)?.kind !== "todo")
                 throw new Error(
                   `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
                 );
@@ -773,17 +755,10 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           }
         })();
       },
-      removeTodo: (path, index, at) => {
+      removeTodo: (path, line) => {
         void (async () => {
           try {
-            const b = boardRef.current;
-            // Same two readings, same order, as ticking one: what the caller read, else what this
-            // board draws. The note refuses the delete when the position no longer holds that line.
-            const line = at ?? (b && subtaskRef(b, path, index));
-            if (!line)
-              throw new Error(
-                `The board no longer draws the todo that was removed from "${path}". Let it reload and try again.`,
-              );
+            // The note refuses the delete when the position no longer holds that line.
             await repo.removeSubtask(path, line);
           } catch (e) {
             reportError(e);
@@ -1130,7 +1105,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
                         wipLimits={wipLimits}
                         filter={filter}
                         doneColumnId={doneColumnId}
-                        onMove={(activeId, overId) => void onMove(activeId, overId)}
+                        onMove={(card, overId) => void onMove(card, overId)}
                         onAddCard={(columnId, title) => void onAddCard(columnId, title)}
                       />
                       {/* Side modes (split/float) render the panel as a sibling; split shrinks the board,

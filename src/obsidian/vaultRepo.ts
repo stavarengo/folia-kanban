@@ -19,6 +19,7 @@ import type {
   HistoryScope,
   LineDrift,
   LineRef,
+  SubtaskRef,
   RelationType,
   SubItem,
 } from "../model/types";
@@ -476,14 +477,12 @@ export class VaultRepository implements CardRepository, HoverParent {
    */
   private async editLine(
     path: string,
-    kind: "subtask" | "comment",
-    at: LineRef,
+    line: { kind: "subtask"; at: SubtaskRef } | { kind: "comment"; at: LineRef },
     write: (text: string) => string,
   ): Promise<void> {
-    const driftOf = kind === "subtask" ? subtaskDrift : commentDrift;
     let drift: LineDrift | null = null;
     await this.editBody(path, (t) => {
-      drift = driftOf(t, at);
+      drift = line.kind === "subtask" ? subtaskDrift(t, line.at) : commentDrift(t, line.at);
       return drift ? t : write(t);
     });
     if (drift === null) return;
@@ -492,7 +491,7 @@ export class VaultRepository implements CardRepository, HoverParent {
     // refuse — from being swallowed as ours. At worst it costs one extra reload, when an earlier
     // write of ours really did land on this note moments ago.
     this.recentWrites.delete(path);
-    throw staleLine(kind, path, at, drift);
+    throw staleLine(line.kind, path, line.at, drift);
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
@@ -505,9 +504,9 @@ export class VaultRepository implements CardRepository, HoverParent {
       // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
       // where a subitem sits, so writing them separately would leave a moment where the board
       // reloads on a line that says two different things.
-      const { index, text, claim, status, done } = mutation.setSubtaskStatus;
-      const at: LineRef = claim === undefined ? { index, text } : { index, text, claim };
-      await this.editLine(mutation.path, "subtask", at, (t) =>
+      const { status, done, ...at } = mutation.setSubtaskStatus;
+      const { index } = at;
+      await this.editLine(mutation.path, { kind: "subtask", at }, (t) =>
         setSubtaskStatusText(
           done === undefined ? t : setSubtaskDone(t, index, done),
           index,
@@ -521,7 +520,8 @@ export class VaultRepository implements CardRepository, HoverParent {
       // those can be minutes apart, and either half moving changes the answer. Read once first so a
       // line the rule moves nowhere is not rewritten at all (the same two looks `parentLines` takes
       // below), then decided again inside the write, which is the text that actually changes.
-      const { index, text, doneColumn } = mutation.syncClaim;
+      const { doneColumn, ...at } = mutation.syncClaim;
+      const { index, text } = at;
       const nextFor = (item: SubItem | undefined): string | null | undefined =>
         item && claimInStep(item.status ?? null, item.done, doneColumn);
       // `read`, not `cachedRead`: this look decides whether a write happens, and the display cache
@@ -539,9 +539,12 @@ export class VaultRepository implements CardRepository, HoverParent {
       // claimless todo — a write of identical bytes, and the mtime and sync churn that goes with
       // it — for a window of one await.
       const settled =
-        seen !== undefined && seen.text === text && nextFor(seen) === (seen.status ?? null);
+        seen !== undefined &&
+        seen.text === text &&
+        seen.occurrence === at.occurrence &&
+        nextFor(seen) === (seen.status ?? null);
       if (!settled) {
-        await this.editLine(mutation.path, "subtask", { index, text }, (t) => {
+        await this.editLine(mutation.path, { kind: "subtask", at }, (t) => {
           const item = parseSubtasks(t)[index];
           const was = item?.status ?? null;
           const next = nextFor(item);
@@ -603,13 +606,13 @@ export class VaultRepository implements CardRepository, HoverParent {
     await this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, at: LineRef, text: string): Promise<void> {
-    await this.editLine(path, "comment", at, (t) =>
+    await this.editLine(path, { kind: "comment", at }, (t) =>
       updateTimestampedLine(t, SECTION.comments, at.index, text),
     );
     await this.maybeHistory(path, "comment", commentEditedLine());
   }
   async removeComment(path: string, at: LineRef): Promise<void> {
-    await this.editLine(path, "comment", at, (t) =>
+    await this.editLine(path, { kind: "comment", at }, (t) =>
       removeTimestampedLine(t, SECTION.comments, at.index),
     );
     await this.maybeHistory(path, "comment", commentRemovedLine());
@@ -618,18 +621,18 @@ export class VaultRepository implements CardRepository, HoverParent {
     await this.editBody(path, (t) => addTodoText(t, text));
     await this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
-  async toggleSubtask(path: string, at: LineRef, done: boolean): Promise<void> {
+  async toggleSubtask(path: string, at: SubtaskRef, done: boolean): Promise<void> {
     // The history line names `at.text`, and the write only lands while the note still reads that
     // way — so the record and the tick are the same line, with nothing read separately to disagree.
-    await this.editLine(path, "subtask", at, (t) => setSubtaskDone(t, at.index, done));
+    await this.editLine(path, { kind: "subtask", at }, (t) => setSubtaskDone(t, at.index, done));
     await this.maybeHistory(
       path,
       "subtask",
       done ? subtaskDoneLine(at.text) : subtaskReopenedLine(at.text),
     );
   }
-  async removeSubtask(path: string, at: LineRef): Promise<void> {
-    await this.editLine(path, "subtask", at, (t) => removeSubtaskText(t, at.index));
+  async removeSubtask(path: string, at: SubtaskRef): Promise<void> {
+    await this.editLine(path, { kind: "subtask", at }, (t) => removeSubtaskText(t, at.index));
     await this.maybeHistory(path, "subtask", subtaskRemovedLine(at.text));
   }
 

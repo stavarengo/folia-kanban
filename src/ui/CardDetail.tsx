@@ -20,7 +20,7 @@ import type {
   SubItem,
   TitleMode,
 } from "../model/types";
-import { boardLinkResolver, syncSubcardLines, type LinkResolver } from "../model/board";
+import { boardLinkResolver, isTodoLine, syncSubcardLines, type LinkResolver } from "../model/board";
 import { setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
@@ -1496,7 +1496,7 @@ export function CardDetail({
               className="folia-icon-btn folia-action-done"
               aria-label="Mark done"
               title="Mark done"
-              onClick={() => actions.complete(path)}
+              onClick={() => actions.complete(card)}
             >
               <Icon name="check-circle" />
             </button>
@@ -1881,7 +1881,7 @@ export function CardDetail({
                       value={claim.value}
                       onChange={(e) => {
                         const value = e.target.value;
-                        if (s.kind === "card") {
+                        if (!isTodoLine(s)) {
                           if (!child) return;
                           void mutate(async () => {
                             // "With this card" places the child without saying whether the work
@@ -1900,7 +1900,7 @@ export function CardDetail({
                         }
                         // The line as this panel read it, not as the board did: what the column
                         // replaces is the claim shown on this row, and the two readings can differ.
-                        actions.moveTodo(path, s.index, value === "" ? null : value, s);
+                        actions.moveTodo(path, s, value === "" ? null : value);
                       }}
                     >
                       <option value="">With this card</option>
@@ -1921,9 +1921,7 @@ export function CardDetail({
                   className="folia-icon-btn folia-mini"
                   aria-label="Remove"
                   title="Remove"
-                  onClick={() =>
-                    void mutate(() => repo.removeSubtask(path, { index: s.index, text: s.text }))
-                  }
+                  onClick={() => void mutate(() => repo.removeSubtask(path, s))}
                 >
                   <Icon name="close" size={13} />
                 </button>

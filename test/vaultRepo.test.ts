@@ -657,7 +657,7 @@ describe("field edits and their history lines", () => {
   it("names the subtask in its history line, in the words the caller wrote it by", async () => {
     const { app, repo } = repoWithCard("all", "\n# One\n\n## Subtasks\n- [ ] Write the docs\n");
 
-    const line = { index: 0, text: "Write the docs" };
+    const line = { index: 0, text: "Write the docs", occurrence: 0 };
     await repo.toggleSubtask("basic/Cards/One.md", line, true);
     await repo.removeSubtask("basic/Cards/One.md", line);
 
@@ -697,9 +697,9 @@ describe("field edits and their history lines", () => {
       const { app, repo, before } = subtasksEdited();
 
       // Index 1 was "Ship it" when the caller read it; it is "Write the docs" now.
-      await expect(repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true)).rejects.toThrow(
-        /no longer reads "Ship it"/,
-      );
+      await expect(
+        repo.toggleSubtask(PATH, { index: 1, text: "Ship it", occurrence: 0 }, true),
+      ).rejects.toThrow(/no longer reads "Ship it"/);
 
       expect(app.vault.text(PATH)).toBe(before);
     });
@@ -707,9 +707,9 @@ describe("field edits and their history lines", () => {
     it("refuses to remove a line the note no longer holds", async () => {
       const { app, repo, before } = subtasksEdited();
 
-      await expect(repo.removeSubtask(PATH, { index: 1, text: "Ship it" })).rejects.toThrow(
-        /no longer reads "Ship it"/,
-      );
+      await expect(
+        repo.removeSubtask(PATH, { index: 1, text: "Ship it", occurrence: 0 }),
+      ).rejects.toThrow(/no longer reads "Ship it"/);
 
       expect(app.vault.text(PATH)).toBe(before);
     });
@@ -720,7 +720,13 @@ describe("field edits and their history lines", () => {
       await expect(
         repo.applyMove({
           path: PATH,
-          setSubtaskStatus: { index: 1, text: "Ship it", claim: null, status: "doing" },
+          setSubtaskStatus: {
+            index: 1,
+            text: "Ship it",
+            occurrence: 0,
+            claim: null,
+            status: "doing",
+          },
         }),
       ).rejects.toThrow(/no longer reads "Ship it"/);
 
@@ -747,6 +753,7 @@ describe("field edits and their history lines", () => {
           setSubtaskStatus: {
             index: 0,
             text: "Write the docs",
+            occurrence: 0,
             claim: "doing",
             status: "done",
           },
@@ -772,7 +779,7 @@ describe("field edits and their history lines", () => {
 
       await repo.applyMove({
         path: PATH,
-        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+        syncClaim: { index: 0, text: "Write the docs", occurrence: 0, doneColumn: "done" },
       });
 
       expect(app.vault.text(PATH)).toContain("- [ ] Write the docs\n");
@@ -790,7 +797,7 @@ describe("field edits and their history lines", () => {
       // An open box on a line standing outside Done moves no claim: there is nothing to write.
       await repo.applyMove({
         path: PATH,
-        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+        syncClaim: { index: 0, text: "Write the docs", occurrence: 0, doneColumn: "done" },
       });
 
       expect(app.vault.text(PATH)).toBe(before);
@@ -812,7 +819,7 @@ describe("field edits and their history lines", () => {
 
       await repo.applyMove({
         path: PATH,
-        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+        syncClaim: { index: 0, text: "Write the docs", occurrence: 0, doneColumn: "done" },
       });
 
       expect(app.vault.text(PATH)).toContain("- [ ] Write the docs\n");
@@ -839,7 +846,7 @@ describe("field edits and their history lines", () => {
 
       await repo.applyMove({
         path: PATH,
-        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+        syncClaim: { index: 0, text: "Write the docs", occurrence: 0, doneColumn: "done" },
       });
 
       expect(app.vault.text(PATH)).toContain("- [ ] Write the docs [status:: todo]");
@@ -863,7 +870,7 @@ describe("field edits and their history lines", () => {
 
       await repo.applyMove({
         path: PATH,
-        syncClaim: { index: 0, text: "Write the docs", doneColumn: "done" },
+        syncClaim: { index: 0, text: "Write the docs", occurrence: 0, doneColumn: "done" },
       });
 
       expect(app.vault.text(PATH)).toContain("- [x] Write the docs\n");
@@ -889,7 +896,7 @@ describe("field edits and their history lines", () => {
       await expect(
         repo.applyMove({
           path: PATH,
-          syncClaim: { index: 1, text: "Ship it", doneColumn: "done" },
+          syncClaim: { index: 1, text: "Ship it", occurrence: 0, doneColumn: "done" },
         }),
       ).rejects.toThrow(/no longer reads "Ship it"/);
 
@@ -907,6 +914,7 @@ describe("field edits and their history lines", () => {
         setSubtaskStatus: {
           index: 0,
           text: "Write the docs",
+          occurrence: 0,
           claim: "doing",
           status: "done",
         },
@@ -916,7 +924,7 @@ describe("field edits and their history lines", () => {
       expect(app.vault.text(PATH)).toContain("- [ ] Write the docs [status:: done]");
 
       // Removing the line takes the claim with it, so that write never states one.
-      await repo.removeSubtask(PATH, { index: 0, text: "Write the docs" });
+      await repo.removeSubtask(PATH, { index: 0, text: "Write the docs", occurrence: 0 });
 
       expect(app.vault.text(PATH)).not.toContain("- [ ] Write the docs");
       expect(app.vault.text(PATH)).toContain("Subtask removed: Write the docs");
@@ -952,9 +960,9 @@ describe("field edits and their history lines", () => {
         return process(file, fn);
       });
 
-      await expect(repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true)).rejects.toThrow(
-        /no longer reads "Ship it"/,
-      );
+      await expect(
+        repo.toggleSubtask(PATH, { index: 1, text: "Ship it", occurrence: 0 }, true),
+      ).rejects.toThrow(/no longer reads "Ship it"/);
 
       expect(app.vault.text(PATH)).toContain("- [ ] Ship it");
       expect(app.vault.text(PATH)).not.toContain("- [x]");
@@ -963,7 +971,7 @@ describe("field edits and their history lines", () => {
     it("still writes when the note is the one the caller described", async () => {
       const { app, repo } = repoWithCard("all", TWO_TODOS);
 
-      await repo.toggleSubtask(PATH, { index: 1, text: "Ship it" }, true);
+      await repo.toggleSubtask(PATH, { index: 1, text: "Ship it", occurrence: 0 }, true);
 
       expect(app.vault.text(PATH)).toContain("- [x] Ship it");
       expect(app.vault.text(PATH)).toContain("Subtask done: Ship it");
@@ -1335,7 +1343,7 @@ describe("telling our own writes apart from someone else's (onChange)", () => {
     const off = repo.onChange(reload);
 
     await expect(
-      repo.toggleSubtask("basic/Cards/One.md", { index: 0, text: "Gone" }, true),
+      repo.toggleSubtask("basic/Cards/One.md", { index: 0, text: "Gone", occurrence: 0 }, true),
     ).rejects.toThrow(/no longer reads "Gone"/);
     app.vault.emitEvent("modify", file);
     vi.advanceTimersByTime(150);
@@ -1467,6 +1475,7 @@ describe("applying a move", () => {
       setSubtaskStatus: {
         index: 0,
         text: "Write the docs",
+        occurrence: 0,
         claim: null,
         status: "doing",
         done: true,
@@ -1580,7 +1589,13 @@ describe("applying a move", () => {
 
     await repo.applyMove({
       path: "basic/Cards/One.md",
-      setSubtaskStatus: { index: 0, text: "Write the docs", claim: "doing", status: null },
+      setSubtaskStatus: {
+        index: 0,
+        text: "Write the docs",
+        occurrence: 0,
+        claim: "doing",
+        status: null,
+      },
     });
 
     // The checkbox is not the move's business: a status-only move must leave it exactly as it was.

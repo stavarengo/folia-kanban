@@ -141,7 +141,7 @@ export function resolveNotePath(board: Board, ref: string): string {
   const todoRef = board.cards[path]?.todoRef;
   if (!todoRef) return path;
   throw new ToolError(
-    `"${path}" is a checklist line in "${todoRef.parentPath}", not a note of its own. Move it with move_card, or edit line ${todoRef.index} of that note with the subtask tools.`,
+    `"${path}" is a checklist line in "${todoRef.parentPath}", not a note of its own. Move it with move_card, or edit line ${todoRef.line.index} of that note with the subtask tools.`,
   );
 }
 

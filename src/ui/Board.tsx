@@ -20,7 +20,7 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import type { Board as BoardModel } from "../model/types";
+import type { Board as BoardModel, Card } from "../model/types";
 import {
   applyReloc,
   planDrop,
@@ -65,7 +65,8 @@ interface Props {
   wipLimits: Record<string, number>;
   filter: Filter;
   doneColumnId: string | null;
-  onMove: (activeId: string, overId: string) => void;
+  /** A card drop: the card as it was when it was picked up, and the id it was released over. */
+  onMove: (card: Card, overId: string) => void;
   onAddCard: (columnId: string, title: string) => void;
 }
 
@@ -113,8 +114,10 @@ export function Board({
   const activeColumn = activeColumnDrag
     ? (board.config.columns.find((c) => c.id === activeId) ?? null)
     : null;
-  const activeCard =
-    activeId && !activeColumnDrag ? board.cards[splitCardDragId(activeId).path] : null;
+  // The card as it was when it was picked up, not whatever its path names on a board reloaded since:
+  // a line removed above a placed todo hands its path to the line below, and the drop must carry
+  // what the person is holding — the overlay shows it, and the write is held to it.
+  const [activeCard, setActiveCard] = useState<Card | null>(null);
 
   // A committed cross-column move KEEPS `dragReloc` through the drop tween + the async persist window
   // (clearing it synchronously in onDragEnd would snap the card back to its source column before
@@ -312,7 +315,11 @@ export function Board({
       // room tween computes against the pre-gap layout.
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       onDragStart={(e: DragStartEvent) => {
-        setActiveId(String(e.active.id));
+        const id = String(e.active.id);
+        setActiveId(id);
+        setActiveCard(
+          columnIds.includes(id) ? null : (board.cards[splitCardDragId(id).path] ?? null),
+        );
         setDragReloc(null);
       }}
       onDragOver={(e: DragOverEvent) => {
@@ -338,6 +345,7 @@ export function Board({
       }}
       onDragEnd={(e: DragEndEvent) => {
         setActiveId(null);
+        setActiveCard(null);
         const reloc = dragReloc;
         if (!e.over) {
           // No drop target → revert to source. No board update is coming, so clear the gap NOW.
@@ -349,17 +357,20 @@ export function Board({
           // (bare path / column id — never the namespaced active id, which would mis-route through
           // planDrop's split). KEEP `dragReloc` through the drop tween + persist; the board-effect
           // clears it once the reloaded board lands the card at this exact slot (no jump).
-          onMove(splitCardDragId(reloc.activeId).path, reloc.beforePath ?? reloc.toColumn);
+          // Nothing was picked up that a board could name, so no reload is coming to close the gap.
+          if (activeCard) onMove(activeCard, reloc.beforePath ?? reloc.toColumn);
+          else setDragReloc(null);
           return;
         }
         // Same-column reorder or column header drag: the native sortable placeholder already sits at
         // the destination, so planDrop + onMove keep the verified tween. No gap to clear.
         const plan = planDrop(board, String(e.active.id), String(e.over.id), columnIds);
         if (plan.kind === "reorderColumns") actions.reorderColumns(plan.activeId, plan.overId);
-        else if (plan.kind === "moveCard") onMove(plan.path, plan.overId);
+        else if (plan.kind === "moveCard" && activeCard) onMove(activeCard, plan.overId);
       }}
       onDragCancel={() => {
         setActiveId(null);
+        setActiveCard(null);
         // A cancel returns the card to its source — clear the gap immediately (no board update coming).
         setDragReloc(null);
       }}

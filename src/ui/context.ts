@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type RefObject } from "react";
 import type { RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
-import type { Card, ColumnDef, ContextConfig, SubItem } from "../model/types";
+import type { Card, ColumnDef, ContextConfig, TodoLine } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
 import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
@@ -179,8 +179,11 @@ export interface BoardActions {
    * it refused; every path that sets a card's column asks this before writing.
    */
   refusedByLane(columnId: string, card: Card): boolean;
-  /** Move a card to the board's "done" column, if one exists. */
-  complete(path: string): void;
+  /**
+   * Move a card to the board's "done" column, if one exists. The card as the caller drew it: for a
+   * checklist line standing in a column of its own, that tile is the reading the move is held to.
+   */
+  complete(card: Card): void;
   /** Trash the card's note (after confirmation in the UI). */
   remove(path: string): void;
   /**
@@ -229,28 +232,25 @@ export interface BoardActions {
    * takes when it opens, so the actions it offers can name the line the person raised it on rather
    * than whatever the position holds by the time they click.
    */
-  readTodo(path: string, index: number): SubItem | null;
+  readTodo(path: string, index: number): TodoLine | null;
   /**
-   * Check or uncheck the index-th checklist item of a card.
-   *
-   * `line` is the caller's own reading of that line, when it has one — see {@link moveTodo}. The
-   * tick is written against it, so a position that has since been given to another line is refused
-   * by the note rather than ticked.
+   * Check or uncheck one checklist line of a card, named by the caller's own reading of it — the
+   * one taken when the action was offered, never looked up again by position. The tick is written
+   * against it, so a position that has since been given to another line is refused by the note.
    */
-  toggleTodo(path: string, index: number, done: boolean, line?: SubItem): void;
-  /** Delete the index-th checklist item of a card, named by `line` the same way {@link toggleTodo} is. */
-  removeTodo(path: string, index: number, line?: SubItem): void;
+  toggleTodo(path: string, line: TodoLine, done: boolean): void;
+  /** Delete one checklist line of a card, named by `line` the same way {@link toggleTodo} is. */
+  removeTodo(path: string, line: TodoLine): void;
   /**
-   * Send the index-th checklist line of `path` to a column of its own, or back to its card's column
-   * with `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until
-   * it claims a column, so without this there would be nothing to drag in the first place.
+   * Send one checklist line of `path` to a column of its own, or back to its card's column with
+   * `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until it
+   * claims a column, so without this there would be nothing to drag in the first place.
    *
-   * `line` is the caller's own reading of that line, when it has one. The column replaces whatever
-   * the line claimed, and the claim the write refuses to go over is the one the person was looking
-   * at when they picked — which, for the detail panel, is the note as the panel read it and not as
-   * the board did. A caller showing the board's own tile leaves it out and gets the board's reading.
+   * The column replaces whatever `line` claimed, and the claim the write refuses to go over is the
+   * one the person was looking at when they picked — which, for the detail panel, is the note as the
+   * panel read it and not as the board did.
    */
-  moveTodo(path: string, index: number, columnId: string | null, line?: SubItem): void;
+  moveTodo(path: string, line: TodoLine, columnId: string | null): void;
   /**
    * Record (or, with an empty marker, forget) how far the reader has read this card's comments.
    *

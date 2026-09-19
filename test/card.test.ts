@@ -535,8 +535,8 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
   it("parses checklist lines on a CRLF note instead of finding none", () => {
     const items = parseSubtasks(crlfSubtasks);
     expect(items).toEqual([
-      { kind: "todo", text: "one", done: false, index: 0 },
-      { kind: "todo", text: "two", done: true, index: 1 },
+      { kind: "todo", text: "one", done: false, index: 0, occurrence: 0 },
+      { kind: "todo", text: "two", done: true, index: 1, occurrence: 0 },
     ]);
   });
 
@@ -1214,7 +1214,8 @@ describe("author names are sanitized into something the line grammar can hold", 
 describe("does the note still read the line the caller described", () => {
   const subtasks = "# C\n\n## Subtasks\n- [ ] one\n- [x] two [status:: doing]\n- [ ] [[Child]]\n";
   // Most of these ask only whether anything changed; the ones about a claim ask what did.
-  const subtaskStillReads = (text: string, at: LineRef) => subtaskDrift(text, at) === null;
+  const subtaskStillReads = (text: string, at: LineRef) =>
+    subtaskDrift(text, { ...at, occurrence: 0 }) === null;
   const commentStillReads = (text: string, at: LineRef) => commentDrift(text, at) === null;
 
   it("says yes to the line at that index and no to any other", () => {
@@ -1246,37 +1247,71 @@ describe("does the note still read the line the caller described", () => {
   // line whose claim somebody changed reads exactly as it did. A write says what the line has to
   // still claim for its decision to hold, and only then is the difference the line's own to report.
   it("tells a claim that moved from the same line reading the same way", () => {
-    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: "doing" })).toBeNull();
-    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: "todo" })).toEqual({
-      what: "claim",
-      found: "doing",
-    });
+    expect(
+      subtaskDrift(subtasks, { index: 1, text: "two", occurrence: 0, claim: "doing" }),
+    ).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", occurrence: 0, claim: "todo" })).toEqual(
+      {
+        what: "claim",
+        found: "doing",
+      },
+    );
     // A line that gained a claim, and one that lost the claim the caller decided from.
-    expect(subtaskDrift(subtasks, { index: 0, text: "one", claim: null })).toBeNull();
-    expect(subtaskDrift(subtasks, { index: 1, text: "two", claim: null })).toEqual({
+    expect(
+      subtaskDrift(subtasks, { index: 0, text: "one", occurrence: 0, claim: null }),
+    ).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", occurrence: 0, claim: null })).toEqual({
       what: "claim",
       found: "doing",
     });
-    expect(subtaskDrift(subtasks, { index: 0, text: "one", claim: "doing" })).toEqual({
+    expect(
+      subtaskDrift(subtasks, { index: 0, text: "one", occurrence: 0, claim: "doing" }),
+    ).toEqual({
       what: "claim",
       found: null,
     });
   });
 
+  // Words alone cannot tell two identical lines apart, so a line added above a pair of twins would
+  // hand a write meant for the second one to the first. Which of them it was is part of its name.
+  it("tells identical lines apart by which of them the caller read", () => {
+    const twins = "# C\n\n## Subtasks\n- [ ] Review\n- [ ] other\n- [ ] Review\n";
+    expect(parseSubtasks(twins).map((s) => [s.text, s.occurrence])).toEqual([
+      ["Review", 0],
+      ["other", 0],
+      ["Review", 1],
+    ]);
+    const second = { index: 2, text: "Review", occurrence: 1 };
+    expect(subtaskDrift(twins, second)).toBeNull();
+    // "other" goes and two lines land on top: index 2 still reads "Review", but it is the first one.
+    const shifted = "# C\n\n## Subtasks\n- [ ] Intro\n- [ ] Top\n- [ ] Review\n- [ ] Review\n";
+    expect(subtaskDrift(shifted, second)).toEqual({ what: "twin" });
+  });
+
+  it("tells a box ticked since from the same line, for a write that states the box", () => {
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", occurrence: 0, box: true })).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 0, text: "one", occurrence: 0, box: true })).toEqual({
+      what: "box",
+      found: false,
+    });
+  });
+
   it("says nothing about a claim the caller never decided from", () => {
-    expect(subtaskDrift(subtasks, { index: 1, text: "two" })).toBeNull();
+    expect(subtaskDrift(subtasks, { index: 1, text: "two", occurrence: 0 })).toBeNull();
   });
 
   it("leaves a line naming a child note out of it, on both sides", () => {
     // Such a line's column is the child's own `status`, not this field: the reader reports no claim
     // for it however the line is written, so a hand-typed field cannot make it look changed.
     const withField = subtasks.replace("- [ ] [[Child]]", "- [ ] [[Child]] [status:: doing]");
-    expect(subtaskDrift(withField, { index: 2, text: "[[Child]]", claim: null })).toBeNull();
+    expect(
+      subtaskDrift(withField, { index: 2, text: "[[Child]]", occurrence: 0, claim: null }),
+    ).toBeNull();
   });
 
   it("reads the words first: a line that moved is a moved line, whatever it claims", () => {
     const inserted = subtasks.replace("- [ ] one", "- [ ] zero\n- [ ] one");
-    expect(subtaskDrift(inserted, { index: 0, text: "one", claim: null })).toEqual({
+    expect(subtaskDrift(inserted, { index: 0, text: "one", occurrence: 0, claim: null })).toEqual({
       what: "text",
     });
   });

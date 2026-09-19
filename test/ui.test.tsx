@@ -2529,6 +2529,53 @@ describe("card context menu", () => {
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
+  // Two lines reading the same: a line added above both slides the first one into the place of the
+  // second, words and all. Which of the two it is still tells them apart, and the refusal says so.
+  it("will not tick the identical line that slid into the place of the one its menu was raised on", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] Review\n- [ ] Review\n",
+      },
+    });
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] Intro\n- [ ] Review\n- [ ] Review\n";
+    act(() => repo.notify());
+    await within(card).findByText("Intro");
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
+
+    expect(await screen.findByText(/no longer the same one of the lines reading that/)).toHaveClass(
+      "folia-toast-error",
+    );
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  it("will not untick a box somebody ticked by hand under the menu", async () => {
+    const repo = shiftRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
+    const card = (await screen.findByText("First", { selector: ".folia-card-title" })).closest(
+      ".folia-card",
+    ) as HTMLElement;
+    fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] alpha\n- [x] beta\n- [ ] gamma\n";
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
+
+    expect(await screen.findByText(/its box is ticked now/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
   it("will not remove the todo that slid into the place of the one its menu was raised on", async () => {
     const repo = shiftRepo();
     const menu = await menuOnBetaAfterAlphaGoes(repo);
@@ -2689,8 +2736,33 @@ describe("card context menu", () => {
     act(() => repo.notify());
     await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
     const before = repo.files.get("Tasks/First.md")!.body;
+    // The tile it stands on now draws gamma, but the confirm is still about the line it was raised
+    // on — so the dialog, the removal and the refusal below all name the same line.
+    expect(confirm).toHaveAccessibleName("Remove todo beta?");
 
     await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // The tile's own ✓ is aimed at the line the tile was drawn from. A note that has moved on before
+  // the board redraws refuses the move out loud, rather than completing whatever the position holds.
+  it("will not complete a placed todo whose line the note no longer holds there", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n",
+      },
+    });
+    render_(repo);
+    const user = userEvent.setup();
+    const tile = (await screen.findByText("beta")).closest(".folia-card") as HTMLElement;
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n";
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await user.click(within(tile).getByLabelText('Mark "beta" done'));
 
     expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
@@ -3803,6 +3875,85 @@ describe("cross-column make-room (live relocation gap)", () => {
     await waitFor(() => expect(cardsIn("Todo")).toContain("Tasks/Alpha.md"));
     expect(cardsIn("Doing")).not.toContain("Tasks/Alpha.md");
     expect(repo.files.get("Tasks/Alpha.md")!.fm.status).toBe("todo");
+  });
+
+  // A placed todo's tile is named by its line's position. A line removed above it while it is being
+  // dragged — another pane, a sync pull — hands that position to the line below, and a drop that
+  // looked the tile up again would move that other line. The drop carries what was picked up.
+  it("will not move the placed todo that slid into the place of the one being dragged", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/First.md": {
+        fm: { type: "task", status: "doing", order: 1 },
+        body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta [status:: todo]\n- [ ] gamma [status:: todo]\n",
+      },
+      "Tasks/Echo.md": { fm: { type: "task", status: "doing", order: 2 }, body: "\n# Echo\n" },
+    });
+    cardY["Tasks/First.md#todo:1"] = 40;
+    cardY["Tasks/First.md#todo:2"] = 180;
+    cardY["Tasks/First.md"] = 40;
+    cardY["Tasks/Echo.md"] = 110;
+    render_(repo);
+    const main = (await screen.findByText("beta")).closest(".folia-card-main") as HTMLElement;
+    main.focus();
+    await user.keyboard("{ }");
+    await crossIntoDoing(user);
+    await waitFor(() => expect(cardsIn("Doing")).toContain("Tasks/First.md#todo:1"));
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [ ] beta [status:: todo]\n- [ ] gamma [status:: todo]\n";
+    act(() => repo.notify());
+    await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await user.keyboard("{ }");
+
+    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+  });
+
+  // A checked line stands in Done whatever it claims, so another writer can change its claim while
+  // it is being dragged without moving its tile. The drop replaces the claim the person picked up,
+  // and a claim somebody wrote in the meantime is refused rather than overwritten.
+  it("will not overwrite a claim somebody changed while the todo was being dragged", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      {
+        ...config,
+        columns: [
+          { id: "done", title: "Done" },
+          { id: "todo", title: "Todo" },
+          { id: "doing", title: "Doing" },
+        ],
+      },
+      {
+        "Tasks/First.md": {
+          fm: { type: "task", status: "todo", order: 1 },
+          body: "\n# First\n\n## Subtasks\n- [x] beta [status:: doing]\n",
+        },
+      },
+    );
+    cardY["Tasks/First.md#todo:0"] = 40;
+    cardY["Tasks/First.md"] = 40;
+    render_(repo);
+    const main = (await screen.findByText("beta")).closest(".folia-card-main") as HTMLElement;
+    expect(cardsIn("Done")).toContain("Tasks/First.md#todo:0");
+    main.focus();
+    await user.keyboard("{ }");
+    await user.keyboard("{ArrowLeft}");
+    // Over its own card's column, which sends the line home: its claim goes, and the claim that
+    // write replaces is the one the person picked up.
+    await waitFor(() => expect(cardsIn("Todo")).toContain("Tasks/First.md#todo:0"));
+    repo.files.get("Tasks/First.md")!.body =
+      "\n# First\n\n## Subtasks\n- [x] beta [status:: todo]\n";
+    act(() => repo.notify());
+    const before = repo.files.get("Tasks/First.md")!.body;
+
+    await user.keyboard("{ }");
+
+    expect(
+      await screen.findByText(/now claims "todo" where this write replaces "doing"/),
+    ).toHaveClass("folia-toast-error");
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 });
 

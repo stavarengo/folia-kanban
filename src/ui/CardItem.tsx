@@ -1,7 +1,8 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card, CardStats, SubItem } from "../model/types";
+import type { Card, CardStats, TodoLine } from "../model/types";
+import { sameLine } from "../model/board";
 import type { UnreadState } from "../model/unread";
 import { assigneeValues } from "../model/assignees";
 import { cardChips, cardUrgency, priorityTone, relationChips } from "./cardView";
@@ -60,8 +61,8 @@ function CardItemInner({
   // For a placed todo: the checklist line its "Remove todo?" was raised on. The confirm outlives a
   // board reload the same way the context menu does, and this tile is named by the position of that
   // line — so a line taken away above it leaves the tile standing, drawn from whatever slid into
-  // the position, with the confirm still asking about what the person clicked.
-  const confirmingLine = useRef<SubItem | null>(null);
+  // the position, while the confirm, its label and the removal all stay about what was clicked.
+  const [confirmingLine, setConfirmingLine] = useState<TodoLine | null>(null);
   const [menu, setMenu] = useState<ContextTarget | null>(null);
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
@@ -142,29 +143,23 @@ function CardItemInner({
     e.stopPropagation();
     const todoEl = (e.target as HTMLElement).closest(".folia-card-next-todo");
     const rowIndex = todoEl ? Number(todoEl.getAttribute("data-todo-index")) : NaN;
-    // Which checklist line was right-clicked: this tile's own, for a todo placed in a column, or
-    // the surfaced next-todo row the click landed on.
-    const todoIndex = todoRef
-      ? todoRef.index
+    // Which checklist line was right-clicked, read here, while the person is still pointing at it:
+    // this tile's own, for a todo placed in a column, or the surfaced next-todo row the click
+    // landed on. The menu that opens outlives board reloads, and a line removed above this one
+    // moves every index below it — so its actions carry the line rather than the place it sat.
+    const line = todoRef
+      ? todoRef.line
       : todoEl && Number.isFinite(rowIndex)
-        ? rowIndex
+        ? actions.readTodo(notePath, rowIndex)
         : null;
-    if (todoIndex === null) {
-      setMenu({ x: e.clientX, y: e.clientY, kind: "card" });
-      return;
-    }
-    // Read the line here, while the person is still pointing at it. The menu that opens outlives
-    // board reloads, and a line removed above this one moves every index below it — so the actions
-    // in it must carry the line rather than the place it sat. Read from the board rather than
-    // rebuilt from the tile: a tile is drawn from the line but does not carry all of it back.
-    const line = actions.readTodo(notePath, todoIndex);
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      kind: "todo",
-      todoIndex,
-      ...(line ? { todoLine: line } : {}),
-    });
+    // A row the board no longer holds a todo at gets no menu: the card's own would offer to finish
+    // the whole card from a click aimed at one line.
+    if (todoEl && !line) return;
+    setMenu(
+      line
+        ? { x: e.clientX, y: e.clientY, kind: "todo", todoLine: line }
+        : { x: e.clientX, y: e.clientY, kind: "card" },
+    );
   };
   // Merge dnd-kit keyboard handling (Space = pick up) with Enter = open.
   const onKeyDown = (e: KeyboardEvent) => {
@@ -401,7 +396,7 @@ function CardItemInner({
               title="Mark done"
               onClick={(e) => {
                 e.stopPropagation();
-                actions.complete(card.path);
+                actions.complete(card);
               }}
             >
               <Icon name="check-circle" size={15} />
@@ -433,7 +428,7 @@ function CardItemInner({
             title={todoRef ? "Remove todo" : "Delete card"}
             onClick={(e) => {
               e.stopPropagation();
-              confirmingLine.current = todoRef ? actions.readTodo(notePath, todoRef.index) : null;
+              setConfirmingLine(todoRef ? todoRef.line : null);
               setConfirming(true);
             }}
           >
@@ -446,24 +441,21 @@ function CardItemInner({
         <div
           className="folia-card-confirm"
           role="alertdialog"
-          aria-label={todoRef ? `Remove todo ${card.title}?` : `Delete ${card.title}?`}
+          aria-label={
+            confirmingLine ? `Remove todo ${confirmingLine.text}?` : `Delete ${card.title}?`
+          }
         >
-          <span>{todoRef ? "Remove todo?" : "Delete card?"}</span>
+          <span>{confirmingLine ? "Remove todo?" : "Delete card?"}</span>
           <div className="folia-row-actions">
             <button
               className="folia-btn folia-btn-danger"
               onClick={(e) => {
                 e.stopPropagation();
-                if (todoRef)
-                  actions.removeTodo(
-                    todoRef.parentPath,
-                    todoRef.index,
-                    confirmingLine.current ?? undefined,
-                  );
+                if (confirmingLine) actions.removeTodo(notePath, confirmingLine);
                 else actions.remove(card.path);
               }}
             >
-              {todoRef ? "Remove" : "Delete"}
+              {confirmingLine ? "Remove" : "Delete"}
             </button>
             <button
               className="folia-btn"
@@ -485,13 +477,14 @@ function CardItemInner({
           return (
             <CardContextMenu
               target={menu}
+              card={card}
               path={notePath}
               // The line's OWN words, not where the tile renders: a checked line sits in the done
               // column whatever it claims, and the menu must not offer to "move" it to the column
               // it is already showing while quietly rewriting the line to something else. Off the
               // same reading every action in this menu is aimed at, so the column it marks and the
               // column it would replace can never be two different lines' answers.
-              todoColumn={menu.todoLine?.status ?? ""}
+              todoColumn={menu.kind === "todo" ? (menu.todoLine.status ?? "") : ""}
               priority={typeof fm.priority === "string" ? fm.priority : ""}
               assignees={assigneeValues(card)}
               isDone={!canComplete}
@@ -553,8 +546,11 @@ export const CardItem = memo(
     a.parentTitle === b.parentTitle &&
     a.hasSubcardChildren === b.hasSubcardChildren &&
     a.card.todoRef?.parentPath === b.card.todoRef?.parentPath &&
-    a.card.todoRef?.index === b.card.todoRef?.index &&
-    a.card.todoRef?.claim === b.card.todoRef?.claim &&
+    // The tile's reading is what its actions carry, so a line that changed in any part of it has to
+    // reach the tile — a kept render would hand the next click the older reading.
+    (a.card.todoRef && b.card.todoRef
+      ? sameLine(a.card.todoRef.line, b.card.todoRef.line)
+      : a.card.todoRef === b.card.todoRef) &&
     a.card.frontmatter.status === b.card.frontmatter.status &&
     (a.card.todoRef != null || a.card.frontmatter === b.card.frontmatter) &&
     // Body tags come from the metadata cache as a fresh array each load, so this compares their

@@ -7,32 +7,29 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import type { SubItem } from "../model/types";
+import type { Card, TodoLine } from "../model/types";
 import { samePriority } from "../model/priorities";
 import { sameAssignee, toggleAssignee } from "../model/assignees";
 import { priorityOptions, priorityTone } from "./cardView";
 import { useBoardActions, useBoardDocument, useBoardWindow, useSettings } from "./context";
 import { Icon, type IconName } from "./icons";
 
-export interface ContextTarget {
-  x: number;
-  y: number;
-  kind: "card" | "todo";
-  /** Set when kind === "todo": the SubItem.index of the clicked checklist row. */
-  todoIndex?: number;
-  /**
-   * Set when kind === "todo": that checklist line as the board read it the moment this menu was
-   * raised. A position alone names a different line as soon as anything above it goes, and this
-   * menu stays open across the reload that would do exactly that — so every action in it carries
-   * the line the person was pointing at, and the note refuses when that line has since moved on.
-   * Absent only when the board could name no line there, which leaves the actions reading by
-   * position as they did before.
-   */
-  todoLine?: SubItem;
-}
+/**
+ * Where the menu was raised, and on what. For a checklist line, `todoLine` is that line as it was
+ * read the moment the menu opened: a position alone names a different line as soon as anything
+ * above it goes, and this menu stays open across the reload that would do exactly that — so every
+ * action in it carries the line the person was pointing at, and the note refuses when that line
+ * has since moved on.
+ */
+export type ContextTarget = { x: number; y: number } & (
+  | { kind: "card" }
+  | { kind: "todo"; todoLine: TodoLine }
+);
 
 interface Props {
   target: ContextTarget;
+  /** The card the menu was raised on, as it was drawn. */
+  card: Card;
   path: string;
   /** The card's current priority frontmatter value (for the "Change priority" group). */
   priority: string;
@@ -56,6 +53,7 @@ interface Props {
 
 export function CardContextMenu({
   target,
+  card,
   path,
   priority,
   assignees,
@@ -181,21 +179,10 @@ export function CardContextMenu({
     >
       {target.kind === "todo" ? (
         <>
-          {item("Mark done", "check-circle", () => {
-            if (target.todoIndex !== undefined)
-              a.toggleTodo(path, target.todoIndex, true, target.todoLine);
+          {item("Mark done", "check-circle", () => a.toggleTodo(path, target.todoLine, true))}
+          {item("Remove todo", "trash", () => a.removeTodo(path, target.todoLine), {
+            danger: true,
           })}
-          {item(
-            "Remove todo",
-            "trash",
-            () => {
-              if (target.todoIndex !== undefined)
-                a.removeTodo(path, target.todoIndex, target.todoLine);
-            },
-            {
-              danger: true,
-            },
-          )}
           <div className="folia-menu-divider" />
           <span className="folia-menu-label">Column</span>
           <div className="folia-menu-columns" role="group" aria-label="Move todo to a column">
@@ -207,8 +194,7 @@ export function CardContextMenu({
                 aria-checked={c.id === todoColumn}
                 onClick={() => {
                   actioned.current = true;
-                  if (target.todoIndex !== undefined)
-                    a.moveTodo(path, target.todoIndex, c.id, target.todoLine);
+                  a.moveTodo(path, target.todoLine, c.id);
                   onClose();
                 }}
               >
@@ -222,8 +208,7 @@ export function CardContextMenu({
               title="Show it inside its card again"
               onClick={() => {
                 actioned.current = true;
-                if (target.todoIndex !== undefined)
-                  a.moveTodo(path, target.todoIndex, null, target.todoLine);
+                a.moveTodo(path, target.todoLine, null);
                 onClose();
               }}
             >
@@ -239,7 +224,7 @@ export function CardContextMenu({
           {item("Open details", "external-link", () => a.open(path))}
           {item("Rename", "pencil", onRename)}
           {item("Override card title", "type", () => a.editTitleOverride(path))}
-          {!isDone && item("Mark done", "check-circle", () => a.complete(path))}
+          {!isDone && item("Mark done", "check-circle", () => a.complete(card))}
           {me !== "" &&
             item(
               assignees.some((name) => sameAssignee(name, me)) ? "Unassign me" : "Assign to me",

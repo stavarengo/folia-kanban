@@ -15,6 +15,7 @@ import type {
   ContextConfig,
   HistoryScope,
   LineRef,
+  SubtaskRef,
   RelationType,
 } from "../src/model/types";
 import type { CardMutation } from "../src/model/board";
@@ -193,13 +194,10 @@ export class FakeRepo implements CardRepository {
       Object.assign(this.entry(mutation.path).fm, mutation.setFrontmatter);
     for (const key of mutation.unsetFrontmatter ?? []) delete this.entry(mutation.path).fm[key];
     if (mutation.setSubtaskStatus) {
-      const { index, text, claim, status, done } = mutation.setSubtaskStatus;
+      const { status, done, ...at } = mutation.setSubtaskStatus;
+      const { index } = at;
       const e = this.entry(mutation.path);
-      this.requireLine(
-        mutation.path,
-        "subtask",
-        claim === undefined ? { index, text } : { index, text, claim },
-      );
+      this.requireLine(mutation.path, { kind: "subtask", at });
       e.body = setSubtaskStatus(
         done === undefined ? e.body : setSubtaskDone(e.body, index, done),
         index,
@@ -209,13 +207,14 @@ export class FakeRepo implements CardRepository {
     if (mutation.syncClaim) {
       // Mirrors the vault adapter: the claim AND the box are read from what the note says at this
       // moment, and a line the rule moves nowhere is not rewritten.
-      const { index, text, doneColumn } = mutation.syncClaim;
+      const { doneColumn, ...at } = mutation.syncClaim;
+      const { index, text } = at;
       const e = this.entry(mutation.path);
       const seen = parseSubtasks(e.body)[index];
       const was = seen?.status ?? null;
       const next = seen ? claimInStep(was, seen.done, doneColumn) : was;
-      if (seen?.text !== text || next !== was) {
-        this.requireLine(mutation.path, "subtask", { index, text });
+      if (seen?.text !== text || seen.occurrence !== at.occurrence || next !== was) {
+        this.requireLine(mutation.path, { kind: "subtask", at });
         if (next !== was) e.body = setSubtaskStatus(e.body, index, next);
       }
     }
@@ -259,7 +258,7 @@ export class FakeRepo implements CardRepository {
     this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, at: LineRef, text: string) {
-    this.requireLine(path, "comment", at);
+    this.requireLine(path, { kind: "comment", at });
     this.entry(path).body = updateTimestampedLine(
       this.entry(path).body,
       SECTION.comments,
@@ -269,7 +268,7 @@ export class FakeRepo implements CardRepository {
     this.maybeHistory(path, "comment", commentEditedLine());
   }
   async removeComment(path: string, at: LineRef) {
-    this.requireLine(path, "comment", at);
+    this.requireLine(path, { kind: "comment", at });
     this.entry(path).body = removeTimestampedLine(
       this.entry(path).body,
       SECTION.comments,
@@ -281,8 +280,8 @@ export class FakeRepo implements CardRepository {
     this.entry(path).body = addTodo(this.entry(path).body, text);
     this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
-  async toggleSubtask(path: string, at: LineRef, done: boolean) {
-    this.requireLine(path, "subtask", at);
+  async toggleSubtask(path: string, at: SubtaskRef, done: boolean) {
+    this.requireLine(path, { kind: "subtask", at });
     this.entry(path).body = setSubtaskDone(this.entry(path).body, at.index, done);
     this.maybeHistory(
       path,
@@ -290,17 +289,21 @@ export class FakeRepo implements CardRepository {
       done ? subtaskDoneLine(at.text) : subtaskReopenedLine(at.text),
     );
   }
-  async removeSubtask(path: string, at: LineRef) {
-    this.requireLine(path, "subtask", at);
+  async removeSubtask(path: string, at: SubtaskRef) {
+    this.requireLine(path, { kind: "subtask", at });
     this.entry(path).body = removeSubtask(this.entry(path).body, at.index);
     this.maybeHistory(path, "subtask", subtaskRemovedLine(at.text));
   }
 
   /** The adapter's refusal, in memory: a position that no longer holds the caller's line. */
-  private requireLine(path: string, kind: "subtask" | "comment", at: LineRef) {
+  private requireLine(
+    path: string,
+    line: { kind: "subtask"; at: SubtaskRef } | { kind: "comment"; at: LineRef },
+  ) {
     const body = this.entry(path).body;
-    const drift = (kind === "subtask" ? subtaskDrift : commentDrift)(body, at);
-    if (drift) throw staleLine(kind, path, at, drift);
+    const drift =
+      line.kind === "subtask" ? subtaskDrift(body, line.at) : commentDrift(body, line.at);
+    if (drift) throw staleLine(line.kind, path, line.at, drift);
   }
 
   private editRelations(

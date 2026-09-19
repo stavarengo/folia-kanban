@@ -134,8 +134,8 @@ function todoCard(
     title: card.title,
     column: shownColumn(board, path, ctx),
     note: ref?.parentPath,
-    subtaskIndex: ref?.index,
-    claimedColumn: ref?.claim,
+    subtaskIndex: ref?.line.index,
+    claimedColumn: ref?.line.status,
     hint: "This card is a checklist line. Read or edit it through the note named in `note`.",
   };
 }

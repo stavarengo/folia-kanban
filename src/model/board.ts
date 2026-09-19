@@ -17,6 +17,8 @@ import type {
   RelationType,
   RelationTypeDef,
   SubItem,
+  SubtaskRef,
+  TodoLine,
 } from "./types";
 import { dateOnly } from "./dates";
 import type { MatchContext } from "./filter";
@@ -526,7 +528,7 @@ export function buildBoard(
         titleSource: "subtask",
         frontmatter: { status: target },
         childLinks: [],
-        todoRef: { parentPath: c.path, index: item.index, claim: item.status ?? "" },
+        todoRef: { parentPath: c.path, line: { ...item, kind: "todo" } },
       };
       if (c.context !== undefined) todoCard.context = c.context;
       cardsByPath[path] = todoCard;
@@ -901,19 +903,12 @@ export interface CardMutation {
    * An inline todo's placement, written to its own `## Subtasks` line instead of to frontmatter:
    * the line's `[status:: …]` field (`null` clears it) and, when the move states one, its checkbox.
    * An absent `done` leaves the box exactly as the note has it. Mutually exclusive with
-   * `setFrontmatter` — a checklist line has no frontmatter of its own. `text` is what the line said
-   * when the board read it, so the write refuses a position that has since become another line.
-   * `claim` is what it claimed then (`null` — nothing), for a `status` chosen against that value:
-   * the write refuses rather than replace a claim somebody has changed in the meantime. Left out by
-   * a write that replaces the claim for a reason of its own rather than in place of what it said.
+   * `setFrontmatter` — a checklist line has no frontmatter of its own. The line is named by the
+   * reading the move was decided against, so the write refuses a position that has since become
+   * another line; its `claim` is left out by a write that replaces the claim for a reason of its own
+   * rather than in place of what it said (see {@link SubtaskRef.claim}).
    */
-  setSubtaskStatus?: {
-    index: number;
-    text: string;
-    claim?: string | null;
-    status: string | null;
-    done?: boolean;
-  };
+  setSubtaskStatus?: SubtaskRef & { status: string | null; done?: boolean };
   /**
    * Bring an inline todo's `[status:: …]` claim into step with its own checkbox, by the rule in
    * {@link claimInStep} — applied to the claim AND the box the note carries when this lands, not to
@@ -921,7 +916,7 @@ export interface CardMutation {
    * half from now and half from then is how an unticked line ends up claiming Done. Nothing is
    * written when the rule moves nothing, so a line that needs no follow-up is not rewritten at all.
    */
-  syncClaim?: { index: number; text: string; doneColumn: string };
+  syncClaim?: SubtaskRef & { doneColumn: string };
   /** Frontmatter keys to remove from `path` — how a subcard's own `status` claim is dropped. */
   unsetFrontmatter?: string[];
   /**
@@ -1004,8 +999,8 @@ export function planDrop(
 }
 
 /**
- * Move the index-th checklist line of `parentPath` into `toColumnId`, or back home to wherever its
- * card is with `null`. This is the ONE write behind every way a todo changes column — the drag, the
+ * Move a checklist line of `parentPath` into `toColumnId`, or back home to wherever its card is
+ * with `null`. This is the ONE write behind every way a todo changes column — the drag, the
  * context menu and the detail panel — so a todo cannot end up in a state one of them can produce
  * and another cannot read.
  *
@@ -1014,12 +1009,86 @@ export function planDrop(
  * the done column reads as done whether or not anyone ticked its box. Coming home does not touch
  * the checkbox at all — it says where a todo shows, never whether the work is over.
  *
- * `at.line` is the caller's own reading of that line, for a caller that has one. The column being
- * chosen replaces whatever the line claimed, so the claim the write is held to has to be the one
- * the person was looking at when they chose: the detail panel reads the note itself, and its reading
- * is not always the board's. Left out, the board's own reading stands in — which is right for
- * a tile the board itself drew.
+ * `line` is the reading the move was decided against, and nothing else names the line: not a
+ * position looked up on `board`, which may have been reloaded onto a shifted note since the drag
+ * started or the menu opened. The column being chosen replaces whatever the line claimed, so the
+ * claim the write is held to is the one in that reading too.
  */
+export function moveSubtask(
+  board: Board,
+  parentPath: string,
+  line: TodoLine,
+  toColumnId: string | null,
+): CardMutation | null {
+  const parent = board.cards[parentPath];
+  if (!parent) return null;
+  const { index } = line;
+  const drawn = parent.subItems?.find((s) => s.index === index);
+  const home = columnOf(board, parentPath);
+  // Where the line stands today, for the history line to name. The board's own tile answers that
+  // whenever the line being moved is the one the board drew — it knows about lanes, which no rule
+  // here could work out. A reading the board no longer holds is of a line the board has not got,
+  // and then the only honest answer is the one the line itself gives.
+  const from =
+    drawn !== undefined && sameLine(drawn, line)
+      ? (columnOf(board, makeTodoPath(parentPath, index)) ?? home)
+      : standsIn(board, line, home);
+  const target = toColumnId ?? home;
+  // "The column my card is in" and "no claim of my own" name the same place, and only one of them
+  // keeps naming it after the card moves. So a move that lands on the card's own column is written
+  // as no claim at all: otherwise dragging a todo back onto its parent would leave a field pinning
+  // it to that column, and the todo would pop out on its own the next time the card was dragged.
+  const claimTo = toColumnId !== null && toColumnId === home ? null : toColumnId;
+  // What the line LITERALLY says, unnormalised — including a value naming no column of this board
+  // (a typo, or a column since renamed). The board graph ignores such a value, but the write path
+  // must not: normalising it to "no claim" here would make the guard below skip the one write that
+  // can clear it, leaving a field no interface could reach and the todo free to detach the day a
+  // column with that id appears.
+  const claim = line.status ?? null;
+  // Naming a column states a done-ness; sending a todo home does not. In that second case the
+  // checkbox is left out of the write entirely rather than written back to what we believe it
+  // currently is — the board we are reading may be one reload behind the note, and a stale belief
+  // would tick or untick the wrong way. Read from `toColumnId`, not `claimTo`: dropping a finished
+  // todo on its card's Todo column reopens it, even though the claim that lands is "none".
+  const done =
+    toColumnId === null ? undefined : toColumnId === findDoneColumn(board.config.columns);
+  if (claim === claimTo && (done === undefined || line.done === done)) {
+    return null; // the line already says this
+  }
+  // A column chosen by hand replaces whatever the line claimed, so the write may only land on the
+  // value it was chosen against: a claim somebody has moved in the meantime is theirs, and the
+  // person who picked this column never saw it.
+  const at = { ...lineRef(line), claim, status: claimTo };
+  const label = line.text || "todo";
+  return {
+    path: parentPath,
+    // A move that states the checkbox replaces the box as well as the claim, so it is held to both.
+    setSubtaskStatus: done === undefined ? at : { ...at, box: line.done, done },
+    history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
+  };
+}
+
+/** Where a checklist line sat and what it said — the part of a reading every write is held to. */
+function lineRef(line: SubItem): SubtaskRef {
+  return { index: line.index, text: line.text, occurrence: line.occurrence };
+}
+
+export function isTodoLine(line: SubItem): line is TodoLine {
+  return line.kind === "todo";
+}
+
+/** Whether two readings of a checklist line say the same thing, position, words, box and claim. */
+export function sameLine(a: SubItem, b: SubItem): boolean {
+  return (
+    a.index === b.index &&
+    a.text === b.text &&
+    a.occurrence === b.occurrence &&
+    a.done === b.done &&
+    a.status === b.status &&
+    a.kind === b.kind
+  );
+}
+
 /**
  * The column a checklist line stands in by its own reading — its claim, with the done column
  * winning once the line reads as finished, and its card's own column when it claims none this board
@@ -1033,89 +1102,37 @@ function standsIn(board: Board, item: SubItem, home: string | null): string | nu
   return (item.done || claim === doneCol) && doneCol !== null ? doneCol : claim;
 }
 
-export function moveSubtask(
-  board: Board,
-  parentPath: string,
-  at: { index: number; line?: SubItem },
-  toColumnId: string | null,
-): CardMutation | null {
-  const parent = board.cards[parentPath];
-  const { index, line } = at;
-  if (!parent) return null;
-  const drawn = parent.subItems?.find((s) => s.index === index && s.kind === "todo");
-  const item = line?.kind === "todo" && line.index === index ? line : drawn;
-  if (!item) return null;
-  const home = columnOf(board, parentPath);
-  // Where the line stands today, for the history line to name. The board's own tile answers that
-  // whenever the line being moved is the one the board drew — it knows about lanes, which no rule
-  // here could work out. A caller reading the note ahead of the board is moving a line the board
-  // has not seen, and then the only honest answer is the one the line itself gives.
-  const from =
-    drawn !== undefined && drawn.status === item.status && drawn.done === item.done
-      ? (columnOf(board, makeTodoPath(parentPath, index)) ?? home)
-      : standsIn(board, item, home);
-  const target = toColumnId ?? home;
-  // "The column my card is in" and "no claim of my own" name the same place, and only one of them
-  // keeps naming it after the card moves. So a move that lands on the card's own column is written
-  // as no claim at all: otherwise dragging a todo back onto its parent would leave a field pinning
-  // it to that column, and the todo would pop out on its own the next time the card was dragged.
-  const claimTo = toColumnId !== null && toColumnId === home ? null : toColumnId;
-  // What the line LITERALLY says, unnormalised — including a value naming no column of this board
-  // (a typo, or a column since renamed). The board graph ignores such a value, but the write path
-  // must not: normalising it to "no claim" here would make the guard below skip the one write that
-  // can clear it, leaving a field no interface could reach and the todo free to detach the day a
-  // column with that id appears.
-  const claim = item.status ?? null;
-  // Naming a column states a done-ness; sending a todo home does not. In that second case the
-  // checkbox is left out of the write entirely rather than written back to what we believe it
-  // currently is — the board we are reading may be one reload behind the note, and a stale belief
-  // would tick or untick the wrong way. Read from `toColumnId`, not `claimTo`: dropping a finished
-  // todo on its card's Todo column reopens it, even though the claim that lands is "none".
-  const done =
-    toColumnId === null ? undefined : toColumnId === findDoneColumn(board.config.columns);
-  if (claim === claimTo && (done === undefined || item.done === done)) {
-    return null; // the line already says this
-  }
-  // A column chosen by hand replaces whatever the line claimed, so the write may only land on the
-  // value it was chosen against: a claim somebody has moved in the meantime is theirs, and the
-  // person who picked this column never saw it.
-  const setSubtaskStatus =
-    done === undefined
-      ? { index, text: item.text, claim, status: claimTo }
-      : { index, text: item.text, claim, status: claimTo, done };
-  const label = item.text || "todo";
-  return {
-    path: parentPath,
-    setSubtaskStatus,
-    history: `Moved subtask "${label}" from ${columnTitle(board.config, from ?? "\u2014")} to ${columnTitle(board.config, target ?? "\u2014")}`,
-  };
-}
-
 /**
- * The tile a checklist line would be drawn as, standing in `at.columnId` — what a rule has to be
- * read against before that claim is written, for a line the board draws no tile for yet or draws
- * under words the caller's own reading has moved past.
+ * The tile a lane's rule judges a checklist line by before `columnId` is written onto it: the one
+ * the board already draws for that line — it can carry inline fields a rule reads — or else the
+ * tile the line would be drawn as, standing there. The board's tile only answers for the line being
+ * moved: a caller reading the note ahead of the board can be moving a line the board has at that
+ * index under other words, and judging that one would refuse, or wave through, on somebody else's.
  *
- * Minted exactly as `buildBoard` mints a placed todo, down to the parent's own name and context,
- * because a lane's rule reads those: judged instead against a bare stand-in, a line whose parent
- * sits in a context would be refused by the very lane that is about to draw it. `null` when the
- * board knows no such card to take them from.
+ * The tile to be is minted exactly as `buildBoard` mints a placed todo, down to the parent's own
+ * name and context, because a lane's rule reads those: judged instead against a bare stand-in, a
+ * line whose parent sits in a context would be refused by the very lane that is about to draw it.
+ * `null` when the board knows no such card to take them from.
  */
-export function prospectiveTodo(
+export function todoTile(
   board: Board,
   parentPath: string,
-  at: { index: number; text: string; columnId: string },
+  line: TodoLine,
+  columnId: string,
 ): Card | null {
+  const path = makeTodoPath(parentPath, line.index);
+  const drawn = board.cards[path];
+  if (drawn && drawn.title === line.text) return drawn;
   const parent = board.cards[parentPath];
   if (!parent) return null;
   const card: Card = {
-    path: makeTodoPath(parentPath, at.index),
+    path,
     basename: parent.basename,
-    title: at.text,
+    title: line.text,
     titleSource: "subtask",
-    frontmatter: { status: at.columnId },
+    frontmatter: { status: columnId },
     childLinks: [],
-    todoRef: { parentPath, index: at.index, claim: at.columnId },
+    todoRef: { parentPath, line: { ...line, status: columnId } },
   };
   if (parent.context !== undefined) card.context = parent.context;
   return card;
@@ -1220,7 +1237,7 @@ export function syncSubtaskClaim(
   // note is the only thing that knows either — and an answer taken half from that reading and half
   // from the note is how a line ends up with a box and a claim telling different stories.
   if (doneCol === null) return null;
-  return { path: parentPath, syncClaim: { index, text: line.text, doneColumn: doneCol } };
+  return { path: parentPath, syncClaim: { ...lineRef(line), doneColumn: doneCol } };
 }
 
 /**
@@ -1294,15 +1311,12 @@ export function reassignColumn(
   // someone deleted the done column, in their own note, with nothing to undo it.
   return {
     path: todoRef.parentPath,
-    // A todo tile's title IS its checklist line's text (that is what `buildBoard` mints it from),
-    // which is what the write needs to recognise the line it was told to move.
-    //
     // No claim is stated: this write does not replace a value it was chosen against, it rehomes a
     // line out of a column that is going away, and a checked line stands in Done whatever it claims
     // — so the claim the board read there is not the value this is about. Holding the write to it
     // would refuse the rehoming of a line whose claim moved, and leave that line claiming a column
     // that no longer exists once the delete goes through, with nothing left to repeat the edit on.
-    setSubtaskStatus: { index: todoRef.index, text: card.title, status: toColumnId },
+    setSubtaskStatus: { ...lineRef(todoRef.line), status: toColumnId },
   };
 }
 
@@ -1325,7 +1339,6 @@ export function resolveDrop(
   activeId: string,
   overId: string,
 ): { columnId: string; index: number } | null {
-  if (!board.cards[activeId]) return null;
   if (board.columns[overId]) {
     const list = board.columns[overId].filter((p) => p !== activeId);
     return { columnId: overId, index: list.length };
@@ -1340,18 +1353,24 @@ export function resolveDrop(
 /**
  * Move/reorder a card to `toColumnId` at `dropIndex`. Returns the single mutation to apply
  * (status + fractional order + a history line). Pure: does not mutate the board.
+ *
+ * `moved` is the card as the caller read it when the action started — the tile that was picked
+ * up, not a path looked up again here. For a note that is only its identity; for a checklist line
+ * standing in a column of its own it is the reading the move is held to, since `board` may have
+ * been reloaded onto a note where that tile's position now names another line.
  */
 export function moveCard(
   board: Board,
-  cardPath: string,
+  moved: Card,
   toColumnId: string,
   dropIndex: number,
 ): CardMutation | null {
+  const todoRef = moved.todoRef;
+  if (todoRef) return moveSubtask(board, todoRef.parentPath, todoRef.line, toColumnId);
+  const cardPath = moved.path;
   const card = board.cards[cardPath];
   if (!card) return null;
   const fromStatus = String(card.frontmatter.status ?? "");
-  const todoRef = card.todoRef;
-  if (todoRef) return moveSubtask(board, todoRef.parentPath, { index: todoRef.index }, toColumnId);
   const colCards = (board.columns[toColumnId] ?? [])
     .filter((p) => p !== cardPath)
     .flatMap((p) => {

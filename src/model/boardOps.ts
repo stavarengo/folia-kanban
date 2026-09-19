@@ -8,37 +8,41 @@
 
 import type { MatchContext } from "./filter";
 import { laneRefusal } from "./lanes";
-import type { Board, SubItem } from "./types";
+import type { Board, Card, SubItem } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import type { CardRepository } from "./repo";
 import { StaleLineError } from "./repo";
 
-/** Where a move lands: a column, and a slot in it. An absent `index` means the end of the column. */
+/**
+ * Where a move lands: a column, and a slot in it. An absent `index` means the end of the column.
+ * `card` is the card as the caller read it when the action started (see `moveCard`).
+ */
 export interface MoveTarget {
-  path: string;
+  card: Card;
   columnId: string;
   index?: number;
 }
 
-/** A dnd-kit drop: the dragged card, and the id it was released over (a column id or a card path). */
+/** A dnd-kit drop: the card picked up, and the id it was released over (a column id or a card path). */
 export interface DropTarget {
-  activeId: string;
+  card: Card;
   overId: string;
 }
 
 /**
  * Move or reorder a card. `index` counts slots in the target column with the moved card taken out,
- * so 0 is the top and an absent value appends. Returns false when the board knows no such card,
- * which is the caller's cue that nothing was written.
+ * so 0 is the top and an absent value appends. Returns false when nothing was written: the board
+ * knows no such note, or a checklist line's reading already stands where it was sent.
  */
 export async function moveCardTo(
   repo: CardRepository,
   board: Board,
   target: MoveTarget,
 ): Promise<boolean> {
-  const { path, columnId } = target;
-  const index = target.index ?? (board.columns[columnId] ?? []).filter((p) => p !== path).length;
-  const mutation = moveCard(board, path, columnId, index);
+  const { card, columnId } = target;
+  const index =
+    target.index ?? (board.columns[columnId] ?? []).filter((p) => p !== card.path).length;
+  const mutation = moveCard(board, card, columnId, index);
   if (!mutation) return false;
   await repo.applyMove(mutation);
   return true;
@@ -50,10 +54,10 @@ export async function moveCardOver(
   board: Board,
   drop: DropTarget,
 ): Promise<boolean> {
-  const resolved = resolveDrop(board, drop.activeId, drop.overId);
+  const resolved = resolveDrop(board, drop.card.path, drop.overId);
   if (!resolved) return false;
   return moveCardTo(repo, board, {
-    path: drop.activeId,
+    card: drop.card,
     columnId: resolved.columnId,
     index: resolved.index,
   });

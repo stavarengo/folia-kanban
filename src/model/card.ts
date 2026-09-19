@@ -10,7 +10,7 @@
 // vault.process(file, text => ...).
 
 import { parse as parseYaml } from "yaml";
-import type { CardBody, CardStats, LineDrift, LineRef, SubItem } from "./types";
+import type { CardBody, CardStats, LineDrift, LineRef, SubItem, SubtaskRef } from "./types";
 import { fencedLines, unclosedFence } from "./fences";
 import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
@@ -333,7 +333,7 @@ function splitInlineStatus(text: string): { text: string; status?: string } {
   return value === "" ? { text: rest } : { text: rest, status: value };
 }
 
-function parseSubItem(rawText: string, index: number, done: boolean): SubItem {
+function parseSubItem(rawText: string, index: number, done: boolean): Omit<SubItem, "occurrence"> {
   // Strip the inline field FIRST: a subcard line carrying one (`- [ ] [[Child]] [status:: doing]`)
   // must still parse as a link, not fall through to a plain todo whose text happens to contain one.
   const { text: trimmed, status } = splitInlineStatus(rawText.trim());
@@ -351,13 +351,14 @@ function parseSubItem(rawText: string, index: number, done: boolean): SubItem {
 export function parseSubtasks(text: string): SubItem[] {
   const lines = splitFrontmatter(text).body.split("\n");
   const items: SubItem[] = [];
-  let i = 0;
+  const seen = new Map<string, number>();
   for (const n of sectionContent(lines, SECTION.subtasks) ?? []) {
     const m = CHECKBOX_RE.exec(lines[n] ?? "");
     if (!m) continue;
-    const rawText = m[3] ?? "";
-    const checkChar = m[2] ?? " ";
-    items.push(parseSubItem(rawText, i++, checkChar !== " "));
+    const item = parseSubItem(m[3] ?? "", items.length, (m[2] ?? " ") !== " ");
+    const occurrence = seen.get(item.text) ?? 0;
+    seen.set(item.text, occurrence + 1);
+    items.push({ ...item, occurrence });
   }
   return items;
 }
@@ -410,19 +411,22 @@ export function parseBody(text: string): CardBody {
  * Asked inside the write, against the very text about to be changed: the index was produced by a
  * read that may be minutes old, and a line inserted above it since would silently hand the write
  * somebody else's todo. Compared through `parseSubtasks`, the same reader every caller got its
- * `SubItem` from, so an indent can never make a line look changed.
+ * `SubItem` from, so an indent can never make a line look changed. Between lines reading exactly
+ * the same, which one it was ({@link SubItem.occurrence}) is part of the line's name too.
  *
  * The words are only half of what names a line, for a write that replaces the `[status:: …]` value
  * it was chosen against: the field is not part of `SubItem.text`, so a claim changed underneath
  * reads as the same line by every word this can see. Such a caller says which claim it saw
- * ({@link LineRef.claim}), and the note keeps a value written since rather than having it replaced
+ * ({@link SubtaskRef.claim}), and the note keeps a value written since rather than having it replaced
  * by one nobody at this end ever read. A line naming a child note is the exception the reader itself
  * makes: `parseSubtasks` reports no claim for one, on either side of this comparison, because such
  * a line's column lives in the child's own frontmatter.
  */
-export function subtaskDrift(text: string, at: LineRef): LineDrift | null {
+export function subtaskDrift(text: string, at: SubtaskRef): LineDrift | null {
   const item = parseSubtasks(text)[at.index];
   if (item?.text !== at.text) return { what: "text" };
+  if (item.occurrence !== at.occurrence) return { what: "twin" };
+  if (at.box !== undefined && item.done !== at.box) return { what: "box", found: item.done };
   if (at.claim === undefined) return null;
   const found = item.status ?? null;
   return found === at.claim ? null : { what: "claim", found };

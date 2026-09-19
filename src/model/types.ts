@@ -57,6 +57,15 @@ export interface LineRef {
   index: number;
   /** The entry's text, as that same reader reports it (`SubItem.text`, a comment's `text`). */
   text: string;
+}
+
+/**
+ * A checklist line as the caller read it. Words alone cannot tell two lines reading exactly the
+ * same apart, so the reading also says which of those it was ({@link SubItem.occurrence}): a line
+ * added or removed above a pair of twins then still refuses, instead of handing the write the twin.
+ */
+export interface SubtaskRef extends LineRef {
+  occurrence: number;
   /**
    * For a checklist line whose `[status:: …]` claim this write replaces: the claim the caller read
    * there (`null` — it read none), so the write refuses when the line claims something else by now.
@@ -64,19 +73,28 @@ export interface LineRef {
    * underneath (another pane, another app, a sync pull) leaves a line reading exactly as it did,
    * and the value about to go is one nobody at this end ever saw.
    *
-   * Left out where the claim is not what this write was decided against: removing the line, editing
-   * a comment, ticking a box — a tick's own follow-up is worked out from the note when it lands
+   * Left out where the claim is not what this write was decided against: removing the line, ticking
+   * a box — a tick's own follow-up is worked out from the note when it lands
    * (see `claimInStep`), so there is no earlier reading of the claim to hold it to.
    */
   claim?: string | null;
+  /**
+   * For a write that states the line's checkbox: whether the caller read it ticked, so a box
+   * somebody changed in the meantime is refused rather than overwritten, the same as a claim.
+   */
+  box?: boolean;
 }
 
 /**
- * How a note's line differs from the {@link LineRef} a caller described: its words, or the
- * `[status:: …]` claim the caller decided against — which the note still holds, and which is what a
- * refusal has to name for the person to know whose value was about to go.
+ * How a note's line differs from the reading a caller described: its words, which of several
+ * identical lines it is, or the claim or the box the caller decided against — which the note still
+ * holds, and which is what a refusal has to name for the person to know whose value was about to go.
  */
-export type LineDrift = { what: "text" } | { what: "claim"; found: string | null };
+export type LineDrift =
+  | { what: "text" }
+  | { what: "twin" }
+  | { what: "claim"; found: string | null }
+  | { what: "box"; found: boolean };
 
 type SubItemKind = "todo" | "card";
 
@@ -98,7 +116,12 @@ export interface SubItem {
   status?: string;
   /** 0-based position among checklist items in the Subtasks section (stable edit handle). */
   index: number;
+  /** How many lines above this one in the same section read exactly `text` (0 for the first). */
+  occurrence: number;
 }
+
+/** A plain todo line, whole: the reading a placed tile is drawn from and every write to it carries. */
+export type TodoLine = SubItem & { kind: "todo" };
 
 // Only referenced by CardBody below (not imported elsewhere), so kept module-private.
 interface Comment {
@@ -232,16 +255,16 @@ export interface Card {
   subItems?: SubItem[];
   /**
    * Set ONLY on the synthetic cards `buildBoard` mints for an inline todo that sits in its own
-   * column: the file that owns the checklist line, the line's `SubItem.index` inside it, and the
-   * `[status:: …]` value that line literally carries. Its `path` is synthetic (see `makeTodoPath`)
-   * and names no file, so every write path must route through the parent named here instead of
-   * treating `Card.path` as a vault path.
+   * column: the file that owns the checklist line, and the line itself as it was read. Its `path`
+   * is synthetic (see `makeTodoPath`) and names no file, so every write path must route through the
+   * parent named here instead of treating `Card.path` as a vault path.
    *
-   * `claim` is the line's own words, NOT where the tile renders — a checked line sits in the done
-   * column whatever it claims. A picker must show the claim, or choosing the column it already
-   * displays would silently rewrite the line to something else.
+   * The line travels whole because the tile IS the reading an action on it is decided against: a
+   * drag or a click that outlives a reload must still carry what the person was pointing at, not
+   * whatever the same position holds by then. Its `status` is the line's own claim, NOT where the
+   * tile renders — a checked line sits in the done column whatever it claims.
    */
-  todoRef?: { parentPath: string; index: number; claim: string };
+  todoRef?: { parentPath: string; line: TodoLine };
   /** Optional precomputed display stats (ignored by board logic). */
   stats?: CardStats;
   /**

@@ -11,6 +11,7 @@ import type {
   LineDrift,
   LineRef,
   RelationType,
+  SubtaskRef,
 } from "./types";
 import type { CardMutation } from "./board";
 import type { FileOp } from "./pathOps";
@@ -32,10 +33,21 @@ function claimWords(claim: string | null): string {
 export function staleLine(
   kind: "subtask" | "comment",
   path: string,
-  at: LineRef,
+  at: LineRef & Partial<SubtaskRef>,
   drift: LineDrift,
 ): StaleLineError {
   const where = `The ${kind} at index ${at.index} of "${path}"`;
+  if (drift.what === "box") {
+    const box = (ticked: boolean) => (ticked ? "ticked" : "unticked");
+    return new StaleLineError(
+      `${where} still reads "${at.text}", but its box is ${box(drift.found)} now where this write was decided on it ${box(!drift.found)} — the note changed since it was read, so nothing was written. Read it again and repeat the edit on what is there now.`,
+    );
+  }
+  if (drift.what === "twin") {
+    return new StaleLineError(
+      `${where} still reads "${at.text}", but it is no longer the same one of the lines reading that — a line was added or removed above it since it was read, so nothing was written. Read it again and repeat the edit on what is there now.`,
+    );
+  }
   // A claim that moved leaves the line reading exactly as the caller described it, so saying it no
   // longer reads that way would be untrue. What the person needs is the two values: what the line
   // claims now, and the one this write was about to put in its place.
@@ -97,7 +109,7 @@ export interface CardRepository {
    *
    * A checklist line is named by what it said as well as where it sat, and a write that replaces
    * the line's own `[status:: …]` claim also names the claim it replaces (see
-   * {@link LineRef.claim}). This throws {@link StaleLineError} and writes nothing when the note no
+   * {@link SubtaskRef.claim}). This throws {@link StaleLineError} and writes nothing when the note no
    * longer reads that way there, or when that claim is not the one the line carries any more.
    *
    * `syncClaim` is the one write decided the other way round — against the claim the note holds
@@ -127,8 +139,8 @@ export interface CardRepository {
   /** Delete one comment line only. */
   removeComment(path: string, at: LineRef): Promise<void>;
   addTodo(path: string, text: string): Promise<void>;
-  toggleSubtask(path: string, at: LineRef, done: boolean): Promise<void>;
-  removeSubtask(path: string, at: LineRef): Promise<void>;
+  toggleSubtask(path: string, at: SubtaskRef, done: boolean): Promise<void>;
+  removeSubtask(path: string, at: SubtaskRef): Promise<void>;
 
   /**
    * Declare a relationship of `type` (a key of the board's vocabulary, `BoardConfig.relations`)

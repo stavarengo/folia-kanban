@@ -27,9 +27,10 @@ import {
   resolveDrop,
   splitCardDragId,
   subtaskRef,
+  isTodoLine,
   subtreePaths,
 } from "../src/model/board";
-import type { BoardConfig, Card, ColumnDef, SubItem } from "../src/model/types";
+import type { Board, BoardConfig, Card, ColumnDef, SubItem, TodoLine } from "../src/model/types";
 import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {
@@ -421,7 +422,7 @@ describe("ordering", () => {
       config,
       cards.map((c) => ({ ...c, frontmatter: { status: "todo" } })),
     );
-    const mut = moveCard(b, "Tasks/C.md", "todo", 0)!;
+    const mut = moveCard(b, b.cards["Tasks/C.md"]!, "todo", 0)!;
     expect(mut.setFrontmatter).toEqual({ status: "todo", order: -1 });
     // apply and rebuild: C now first
     const moved = cards.map((c) =>
@@ -439,9 +440,9 @@ describe("ordering", () => {
 
 describe("a subcard reaching Done and its parent's checklist line", () => {
   function link(target: string, index: number, done = false): SubItem {
-    return { kind: "card", text: `[[${target}]]`, done, link: target, index };
+    return { kind: "card", text: `[[${target}]]`, done, link: target, index, occurrence: 0 };
   }
-  const todoLine: SubItem = { kind: "todo", text: "Plain", done: false, index: 0 };
+  const todoLine: SubItem = { kind: "todo", text: "Plain", done: false, index: 0, occurrence: 0 };
   function withItems(basename: string, fm: Partial<Card["frontmatter"]>, items: SubItem[]): Card {
     return {
       ...card(
@@ -464,21 +465,21 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
   it("moving the child into Done ticks the parent line, out of Done unticks it — by link", () => {
     const parent = withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1)]);
     const b = buildBoard(config, [parent, card("Child", { status: "next" })]);
-    expect(moveCard(b, "Tasks/Child.md", "done", 0)).toMatchObject({
+    expect(moveCard(b, b.cards["Tasks/Child.md"]!, "done", 0)).toMatchObject({
       path: "Tasks/Child.md",
       setFrontmatter: { status: "done" },
       parentLines: [{ path: "Tasks/Parent.md", links: ["Child"], done: true }],
     });
     // Not yet ticked and heading somewhere that is not Done: the line already says so, no write.
-    expect(moveCard(b, "Tasks/Child.md", "doing", 0)?.parentLines).toBeUndefined();
+    expect(moveCard(b, b.cards["Tasks/Child.md"]!, "doing", 0)?.parentLines).toBeUndefined();
 
     const ticked = withItems("Parent", { status: "todo" }, [todoLine, link("Child", 1, true)]);
     const b2 = buildBoard(config, [ticked, card("Child", { status: "done" })]);
-    expect(moveCard(b2, "Tasks/Child.md", "todo", 0)?.parentLines).toEqual([
+    expect(moveCard(b2, b2.cards["Tasks/Child.md"]!, "todo", 0)?.parentLines).toEqual([
       { path: "Tasks/Parent.md", links: ["Child"], done: false },
     ]);
     // A reorder says nothing about finishing.
-    expect(moveCard(b2, "Tasks/Child.md", "done", 0)?.parentLines).toBeUndefined();
+    expect(moveCard(b2, b2.cards["Tasks/Child.md"]!, "done", 0)?.parentLines).toBeUndefined();
   });
 
   it("treats a drop in the column a status-less card renders in as a reorder", () => {
@@ -489,9 +490,11 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     ]);
     expect(b.columns["todo"]).toEqual(["Tasks/A.md", "Tasks/B.md"]);
     // The note's own record still says its `status` changed; only the checkbox reads it as a reorder.
-    expect(moveCard(b, "Tasks/B.md", "todo", 0)).toMatchObject({ history: "Moved from — to Todo" });
-    expect(moveCard(b, "Tasks/B.md", "todo", 0)?.parentLines).toBeUndefined();
-    expect(moveCard(b, "Tasks/B.md", "doing", 0)?.parentLines).toEqual([
+    expect(moveCard(b, b.cards["Tasks/B.md"]!, "todo", 0)).toMatchObject({
+      history: "Moved from — to Todo",
+    });
+    expect(moveCard(b, b.cards["Tasks/B.md"]!, "todo", 0)?.parentLines).toBeUndefined();
+    expect(moveCard(b, b.cards["Tasks/B.md"]!, "doing", 0)?.parentLines).toEqual([
       { path: "Tasks/A.md", links: ["B"], done: false },
     ]);
     // Unless the first column IS Done: landing there is the statement, whatever the tile did.
@@ -500,7 +503,7 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       withItems("A", { status: "todo" }, [link("B", 0)]),
       withItems("B", {}, [link("A", 0)]),
     ]);
-    expect(moveCard(b2, "Tasks/B.md", "done", 0)?.parentLines).toEqual([
+    expect(moveCard(b2, b2.cards["Tasks/B.md"]!, "done", 0)?.parentLines).toEqual([
       { path: "Tasks/A.md", links: ["B"], done: true },
     ]);
   });
@@ -533,7 +536,7 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       withItems("Parent", { status: "open" }, [link("Child", 0)]),
       card("Child", { status: "open" }),
     ]);
-    expect(moveCard(b, "Tasks/Child.md", "later", 0)?.parentLines).toBeUndefined();
+    expect(moveCard(b, b.cards["Tasks/Child.md"]!, "later", 0)?.parentLines).toBeUndefined();
   });
 
   it("binds an ambiguous link the way the vault does, when the vault answers", () => {
@@ -644,7 +647,7 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
       syncSubtaskClaim(
         b,
         "Tasks/Parent.md",
-        { kind: "card", text: "[[Placed]]", done: false, index: 0 },
+        { kind: "card", text: "[[Placed]]", done: false, index: 0, occurrence: 0 },
         true,
       ),
     ).toBeNull();
@@ -670,13 +673,13 @@ describe("moveCard mutation", () => {
   const b = buildBoard(config, [card("A", { status: "todo" }), card("B", { status: "doing" })]);
 
   it("describes a cross-column move in history", () => {
-    const mut = moveCard(b, "Tasks/A.md", "doing", 0)!;
+    const mut = moveCard(b, b.cards["Tasks/A.md"]!, "doing", 0)!;
     expect(mut.setFrontmatter?.status).toBe("doing");
     expect(mut.history).toBe("Moved from Todo to Doing");
   });
 
   it("describes a same-column reorder in history", () => {
-    const mut = moveCard(b, "Tasks/A.md", "todo", 0)!;
+    const mut = moveCard(b, b.cards["Tasks/A.md"]!, "todo", 0)!;
     expect(mut.history).toBe("Reordered within Todo");
   });
 });
@@ -1173,10 +1176,16 @@ describe("isComputedOrder (#6 — auto-sorted columns)", () => {
 });
 
 describe("subitems in a column of their own", () => {
-  function todo(text: string, index: number, status?: string, done = false): SubItem {
+  function todo(text: string, index: number, status?: string, done = false): TodoLine {
     return status === undefined
-      ? { kind: "todo", text, done, index }
-      : { kind: "todo", text, done, status, index };
+      ? { kind: "todo", text, done, index, occurrence: 0 }
+      : { kind: "todo", text, done, status, index, occurrence: 0 };
+  }
+  /** The line the board itself read at that position — what a tile it drew carries. */
+  function drawn(b: Board, parentPath: string, index: number): TodoLine {
+    const line = subtaskRef(b, parentPath, index);
+    if (!line || !isTodoLine(line)) throw new Error(`no todo ${index} in ${parentPath}`);
+    return line;
   }
   function withTodos(basename: string, fm: Partial<Card["frontmatter"]>, items: SubItem[]): Card {
     return { ...card(basename, fm), subItems: items };
@@ -1211,7 +1220,7 @@ describe("subitems in a column of their own", () => {
       title: "Write docs",
       titleSource: "subtask",
       frontmatter: { status: "doing" },
-      todoRef: { parentPath: "Tasks/Root.md", index: 0 },
+      todoRef: { parentPath: "Tasks/Root.md", line: todo("Write docs", 0, "doing") },
     });
     expect(b.placedOf[p]).toBe("Tasks/Root.md");
   });
@@ -1310,16 +1319,20 @@ describe("subitems in a column of their own", () => {
       withTodos("Root", { status: "todo" }, [todo("Pinned home", 0, "todo")]),
     ]);
     // It renders with its card, but the line still claims `todo` — sending it home must write.
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), null)).toMatchObject({
       path: "Tasks/Root.md",
       setSubtaskStatus: { index: 0, text: "Pinned home", status: null },
     });
     // Naming that same column is the same request, so it clears the claim rather than restating it:
     // a claim pinning a todo to its card's column would detach the todo the day the card moves.
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "todo")?.setSubtaskStatus).toEqual({
+    expect(
+      moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), "todo")?.setSubtaskStatus,
+    ).toEqual({
       index: 0,
       text: "Pinned home",
+      occurrence: 0,
       claim: "todo",
+      box: false,
       status: null,
       done: false,
     });
@@ -1327,8 +1340,8 @@ describe("subitems in a column of their own", () => {
 
   it("writes nothing when an unclaimed todo is sent to the column it already shows in", () => {
     const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("Plain", 0)])]);
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "todo")).toBeNull();
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), "todo")).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), null)).toBeNull();
   });
 
   // `null` here answers two unrelated questions, and a caller has to tell them apart: a line that
@@ -1343,20 +1356,26 @@ describe("subitems in a column of their own", () => {
     ]);
     const line = todo("Placed", 0, "doing");
     // No card of that name: there is no note to write into, whatever the caller read.
-    expect(moveSubtask(b, "Tasks/Nobody.md", { index: 0, line }, "done")).toBeNull();
-    // A card this board knows, but no line of its own at that position and no reading supplied.
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 4 }, "done")).toBeNull();
-    // A reading is only taken for the position it is about. One describing another row is set
-    // aside for the board's own, and here the board has none there either — so `null` again, and
-    // a caller must not read that as "already where it belongs".
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 1, line }, "done")).toBeNull();
+    expect(moveSubtask(b, "Tasks/Nobody.md", line, "done")).toBeNull();
+    // A reading of a line this board no longer draws still becomes the write: the note, not the
+    // board, is what says whether that line stands, and the write refuses when it does not.
+    expect(moveSubtask(b, "Tasks/Root.md", todo("Gone", 4, "doing"), "done")).toMatchObject({
+      setSubtaskStatus: { index: 4, text: "Gone", occurrence: 0, claim: "doing" },
+    });
     // Card known, line named — so this `null` is the line already claiming `doing`, unticked, and
     // asked for `doing` again.
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0, line }, "doing")).toBeNull();
+    expect(moveSubtask(b, "Tasks/Root.md", line, "doing")).toBeNull();
     // Every other column, on that same named call, writes.
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0, line }, "done")).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", line, "done")).toMatchObject({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, text: "Placed", claim: "doing", status: "done", done: true },
+      setSubtaskStatus: {
+        index: 0,
+        text: "Placed",
+        occurrence: 0,
+        claim: "doing",
+        status: "done",
+        done: true,
+      },
     });
   });
 
@@ -1381,13 +1400,16 @@ describe("subitems in a column of their own", () => {
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [todo("Finished", 0, "done", true)]),
     ]);
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)?.setSubtaskStatus).toEqual({
+    expect(
+      moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), null)?.setSubtaskStatus,
+    ).toEqual({
       index: 0,
       text: "Finished",
+      occurrence: 0,
       claim: "done",
       status: null,
     });
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, "doing")).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), "doing")).toMatchObject({
       setSubtaskStatus: { index: 0, text: "Finished", status: "doing", done: false },
     });
   });
@@ -1462,17 +1484,17 @@ describe("subitems in a column of their own", () => {
     ]);
     expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Placed", 0, "doing"), true)).toEqual({
       path: "Tasks/Root.md",
-      syncClaim: { index: 0, text: "Placed", doneColumn: "done" },
+      syncClaim: { index: 0, text: "Placed", occurrence: 0, doneColumn: "done" },
     });
     expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Finished", 2, "done", true), false)).toEqual({
       path: "Tasks/Root.md",
-      syncClaim: { index: 2, text: "Finished", doneColumn: "done" },
+      syncClaim: { index: 2, text: "Finished", occurrence: 0, doneColumn: "done" },
     });
     // A line the board read as claiming nothing gets the same rule, since the note may say
     // otherwise by now — `claimInStep` is what decides that a claimless line stays claimless.
     expect(syncSubtaskClaim(b, "Tasks/Root.md", todo("Plain", 1), true)).toEqual({
       path: "Tasks/Root.md",
-      syncClaim: { index: 1, text: "Plain", doneColumn: "done" },
+      syncClaim: { index: 1, text: "Plain", occurrence: 0, doneColumn: "done" },
     });
   });
 
@@ -1496,7 +1518,7 @@ describe("subitems in a column of their own", () => {
     // if the write path ignored it too, no interface could ever remove it.
     const b = buildBoard(config, [withTodos("Root", { status: "todo" }, [todo("X", 0, "Doing")])]);
     expect(b.columns["doing"]).toEqual([]); // not placed: no such column id
-    expect(moveSubtask(b, "Tasks/Root.md", { index: 0 }, null)).toMatchObject({
+    expect(moveSubtask(b, "Tasks/Root.md", drawn(b, "Tasks/Root.md", 0), null)).toMatchObject({
       setSubtaskStatus: { index: 0, text: "X", status: null },
     });
   });
@@ -1506,22 +1528,26 @@ describe("subitems in a column of their own", () => {
       withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
     ]);
     const p = makeTodoPath("Tasks/Root.md", 0);
-    expect(moveCard(b, p, "done", 0)).toEqual({
+    expect(moveCard(b, b.cards[p]!, "done", 0)).toEqual({
       path: "Tasks/Root.md",
       setSubtaskStatus: {
         index: 0,
         text: "Write docs",
+        occurrence: 0,
         claim: "doing",
+        box: false,
         status: "done",
         done: true,
       },
       history: 'Moved subtask "Write docs" from Doing to Done',
     });
     // `todo` is the card's own column, so the line goes back to claiming nothing at all.
-    expect(moveCard(b, p, "todo", 0)?.setSubtaskStatus).toEqual({
+    expect(moveCard(b, b.cards[p]!, "todo", 0)?.setSubtaskStatus).toEqual({
       index: 0,
       text: "Write docs",
+      occurrence: 0,
       claim: "doing",
+      box: false,
       status: null,
       done: false,
     });
@@ -1531,7 +1557,7 @@ describe("subitems in a column of their own", () => {
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
     ]);
-    expect(moveCard(b, makeTodoPath("Tasks/Root.md", 0), "doing", 0)).toBeNull();
+    expect(moveCard(b, b.cards[makeTodoPath("Tasks/Root.md", 0)]!, "doing", 0)).toBeNull();
   });
 
   it("rehomes an orphan of either kind without history", () => {
@@ -1549,7 +1575,7 @@ describe("subitems in a column of their own", () => {
     // would leave a line claiming a column that is about to stop existing.
     expect(reassignColumn(b, makeTodoPath("Tasks/Root.md", 0), "todo")).toEqual({
       path: "Tasks/Root.md",
-      setSubtaskStatus: { index: 0, text: "Write docs", status: "todo" },
+      setSubtaskStatus: { index: 0, text: "Write docs", occurrence: 0, status: "todo" },
     });
   });
 });
