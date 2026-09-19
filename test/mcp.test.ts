@@ -361,6 +361,38 @@ describe("writing through the tools", () => {
     ]);
   });
 
+  it("tells two lines reading the same apart when given which of them it was", async () => {
+    const { host, repo } = fixture();
+    for (const text of ["Review", "Review"]) {
+      await call(host, "add_subtask", { board: "Board.md", card: "Tasks/Write docs.md", text });
+    }
+    const card = (await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Write docs.md",
+    })) as { subtasks: { index: number; occurrence: number }[] };
+    expect(card.subtasks.map((s) => [s.index, s.occurrence])).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    // Somebody adds a line at the top: index 1 still reads "Review", but it is the first of the two.
+    repo.files.get("Tasks/Write docs.md")!.body = repo.files
+      .get("Tasks/Write docs.md")!
+      .body.replace("- [ ] Review", "- [ ] Intro\n- [ ] Review");
+
+    await expect(
+      call(host, "set_subtask_done", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md",
+        index: 1,
+        text: "Review",
+        occurrence: 1,
+        done: true,
+      }),
+    ).rejects.toThrow(/occurrence 0 of the lines reading that, not 1/);
+    const body = await repo.readBody("Tasks/Write docs.md");
+    expect(body.subtasks.map((s) => s.done)).toEqual([false, false, false]);
+  });
+
   it("says how many subtasks there are when asked for one that is not there", async () => {
     const { host } = fixture();
     await expect(
@@ -534,13 +566,13 @@ describe("the shapes a board can take that a column listing hides", () => {
 
 describe("a checklist line standing in a column of its own", () => {
   /** One note whose checklist line claims a column, so the board shows two cards for one file. */
-  function claimed(claim = "doing"): Fixture {
+  function claimed(claim = "doing", above = ""): Fixture {
     const repo = new FakeRepo(
       config,
       {
         "Tasks/Write docs.md": {
           fm: { status: "todo", order: 1 },
-          body: `\n## Subtasks\n\n- [ ] Draft it [status:: ${claim}]\n`,
+          body: `\n## Subtasks\n\n${above}- [ ] Draft it [status:: ${claim}]\n`,
         },
       },
       () => "all",
@@ -586,8 +618,202 @@ describe("a checklist line standing in a column of its own", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md#todo:0",
       column: "doing",
+      line: await reported(host, "Tasks/Write docs.md#todo:0"),
     })) as { column: string };
     expect(result.column).toBe("doing");
+  });
+
+  /** The `line` get_board reported for a checklist line's card — what an agent hands back. */
+  async function reported(host: BoardHost, path: string): Promise<unknown> {
+    const board = (await call(host, "get_board", { board: "Board.md" })) as {
+      columns: { cards: { path: string; line?: unknown }[] }[];
+    };
+    const card = board.columns.flatMap((c) => c.cards).find((c) => c.path === path);
+    return card?.line;
+  }
+
+  it("reports the line it stands for, occurrence and claim included, from both readers", async () => {
+    const { host } = claimed();
+    const line = {
+      kind: "todo",
+      text: "Draft it",
+      done: false,
+      status: "doing",
+      index: 0,
+      occurrence: 0,
+    };
+    expect(await reported(host, "Tasks/Write docs.md#todo:0")).toEqual(line);
+    const card = await call(host, "get_card", {
+      board: "Board.md",
+      card: "Tasks/Write docs.md#todo:0",
+    });
+    expect(card).toMatchObject({ line, subtaskIndex: 0, claimedColumn: "doing" });
+  });
+
+  // A position alone is exactly what let a move land on whatever line had slid into it.
+  it("refuses a move that names the line by its position alone", async () => {
+    const { host, repo } = claimed();
+    const before = repo.files.get("Tasks/Write docs.md")!.body;
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "done",
+      }),
+    ).rejects.toThrow(/Pass its `line` exactly as get_board or get_card reported it/);
+    // The same holds for a line named by its words: the claim is still what the move replaces.
+    await expect(
+      call(host, "move_card", { board: "Board.md", card: "Draft it", column: "done" }),
+    ).rejects.toThrow(/Pass its `line`/);
+    expect(repo.files.get("Tasks/Write docs.md")!.body).toBe(before);
+  });
+
+  it("moves the line it was read as", async () => {
+    const { host, repo } = claimed();
+    const line = await reported(host, "Tasks/Write docs.md#todo:0");
+    const result = await call(host, "move_card", {
+      board: "Board.md",
+      card: "Draft it",
+      column: "done",
+      line,
+    });
+    expect(result).toMatchObject({ column: "done" });
+    expect(repo.files.get("Tasks/Write docs.md")!.body).toContain("- [x] Draft it [status:: done]");
+  });
+
+  // The agent read the board, the person removed a line above, and the placed todo the agent meant
+  // is now line 0 while another placed todo sits at line 1. Without the reading, the move would
+  // have gone to that other line.
+  it("refuses a line that moved since it was read, and writes nothing", async () => {
+    const { host, repo } = claimed("doing", "- [ ] Above\n- [ ] Also placed [status:: doing]\n");
+    const line = await reported(host, "Tasks/Write docs.md#todo:2");
+    repo.files.get("Tasks/Write docs.md")!.body =
+      "\n## Subtasks\n\n- [ ] Above\n- [ ] Draft it [status:: doing]\n- [ ] Next [status:: doing]\n";
+    const before = repo.files.get("Tasks/Write docs.md")!.body;
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:2",
+        column: "done",
+        line,
+      }),
+    ).rejects.toThrow(/no longer reads "Draft it"/);
+    expect(repo.files.get("Tasks/Write docs.md")!.body).toBe(before);
+  });
+
+  it("refuses to replace a claim somebody changed since it was read", async () => {
+    const { host, repo } = claimed();
+    const line = await reported(host, "Tasks/Write docs.md#todo:0");
+    repo.files.get("Tasks/Write docs.md")!.body =
+      "\n## Subtasks\n\n- [ ] Draft it [status:: done]\n";
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "todo",
+        line,
+      }),
+    ).rejects.toThrow(/now claims "done" where this write replaces "doing"/);
+  });
+
+  // Nothing to write by the agent's reading is not the same as nothing having changed: a line that
+  // reads differently now is refused, rather than reported as moved.
+  it("refuses a move its stale reading says is already done", async () => {
+    const { host, repo } = claimed();
+    const line = await reported(host, "Tasks/Write docs.md#todo:0");
+    repo.files.get("Tasks/Write docs.md")!.body =
+      "\n## Subtasks\n\n- [ ] Review it [status:: done]\n";
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "doing",
+        line,
+      }),
+    ).rejects.toThrow(/no longer reads the way `line` says/);
+  });
+
+  it("refuses to overwrite a box somebody ticked by hand since it was read", async () => {
+    const { host, repo } = claimed();
+    const line = await reported(host, "Tasks/Write docs.md#todo:0");
+    repo.files.get("Tasks/Write docs.md")!.body =
+      "\n## Subtasks\n\n- [x] Draft it [status:: doing]\n";
+    const before = repo.files.get("Tasks/Write docs.md")!.body;
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "todo",
+        line,
+      }),
+    ).rejects.toThrow(/its box is ticked now/);
+    expect(repo.files.get("Tasks/Write docs.md")!.body).toBe(before);
+  });
+
+  it("refuses a line that links a child card, whose column is the child's own", async () => {
+    const repo = new FakeRepo(config, {
+      "Tasks/Parent.md": {
+        fm: { status: "todo", order: 1 },
+        body: "\n## Subtasks\n\n- [ ] [[Child]]\n",
+      },
+      "Tasks/Child.md": { fm: { status: "doing", order: 1 }, body: "" },
+    });
+    const host: BoardHost = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path) => (path === "Board.md" ? repo : null),
+    };
+    const before = repo.files.get("Tasks/Parent.md")!.body;
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Parent.md#todo:0",
+        column: "done",
+        line: { index: 0, text: "[[Child]]", occurrence: 0, done: false },
+      }),
+    ).rejects.toThrow(/links a card of its own/);
+    expect(repo.files.get("Tasks/Parent.md")!.body).toBe(before);
+  });
+
+  it("tells two lines reading the same apart by which of them it was", async () => {
+    const { host, repo } = claimed("doing", "- [ ] Draft it\n");
+    const line = await reported(host, "Tasks/Write docs.md#todo:1");
+    expect(line).toMatchObject({ index: 1, occurrence: 1 });
+    // A line lands above both: line 1 still reads "Draft it", but it is the first of the two now.
+    repo.files.get("Tasks/Write docs.md")!.body =
+      "\n## Subtasks\n\n- [ ] Intro\n- [ ] Draft it\n- [ ] Draft it [status:: doing]\n";
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:1",
+        column: "done",
+        line,
+      }),
+    ).rejects.toThrow(/no longer the same one of the lines reading that/);
+  });
+
+  it("refuses a reading of another line than the card it names", async () => {
+    const { host } = claimed();
+    const line = { index: 3, text: "Draft it", occurrence: 0, done: false, status: "doing" };
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Write docs.md#todo:0",
+        column: "done",
+        line,
+      }),
+    ).rejects.toThrow(/`line` is line 3 of "Tasks\/Write docs.md", but .* names line 0/);
+  });
+
+  it("refuses a reading handed along with a note, which has no line to hold it to", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "move_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        column: "done",
+        line: { index: 0, text: "x", occurrence: 0, done: false },
+      }),
+    ).rejects.toThrow(/is a note, not a checklist line/);
   });
 
   it("still refuses a card that really is not on the board", async () => {
@@ -606,6 +832,7 @@ describe("a checklist line standing in a column of its own", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md#todo:0",
       column: "todo",
+      line: await reported(host, "Tasks/Write docs.md#todo:0"),
     })) as { column: string | null; position?: number };
     expect(result.column).toBe("todo");
     // No tile of its own, so no slot to report — rather than the -1 an indexOf miss would give.

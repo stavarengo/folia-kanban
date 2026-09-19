@@ -3,23 +3,22 @@
 // checkbox syncing and the fractional ordering it would have got from a person dragging it.
 
 import { z } from "zod";
-import { boardMatchContext, columnOf } from "../model/board";
-import type { MatchContext } from "../model/filter";
-import { laneMismatch, laneVerdict, prospectiveCard } from "../model/lanes";
-import type { Board, Card } from "../model/types";
-import { moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
+import { boardMatchContext } from "../model/board";
+import { prospectiveCard } from "../model/lanes";
+import type { Board } from "../model/types";
+import { setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
 import { StaleLineError } from "../model/repo";
+import { laneWarning, refuseLaneMismatch, requireColumn } from "./columnChecks";
+import { moveCard } from "./moveCard";
 import { refuseAuthor, refuseMultilineEntry, refuseUnsafeDescription } from "./refusals";
 import {
   boardArg,
   cardArg,
   columnArg,
-  landedColumn,
   openBoard,
-  resolveCardPath,
   resolveNotePath,
   tool,
   ToolError,
@@ -107,40 +106,6 @@ function refuseArrayForScalarKey(key: string, value: unknown): void {
 }
 
 /**
- * A column with a `filter` rule is a lane: the board fills it from that rule, not from a card's
- * status, so setting a card's status to it does not put the card in the lane. A card the rule
- * rejects would claim a column no view draws it in — the board's fallback column keeps it on
- * screen, but not where the caller asked for it, and the caller would never know.
- *
- * So the write is refused with the rule quoted, rather than performed and warned about. The one
- * thing that is not grounds to refuse is a rule this server cannot fully evaluate: `unread:` reads
- * which comments a person has seen and `assignee:me` the name only the board view is told, and
- * blocking a legitimate move over a rule you cannot read is worse than the write it prevents. Those
- * keep the warning this tool has always returned.
- */
-function refuseLaneMismatch(
-  board: Board,
-  target: { columnId: string; card: Card; ctx: MatchContext },
-  next: string,
-): void {
-  const check = laneVerdict(board, target.columnId, target.card, target.ctx);
-  if (check?.verdict !== "rejects") return;
-  throw new ToolError(`${laneMismatch(check.lane, target.card)} ${next}`);
-}
-
-/** What remains to be said about a lane whose rule this server cannot fully evaluate. */
-function laneWarning(
-  board: Board,
-  columnId: string,
-  card: Card,
-  ctx: MatchContext,
-): string | undefined {
-  const check = laneVerdict(board, columnId, card, ctx);
-  if (check?.verdict !== "unknown") return undefined;
-  return `Column "${columnId}" is filled by the rule \`${check.lane.rule}\`, not by a card's status, and part of that rule reads state this server cannot see — which comments a person has read, or who "me" is. The board draws this card there only if it really matches; check it with get_board.`;
-}
-
-/**
  * Set or clear one frontmatter key. `null` clears it, and only `null` — an agent that writes `""`
  * asked for an empty value, and deleting the key instead is data loss it never asked for and is
  * not told about. `docs/mcp.md` promises exactly this.
@@ -153,31 +118,6 @@ async function writeField(
 ): Promise<void> {
   if (value === null) await repo.unsetFrontmatterKey(path, key);
   else await repo.setFrontmatter(path, { [key]: value });
-}
-
-/** The board really has that column, or an error naming the ones it does have. */
-function requireColumn(board: Board, columnId: string): void {
-  if (board.config.columns.some((c) => c.id === columnId)) return;
-  throw new ToolError(
-    `Board "${board.config.path}" has no column "${columnId}". Its columns are: ${board.config.columns.map((c) => c.id).join(", ")}.`,
-  );
-}
-
-/**
- * A checklist line standing in a column of its own moves too — on its own line — so move_card is
- * the one write that accepts a card with no note behind it. What it cannot do is take a slot: its
- * position comes from where the line sits in its parent's checklist, which is not this tool's to
- * rewrite. Saying so beats silently ignoring the argument.
- */
-function refuseSlotForChecklistLine(
-  board: Board,
-  path: string,
-  args: { column: string; position?: number | undefined },
-): void {
-  if (!board.cards[path]?.todoRef || args.position === undefined) return;
-  throw new ToolError(
-    `"${path}" is a checklist line; it is ordered by its place in its parent's list, so move_card cannot give it a position. Drop the argument to move it to "${args.column}".`,
-  );
 }
 
 const createCard = tool({
@@ -232,63 +172,6 @@ const createCard = tool({
     }
     const warning = laneWarning(board, args.column, willBe, laneCtx);
     return { path, column: args.column, ...(warning === undefined ? {} : { warning }) };
-  },
-});
-
-const moveCard = tool({
-  name: "move_card",
-  title: "Move a card",
-  description:
-    "Move a card to a column, optionally to a given slot in it (0 is the top; leave it out to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does.",
-  input: z.object({
-    board: boardArg,
-    card: cardArg,
-    column: columnArg,
-    position: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe("Slot in the target column, counted with this card taken out. Omit to append."),
-  }),
-  run: async (host, args) => {
-    const { repo, board } = await openBoard(host, args.board);
-    requireColumn(board, args.column);
-    const path = resolveCardPath(board, args.card);
-    refuseSlotForChecklistLine(board, path, args);
-    const card = board.cards[path];
-    const laneCtx = boardMatchContext(board);
-    if (card) {
-      refuseLaneMismatch(
-        board,
-        { columnId: args.column, card, ctx: laneCtx },
-        "Nothing was moved. Give the card what the rule asks for with update_card first, or move it to a column with no rule of its own.",
-      );
-    }
-    const moved =
-      card !== undefined &&
-      (await moveCardTo(repo, board, {
-        card,
-        columnId: args.column,
-        ...(args.position === undefined ? {} : { index: args.position }),
-      }));
-    // Nothing to write is not the same as nothing to report: a checklist line already claiming the
-    // column it was asked to move to is exactly where the caller wants it.
-    if (!moved && columnOf(board, path) !== args.column) {
-      throw new ToolError(`Nothing to move: "${path}" is not a card on this board.`);
-    }
-    const after = await repo.loadBoard();
-    const slot = (after.columns[args.column] ?? []).indexOf(path);
-    const warning = card ? laneWarning(board, args.column, card, laneCtx) : undefined;
-    return {
-      path,
-      column: landedColumn(after, path),
-      ...(warning === undefined ? {} : { warning }),
-      // Only a card with a tile of its own has a slot to report. One drawn inside its parent is
-      // ordered by that parent, so a number here would be an invitation to move_card a position
-      // this tool would refuse.
-      ...(slot < 0 ? {} : { position: slot }),
-    };
   },
 });
 
@@ -384,7 +267,7 @@ const addSubtask = tool({
   name: "add_subtask",
   title: "Add a subtask",
   description:
-    "Append an unchecked line to a card's `## Subtasks` checklist. The reply names the line it wrote, `index` and `text`, in the words set_subtask_done will expect.",
+    "Append an unchecked line to a card's `## Subtasks` checklist. The reply names the line it wrote, `index`, `text` and `occurrence`, in the words set_subtask_done will expect.",
   input: z.object({
     board: boardArg,
     card: cardArg,
@@ -403,7 +286,13 @@ const addSubtask = tool({
     // echoed from the argument: the note is what set_subtask_done compares against, and what it
     // reads back has been trimmed of the padding and the inline fields the line still carries.
     const added = subtasks[before];
-    return { path, index: added?.index, text: added?.text, subtasks: subtasks.length };
+    return {
+      path,
+      index: added?.index,
+      text: added?.text,
+      occurrence: added?.occurrence,
+      subtasks: subtasks.length,
+    };
   },
 });
 
@@ -411,7 +300,7 @@ const setSubtask = tool({
   name: "set_subtask_done",
   title: "Tick or untick a subtask",
   description:
-    "Check or uncheck one `## Subtasks` line, named by the index AND the text get_card reported for it. A line that claims a column of its own is kept in step with its checkbox.",
+    "Check or uncheck one `## Subtasks` line, named by the index AND the text get_card reported for it — and, between lines reading exactly the same, its occurrence. A line that claims a column of its own is kept in step with its checkbox.",
   input: z.object({
     board: boardArg,
     card: cardArg,
@@ -420,6 +309,14 @@ const setSubtask = tool({
       .string()
       .describe(
         "The subtask's `text`, exactly as get_card reports it in `subtasks`. An index is only a position: pass the words too and the write refuses instead of landing on whatever line has taken that place since you read the card.",
+      ),
+    occurrence: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        "The subtask's `occurrence`, as get_card reports it: which of the lines reading exactly this `text` it is. Pass it and a line added or removed above a pair of identical lines is refused rather than landing on the other one.",
       ),
     done: z.boolean(),
   }),
@@ -436,6 +333,11 @@ const setSubtask = tool({
     if (line.text !== args.text) {
       throw new ToolError(
         `Subtask ${args.index} of "${path}" reads "${line.text}", not "${args.text}". The card changed since you read it — read it again and name the line you mean by what it says now.`,
+      );
+    }
+    if (args.occurrence !== undefined && line.occurrence !== args.occurrence) {
+      throw new ToolError(
+        `Subtask ${args.index} of "${path}" reads "${args.text}", but it is occurrence ${line.occurrence} of the lines reading that, not ${args.occurrence} — a line was added or removed above it since you read the card. Read it again and name the line you mean by what it says now.`,
       );
     }
     // The line goes whole, exactly as the detail panel passes the subtask it drew: its `[[link]]`,

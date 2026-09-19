@@ -34,6 +34,8 @@ function cardSummary(board: Board, path: string): Record<string, unknown> {
     path,
     title: card.title,
     kind: card.todoRef ? "todo" : "note",
+    // What move_card holds a move of this line to: the line as it stood when this was read.
+    line: card.todoRef?.line,
     order: card.frontmatter.order,
     priority: card.frontmatter.priority,
     due: card.frontmatter.due,
@@ -136,7 +138,8 @@ function todoCard(
     note: ref?.parentPath,
     subtaskIndex: ref?.line.index,
     claimedColumn: ref?.line.status,
-    hint: "This card is a checklist line. Read or edit it through the note named in `note`.",
+    line: ref?.line,
+    hint: "This card is a checklist line. Read or edit it through the note named in `note`; move it with move_card, passing `line` back as it is here.",
   };
 }
 

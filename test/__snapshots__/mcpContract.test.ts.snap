@@ -117,7 +117,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Move a card to a column, optionally to a given slot in it (0 is the top; leave it out to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does.",
+    "description": "Move a card to a column, optionally to a given slot in it (0 is the top; leave it out to append). Records the move in the card's history and keeps a parent's checklist box in step, the same way a drag does. A checklist line standing in a column of its own also needs its \`line\`, as get_board or get_card reported it.",
     "inputSchema": {
       "properties": {
         "board": {
@@ -131,6 +131,37 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
         "column": {
           "description": "Column id, as get_board reports it — not its title.",
           "type": "string",
+        },
+        "line": {
+          "description": "Required when \`card\` is a checklist line: its \`line\`, exactly as get_board or get_card reported it. A checklist line is named by its position in its note, and a position names whatever line sits there by the time the move lands — so the move is held to this reading, and refused when the note no longer reads that way.",
+          "properties": {
+            "done": {
+              "type": "boolean",
+            },
+            "index": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "occurrence": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "status": {
+              "type": "string",
+            },
+            "text": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "index",
+            "text",
+            "occurrence",
+            "done",
+          ],
+          "type": "object",
         },
         "position": {
           "description": "Slot in the target column, counted with this card taken out. Omit to append.",
@@ -289,7 +320,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Append an unchecked line to a card's \`## Subtasks\` checklist. The reply names the line it wrote, \`index\` and \`text\`, in the words set_subtask_done will expect.",
+    "description": "Append an unchecked line to a card's \`## Subtasks\` checklist. The reply names the line it wrote, \`index\`, \`text\` and \`occurrence\`, in the words set_subtask_done will expect.",
     "inputSchema": {
       "properties": {
         "board": {
@@ -322,7 +353,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Check or uncheck one \`## Subtasks\` line, named by the index AND the text get_card reported for it. A line that claims a column of its own is kept in step with its checkbox.",
+    "description": "Check or uncheck one \`## Subtasks\` line, named by the index AND the text get_card reported for it — and, between lines reading exactly the same, its occurrence. A line that claims a column of its own is kept in step with its checkbox.",
     "inputSchema": {
       "properties": {
         "board": {
@@ -338,6 +369,12 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
         },
         "index": {
           "description": "The subtask's \`index\`, as get_card reports it.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "occurrence": {
+          "description": "The subtask's \`occurrence\`, as get_card reports it: which of the lines reading exactly this \`text\` it is. Pass it and a line added or removed above a pair of identical lines is refused rather than landing on the other one.",
           "maximum": 9007199254740991,
           "minimum": 0,
           "type": "integer",
