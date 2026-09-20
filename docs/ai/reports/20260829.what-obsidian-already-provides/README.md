@@ -84,17 +84,17 @@ Ordered by what the gap costs today. Items marked **bug** are wrong behaviour a 
 
 1. **05-01** (trade-off) — `WorkspaceLeaf.prototype.setViewState` is replaced for the whole app for the plugin's lifetime, and no lint rule, guard or written Obsidian guideline covers it.
 2. **05-10** (clear win) — **bug.** `Plugin.onExternalSettingsChange` is not implemented, so a `data.json` changed by Sync or by hand is silently overwritten with what this instance had in memory. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
-3. **04-12** (clear win) — **bug.** Subtask and comment edits apply a line index taken from an earlier read, with no recheck inside `vault.process`; the MCP `set_subtask_done` tool is the riskiest caller.
-4. **04-02** (clear win) — **bug.** Subcard links are written as a bare `[[basename]]`, so Folia can write a link Folia itself cannot resolve as soon as two notes share a name.
+3. **04-12** (clear win) — **bug.** Subtask and comment edits apply a line index taken from an earlier read, with no recheck inside `vault.process`; the MCP `set_subtask_done` tool is the riskiest caller. *Fixed across 2026-09-10 to 2026-09-19, and what occurrence counting still cannot see was decided on 2026-09-19; the audit's own reading, above, is left as it stood.*
+4. **04-02** (clear win) — **bug.** Subcard links are written as a bare `[[basename]]`, so Folia can write a link Folia itself cannot resolve as soon as two notes share a name. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 5. **02-01** (withdrawn 2026-09-10) — **not a bug.** The audit read the unused `--text-on-accent-inverted` as white text on a near-white button under a pale accent. It isn't: Obsidian makes that choice at runtime, rewriting `--text-on-accent` in the inline style of `<body>`, and Folia's tokens inherit it, so the two paint the same colour. What survives is a fragility, not a defect — see the correction on 02-01 and `docs/decisions.md`. The section's own reading is left as it stood.
-6. **06-04** (clear win) — **bug.** Menus, the modal and the panel's listeners use `activeDocument`, which follows the focused window rather than the board that owns them. Confirmed live: with the Settings window focused, the column popover rendered into that window.
-7. **07-01** (trade-off) — `manifest.json` sets `isDesktopOnly: false` while the plugin dynamically imports the Node `http` builtin. The gating is correct and the submission requirement still says "must"; the reasoning exists only as a code comment.
-8. **07-02** (trade-off) — the MCP bearer token is stored in `data.json` in the clear, so a credential for a server bound to one machine travels with the vault. `App.secretStorage` (1.11.4) is the written answer.
+6. **06-04** (clear win) — **bug.** Menus, the modal and the panel's listeners use `activeDocument`, which follows the focused window rather than the board that owns them. Confirmed live: with the Settings window focused, the column popover rendered into that window. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
+7. **07-01** (trade-off) — `manifest.json` sets `isDesktopOnly: false` while the plugin dynamically imports the Node `http` builtin. The gating is correct and the submission requirement still says "must"; the reasoning exists only as a code comment. *Fixed on 2026-09-10, both halves: the manifest now declares `isDesktopOnly: true`, and the reasoning the finding asked for is written down as `docs/decisions.md#Mobile is not supported, and the manifest now says so`. The audit's own reading, above, is left as it stood.*
+8. **07-02** (trade-off) — the MCP bearer token is stored in `data.json` in the clear, so a credential for a server bound to one machine travels with the vault. `App.secretStorage` (1.11.4) is the written answer. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 9. **05-02** (clear win) — **bug.** Every "Open note" affordance ignores modifier keys, so Ctrl/Cmd-click cannot open a card in a new tab, split or window the way it does everywhere else in Obsidian. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
-10. **04-01** (trade-off) — **bug.** The wikilink resolver is hand-written, has no `sourcePath`, never consults `aliases`, and silently drops a relationship when two cards share a basename.
-11. **04-06** (trade-off) — **bug.** Card tags are read only from the `tags` frontmatter key, so a card tagged in its body is invisible to the board's own tag filter with nothing telling the user why.
-12. **02-25** (trade-off) — **bug.** Folia's z-index ladder shares the numeric space with Obsidian's `--layer-*` scale, with five exact collisions. Confirmed live: Obsidian's tooltip (layer 70) paints over an open Folia menu (60).
-13. **04-15** (trade-off) — **bug.** The checklist parser accepts only `[ ]`, `[x]` and `[X]`, so a card using any other checkbox character loses its subtask state.
+10. **04-01** (trade-off) — **bug.** The wikilink resolver is hand-written, has no `sourcePath`, never consults `aliases`, and silently drops a relationship when two cards share a basename. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
+11. **04-06** (trade-off) — **bug.** Card tags are read only from the `tags` frontmatter key, so a card tagged in its body is invisible to the board's own tag filter with nothing telling the user why. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
+12. **02-25** (trade-off) — **bug.** Folia's z-index ladder shares the numeric space with Obsidian's `--layer-*` scale, with five exact collisions. Confirmed live: Obsidian's tooltip (layer 70) paints over an open Folia menu (60). *Fixed on 2026-09-10 for the body-portalled surfaces, which now read the `--layer-*` scale; the in-board rungs are still Folia's own. The audit's own reading, above, is left as it stood.*
+13. **04-15** (trade-off) — **bug.** The checklist parser accepts only `[ ]`, `[x]` and `[X]`, so a card using any other checkbox character loses its subtask state. *Fixed on 2026-09-09; the audit's own reading, above, is left as it stood.*
 14. **02-10** (trade-off) — the raw-value audit's pixel detector is `\d{2,}px`, so every single-digit px value passes unseen, and the waiver retired on "nothing remains to migrate" was signed off against that overstated coverage.
 15. **05-03** (clear win) — **bug.** The detail panel's rendered links have no hover preview, because the view is never registered as a hover-link source. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
 
@@ -115,19 +115,29 @@ Things about the guards, the waivers, the release path and the documentation rat
 
 ## Decided items
 
-Two divergences were already argued and written down. They are findings, not omissions.
+Divergences that were argued and written down rather than left open. They are findings, not omissions. `docs/decisions.md` held two of these when the report was written and holds seven now; below is the whole file in its own order, with what each one settles here.
 
-- **05-05** — the board and a Markdown editor cannot be shown side by side in one tab (`docs/decisions.md#The board and a Markdown editor side by side, in one tab`).
-- **03-09** — unread-comment ordering uses local, timezone-free timestamps (`docs/decisions.md#Unread-comment ordering assumes one clock`).
+Argued before the report:
+
+- **The board and a Markdown editor side by side, in one tab** (decided 2026-08-26) — settles **05-05**: the board and a Markdown editor cannot be shown side by side in one tab.
+- **Unread-comment ordering assumes one clock** (decided 2026-08-26) — settles **03-09**: unread-comment ordering uses local, timezone-free timestamps.
+- **The community-directory action's release mode** (decided 2026-08-26) — settles none of the report's findings. It is the third decision section 07 found recorded outside `docs/decisions.md`, in `docs/releasing.md`, and it has since been written into the file proper. 07-04 and 07-13 are about the local scan's skipped checks and the build's skipped type check, neither of which this decision touches.
+
+Written after the report, in answer to it or to the work it triggered:
+
+- **Two guided board setups racing for the same card folder** (decided 2026-09-09) — settles none of the report's findings; no finding covers the `makeBoard` race.
+- **Mobile is not supported, and the manifest now says so** (decided 2026-09-10) — settles **07-01** and **02-42**. 07-01 asked for exactly this entry, and got it along with the manifest change.
+- **Folia does not decide for itself what colour goes on a pale accent** (decided 2026-09-10) — settles **02-01**, and is where its withdrawal is argued in full.
+- **Identical checklist lines are told apart by count, not by identity** (decided 2026-09-19) — settles what the **04-12** fixes deliberately left open: an edit that slides an identical line into the meant line's place moves the position and the occurrence count together, so the write still lands on the twin.
+
+One ask for an entry is still open: **07-06** wants the `WorkspaceLeaf.prototype.setViewState` prototype patch argued in `docs/decisions.md`, and the file still has nothing on it.
 
 ## What could not be verified
 
-The live pass against Obsidian 1.13.7 settled 24 of the 33 items the source pass could not. These remain open, with what would settle each.
+The live pass against Obsidian 1.13.7 settled 24 of the 33 items the source pass could not. Code landed since has overtaken two of them entirely and half of a third, and those are gone from the list below: the device question behind 01-05 and 02-42, since mobile is now decided as unsupported and the manifest says so; the old-floor build question in 07-14, since the floor it asked about is no longer the one shipped; and the `aliases` half of 04-01 and 04-02, since link resolution now goes through `getFirstLinkpathDest` itself. The rest remain open, with what would settle each.
 
-- Whether Obsidian puts `is-mobile`, `is-phone` and `is-tablet` on `body` on a real device, and whether a `title` attribute produces any tooltip on a phone (01-05, 02-42). Needs a phone or tablet running the plugin.
-- Whether `getFirstLinkpathDest` resolves through `aliases`, and whether Obsidian actually refuses the filename characters `sanitizeFilename` assumes (04-01, 04-02). Both need a write to a vault; this pass was read-only.
+- Whether Obsidian actually refuses the filename characters `sanitizeFilename` assumes (04 Unverified). Needs a write to a vault; this pass was read-only.
 - What the `yaml` package actually costs in the shipped bundle (04-04). Needs a `pnpm build` with and without the dependency.
-- Which ECMAScript edition the Electron implied by `minAppVersion` 1.7.2 supports, and what `target: "es2018"` costs in bytes (07-14). Needs a build against the old floor.
 - Whether a community-directory reviewer treats an em dash in a manifest description as a special character in practice (07-03). A human process question; the automated half is settled, since neither the local scan nor Obsidian's own action inspects the characters inside a description.
 - How many Folia users run an Obsidian below 1.13 (05-13). The directory's download statistics do not break down by app version.
 - Whether Obsidian's own drag machinery would behave acceptably for sortable columns and cards (06 aligned list). `app.dragManager` exists at runtime but is absent from the typings and shaped for dragging files between panes; testing it means building against an internal API.
@@ -139,9 +149,9 @@ Seven researchers each took one section under a shared brief that fixed the find
 
 ## Triage
 
-Done on 2026-08-29, the day the report was written, under the backlog's own rules: one entry per theme rather than per finding, no entry duplicating one that already exists, and no entry proposing its own solution. Thirty-one new entries absorb 109 of the sections' headings (96 findings and 13 cross-references); nine more headings (6 findings and 3 cross-references) are folded into four entries that already existed; thirteen findings are dismissed on the strength of their own read; two were already decided in `docs/decisions.md`. That reconciles to the report's 117 findings and 133 headings.
+Done on 2026-08-29, the day the report was written, under the backlog's own rules: one entry per theme rather than per finding, no entry duplicating one that already exists, and no entry proposing its own solution. Thirty-one new entries absorb 109 of the sections' headings (96 findings and 13 cross-references); nine more headings (6 findings and 3 cross-references) are folded into four entries that already existed; thirteen findings are dismissed on the strength of their own read; two were already decided in `docs/decisions.md`. That reconciles to the report's 117 findings and 133 headings. Two further entries, #40 and #55, were split off those thirty-one later and are listed below in their own rows, marked as such; they add no heading the original thirty-one did not already absorb.
 
-Every one of the 133 `###` headings in the seven sections appears exactly once below. Sixteen of those headings are cross-references rather than findings, and each is listed in the same row as the finding it points at.
+Every one of the 133 `###` headings in the seven sections appears below, in the row of the entry that absorbed it on 2026-08-29. Sixteen of those headings are cross-references rather than findings, and each is listed in the same row as the finding it points at. Three findings — 04-02, 04-03 and 05-06 — appear twice, once in that original row and once in the later split that now carries them.
 
 ### Became backlog entries
 
@@ -160,15 +170,17 @@ Every one of the 133 `###` headings in the seven sections appears exactly once b
 | [#25](https://github.com/stavarengo/folia-kanban/issues/25) | Twelve controls drawn beside the variables published for them | 02-17, 02-18, 02-19, 02-29, 02-32, 02-33, 02-34, 02-35, 02-37, 02-39, 02-40, 02-41 |
 | [#26](https://github.com/stavarengo/folia-kanban/issues/26) | The raw-value audit's coverage, and the waiver retired against it | 02-10 |
 | 20260829.20 (fixed, entry closed) | The mobile claim in the manifest, and the gated Node import under it | 02-42, 07-01 |
-| 20260829.21 (fixed, entry closed) | Link resolution and link text by Folia's own rules | 03-04, 04-01, 04-02, 04-03 |
+| 20260829.21 (fixed, entry closed) | Link resolution and link text by Folia's own rules — the residual it stopped short of is tracked in #40 below | 03-04, 04-01, 04-02, 04-03 |
+| [#40](https://github.com/stavarengo/folia-kanban/issues/40) (split out of 20260829.21 later) | A vault set to Markdown links still gets wikilinks from Folia, and reads nothing else | 04-02, 04-03 |
 | [#27](https://github.com/stavarengo/folia-kanban/issues/27) | A second parsing layer over files the app already parsed | 04-04, 04-05, 04-16, 04-17, 04-19, 07-16 |
 | 20260829.23 (fixed, entry closed) | Bug: any checkbox character but `x` loses a card's subtask state | 04-15 |
 | 20260829.24 (fixed, entry closed) | Bug: a card tagged in its body never matches the tag filter | 04-06 |
-| 20260829.25 (fixed, entry closed) | Bug: a stale line index applied inside `vault.process` | 04-12 |
+| 20260829.25 (fixed, entry closed) | Bug: a stale line index applied inside `vault.process` — the five closed issues #36, #37, #50, #51 and #53 are the rest of that checklist-line family, opened later and citing no finding id | 04-12 |
 | [#28](https://github.com/stavarengo/folia-kanban/issues/28) | Any vault change anywhere reloads the whole board | 04-09 |
 | [#29](https://github.com/stavarengo/folia-kanban/issues/29) | Eight one-line detours around the vault and view API | 04-07, 04-08, 04-10, 04-11, 04-18, 05-07, 07-07, 07-09 |
 | [#30](https://github.com/stavarengo/folia-kanban/issues/30) | The prototype patch and the undeclared `popstate` field, unwritten | 05-01, 05-04, 07-06 |
 | [#31](https://github.com/stavarengo/folia-kanban/issues/31) | Four `src/main.ts` conventions diverged from at a cost to converge | 05-06, 05-08, 05-09, 05-12, 07-08 |
+| [#55](https://github.com/stavarengo/folia-kanban/issues/55) (split out of #31 later) | The tab-header button sync rescans the workspace instead of reading its event payload | 05-06 |
 | 20260829.30 (fixed, entry closed) | Bug: opening a card ignores modifiers, and its links have no preview | 03-02, 03-03, 05-02, 05-03 |
 | 20260829.31 (fixed, entry closed) | Bug: an externally changed `data.json` is silently overwritten | 05-10 |
 | 20260829.32 (fixed, entry closed) | The MCP bearer token travelling with the vault | 07-02 |
@@ -212,7 +224,7 @@ Each on the strength of its own **Read**, which in every case also says what wou
 
 ### Decided
 
-Both were argued and written down before this report, and are listed here to close the accounting.
+Two findings were argued and written down before this report, and are listed here to close the accounting. `docs/decisions.md` has since grown to seven entries; the ones written after the report settle findings the triage above had sent to entries rather than here, so the accounting is unchanged. "Decided items" earlier in this file lists all seven and what each settles.
 
 | Finding | Decision |
 | --- | --- |
