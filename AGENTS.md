@@ -18,6 +18,7 @@
 4. No task is complete until `pnpm verify` passes (`pnpm verify:ui` for UI changes).
 5. Track exceptions with a waiver under `tracking/waivers/` and surface it in the closeout report.
 6. Closeout: run `pnpm verify`, report each check's result, and explain any "not run".
+7. Committing: a change is breaking when a user would need to be told about it before upgrading. If the software itself tells them what to do at the moment it matters, it is a `fix`.
 
 ### Driving the Obsidian UI via the Chrome DevTools MCP server
 
