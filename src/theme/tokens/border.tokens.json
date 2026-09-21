@@ -71,5 +71,13 @@
       "owned": true,
       "reason": "A pointer-state outline independent of host fills, shadows and border widths, which may be identical or zero on macOS and custom themes. It uses the label colour so the cue follows the foreground chosen for each neutral or filled control."
     }
+  },
+  "control-press-veil": {
+    "$value": "linear-gradient(color-mix(in oklch, currentColor 12%, transparent), color-mix(in oklch, currentColor 12%, transparent))",
+    "cssVar": "--folia-control-press-veil",
+    "source": {
+      "owned": true,
+      "reason": "Pressed has to differ from hovered by more than outline width, which at dpr 1 is one pixel of line. Obsidian draws no pressed state on its own buttons, so there is nothing to alias, and the host fill pairs that could carry one are identical on macOS. A background-image tint over the label colour changes the control's face without touching the background, the box-shadow or the layout, so it reaches transparent and dashed controls as well as filled ones."
+    }
   }
 }

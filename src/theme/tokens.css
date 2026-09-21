@@ -113,6 +113,7 @@
   --folia-border-width-hair: var(--border-width);
   --folia-border-width-thick: 2px;
   --folia-control-outline: 1px solid currentColor;
+  --folia-control-press-veil: linear-gradient(color-mix(in oklch, currentColor 12%, transparent), color-mix(in oklch, currentColor 12%, transparent));
   --folia-focus-ring-w: 2px;
   --folia-focus-ring-offset: var(--size-2-1);
   --folia-focus-ring-offset-inset: calc(-1 * var(--folia-focus-ring-offset));
