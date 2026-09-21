@@ -22,7 +22,6 @@
 .folia-add-inline input:focus,
 .folia-add-inline textarea:focus,
 .folia-desc:focus,
-.folia-fields select:focus,
 .folia-fields input:focus {
   outline: none;
   border-color: var(--folia-accent);

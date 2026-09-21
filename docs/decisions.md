@@ -157,3 +157,13 @@ Portalled menus carry both their component class and `.folia-scope`, so a compon
 This is stricter than browser cycle detection for descendants. [CSS resolves custom properties before inheritance](https://www.w3.org/TR/css-variables-1/#cycles), so a descendant can read an inherited computed value without reintroducing its ancestor's dependency edges. The guard deliberately rejects that pattern when it would become cyclic on a scope element. Its diagnostic names the possible overlap rather than claiming every descendant use is invalid.
 
 **What would change this:** a necessary component override that the conservative rule rejects despite demonstrably safe selector placement. That would require a narrower check with a regression test, not a claim that inheritance preserves unresolved dependency edges.
+
+## The board's selects carry no dropdown chevron
+
+**Decided 2026-09-21. Folia's `<select>` elements take Obsidian's own dropdown face and go without its arrow.**
+
+Obsidian 1.12.7 dresses every bare `<select>` through `select, .combobox-button, .dropdown`, so background, padding, height, radius, shadow and the focus ring arrive for free once the board stops overriding them. The chevron does not: it is an inline data-URI SVG declared on the `.dropdown` class alone, with a second declaration under `.theme-dark` for the light-on-dark version. `--dropdown-background-position`, `--dropdown-background-size` and `--dropdown-background-blend-mode` describe that image's three background layers and paint nothing without it, so declaring them would be three inert lines.
+
+The only way to the glyph is putting `.dropdown` on the element, which is the undocumented-class contract the owner ruled out (`docs/ai/reports/…/02…md` decision 5 in the phase context). Drawing a chevron from Folia's own icon set is not available to a `<select>`, whose shadow DOM takes no children. Leaving `appearance` alone and letting the platform draw its native arrow would restore an indicator and lose the app's look, which is the divergence 02-19 is about.
+
+**What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
