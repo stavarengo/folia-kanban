@@ -3,7 +3,10 @@
   position: relative; /* anchors the left-edge resize handle */
   flex: 0 0 var(--folia-detail-w);
   width: var(--folia-detail-w);
-  border-left: var(--folia-border-width) solid var(--folia-border-strong);
+  /* The panel's left edge is a resize divider, so it is drawn with the app's divider variables
+     rather than with the board's own border. `.folia-detail--modal` below resets `border` wholesale,
+     which keeps this to the side presentations, where the edge is actually draggable. */
+  border-left: var(--divider-width) solid var(--divider-color);
   background: var(--folia-col-bg);
   box-shadow: var(--folia-shadow-panel);
   overflow-y: auto;
@@ -52,6 +55,20 @@
   width: var(--folia-resize-w);
   cursor: var(--folia-cursor-resize);
   z-index: var(--folia-z-index-base);
+}
+/* The strip is wider than the line it drags so it stays easy to grab; the line itself only appears
+   under the pointer, thickened and recoloured the way every split handle in the window behaves.
+   Drawn centred on the panel's own border rather than replacing it, so the edge never doubles. */
+.folia-detail-resize:hover::after,
+.folia-detail-resize:active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--divider-width-hover);
+  background: var(--divider-color-hover);
 }
 @keyframes folia-slide-in {
   from { transform: translateX(var(--folia-detail-slide)); opacity: var(--folia-opacity-hidden); }
