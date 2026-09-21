@@ -1,5 +1,5 @@
 // Custom properties inherit down the DOM, and `createPortal` moves a subtree out of it. Every
-// `--folia-*` token is declared in one rule, `.folia-scope` in src/styles.css, so a surface the
+// `--folia-*` token is declared in one rule, `.folia-scope` in src/theme/tokens.css, so a surface the
 // plugin portals to the document body resolves NONE of them unless it carries that class itself:
 // priority chips lose their colour, radii, shadows and font sizes silently fall back to nothing.
 // jsdom cannot see this — it loads no stylesheet, so every test renders exactly what the component

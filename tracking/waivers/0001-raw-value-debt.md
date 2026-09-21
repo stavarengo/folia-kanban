@@ -40,3 +40,9 @@ Closed. Each allowlist entry now carries a `count` — how many times that exact
 ## Replacement
 
 The token homes under `tokens/source/*.tokens.json` (typography, zindex, opacity, radius, shadow, color) are now the single source of truth for the design-significant values, consumed via token references per `DS-FOUNDATION-SSOT-1` / `DS-FOUNDATION-CATEGORIES-5`. The 46 accepted residuals in `scripts/raw-value-allowlist.json` have no semantic equivalent and are intentionally not represented as tokens; the ratchet keeps them fenced.
+
+## Update (2026-09-21)
+
+The ratchet this waiver describes no longer exists. `scripts/audit-raw-values.mjs` and `scripts/raw-value-allowlist.json` were deleted and replaced by `scripts/check-theme.mjs` (`pnpm theme:check`), which admits no raw design value anywhere outside `src/theme/tokens.css` — not by allowlist, not by count, not at all. The forty-six residuals this waiver accepted as permanent were all moved into the token block, each as a token named for what it is for and carrying, in `src/theme/tokens/*.tokens.json`, either an alias of a CSS variable Obsidian documents or a written reason why Obsidian has no answer for it.
+
+So the debt category this waiver tracked is gone, along with both gaps recorded above: there is no ceiling to spend, and a value mentioned in a comment is no longer a value at all, because the guard reads declarations through a CSS parser rather than lines through a regular expression. Nothing here is rewritten — the reasoning was sound for the ratchet it described, and the record of why a ratchet was the proportionate answer at the time is worth keeping. It simply no longer describes the repository.

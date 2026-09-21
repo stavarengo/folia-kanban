@@ -11,21 +11,21 @@
 
 ## Reason
 
-Retired: the visual-regression conformance category is now enforced by a proportionate mechanism wired into `ds:check`, so this waiver is resolved. There is still no Storybook or standalone component-preview harness, and an Obsidian plugin renders only inside the host app — but a full pixel-diff harness (headless host, snapshot baselines, flake management) remains disproportionate for a solo repo. Per `DS-PROCESS-CONFORMANCE-4` the category is enforced by a lighter-weight mechanism instead of the heaviest tool: a **structural-snapshot regression net** (`test:visual`, `test/visual-regression.test.tsx`) that snapshots the focused outerHTML of the stable token-consuming units (a rendered `.folia-card`, a `.folia-column-header`), paired with the **token drift-check** (`tokens:check`, `scripts/check-tokens.mjs`) that guards the token↔consumer mapping.
+Retired: the visual-regression conformance category is now enforced by a proportionate mechanism wired into `ds:check`, so this waiver is resolved. There is still no Storybook or standalone component-preview harness, and an Obsidian plugin renders only inside the host app — but a full pixel-diff harness (headless host, snapshot baselines, flake management) remains disproportionate for a solo repo. Per `DS-PROCESS-CONFORMANCE-4` the category is enforced by a lighter-weight mechanism instead of the heaviest tool: a **structural-snapshot regression net** (`test:visual`, `test/visual-regression.test.tsx`) that snapshots the focused outerHTML of the stable token-consuming units (a rendered `.folia-card`, a `.folia-column-header`), paired with the **theme guard** (`theme:check`, `scripts/check-theme.mjs`) that guards the token↔consumer mapping.
 
 ## Risk
 
-**Low, and now actively guarded.** Styling is centralized in one `src/styles.css`; the token drift-check guards the token↔consumer mapping, the raw-value ratchet blocks new literals, and the structural-snapshot net catches unintended changes to the class/attribute scaffolding the tokens hang off of. The residual gap is a *rendered-pixel* change that alters no structure and no token — caught by manual review through the `examples/` vault until (and unless) a pixel-diff harness is adopted. This residual is accepted as proportionate for an in-Obsidian-rendered solo plugin.
+**Low, and now actively guarded.** Styling is centralized in `src/theme/`; the theme guard holds the token↔consumer mapping and admits no raw value outside `src/theme/tokens.css`, and the structural-snapshot net catches unintended changes to the class/attribute scaffolding the tokens hang off of. The residual gap is a *rendered-pixel* change that alters no structure and no token — caught by manual review through the `examples/` vault until (and unless) a pixel-diff harness is adopted. This residual is accepted as proportionate for an in-Obsidian-rendered solo plugin.
 
 ## Resolution
 
 The visual-regression category is satisfied by two checks that together form the safety net, both wired into `ds:check`:
 
 1. **Structural-snapshot regression net** — `test/visual-regression.test.tsx` (`pnpm test:visual`) renders a representative board and snapshots small, targeted units (`.folia-card`, `.folia-column-header`) so unintended structural change to token-consuming markup fails the gate.
-2. **Token drift-check** — `scripts/check-tokens.mjs` (`pnpm tokens:check`) guards the token↔consumer mapping.
+2. **Theme guard** — `scripts/check-theme.mjs` (`pnpm theme:check`) guards the token↔consumer mapping.
 
 A full pixel-diff / browser harness (Storybook + Playwright or equivalent) is **intentionally deferred** as disproportionate for a plugin that renders only inside Obsidian in a solo repo; if such a harness is ever adopted, a screenshot/pixel-diff stage can be added under `ds:check` at that point. No renewal is required: this waiver is closed, not renewed.
 
 ## Replacement
 
-The standing mechanism for `DS-PROCESS-CONFORMANCE-1` #5, at a cost proportionate to a solo repo: the **structural-snapshot regression net** (`test:visual`) + the **token drift-check** (`tokens:check`), both enforced in `ds:check`, complemented by the **`examples/` vault** for manual visual review of pure-pixel changes.
+The standing mechanism for `DS-PROCESS-CONFORMANCE-1` #5, at a cost proportionate to a solo repo: the **structural-snapshot regression net** (`test:visual`) + the **theme guard** (`theme:check`), both enforced in `ds:check`, complemented by the **`examples/` vault** for manual visual review of pure-pixel changes.

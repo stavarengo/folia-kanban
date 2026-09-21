@@ -6,7 +6,7 @@
 // so there every rule computes exactly what the plugin wrote.
 //
 // This check is that missing eye. It pairs the classes the plugin puts on real `<button>` elements
-// with the rules in `src/styles.css` that colour them, and requires each such rule to out-specify
+// with the rules in `src/theme/` that colour them, and requires each such rule to out-specify
 // (0,1,1). The usual fix is to name the class twice — `.folia-link.folia-link { … }` — which
 // matches exactly the same elements at (0,2,0); selecting through an ancestor class works too.
 //
