@@ -86,7 +86,7 @@
     }
   },
   "ring": {
-    "$value": "0 0 0 2px color-mix(in srgb, var(--folia-accent) 30%, transparent)",
+    "$value": "0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent)",
     "cssVar": "--folia-ring",
     "source": {
       "owned": true,
@@ -94,7 +94,7 @@
     }
   },
   "ring-soft": {
-    "$value": "0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent)",
+    "$value": "0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent)",
     "cssVar": "--folia-ring-soft",
     "source": {
       "owned": true,

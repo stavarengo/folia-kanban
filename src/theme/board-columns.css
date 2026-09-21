@@ -81,6 +81,7 @@
   color: var(--folia-on-accent);
   background: var(--folia-danger);
 }
+/* These two mix into opaque colours and stay in srgb — see src/theme/README.md. */
 .folia-column.is-over-limit {
   border-color: color-mix(in srgb, var(--folia-danger) 50%, var(--folia-border));
 }

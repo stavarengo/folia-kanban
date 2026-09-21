@@ -19,6 +19,12 @@ Raw design values — a colour, a length with a unit, a duration, an angle, a we
 
 A `calc()`, `min()`, `max()` or `clamp()` may use only `0`, `1`, `-1` and `2` as a plain number, which is what the theme needs today: negating a token, which CSS gives no other way to do, and a symmetric pair. That list is deliberately narrow rather than general — `calc(100% / 3)` for a three-column grid will fail — because a multiplier is usually a size someone chose. Widen it in `checkRawValues` when a real rule needs a number that is arithmetic rather than a decision, and say which rule in the commit.
 
+## Which space a `color-mix` mixes in
+
+Obsidian mixes colours in OKLCH as of 1.13, and its own documentation writes the idiom as `color-mix(in oklch, var(--color-red) 20%, transparent)`. The bundle follows that for every mix whose second colour is `transparent`, which is all but fourteen of them: mixing a colour into `transparent` is pure alpha, so the two spaces rasterise to the same pixel and the change is free.
+
+The fourteen that mix two opaque colours stay `in srgb`, and the reason is the same everywhere: the percentages were hand-tuned for contrast in both light and dark, the two spaces differ there by a few units per channel, and nothing in this repository can tell whether a re-tuned number still clears WCAG AA — `test/a11y.axe.test.tsx` disables the contrast rule because jsdom cannot compute one, and there is no visual-regression harness (`tracking/waivers/0002-automated-a11y-gate.md`, `0003-visual-regression-automation.md`). Moving them is a change nobody can check, so it waits for a check. The audit's 02-09 has the measurements.
+
 ## Adding a token
 
 1. Decide what it is FOR, and name it that. `size.hit-small`, not `size.24`.

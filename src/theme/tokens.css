@@ -148,8 +148,8 @@
   --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4);
   --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);
   --folia-shadow-panel: -8px 0 24px rgba(0, 0, 0, 0.18);
-  --folia-ring: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 30%, transparent);
-  --folia-ring-soft: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent);
+  --folia-ring: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent);
+  --folia-ring-soft: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent);
   --folia-shadow-card-selected: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);
   --folia-shadow-choice-active: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
   --folia-shadow-swatch-active: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);

@@ -41,11 +41,11 @@
 }
 .folia-card[data-urgency="overdue"] {
   --folia-urgency-color: var(--folia-danger);
-  --folia-urgency-tint: color-mix(in srgb, var(--folia-danger) 10%, transparent);
+  --folia-urgency-tint: color-mix(in oklch, var(--folia-danger) 10%, transparent);
 }
 .folia-card[data-urgency="today"] {
   --folia-urgency-color: var(--folia-prio-2);
-  --folia-urgency-tint: color-mix(in srgb, var(--folia-prio-2) 9%, transparent);
+  --folia-urgency-tint: color-mix(in oklch, var(--folia-prio-2) 9%, transparent);
 }
 .folia-card[data-urgency="soon"] {
   /* medium: amber top band, no background tint */
@@ -65,7 +65,7 @@
    outline, so the gap reads as "this is where it'll land" rather than a half-faded duplicate. */
 .folia-card.is-dragging {
   opacity: var(--folia-opacity-shown);
-  background: color-mix(in srgb, var(--folia-accent) 7%, transparent);
+  background: color-mix(in oklch, var(--folia-accent) 7%, transparent);
   border-color: transparent;
   box-shadow: none;
 }
@@ -76,7 +76,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border: var(--folia-border-width-hair) dashed color-mix(in srgb, var(--folia-accent) 60%, transparent);
+  border: var(--folia-border-width-hair) dashed color-mix(in oklch, var(--folia-accent) 60%, transparent);
   border-radius: var(--folia-r-lg);
 }
 /* The priority strip would otherwise still show on the hollowed slot. */

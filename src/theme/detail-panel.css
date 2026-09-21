@@ -646,12 +646,13 @@
   letter-spacing: var(--folia-tracking-label);
   border-radius: var(--folia-r-pill);
   padding: 0 var(--folia-space-sm);
+  /* The text mixes into an opaque colour and stays in srgb — see src/theme/README.md. */
   color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
-  background: color-mix(in srgb, var(--folia-unread) 20%, transparent);
+  background: color-mix(in oklch, var(--folia-unread) 20%, transparent);
 }
 .folia-comment-reply .folia-comment-flag {
   color: color-mix(in srgb, var(--folia-unread-reply) 55%, var(--text-normal));
-  background: color-mix(in srgb, var(--folia-unread-reply) 22%, transparent);
+  background: color-mix(in oklch, var(--folia-unread-reply) 22%, transparent);
 }
 .folia-comments li.folia-comment-unread,
 .folia-comments li.folia-comment-reply {
@@ -660,11 +661,11 @@
 }
 .folia-comments li.folia-comment-unread {
   border-left-color: var(--folia-unread);
-  background: color-mix(in srgb, var(--folia-unread) 8%, transparent);
+  background: color-mix(in oklch, var(--folia-unread) 8%, transparent);
 }
 .folia-comments li.folia-comment-reply {
   border-left-color: var(--folia-unread-reply);
-  background: color-mix(in srgb, var(--folia-unread-reply) 10%, transparent);
+  background: color-mix(in oklch, var(--folia-unread-reply) 10%, transparent);
 }
 /* The "New" rule: where the comments you have already read end. Specificity has to beat the
    `.folia-comments li` block above, which stacks children and draws the quote-style left border. */
@@ -687,7 +688,7 @@
   content: "";
   flex: 1 1 auto;
   height: var(--folia-divider-h);
-  background: color-mix(in srgb, var(--folia-unread) 45%, transparent);
+  background: color-mix(in oklch, var(--folia-unread) 45%, transparent);
 }
 .folia-ts {
   font-size: var(--folia-font-size-xxs);

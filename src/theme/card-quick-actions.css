@@ -7,7 +7,7 @@
   gap: var(--folia-space-hair);
   padding: var(--folia-space-xxs);
   border-radius: var(--folia-r);
-  background: color-mix(in srgb, var(--folia-card-bg) 88%, transparent);
+  background: color-mix(in oklch, var(--folia-card-bg) 88%, transparent);
   backdrop-filter: var(--folia-blur-actions);
   box-shadow: var(--folia-shadow-pop);
   opacity: var(--folia-opacity-hidden);
@@ -36,7 +36,7 @@
   text-align: center;
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--folia-card-bg) 92%, transparent);
+  background: color-mix(in oklch, var(--folia-card-bg) 92%, transparent);
   backdrop-filter: var(--folia-blur-scrim);
   border-radius: var(--folia-r-lg);
   z-index: var(--folia-z-index-raised);

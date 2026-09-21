@@ -20,8 +20,8 @@
      guides, and a board is not a file tree — hiding one should not hide the other. */
   margin-left: var(--nav-item-children-margin-start);
   padding: var(--folia-space-sm) 0 var(--folia-space-sm) var(--nav-item-children-padding-start);
-  border-left: var(--folia-border-width-thick) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--folia-col-accent) 5%, transparent);
+  border-left: var(--folia-border-width-thick) solid color-mix(in oklch, var(--folia-col-accent) 55%, transparent);
+  background: color-mix(in oklch, var(--folia-col-accent) 5%, transparent);
   border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
 }
 .folia-subcard {
@@ -36,7 +36,7 @@
      be declared here rather than written into the padding shorthand below. */
   --folia-card-pad-x: var(--folia-gap);
   box-shadow: none;
-  border-color: color-mix(in srgb, var(--folia-border) 80%, transparent);
+  border-color: color-mix(in oklch, var(--folia-border) 80%, transparent);
 }
 .folia-card--nested .folia-card-main {
   gap: var(--folia-space-xs-plus);
