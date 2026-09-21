@@ -125,19 +125,21 @@
 .folia-scope .folia-filter-suggest-item:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-prio:active:where(:not(:disabled, :focus-visible)) {
+  /* Hovered and pressed used to differ by outline width alone — one pixel of line at dpr 1, and
+     under `.mod-macos`, where the host fill pair collapses and `--input-shadow` is `none`, the only
+     difference the two states had. The ring now also MOVES: hovered it sits 2px inside the control,
+     pressed it snaps out flush to the edge at double the width, so the change is a position as well
+     as a weight. Two other mechanisms were tried and rejected, and both rejections are the same
+     shape — a pressed cue may not spend something the control needs. A tint in the label's colour
+     spends contrast: it moves the face towards the label, which on the primary button measured
+     4.26:1 down to 2.40:1, and no single tint direction is safe across accent, danger and neutral
+     faces in both schemes. `transform: scale()` spends the hit area: it shrinks the button's real
+     hit box under a stationary pointer, so a press that starts in the outer strip lands its
+     mousedown on the button and its mouseup on the parent and never fires `onClick`. The outline is
+     paint only — no layout, no hit testing, no contrast. */
   outline: var(--folia-control-outline);
   outline-width: var(--folia-border-width-thick);
-  outline-offset: calc(-1 * var(--folia-border-width-thick));
-  /* Thickening the outline from 1px to 2px is one pixel of line at dpr 1, and under `.mod-macos`,
-     where the host fill pair collapses and `--input-shadow` is `none`, it was the only difference
-     hovered and pressed had. The control shrinks instead. Deliberately not a tint: any veil in the
-     label's own colour moves the face TOWARDS the label, and on a filled control that is exactly
-     the wrong way — measured at 12% it took the primary button from 4.26:1 to 2.40:1. A veil in the
-     other direction only relocates the problem, because "away from the label" is a different
-     direction on an accent face than on a neutral one, in each scheme. Scale costs no contrast at
-     all, reads the same on a filled button, a transparent menu row and the dashed tile, and moves
-     no layout. */
-  transform: scale(0.97);
+  outline-offset: 0;
 }
 
 /* The tile's dashed border is the "nothing here yet" affordance, and a solid line drawn 2px inside

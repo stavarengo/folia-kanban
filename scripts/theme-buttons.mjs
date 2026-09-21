@@ -211,11 +211,15 @@ export async function checkButtons(roots, fail) {
           : ":disabled, :focus-visible";
       const selector = `.folia-scope .${name}:${state}:where(:not(${excluded}))`;
       requireSignal(selector, "outline", "var(--folia-control-outline)");
-      requireSignal(selector, "outline-offset", "calc(-1 * var(--folia-border-width-thick))");
-      if (state === "active") {
+      // Pressed differs from hovered in where the ring sits as well as how thick it is. Pinning
+      // both offsets keeps the pair distinguishable rather than merely present.
+      requireSignal(
+        selector,
+        "outline-offset",
+        state === "active" ? "0" : "calc(-1 * var(--folia-border-width-thick))",
+      );
+      if (state === "active")
         requireSignal(selector, "outline-width", "var(--folia-border-width-thick)");
-        requireSignal(selector, "transform", "scale(0.97)");
-      }
     }
   }
   requireSignal(

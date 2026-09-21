@@ -399,9 +399,14 @@ describe("theme button contract", () => {
     reject("Button signal .folia-scope .folia-menu-prio");
   });
 
-  it("requires the pressed shrink on a pointer-outline consumer", () => {
-    edit("src/theme/buttons.css", (s) => s.replace("transform: scale(0.97);", ""));
-    reject("needs transform: scale(0.97)");
+  it("requires the pressed ring to sit flush rather than repeat the hover offset", () => {
+    edit("src/theme/buttons.css", (s) =>
+      s.replace(
+        "  outline-width: var(--folia-border-width-thick);\n  outline-offset: 0;",
+        "  outline-width: var(--folia-border-width-thick);\n  outline-offset: calc(-1 * var(--folia-border-width-thick));",
+      ),
+    );
+    reject("needs outline-offset: 0");
   });
 
   it("requires the keyboard suggestion marker consumer", () => {
