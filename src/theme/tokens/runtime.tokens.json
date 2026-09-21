@@ -8,14 +8,6 @@
       "reason": "the column's own colour, written onto the column element by Column.tsx; this is what a surface outside a coloured column reads."
     }
   },
-  "column-opacity": {
-    "$value": "1",
-    "cssVar": "--folia-col-opacity",
-    "source": {
-      "owned": true,
-      "reason": "how faded a parked column is, written onto the column element by Column.tsx; fully opaque is what every other column reads."
-    }
-  },
   "column-hover-opacity": {
     "$value": "1",
     "cssVar": "--folia-col-hover-opacity",
@@ -24,12 +16,20 @@
       "reason": "the same on hover, written by Column.tsx; fully opaque is what every other column reads."
     }
   },
+  "column-opacity": {
+    "$value": "1",
+    "cssVar": "--folia-col-opacity",
+    "source": {
+      "owned": true,
+      "reason": "how faded a parked column is, written onto the column element by Column.tsx; fully opaque is what every other column reads."
+    }
+  },
   "context-color": {
     "$value": "initial",
     "cssVar": "--folia-ctx-color",
     "source": {
       "owned": true,
-      "reason": "the folder context's colour, written onto the card by CardItem.tsx. Declared `initial` — the guaranteed-invalid value — because a card can have a context and no colour, and the strip and the chip answer that differently on purpose; a real value here would silently change both."
+      "reason": "the folder context's colour, written onto the card by CardItem.tsx. Declared `initial` \u2014 the guaranteed-invalid value \u2014 because a card can have a context and no colour, and the strip and the chip answer that differently on purpose; a real value here would silently change both."
     }
   },
   "description-height-max": {
@@ -38,6 +38,14 @@
     "source": {
       "owned": true,
       "reason": "the height the rendered description is capped at, measured and written by CardDetail.tsx; this is the figure used before it measures."
+    }
+  },
+  "statusbar-clearance": {
+    "$value": "32px",
+    "cssVar": "--folia-statusbar-clearance",
+    "source": {
+      "owned": true,
+      "reason": "how much the last card must clear the app's floating status bar, written onto the board root by App.tsx once it has measured the real bar; this is what stands in before it does."
     }
   },
   "urgency-color": {

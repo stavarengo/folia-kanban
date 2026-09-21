@@ -66,12 +66,11 @@
   --folia-menu-h-max: 440px;
   --folia-modal-w: 440px;
   --folia-menu-pad: 11px;
-  --folia-detail-w: 380px; /* side panel width; overridden inline from settings.detailWidth */
+  --folia-detail-w: 380px; /* the width before CardDetail writes the user's own, inline */
   --folia-detail-modal-w: 640px;
   --folia-detail-modal-w-max: 92vw;
   --folia-detail-modal-h-max: 85vh;
   --folia-detail-slide: 14px; /* how far the panel travels as it opens */
-  --folia-statusbar-clearance: 32px; /* fallback; App measures the real status bar and sets it live */
   --folia-suggest-h-max: 280px;
   --folia-search-w: 320px;
   --folia-add-column-w: 220px;
@@ -270,6 +269,7 @@
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
+  --folia-statusbar-clearance: 32px;
   --folia-urgency-color: transparent;
   --folia-urgency-tint: transparent;
 }

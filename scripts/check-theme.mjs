@@ -14,10 +14,10 @@
 // Run: pnpm theme:check
 
 import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import process from "node:process";
 import postcss from "postcss";
-import { themeFiles, THEME_DIR } from "./theme-bundle.mjs";
+import { themeFiles, THEME_DIR, THEME_ENTRY } from "./theme-bundle.mjs";
 
 const TOKENS_CSS = join(THEME_DIR, "tokens.css");
 const TOKENS_JSON_DIR = join(THEME_DIR, "tokens");
@@ -264,7 +264,8 @@ function dimensionKind(unit) {
 }
 
 // ------------------------------------------------------------------ rules A + C over the theme
-const componentFiles = (await themeFiles()).filter((f) => f !== TOKENS_CSS);
+// The entry itself is scanned too: it is a file someone can write a declaration into.
+const componentFiles = [THEME_ENTRY, ...(await themeFiles())].filter((f) => f !== TOKENS_CSS);
 for (const file of componentFiles) {
   const css = await readFile(file, "utf8");
   const root = postcss.parse(css, { from: file });
@@ -324,24 +325,25 @@ for (const file of (await readdir(TOKENS_JSON_DIR)).filter((f) => f.endsWith(".t
 // clothes.
 const FAMILIES = {
   radius: /^--radius-/,
-  length: /^--(size-\d+-\d+|border-width)$/,
+  length: /^--size-\d+-\d+$/,
+  "border-width": /^--border-width$/,
   "font-size": /^--font-ui-/,
   "font-weight": /^--font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/,
   "line-height": /^--line-height-/,
 };
 
-/** Which family a token's value should be measured against, from the CSS it is used for. */
-function familyOf(token, cssVar) {
-  const category = token.path.split(".")[0];
+/** Which family a token's value should be measured against, from what the token is FOR. */
+function familyOf(token) {
+  const category = basename(token.file).replace(".tokens.json", "");
   if (category === "radius") return "radius";
+  if (category === "border") return token.path.startsWith("width") ? "border-width" : null;
   if (category === "typography") {
-    if (/weight/.test(token.path)) return "font-weight";
-    if (/line-height/.test(token.path)) return "line-height";
-    if (/font-size|size/.test(token.path)) return "font-size";
+    if (token.path.startsWith("weight")) return "font-weight";
+    if (token.path.startsWith("line-height")) return "line-height";
+    if (token.path.startsWith("font-size")) return "font-size";
     return null;
   }
-  if (["spacing", "size", "border"].includes(category)) return "length";
-  void cssVar;
+  if (category === "spacing" || category === "size") return "length";
   return null;
 }
 
@@ -431,7 +433,7 @@ for (const t of tokens) {
   }
 
   // Rule E
-  const family = familyOf(t, cssVar);
+  const family = familyOf(t);
   if (family) {
     for (const [name, entry] of defaultsBy.get(family)) {
       if (entry.default === node.$value) {

@@ -1,5 +1,5 @@
 {
-  "$description": "The sizes the board's own furniture is cut to — widths, heights, hit targets and offsets.",
+  "$description": "The sizes the board's own furniture is cut to \u2014 widths, heights, hit targets and offsets.",
   "column-width": {
     "$value": "300px",
     "cssVar": "--folia-col-w",
@@ -61,7 +61,7 @@
     "cssVar": "--folia-detail-w",
     "source": {
       "owned": true,
-      "reason": "the side panel's width, overridden live from the user's own setting; a user preference has no host variable."
+      "reason": "the side panel's width before CardDetail sets the user's own inline; a user preference has no host variable."
     }
   },
   "detail-modal-width": {
@@ -93,15 +93,7 @@
     "cssVar": "--folia-detail-slide",
     "source": {
       "owned": true,
-      "reason": "how far the panel travels as it opens — a motion distance, not a layout size."
-    }
-  },
-  "statusbar-clearance": {
-    "$value": "32px",
-    "cssVar": "--folia-statusbar-clearance",
-    "source": {
-      "owned": true,
-      "reason": "how much the last card must clear the app's floating status bar; App measures the real bar and writes the live value, and this is what stands in before it does."
+      "reason": "how far the panel travels as it opens \u2014 a motion distance, not a layout size."
     }
   },
   "suggest-height-max": {
@@ -329,7 +321,7 @@
     "cssVar": "--folia-cue-thickness",
     "source": {
       "owned": true,
-      "reason": "the thickness of every edge cue a card or column draws — the priority strip, the urgency band and the column accent — off Obsidian's 4px grid."
+      "reason": "the thickness of every edge cue a card or column draws \u2014 the priority strip, the urgency band and the column accent \u2014 off Obsidian's 4px grid."
     }
   },
   "icon-baseline": {
