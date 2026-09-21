@@ -399,14 +399,14 @@ describe("theme button contract", () => {
     reject("Button signal .folia-scope .folia-menu-prio");
   });
 
-  it("requires the pressed ring to sit flush rather than repeat the hover offset", () => {
+  it("requires the pressed ring to sit deeper than the hover ring", () => {
     edit("src/theme/buttons.css", (s) =>
       s.replace(
-        "  outline-width: var(--folia-border-width-thick);\n  outline-offset: 0;",
-        "  outline-width: var(--folia-border-width-thick);\n  outline-offset: calc(-1 * var(--folia-border-width-thick));",
+        "  outline-offset: calc(-1 * 2 * var(--folia-border-width-thick));",
+        "  outline-offset: calc(-1 * var(--folia-border-width-thick));",
       ),
     );
-    reject("needs outline-offset: 0");
+    reject("needs outline-offset: calc(-1 * 2 * var(--folia-border-width-thick))");
   });
 
   it("requires the keyboard suggestion marker consumer", () => {

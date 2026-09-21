@@ -211,12 +211,15 @@ export async function checkButtons(roots, fail) {
           : ":disabled, :focus-visible";
       const selector = `.folia-scope .${name}:${state}:where(:not(${excluded}))`;
       requireSignal(selector, "outline", "var(--folia-control-outline)");
-      // Pressed differs from hovered in where the ring sits as well as how thick it is. Pinning
-      // both offsets keeps the pair distinguishable rather than merely present.
+      // Pressed differs from hovered in where the ring sits as well as how thick it is, and both
+      // offsets are negative so the ring always paints on the control's own face, where its
+      // currentColor is answerable to the label's contrast rather than to the surface behind.
       requireSignal(
         selector,
         "outline-offset",
-        state === "active" ? "0" : "calc(-1 * var(--folia-border-width-thick))",
+        state === "active"
+          ? "calc(-1 * 2 * var(--folia-border-width-thick))"
+          : "calc(-1 * var(--folia-border-width-thick))",
       );
       if (state === "active")
         requireSignal(selector, "outline-width", "var(--folia-border-width-thick)");

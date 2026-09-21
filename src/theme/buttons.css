@@ -127,19 +127,19 @@
 .folia-scope .folia-menu-prio:active:where(:not(:disabled, :focus-visible)) {
   /* Hovered and pressed used to differ by outline width alone — one pixel of line at dpr 1, and
      under `.mod-macos`, where the host fill pair collapses and `--input-shadow` is `none`, the only
-     difference the two states had. The ring now also MOVES: hovered it sits 2px inside the control,
-     pressed it snaps out flush to the edge at double the width, so the change is a position as well
-     as a weight. Two other mechanisms were tried and rejected, and both rejections are the same
-     shape — a pressed cue may not spend something the control needs. A tint in the label's colour
-     spends contrast: it moves the face towards the label, which on the primary button measured
-     4.26:1 down to 2.40:1, and no single tint direction is safe across accent, danger and neutral
-     faces in both schemes. `transform: scale()` spends the hit area: it shrinks the button's real
-     hit box under a stationary pointer, so a press that starts in the outer strip lands its
-     mousedown on the button and its mouseup on the parent and never fires `onClick`. The outline is
-     paint only — no layout, no hit testing, no contrast. */
+     difference the two states had. The ring now also MOVES, and it moves INWARD: hovered it sits
+     2px inside the control, pressed it is twice as thick and twice as deep, so the two lines never
+     overlap and the change is a position as well as a weight.
+     Inward rather than outward, and that is the whole of why this offset is what it is. The ring is
+     `currentColor`, so it is only guaranteed to be visible against the control's OWN face — the
+     label's colour on the label's background. Painted outside the border box it would be judged
+     against whatever surface the control sits on instead, and a primary or danger button, whose
+     label is `--text-on-accent`, would draw a white ring onto a white menu in light mode. Staying
+     inside also keeps the ring clear of the selected-choice shadow, which is drawn outside the
+     border box and whose 2px neutral separator an outside ring would cover. */
   outline: var(--folia-control-outline);
   outline-width: var(--folia-border-width-thick);
-  outline-offset: 0;
+  outline-offset: calc(-1 * 2 * var(--folia-border-width-thick));
 }
 
 /* The tile's dashed border is the "nothing here yet" affordance, and a solid line drawn 2px inside
