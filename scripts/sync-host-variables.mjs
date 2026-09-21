@@ -220,11 +220,13 @@ if (check) {
     console.error("sync-host-variables: registry has drifted; run without --check to regenerate");
     process.exitCode = 1;
   }
-} else if (warnings === 0) {
+} else {
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, json + "\n");
 }
 if (warnings > 0) process.exitCode = 1;
 console.error(
-  `sync-host-variables: ${pages.length} pages read, ${variables.size} variables found, ${warnings} warnings`,
+  `sync-host-variables: ${pages.length} pages read, ${variables.size} variables found, ${warnings} warnings${
+    check ? "" : `, written to ${destination}`
+  }`,
 );
