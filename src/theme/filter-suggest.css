@@ -53,20 +53,20 @@
   color: var(--text-muted);
 }
 .folia-error {
-  color: var(--text-error);
+  color: var(--folia-text-error);
 }
 
 .folia-desc-refusal {
   margin: var(--folia-space-para) 0 0;
   font-size: var(--folia-font-size-xs);
-  color: var(--text-error);
+  color: var(--folia-text-error);
 }
 
 .folia-card-folder-notice {
   padding: var(--folia-pad-notice-y) var(--folia-space-lg);
   font-size: var(--folia-font-size-xs);
-  color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
-  background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
+  color: color-mix(in srgb, var(--folia-text-warning) 70%, var(--text-normal));
+  background: color-mix(in oklch, var(--folia-text-warning) 12%, transparent);
   border-bottom: var(--folia-border-width) solid var(--folia-border);
   flex: 0 0 auto;
 }

@@ -21,8 +21,8 @@
   transform: none;
   pointer-events: auto;
 }
-.folia-action-done:hover { color: var(--folia-success); }
-.folia-action-delete:hover { color: var(--folia-danger); }
+.folia-action-done:hover { color: var(--folia-text-success); }
+.folia-action-delete:hover { color: var(--folia-text-error); }
 
 .folia-card-confirm {
   position: absolute;

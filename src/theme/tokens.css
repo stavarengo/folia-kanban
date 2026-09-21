@@ -189,7 +189,15 @@
      the site, so it only means anything if the reason is written down. Here it is. */
   --folia-on-accent: var(--text-on-accent);
   --folia-on-fill: #fff; /* text on a fill the board chose itself, where no host variable applies */
+  /* `danger` and `success` are FILLS — the danger button, the toast pill, the over-limit badge —
+     and Obsidian publishes no variable for either, so they stay on the palette. The three below
+     are the foregrounds, and they are separate for the same reason the accent is: a theme tunes
+     error text for legibility without touching what an error fill looks like. */
   --folia-danger: var(--color-red);
+  --folia-text-error: var(--text-error);
+  --folia-text-warning: var(--text-warning);
+  --folia-text-success: var(--text-success);
+  --folia-error-bg: var(--background-modifier-error);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
      answered you". Two hues, never a lone colour difference — the tile pairs each with its own
      shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */

@@ -129,6 +129,34 @@
       "alias": "--color-red"
     }
   },
+  "text-error": {
+    "$value": "var(--text-error)",
+    "cssVar": "--folia-text-error",
+    "source": {
+      "alias": "--text-error"
+    }
+  },
+  "text-warning": {
+    "$value": "var(--text-warning)",
+    "cssVar": "--folia-text-warning",
+    "source": {
+      "alias": "--text-warning"
+    }
+  },
+  "text-success": {
+    "$value": "var(--text-success)",
+    "cssVar": "--folia-text-success",
+    "source": {
+      "alias": "--text-success"
+    }
+  },
+  "error-bg": {
+    "$value": "var(--background-modifier-error)",
+    "cssVar": "--folia-error-bg",
+    "source": {
+      "alias": "--background-modifier-error"
+    }
+  },
   "unread": {
     "$value": "var(--color-blue)",
     "cssVar": "--folia-unread",

@@ -33,7 +33,7 @@
 .folia-progress.is-complete .folia-progress-label {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
-  color: var(--folia-success);
+  color: var(--folia-text-success);
 }
 
 .folia-card-meta {

@@ -115,10 +115,10 @@
   cursor: var(--folia-cursor-inert);
 }
 .folia-menu-danger.folia-menu-danger {
-  color: var(--folia-danger);
+  color: var(--folia-text-error);
 }
 .folia-menu-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--folia-danger) 14%, transparent);
+  background: color-mix(in oklch, var(--folia-text-error) 14%, transparent);
 }
 .folia-menu-confirm {
   display: flex;

@@ -27,7 +27,11 @@
 /* Chip text is mixed toward --text-normal so it keeps the hue but stays legible (WCAG AA) in
    BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. That
    border is why `--tag-border-width` stays out of the rule above: Obsidian ships it at 0, and a
-   borderless chip loses the only edge these translucent tints have. */
+   borderless chip loses the only edge these translucent tints have.
+   The percentages are also why the warn and danger chips keep mixing off the ramp rather than off
+   --text-warning / --text-error the way the plain warning surfaces now do: the numbers were tuned
+   against these hues, and nothing in CI can re-check a contrast ratio (see docs/decisions.md and
+   tracking/waivers/0002-automated-a11y-gate.md). Re-tuning without a check is guessing. */
 .folia-chip-prio-1.folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-1) 32%, transparent); }
 .folia-chip-prio-2.folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
 .folia-chip-prio-3.folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in srgb, var(--folia-prio-3) 34%, transparent); }

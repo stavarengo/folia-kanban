@@ -112,7 +112,7 @@
   padding: var(--folia-pad) var(--folia-space-lg);
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--folia-danger) 10%, var(--folia-col-bg));
+  background: var(--folia-error-bg);
   border-bottom: var(--folia-border-width) solid var(--folia-border);
 }
 .folia-detail-body {
@@ -412,8 +412,8 @@
   margin: var(--folia-space-sm) 0 0;
   padding: var(--folia-space-sm) var(--folia-gap);
   font-size: var(--folia-font-size-xs);
-  color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
-  background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
+  color: color-mix(in srgb, var(--folia-text-warning) 70%, var(--text-normal));
+  background: color-mix(in oklch, var(--folia-text-warning) 12%, transparent);
   /* Read as a callout by anyone who uses Obsidian, so it is cornered like one. The rest of the
      callout geometry stays out: its padding and title block would make a one-line inline notice
      considerably heavier than this panel wants. */
