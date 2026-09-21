@@ -70,7 +70,7 @@
 .folia-filter-chip.is-on {
   background: color-mix(in srgb, var(--folia-accent) 16%, transparent);
   border-color: color-mix(in srgb, var(--folia-accent) 45%, transparent);
-  color: var(--folia-accent);
+  color: var(--folia-text-accent);
 }
 .folia-toolbar-status {
   display: flex;

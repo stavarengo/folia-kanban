@@ -31,7 +31,7 @@
   cursor: var(--folia-cursor-control);
 }
 .folia-card .folia-card-parent-ref:hover {
-  color: var(--folia-accent);
+  color: var(--folia-text-accent-hover);
   text-decoration: underline;
 }
 

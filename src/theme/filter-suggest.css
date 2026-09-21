@@ -39,7 +39,7 @@
 .folia-filter-suggest-key {
   font-family: var(--folia-font-mono);
   font-size: var(--folia-font-size-sm);
-  color: var(--folia-accent);
+  color: var(--folia-text-accent);
 }
 .folia-filter-suggest-hint {
   font-size: var(--folia-font-size-xs);

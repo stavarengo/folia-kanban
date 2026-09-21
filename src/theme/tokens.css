@@ -161,6 +161,12 @@
   --folia-prio-3: var(--color-yellow);
   --folia-prio-4: var(--color-blue);
   --folia-accent: var(--interactive-accent);
+  /* Obsidian splits the accent in two: `--interactive-accent` is the FILL behind an accented
+     control, `--text-accent` is accented TEXT. A theme darkens the second for legibility while
+     keeping the first bright, so a foreground painted with the fill sits on a background it was
+     never meant to sit on. `--folia-accent` above is the fill; these two are the foreground. */
+  --folia-text-accent: var(--text-accent);
+  --folia-text-accent-hover: var(--text-accent-hover);
   /* Read flat, on purpose. Obsidian publishes two variables for text on an accent fill —
      `--text-on-accent` for a dark accent, `--text-on-accent-inverted` for a light one — and app.css
      defines them once, on `body`, as `white` and `black`. No button rule branches between them —

@@ -93,6 +93,20 @@
       "alias": "--interactive-accent"
     }
   },
+  "text-accent": {
+    "$value": "var(--text-accent)",
+    "cssVar": "--folia-text-accent",
+    "source": {
+      "alias": "--text-accent"
+    }
+  },
+  "text-accent-hover": {
+    "$value": "var(--text-accent-hover)",
+    "cssVar": "--folia-text-accent-hover",
+    "source": {
+      "alias": "--text-accent-hover"
+    }
+  },
   "on-accent": {
     "$value": "var(--text-on-accent)",
     "cssVar": "--folia-on-accent",
