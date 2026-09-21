@@ -45,8 +45,12 @@
   inset: 0;
   z-index: var(--folia-z-index-app-modal);
   display: grid;
-  place-items: center;
   padding: var(--folia-space-xxl);
+  /* A dialog taller than the window stays reachable: centring alone would push its head off the top
+     edge with no way back. `safe` re-aligns to start once it overflows, and the scroll is the escape
+     hatch for whatever a theme makes of `--dialog-max-height`. */
+  overflow: auto;
+  place-items: safe center;
   background: var(--folia-scrim);
   backdrop-filter: var(--folia-blur-scrim);
   animation: folia-fade-in var(--folia-dur-fast) ease;
@@ -60,9 +64,11 @@
    stays Folia's: no host variable covers a dimmer. */
 .folia-modal {
   width: min(var(--folia-modal-w), 100%);
-  /* Its own declaration rather than a second argument to that `min()`: `--dialog-max-width` may
-     legitimately be `none`, and `min(560px, none)` is invalid, which would drop the width entirely
-     and collapse the dialog to its intrinsic size. `max-width: none` is simply no cap. */
+  /* Its own declaration rather than a second argument to that `min()`: `none` is an ordinary value
+     for a maximum and `min(560px, none)` is invalid, which would drop the width and collapse the
+     dialog to its intrinsic size. `max-width: none` is simply no cap. The `min()` above keeps the
+     `100%` guard because `--dialog-width` is a default width, where a keyword would be a far
+     stranger thing for a theme to write than it is for a maximum. */
   max-width: var(--dialog-max-width);
   max-height: var(--dialog-max-height);
   display: flex;

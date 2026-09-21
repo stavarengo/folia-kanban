@@ -3,13 +3,12 @@
   position: relative; /* anchors the left-edge resize handle */
   flex: 0 0 var(--folia-detail-w);
   width: var(--folia-detail-w);
-  /* The left edge is a resize divider, and the handle below paints it rather than this border.
-     `overflow-y: auto` here computes `overflow-x` to `auto` as well, so anything a child draws
-     outside this padding box is clipped away — which is also why the handle now sits inside it.
-     The border stays, transparent and the divider's own width, so the inset the layout was built on
-     survives. `.folia-detail--modal` resets `border` wholesale, keeping all of this to the side
-     presentations, where the edge is actually draggable. */
-  border-left: var(--divider-width) solid transparent;
+  /* The left edge is a resize divider, so it is drawn with the app's divider variables. It has to
+     be THIS border and not something the handle draws: a border paints on the border box and is
+     immune to scrolling, while the handle is an absolutely positioned child of this scroll
+     container — one viewport tall, and it scrolls away with the content. `.folia-detail--modal`
+     resets `border` wholesale, keeping this to the side presentations, where the edge is draggable. */
+  border-left: var(--divider-width) solid var(--divider-color);
   background: var(--folia-col-bg);
   box-shadow: var(--folia-shadow-panel);
   overflow-y: auto;
@@ -52,23 +51,21 @@
   box-shadow: var(--folia-shadow-overlay);
 }
 
-/* Left-edge drag handle (side modes only), and the divider itself: the strip is the grab target and
-   its own left border is the line. One element draws both states, so the edge never doubles, and it
-   thickens and recolours under the pointer the way every split handle in the window does. */
+/* Left-edge drag target (side modes only). It draws nothing: it is absolutely positioned inside the
+   panel's own scroll container, so it is exactly one viewport tall and travels with the content,
+   and anything it painted would slide off a scrolled panel and hide under the sticky header at the
+   top. `--divider-color-hover` and `--divider-width-hover` therefore have no home yet; the panel's
+   border above carries the resting line. `left: 0` rather than the old `-3px`: `overflow-y: auto`
+   makes the computed `overflow-x` `auto` too, so half the strip used to be clipped away — not
+   painted and not hit-testable — and the full width is now grabbable. */
 .folia-detail-resize {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   width: var(--folia-resize-w);
-  border-left: var(--divider-width) solid var(--divider-color);
   cursor: var(--folia-cursor-resize);
   z-index: var(--folia-z-index-base);
-}
-.folia-detail-resize:hover,
-.folia-detail-resize:active {
-  border-left-width: var(--divider-width-hover);
-  border-left-color: var(--divider-color-hover);
 }
 @keyframes folia-slide-in {
   from { transform: translateX(var(--folia-detail-slide)); opacity: var(--folia-opacity-hidden); }
@@ -219,6 +216,9 @@
 .folia-prop-key {
   flex: 0 0 var(--folia-prop-key-w);
   color: var(--metadata-label-text-color);
+  /* The ellipsis below needs this: without it the label wraps inside its fixed column instead of
+     truncating, and `text-overflow` never fires. */
+  white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
   font-size: var(--metadata-label-font-size);
@@ -239,20 +239,19 @@
   min-width: 0;
   font: inherit;
   font-size: var(--metadata-input-font-size);
-  background: var(--metadata-input-background);
+  background: var(--background-primary);
   color: var(--metadata-input-text-color);
-  /* Obsidian's property inputs carry no border, because the editor pane has other lines to place
-     them against. This panel does not: with a transparent fill and no border the row would be
-     invisible between edits, so the board keeps its own hairline — and with a border it is a text
-     input, which is why the corner is `--input-radius` and not the property row's own radius. The
-     row here is `.folia-prop-row`; this element is the value inside it. */
+  /* The row's identity — the type and colour of the label and of the value — comes from the
+     metadata family, because that is what makes this read as the same object the note's own
+     property editor edits. The BOX around the value stays the board's: Obsidian's property inputs
+     are borderless and transparent because an editor pane has other lines to place them against,
+     and in a panel this narrow that reads as no field at all. So the fill stays, the hairline stays,
+     and the corner is `--input-radius` — with a border, this is a text input, not the property row
+     (`.folia-prop-row`) that contains it. The fill's own divergence is 02-08's, not this finding's. */
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--input-radius);
   padding: var(--folia-space-xs) var(--folia-space-sm-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
-}
-.folia-prop-input:hover {
-  background: var(--metadata-input-background-hover);
 }
 .folia-prop-input:focus {
   outline: none;

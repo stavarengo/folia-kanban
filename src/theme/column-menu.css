@@ -52,6 +52,11 @@
 /* The app's own colour-input geometry, floored at the board's minimum hit target: Obsidian ships a
    22px swatch, which is under it, so the board draws 24px until a theme asks for more. */
 .folia-swatch.folia-swatch {
+  /* The floor is stated twice on purpose. `max()` follows the host swatch upward, and `min-width`
+     holds the target when `max()` cannot: it goes invalid on a keyword value, and a flex item with
+     no minimum is free to shrink below whatever its width says. */
+  min-width: var(--folia-hit-min);
+  min-height: var(--folia-hit-min);
   width: max(var(--folia-hit-min), var(--swatch-width));
   /* The swatch shows a colour, not text, but the "no colour" one draws an icon on `currentColor`;
      inheriting keeps that icon the panel's colour instead of the theme's button text colour. */
