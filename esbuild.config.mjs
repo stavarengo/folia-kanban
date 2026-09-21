@@ -7,10 +7,7 @@ const prod = process.argv[2] === "production";
 
 const outDir = process.env.OUT_DIR || "dist";
 // src is where the file lives in the repo; dest is the name Obsidian expects in the plugin folder.
-const assets = [
-  { src: "manifest.json", dest: "manifest.json" },
-  { src: "src/styles.css", dest: "styles.css" },
-];
+const assets = [{ src: "manifest.json", dest: "manifest.json" }];
 
 const copyPluginAssets = {
   name: "copy-plugin-assets",
@@ -21,6 +18,16 @@ const copyPluginAssets = {
     });
   },
 };
+
+// The stylesheet is its own bundle: esbuild follows src/theme/index.css's @import list and emits
+// one file. It gets no `target`, so the CSS is emitted as authored — a `target` would make esbuild
+// lower modern syntax the plugin relies on (`color-mix()`) for browsers Obsidian never runs on.
+const cssContext = await esbuild.context({
+  entryPoints: ["src/theme/index.css"],
+  bundle: true,
+  logLevel: "info",
+  outfile: `${outDir}/styles.css`,
+});
 
 const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
@@ -60,8 +67,8 @@ const context = await esbuild.context({
 });
 
 if (prod) {
-  await context.rebuild();
+  await Promise.all([context.rebuild(), cssContext.rebuild()]);
   process.exit(0);
 } else {
-  await context.watch();
+  await Promise.all([context.watch(), cssContext.watch()]);
 }

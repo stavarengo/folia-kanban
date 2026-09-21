@@ -1,0 +1,147 @@
+/* The --folia-* translation layer over Obsidian's design foundations. Every token is either an
+   alias of a variable Obsidian documents or an owned value with a reason; src/theme/README.md and
+   `pnpm theme:check` are where those two rules live.
+
+   The token block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down
+   the tree, and several surfaces are portalled OUT of the board root — the card context menu and
+   the column popover to the document body, the edit-column modal to the body, the drag overlay to
+   the board's own body — so a token declared on the root alone resolves to nothing inside them:
+   priority chips lose their colour, radii, shadows and font sizes go dead. Every element the
+   plugin portals outside the root therefore carries `folia-scope` as well, which re-declares the
+   same tokens there. `pnpm portals:check` (scripts/check-portal-scope.mjs) keeps that pairing
+   honest, including the one portal that must NOT carry it: the detail panel is portalled INTO the
+   root, where the tokens already inherit, so the class would only re-declare the block a second
+   time below the root — shadowing whatever App sets live on the root element
+   (`--folia-statusbar-clearance`) with the static fallback for everything under that portal.
+
+   Raw design values are allowed HERE and nowhere else in the bundle. */
+
+.folia-scope {
+  /* The board's base size travels with the token scope, not with the root: a portalled menu sits in
+     the document body, where `font: inherit` on its buttons would otherwise mean the app's font
+     rather than the board's. It lives in this rule rather than in a second one wearing the same
+     selector, so `.folia-scope` names exactly one rule: the token block `pnpm tokens:check` reads. */
+  font-size: var(--font-ui-small, 13px);
+
+  /* radii */
+  --folia-r-sm: 6px;
+  --folia-r: 8px;
+  --folia-r-lg: 10px;
+  --folia-r-xl: 14px;
+  --folia-r-pill: 999px;
+
+  /* spacing */
+  --folia-gap: 10px;
+  --folia-pad: 12px;
+  --folia-col-w: 300px; /* single source for column width + drag-overlay width */
+  --folia-menu-w-min: 200px; /* narrowest a popover may shrink to */
+  --folia-menu-w-max: 320px; /* widest a popover may grow to fit its longest label */
+  --folia-detail-w: 380px; /* side panel width; overridden inline from settings.detailWidth */
+  --folia-statusbar-clearance: 32px; /* fallback; App measures the real status bar and sets it live */
+
+  /* motion */
+  --folia-dur-fast: 110ms;
+  --folia-dur: 170ms;
+  --folia-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* surfaces & lines */
+  --folia-border: var(--background-modifier-border);
+  --folia-border-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
+  --folia-card-bg: var(--background-primary);
+  --folia-col-bg: var(--background-secondary);
+  --folia-scrim: rgba(0, 0, 0, 0.45);
+
+  /* elevation (subtle in dark, structure carried by borders) */
+  --folia-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16);
+  --folia-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.22);
+  --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);
+  --folia-shadow-panel: -8px 0 24px rgba(0, 0, 0, 0.18);
+  --folia-ring: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 30%, transparent);
+
+  /* priority ramp (urgent -> trivial), tinted off the theme's accent palette */
+  --folia-prio-1: var(--color-red, #e5534b);
+  --folia-prio-2: var(--color-orange, #d9882f);
+  --folia-prio-3: var(--color-yellow, #c2a312);
+  --folia-prio-4: var(--color-blue, #5b8def);
+  --folia-accent: var(--interactive-accent);
+  /* Read flat, on purpose. Obsidian publishes two variables for text on an accent fill —
+     `--text-on-accent` for a dark accent, `--text-on-accent-inverted` for a light one — and app.css
+     defines them once, on `body`, as `white` and `black`. No button rule branches between them —
+     `button.mod-cta` sets `--text-color: var(--text-on-accent)` and stops there, and in 1.13.7 the
+     only rule in the whole stylesheet naming the inverted one is a Canvas group label. The choice
+     happens at runtime instead. When the user picks a light accent, Obsidian writes
+     `--text-on-accent: var(--text-on-accent-inverted)` into the INLINE style of `<body>`, next to
+     the `--accent-h/s/l` triple it derives from the setting (verified in 1.13.7: a pale yellow
+     accent turned both `button.mod-cta` and Folia's own primary button black-on-yellow, and a
+     popout opened after it carried the same override). So reading `--text-on-accent` alone is not
+     a missing case: it is how a plugin stays in step with the app, and with a theme that overrides
+     either variable.
+     What this depends on is the DECLARATION SITE, not the value: the override lives on `<body>`, so
+     it only reaches rules that inherit from it. This block does, because `.folia-scope` is always a
+     descendant of a body (see the header note, and scripts/check-portal-scope.mjs, which keeps it
+     that way through every portal). Moved to `:root`/`html` — body's parent — the same declaration
+     would miss the override, fall through to the white fallback below and freeze there for good,
+     visible only to users with a pale accent. That move fails `pnpm tokens:check`, which requires
+     every live token to be declared in this block and nowhere else — the guard is real, but it
+     guards the site, so it only means anything if the reason is written down. Here it is. */
+  --folia-on-accent: var(--text-on-accent, #fff);
+  --folia-danger: var(--color-red, #e5534b);
+  /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
+     answered you". Two hues, never a lone colour difference — the tile pairs each with its own
+     shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
+  --folia-unread: var(--color-blue, #5b8def);
+  --folia-unread-reply: var(--color-purple, #a882e0);
+  --folia-success: var(--color-green, #4caf7d);
+
+  /* typography — font sizes */
+  --folia-font-size-xxs: 10px;
+  --folia-font-size-xxs-plus: 10.5px;
+  --folia-font-size-xs: 11px;
+  --folia-font-size-sm: 12px;
+  --folia-font-size-sm-plus: 12.5px;
+  --folia-font-size-md: 13px;
+  --folia-font-size-md-plus: 13.5px;
+  --folia-font-size-lg: 15px;
+  --folia-font-size-xl: 16px;
+
+  /* typography — font weights */
+  --folia-font-weight-medium: 500;
+  --folia-font-weight-semibold: 600;
+
+  /* z-index — in-board rungs. Every surface using one of these renders inside the workspace leaf,
+     and app.css gives `.workspace-leaf` `contain: strict` + `isolation: isolate`, so the leaf is a
+     stacking context of its own: these numbers are only ever compared with each other, never with
+     the app's. An app overlay is above the whole leaf whatever number it carries. They are
+     Folia's to choose. */
+  --folia-z-index-base: 1;
+  --folia-z-index-raised: 2;
+  --folia-z-index-sticky: 30;
+  --folia-z-index-toast: 50;
+  --folia-z-index-scrim: 55;
+  --folia-z-index-popover: 70;
+
+  /* z-index — surfaces portalled to <body>. Those leave the leaf and land in the root stacking
+     context, side by side with Obsidian's own notices, menus, tooltips and modals, so they read
+     off the app's `--layer-*` scale instead of a parallel ladder of private numbers that could
+     only tie or win by coincidence. A Folia menu therefore sits exactly where an Obsidian menu
+     sits, and the edit-column dialog exactly where an Obsidian modal sits.
+
+     Reading the scale means accepting what it says, and it says a dialog is not the top of the
+     app: a notice (60), a menu (65) and a tooltip (70) all draw over a modal (50), which is why
+     a tooltip for a control inside a dialog is legible and a menu opened from one is usable.
+     Folia's surfaces now inherit that, so the edit-column dialog no longer outranks the app's
+     own overlays the way a private 90 used to.
+
+     The fallbacks are the failure mode, not a second opinion: `z-index` does not inherit, so an
+     unresolved `var()` computes to `auto` and would drop a dialog behind the ribbon and the status
+     bar. The numbers repeat what the scale says today and are only ever read if it goes missing. */
+  --folia-z-index-app-menu: var(--layer-menu, 65);
+  --folia-z-index-app-modal: var(--layer-modal, 50);
+
+  /* opacity */
+  --folia-opacity-muted: 0.7;
+  --folia-opacity-subtle: 0.6;
+  --folia-opacity-faint: 0.5;
+  --folia-opacity-disabled: 0.4;
+}

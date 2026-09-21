@@ -22,13 +22,14 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { readThemeBundle, THEME_DIR } from "./theme-bundle.mjs";
 import process from "node:process";
 
 // Only the React UI is scanned. Controls built through Obsidian's own Setting API
 // (`src/settings.ts`) are deliberately out of scope: those are Obsidian's controls in Obsidian's
 // settings pane, and they are SUPPOSED to wear the theme's face.
 const UI_DIR = "src/ui";
-const CSS_FILE = "src/styles.css";
+const CSS_FILE = THEME_DIR;
 
 /**
  * What `button:not(.clickable-icon)` sets in Obsidian's own app.css, and therefore what a plugin
@@ -143,7 +144,7 @@ const tsx = (await Promise.all(files.map((f) => readFile(join(UI_DIR, f), "utf8"
 const elements = buttons(tsx);
 const classes = new Set(elements.flatMap((b) => [...b.classes]));
 const unclassed = elements.filter((b) => b.classes.size === 0);
-const css = await readFile(CSS_FILE, "utf8");
+const { css } = await readThemeBundle();
 const parsed = rules(css);
 
 const problemsEarly = [];

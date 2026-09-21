@@ -1,0 +1,39 @@
+/* ------------------------------------------------------------ subcard groups
+   A top-level card and its nested subtree share one .folia-card-tree slot in the column. Children
+   sit in a bordered, indented .folia-subcard-group so they read as "these belong to the card above"
+   (Jira-style). The group draws the left accent + inset; nested cards stay denser and own-border-less
+   so the group frame carries the grouping. Deep nesting indents only via the small group padding,
+   so it never runs away across the column width. */
+.folia-card-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.folia-subcard-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 6px 0 6px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 55%, transparent);
+  background: color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 5%, transparent);
+  border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
+}
+.folia-subcard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Nested cards are a touch smaller and denser; the grab affordance they shed comes from
+   `--static` above, which every non-draggable tile carries. */
+.folia-card--nested {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--folia-border) 80%, transparent);
+}
+.folia-card--nested .folia-card-main {
+  gap: 5px;
+  padding: 7px 10px;
+}
+.folia-card--nested .folia-card-title {
+  font-size: var(--folia-font-size-sm-plus);
+}

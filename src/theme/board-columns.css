@@ -1,0 +1,143 @@
+/* ------------------------------------------------------------------ board + columns */
+.folia-board {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--folia-gap);
+  padding: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  scrollbar-width: thin;
+}
+.folia-board.is-pan-scrolling {
+  cursor: grabbing;
+  user-select: none;
+}
+/* In "click and drag" mode the bare board background is itself draggable to pan, so it advertises a
+   grab cursor. Columns/cards/buttons sit above and keep their own cursors, so the hint only shows on
+   the empty space the pan actually responds to. */
+.folia-board[data-pan="empty"] {
+  cursor: grab;
+}
+.folia-board[data-pan="empty"].is-pan-scrolling {
+  cursor: grabbing;
+}
+
+.folia-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--folia-col-w);
+  width: var(--folia-col-w);
+  max-height: 100%;
+  background: var(--folia-col-bg);
+  border: 1px solid var(--folia-border);
+  border-top: 3px solid var(--folia-col-accent, var(--folia-accent));
+  border-radius: var(--folia-r-lg);
+  overflow: hidden;
+}
+
+.folia-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--folia-col-bg);
+  position: relative;
+}
+.folia-column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--folia-r-pill);
+  background: var(--folia-col-accent, var(--folia-accent));
+  flex: 0 0 auto;
+}
+.folia-column-title {
+  font-weight: var(--folia-font-weight-semibold);
+  font-size: var(--folia-font-size-md);
+  color: var(--text-normal);
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folia-column-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--folia-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+  border-radius: var(--folia-r-pill);
+  padding: 1px 8px;
+  min-width: 20px;
+  justify-content: center;
+}
+.folia-column-count.is-over-limit {
+  color: var(--folia-on-accent);
+  background: var(--folia-danger);
+}
+.folia-column.is-over-limit {
+  border-color: color-mix(in srgb, var(--folia-danger) 50%, var(--folia-border));
+}
+.folia-column.is-over-limit .folia-column-header {
+  background: color-mix(in srgb, var(--folia-danger) 8%, var(--folia-col-bg));
+}
+
+.folia-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: var(--folia-statusbar-clearance); /* last card clears the fixed status bar */
+  overflow-y: auto;
+  min-height: 48px;
+  flex: 1 1 auto;
+  scrollbar-width: thin;
+  transition: background var(--folia-dur-fast) ease;
+}
+.folia-column-body.is-over {
+  background: color-mix(in srgb, var(--folia-accent) 9%, transparent);
+}
+.folia-column-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 8px;
+  color: var(--text-faint, var(--text-muted));
+  font-size: var(--folia-font-size-sm);
+  border: 1px dashed var(--folia-border);
+  border-radius: var(--folia-r);
+  opacity: var(--folia-opacity-muted);
+}
+.folia-column-empty.is-filtered {
+  border: none;
+  padding: 10px 8px;
+  opacity: var(--folia-opacity-faint);
+  font-style: italic;
+}
+
+.folia-column-add.folia-column-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 8px;
+  padding: 7px 9px;
+  background: transparent;
+  border: none;
+  border-radius: var(--folia-r);
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-sm);
+  font-weight: var(--folia-font-weight-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
+}
+.folia-column-add:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}

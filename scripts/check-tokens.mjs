@@ -3,7 +3,7 @@
 //
 //   Direction 1 — for every token marked $extensions.folia.live === true, its value
 //   (resolvedValue when the $value is a {ref}) byte-matches the matching --folia-*
-//   declaration inside the .folia-scope token block in src/styles.css. The mapping is
+//   declaration inside the .folia-scope token block in src/theme/tokens.css. The mapping is
 //   set-equal both ways: no live token without a declaration, no --folia-* declaration
 //   without a live token.
 //
@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const tokensDir = join(root, "tokens", "source");
-const cssPath = join(root, "src", "styles.css");
+const cssPath = join(root, "src", "theme", "tokens.css");
 const columnColorsPath = join(root, "src", "ui", "columnColors.ts");
 
 const errors = [];
@@ -67,7 +67,7 @@ for (const file of readdirSync(tokensDir).filter((f) => f.endsWith(".tokens.json
   for (const t of out) allTokens.push({ file, ...t });
 }
 
-// ----------------------------------------------------- parse the styles.css block
+// ----------------------------------------------------- parse the theme/tokens.css block
 // The `.folia-scope { … }` rule holds the --folia-* declarations. Only the declaration
 // lines (`^\s*--folia-…: …;`) inside it count, so later blocks and `var(--folia-…)`
 // usages elsewhere never leak in. The selector is matched at the start of a line so a
@@ -75,12 +75,12 @@ for (const file of readdirSync(tokensDir).filter((f) => f.endsWith(".tokens.json
 // can never be taken for the block itself.
 const css = readFileSync(cssPath, "utf8");
 const scopeRules = [...css.matchAll(/^\.folia-scope\s*\{/gm)];
-if (scopeRules.length === 0) errors.push("[styles.css] no .folia-scope block found");
+if (scopeRules.length === 0) errors.push("[theme/tokens.css] no .folia-scope block found");
 // Exactly one rule may carry the bare selector. A second one would be an inviting place to drop a
 // --folia-* declaration that this bijection would then never see.
 if (scopeRules.length > 1) {
   errors.push(
-    `[styles.css] ${scopeRules.length} \`.folia-scope { … }\` rules; the token block must be the only one`,
+    `[theme/tokens.css] ${scopeRules.length} \`.folia-scope { … }\` rules; the token block must be the only one`,
   );
 }
 const blockStart = scopeRules.length > 0 ? scopeRules[0].index : -1;
@@ -147,7 +147,7 @@ for (const { file, path, node } of allTokens) {
 // Reverse: every --folia-* declaration must be backed by a live token.
 for (const cssVar of cssVars.keys()) {
   if (!liveVarNames.has(cssVar)) {
-    errors.push(`[styles.css] declaration ${cssVar} has no live token in tokens/source/`);
+    errors.push(`[theme/tokens.css] declaration ${cssVar} has no live token in tokens/source/`);
   }
 }
 

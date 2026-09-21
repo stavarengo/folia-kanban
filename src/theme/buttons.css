@@ -1,0 +1,81 @@
+/* ------------------------------------------------------------------ buttons */
+.folia-btn.folia-btn {
+  font: inherit;
+  font-size: var(--folia-font-size-sm);
+  font-weight: var(--folia-font-weight-medium);
+  padding: 5px 11px;
+  border-radius: var(--folia-r-sm);
+  border: 1px solid var(--folia-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
+}
+.folia-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--folia-border-strong);
+}
+.folia-btn-primary.folia-btn-primary {
+  background: var(--folia-accent);
+  border-color: transparent;
+  color: var(--folia-on-accent);
+}
+/* The accent/danger faces state their hover colours in full rather than inheriting half of them:
+   `.folia-btn:hover` sits right above and carries the same weight, so leaving a gap here would let
+   the neutral hover face reach a button that is meant to stay accented. */
+.folia-btn-primary:hover {
+  background: var(--interactive-accent-hover, var(--folia-accent));
+  border-color: transparent;
+  filter: brightness(1.06);
+}
+.folia-btn-danger.folia-btn-danger {
+  color: var(--folia-on-accent);
+  background: var(--folia-danger);
+  border-color: transparent;
+}
+.folia-btn-danger:hover {
+  background: var(--folia-danger);
+  border-color: transparent;
+  filter: brightness(1.06);
+}
+
+.folia-icon-btn.folia-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--folia-r-sm);
+  transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
+}
+.folia-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* Doubled to stay above `.folia-icon-btn.folia-icon-btn`, which is doubled for the theme's sake:
+   a rule that only refines another button rule has to carry the same weight, or the refinement is
+   quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
+.folia-mini.folia-mini {
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+}
+/* The column header's menu button, doubled and placed here for the same reason as `.folia-mini`,
+   and not up in the column-header section where it reads: written above `.folia-icon-btn`, every
+   declaration it makes is one the base rule already makes, so it was silently dropped — the button
+   drew at the base rule's full size and appeared without the fade this rule asks for. Its state
+   rules follow it, so their `opacity: 1` still wins over the `opacity: 0` here. */
+.folia-column-menu-btn.folia-column-menu-btn {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
+}
+.folia-column:hover .folia-column-menu-btn,
+.folia-column-menu-btn:focus-visible,
+.folia-column-menu-btn[aria-expanded="true"] {
+  opacity: 1;
+}

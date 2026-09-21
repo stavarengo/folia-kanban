@@ -1,0 +1,34 @@
+/* ------------------------------------------------------------------ inline add / inputs */
+.folia-add-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px;
+}
+.folia-add-card textarea,
+.folia-add-inline input,
+.folia-add-inline textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r-sm);
+  padding: 7px 9px;
+  transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
+}
+.folia-add-card textarea:focus,
+.folia-add-inline input:focus,
+.folia-add-inline textarea:focus,
+.folia-desc:focus,
+.folia-fields select:focus,
+.folia-fields input:focus {
+  outline: none;
+  border-color: var(--folia-accent);
+  box-shadow: var(--folia-ring);
+}
+.folia-row-actions {
+  display: flex;
+  gap: 6px;
+}

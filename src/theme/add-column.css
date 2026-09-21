@@ -1,0 +1,42 @@
+/* ------------------------------------------------------------------ add column */
+.folia-add-column.folia-add-column {
+  flex: 0 0 220px;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px dashed var(--folia-border);
+  border-radius: var(--folia-r-lg);
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-md);
+  font-weight: var(--folia-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
+}
+.folia-add-column:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--folia-border-strong);
+}
+.folia-add-column.is-editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  cursor: default;
+  border-style: solid;
+}
+.folia-add-column.is-editing input {
+  font: inherit;
+  padding: 7px 9px;
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.folia-add-column.is-editing input:focus {
+  outline: none;
+  border-color: var(--folia-accent);
+  box-shadow: var(--folia-ring);
+}

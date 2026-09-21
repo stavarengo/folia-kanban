@@ -1,0 +1,67 @@
+/* ------------------------------------------------------------------ progress + meta */
+.folia-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.folia-progress-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--folia-r-pill);
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+.folia-progress-fill {
+  height: 100%;
+  border-radius: var(--folia-r-pill);
+  background: var(--folia-accent);
+  transition: width var(--folia-dur) var(--folia-ease);
+}
+.folia-progress.is-complete .folia-progress-fill {
+  background: var(--folia-success);
+}
+.folia-progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--folia-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.folia-progress.is-complete .folia-progress-label {
+  color: var(--folia-success);
+}
+
+.folia-card-meta {
+  display: flex;
+  gap: 12px;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-muted);
+}
+.folia-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+/* The comment badge picks up a colour + a dot when the card holds comments you haven't read. */
+.folia-card-meta .folia-comments-unread {
+  color: var(--folia-unread);
+  font-weight: var(--folia-font-weight-semibold);
+}
+.folia-card-meta .folia-comments-reply {
+  color: var(--folia-unread-reply);
+  font-weight: var(--folia-font-weight-semibold);
+}
+.folia-unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--folia-r-pill);
+  background: currentColor;
+  margin-left: 1px;
+}
+/* The reply state's own shape, so the two unread cues differ by more than hue. */
+.folia-unread-reply-mark {
+  font-size: var(--folia-font-size-xs);
+  line-height: 1;
+  margin-left: 1px;
+}

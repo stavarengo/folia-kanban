@@ -1,0 +1,152 @@
+/* ------------------------------------------------------------------ toolbar */
+.folia-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--folia-border);
+  background: var(--background-primary);
+  flex: 0 0 auto;
+}
+.folia-search {
+  position: relative; /* anchors the #9 filter-suggestion dropdown */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 320px;
+  padding: 0 8px;
+  height: 30px;
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
+}
+.folia-search:focus-within {
+  border-color: var(--folia-accent);
+  box-shadow: var(--folia-ring);
+}
+.folia-search input {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  outline: none;
+  min-width: 0;
+}
+.folia-toolbar-filters {
+  display: flex;
+  gap: 6px;
+}
+.folia-filter-chip.folia-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--folia-r);
+  border: 1px solid var(--folia-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-sm);
+  font-weight: var(--folia-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
+}
+.folia-filter-chip:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.folia-filter-chip.is-on {
+  background: color-mix(in srgb, var(--folia-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--folia-accent) 45%, transparent);
+  color: var(--folia-accent);
+}
+.folia-toolbar-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: var(--folia-font-size-sm);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- #9 filter-syntax autocomplete dropdown (press / to focus, then type a key) ---- */
+.folia-filter-suggest {
+  position: absolute;
+  z-index: var(--folia-z-index-sticky);
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r);
+  background: var(--background-primary);
+  box-shadow: var(--folia-shadow-pop);
+}
+.folia-filter-suggest li {
+  margin: 0;
+}
+.folia-filter-suggest-item.folia-filter-suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: calc(var(--folia-r) - 2px);
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.folia-filter-suggest-item.is-active,
+.folia-filter-suggest-item:hover {
+  background: var(--background-modifier-hover);
+}
+.folia-filter-suggest-key {
+  font-family: var(--font-monospace, monospace);
+  font-size: var(--folia-font-size-sm);
+  color: var(--folia-accent);
+}
+.folia-filter-suggest-hint {
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.folia-loading,
+.folia-error {
+  padding: 2em;
+  color: var(--text-muted);
+}
+.folia-error {
+  color: var(--text-error);
+}
+
+.folia-desc-refusal {
+  margin: 0.25em 0 0;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-error);
+}
+
+.folia-card-folder-notice {
+  padding: 0.5em 14px;
+  font-size: var(--folia-font-size-xs);
+  color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
+  background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
+  border-bottom: 1px solid var(--folia-border);
+  flex: 0 0 auto;
+}
+
+.folia-icon {
+  flex: 0 0 auto;
+  vertical-align: -0.15em;
+}

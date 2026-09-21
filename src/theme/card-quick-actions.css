@@ -1,0 +1,43 @@
+/* ------------------------------------------------------------------ card quick actions + confirm */
+.folia-card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  border-radius: var(--folia-r);
+  background: color-mix(in srgb, var(--folia-card-bg) 88%, transparent);
+  backdrop-filter: blur(3px);
+  box-shadow: var(--folia-shadow-pop);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity var(--folia-dur-fast) ease, transform var(--folia-dur-fast) var(--folia-ease);
+  pointer-events: none;
+}
+.folia-card:hover .folia-card-actions,
+.folia-card:focus-within .folia-card-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.folia-action-done:hover { color: var(--folia-success); }
+.folia-action-delete:hover { color: var(--folia-danger); }
+
+.folia-card-confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+  font-size: var(--folia-font-size-sm);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--folia-card-bg) 92%, transparent);
+  backdrop-filter: blur(2px);
+  border-radius: var(--folia-r-lg);
+  z-index: var(--folia-z-index-raised);
+}

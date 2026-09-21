@@ -1,0 +1,69 @@
+/* ------------------------------------------------- subitems in their own column
+   A subitem that claims a column of its own leaves its parent's nested group and stands in that
+   column like any card. The nesting is then gone as the sign of whose work it is, so the tile
+   carries a `↳ parent` reference in its place. A dashed left edge keeps it distinguishable from a
+   card at a glance without shrinking it (it IS a first-class item in that column now). */
+.folia-card--subitem {
+  border-left: 2px dashed color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 60%, transparent);
+}
+/* Sits BELOW `.folia-card-main` rather than inside it (that div is the drag handle and carries
+   role="button"), pulled up tight against the card body and indented to its text.
+   Selected through `.folia-card` on purpose: Obsidian themes style plain buttons through
+   `button:not(.clickable-icon)`, which out-specifies a lone class and would give this quiet
+   reference line a raised button face. */
+.folia-card .folia-card-parent-ref {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: -5px 0 0;
+  padding: 0 12px 9px;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--folia-font-size-xs);
+  line-height: 1.3;
+  cursor: pointer;
+}
+.folia-card .folia-card-parent-ref:hover {
+  color: var(--folia-accent);
+  text-decoration: underline;
+}
+
+/* drag overlay (the lifted ghost) — the card the cursor actually carries. A faint lift (scale + tilt)
+   plus a deep shadow reads as "picked up and floating above the board". */
+.folia-card-overlay {
+  cursor: grabbing;
+  box-shadow: var(--folia-shadow-overlay);
+  border-color: var(--folia-accent);
+  transform: scale(1.03) rotate(1.5deg);
+  /* matches a card's rendered width: column width minus its 1px borders + 8px body padding */
+  width: calc(var(--folia-col-w) - 18px);
+  /* The lift is the resting state; the drop animation tweens back to the slot from here. */
+  animation: folia-card-lift var(--folia-dur-fast) var(--folia-ease);
+}
+@keyframes folia-card-lift {
+  from {
+    transform: scale(1) rotate(0deg);
+  }
+  to {
+    transform: scale(1.03) rotate(1.5deg);
+  }
+}
+
+/* Column drag overlay (#1 fix) — the lifted ghost the cursor carries while reordering a column. The
+   source column dims in place (`.folia-column.is-dragging`) to read as the drop slot; this header-only
+   ghost (rendered by the DragOverlay) is what actually follows the pointer, mirroring the card lift. */
+.folia-column-overlay {
+  width: var(--folia-col-w);
+  cursor: grabbing;
+  box-shadow: var(--folia-shadow-overlay);
+  border-color: var(--folia-col-accent, var(--folia-accent));
+  transform: rotate(1.5deg);
+  /* A header-only ghost — no body — so it reads as "this column, picked up" without a tall slab. */
+  overflow: hidden;
+}

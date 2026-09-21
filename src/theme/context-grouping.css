@@ -1,0 +1,64 @@
+/* ------------------------------------------------------- context grouping (#14)
+   A card in a `<cardFolder>/<context>/` subfolder gets a left accent strip colored from its
+   context (`--folia-ctx-color`) plus a label chip. The strip is INSET to left:5px so it sits
+   beside — never on top of — the priority bar (left:0, 3px), keeping the two left-edge cues
+   distinct. The chip tints toward the context color when set, else falls back to a muted badge.
+   Cross-track note: the #3 urgency cue (card track) owns the top edge + bg tint per contract §6/§8. */
+.folia-card-context-strip {
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: var(--folia-r-pill);
+  background: var(--folia-ctx-color, var(--folia-border-strong));
+  pointer-events: none;
+}
+/* The strip occupies left 5–7px; `.folia-card-main`'s existing 12px left padding already clears it,
+   so no extra body inset is needed (and a folder-only card with no color must stay visually inert). */
+.folia-chip-context.folia-chip-context {
+  color: var(--folia-ctx-color, var(--text-muted));
+  background: color-mix(in srgb, var(--folia-ctx-color, var(--text-muted)) 16%, transparent);
+  border-color: color-mix(in srgb, var(--folia-ctx-color, var(--text-muted)) 30%, transparent);
+}
+
+/* --- col-header (#2 drag-to-reorder + #7 inline title edit) --- */
+/* The title doubles as the drag handle and the rename click target. Grab cursor signals drag;
+   the dnd distance:5 sensor still lets a clean click through to enter rename. */
+.folia-column-title {
+  cursor: grab;
+  user-select: none;
+}
+.folia-column-title:focus-visible {
+  outline: 2px solid var(--folia-col-accent, var(--folia-accent));
+  outline-offset: 2px;
+  border-radius: var(--folia-r-sm, 4px);
+}
+/* The column being dragged: dim + lift it out of the row so the gap reads as the drop slot.
+   A faded column (#10 `--folia-col-opacity` < 1, e.g. parked) must still read as "dragging", so
+   this rule sets a visible opacity. The faded-hover rule above is scoped `:not(.is-dragging)`, so
+   mid-drag only `.is-faded` and `.is-dragging` match (equal specificity) and this later rule wins —
+   a parked+faded column never goes invisible mid-drag. */
+.folia-column.is-dragging {
+  opacity: var(--folia-opacity-subtle);
+  cursor: grabbing;
+  z-index: var(--folia-z-index-raised);
+}
+.folia-column.is-dragging .folia-column-title {
+  cursor: grabbing;
+}
+/* Inline rename input — sits in the title's slot, inheriting its weight/size so the swap is seamless. */
+.folia-column-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--folia-font-weight-semibold);
+  font-size: var(--folia-font-size-md);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--folia-col-accent, var(--folia-accent));
+  border-radius: var(--folia-r-sm, 4px);
+  padding: 1px 6px;
+}
+.folia-column-title-input:focus {
+  outline: none;
+}

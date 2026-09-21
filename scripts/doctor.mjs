@@ -110,7 +110,7 @@ existsSync(join(root, "pnpm-lock.yaml"))
 
 // 6. Project runtime prerequisites — the files the build and plugin load depend on.
 {
-  const required = ["manifest.json", "src/main.ts", "src/styles.css", "esbuild.config.mjs"];
+  const required = ["manifest.json", "src/main.ts", "src/theme/index.css", "esbuild.config.mjs"];
   const missing = required.filter(
     (p) => !existsSync(join(root, p)) || !statSync(join(root, p)).isFile(),
   );

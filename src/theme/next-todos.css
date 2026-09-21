@@ -1,0 +1,29 @@
+/* ------------------------------------------------------------------ next todos (inline preview) */
+.folia-card-next-todos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.folia-card-next-todo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-muted);
+}
+.folia-card-next-todo-mark {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--text-faint, var(--text-muted));
+  border-radius: 3px;
+}
+.folia-card-next-todo-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

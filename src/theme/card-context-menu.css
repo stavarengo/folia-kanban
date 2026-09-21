@@ -1,0 +1,66 @@
+/* ------------------------------------------------------------------ card context menu (right-click) */
+.folia-card-context {
+  /* No z-index of its own: the element also carries `.folia-menu`, so it sits on the app's menu
+     rung with every other Folia menu. It clears the in-board surfaces (the float panel, the detail
+     modal backdrop) for free, because those are trapped inside the workspace leaf's stacking
+     context while this menu is portalled to <body>, above the leaf entirely. */
+  /* Sized to its longest label ("Copy path relative to board folder") instead of a fixed width that
+     clipped it. The clamp keeps a wide priority row wrapping rather than stretching the menu, and
+     the stable gutter stops the scrollbar — this menu is tall enough to scroll — from sitting on
+     top of the last few characters. */
+  width: max-content;
+  min-width: var(--folia-menu-w-min);
+  max-width: min(var(--folia-menu-w-max), calc(100vw - 2 * var(--folia-pad)));
+  scrollbar-gutter: stable;
+  gap: 2px;
+  padding: 6px;
+}
+.folia-card-context .folia-menu-label {
+  padding: 4px 8px 0;
+}
+.folia-menu-priorities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 4px;
+}
+.folia-menu-prio {
+  font: inherit;
+  font-size: var(--folia-font-size-sm);
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--folia-r-pill);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.folia-menu-prio.is-active {
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
+}
+.folia-menu-prio-none.folia-menu-prio-none {
+  display: grid;
+  place-items: center;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+/* The "put this todo in a column" picker, same shape as the priority row above it. */
+.folia-menu-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 4px;
+}
+.folia-menu-column.folia-menu-column {
+  font: inherit;
+  font-size: var(--folia-font-size-sm);
+  padding: 3px 9px;
+  border: 1px solid var(--folia-border);
+  border-radius: var(--folia-r-pill);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.folia-menu-column.is-active {
+  color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
+}

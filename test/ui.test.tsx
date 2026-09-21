@@ -6280,8 +6280,12 @@ describe("the panel names the file, names the override, and explains the title (
  * jsdom loads no Obsidian theme, so nothing here can compute what a rule actually wins in the real
  * app; what a test CAN pin is what the file says and the order it says it in. `rule` returns one
  * rule's declarations by exact selector, `ruleAt` its offset in the file, so two rules can be
- * compared for position where source order is what decides between them. */
-const styles = readFileSync("src/styles.css", "utf8");
+ * compared for position where source order is what decides between them. The theme is many files,
+ * so they are concatenated in the order src/theme/index.css imports them — the order the browser
+ * sees, and the only one in which a position comparison means anything. */
+const styles = [...readFileSync("src/theme/index.css", "utf8").matchAll(/@import "\.\/([^"]+)";/g)]
+  .map((m) => readFileSync(`src/theme/${m[1]}`, "utf8"))
+  .join("");
 const rule = (selector: string) => {
   const at = styles.indexOf(`\n${selector} {`);
   return at === -1 ? "" : styles.slice(at, styles.indexOf("\n}", at));

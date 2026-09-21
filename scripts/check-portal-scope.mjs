@@ -29,10 +29,11 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { readThemeBundle, THEME_DIR } from "./theme-bundle.mjs";
 import process from "node:process";
 
 const SRC_DIR = "src";
-const CSS_FILE = "src/styles.css";
+const CSS_FILE = THEME_DIR;
 const SCOPE = "folia-scope";
 /** Container expressions that ARE the board root, where the scope already applies. */
 const INSIDE_ROOT = [/^rootRef\.current$/];
@@ -207,7 +208,7 @@ async function sourceFiles(dir) {
 const errors = [];
 let checked = 0;
 
-const css = await readFile(CSS_FILE, "utf8");
+const { css } = await readThemeBundle();
 if (!/^\.folia-scope\s*\{/m.test(css)) {
   errors.push(`[${CSS_FILE}] no .folia-scope rule — the token block must hang off the scope class`);
 }
