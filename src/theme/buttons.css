@@ -57,13 +57,15 @@
   background: var(--background-modifier-hover);
   color: var(--folia-icon-color-hover);
 }
-.folia-icon-btn:focus-visible {
+/* `--icon-color-focused` is Obsidian's pressed-and-engaged colour, not its focus colour: in the
+   running app `.clickable-icon` uses it for `:active` and for a button whose menu is open, and
+   answers `:focus-visible` with a ring rather than an icon colour, which is what Folia's own focus
+   outline already does (focus-visibility.css). `--icon-color-active` is the fourth of the set and
+   is deliberately unused: it marks a toggled-ON icon button, and the board has none.
+   Written after `:hover` because it is the state that has to win while the pointer is down. */
+.folia-icon-btn:active:not(:disabled),
+.folia-icon-btn[aria-expanded="true"] {
   color: var(--folia-icon-color-focused);
-}
-/* After :hover and :focus-visible on purpose: all three weigh the same, so the pressed state only
-   wins while the pointer is down if it is written last. */
-.folia-icon-btn:active:not(:disabled) {
-  color: var(--folia-icon-color-active);
 }
 /* Doubled to stay above `.folia-icon-btn.folia-icon-btn`, which is doubled for the theme's sake:
    a rule that only refines another button rule has to carry the same weight, or the refinement is

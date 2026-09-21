@@ -21,8 +21,10 @@
   transform: none;
   pointer-events: auto;
 }
-.folia-action-done:hover { color: var(--folia-text-success); }
-.folia-action-delete:hover { color: var(--folia-text-error); }
+/* Doubled: `.folia-icon-btn:hover` weighs the same and this file is imported BEFORE buttons.css,
+   so a single class here loses on source order and the tint never renders. */
+.folia-action-done.folia-action-done:hover { color: var(--folia-text-success); }
+.folia-action-delete.folia-action-delete:hover { color: var(--folia-text-error); }
 
 .folia-card-confirm {
   position: absolute;

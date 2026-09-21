@@ -206,7 +206,6 @@
      set where "collapsed" is a colour of its own, which is exactly what the subitems chevron is. */
   --folia-icon-color: var(--icon-color);
   --folia-icon-color-hover: var(--icon-color-hover);
-  --folia-icon-color-active: var(--icon-color-active);
   --folia-icon-color-focused: var(--icon-color-focused);
   --folia-collapse-icon: var(--nav-collapse-icon-color);
   --folia-collapse-icon-collapsed: var(--nav-collapse-icon-color-collapsed);

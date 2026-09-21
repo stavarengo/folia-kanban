@@ -851,12 +851,31 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
       });
     }
   }
-  for (const name of names) {
-    if (!hostKnows(`--color-${name}`))
-      fail(
-        `color.column`,
-        `${name} resolves to --color-${name}, which Obsidian does not document. The column palette is the host's extended colours; a name outside them paints nothing.`,
-      );
+  // Which variable a name resolves to is decided by `columnAccent`, not by this file, so the
+  // template is read out of it rather than repeated here. Repeating it would let the guard keep
+  // reporting OK while the function it is guarding painted something else entirely.
+  const template = /return name \? `(var\(--[a-z-]*)\$\{name\}(\)?[^`]*)` : color;/.exec(src);
+  if (!template) {
+    fail(
+      COLUMN_COLORS,
+      "could not find the `var(--…${name}…)` template in columnAccent. Rule F checks the palette against the variables it actually resolves to, so it cannot run without reading that line.",
+    );
+  } else {
+    const resolve = (name) => `${template[1]}${name}${template[2]}`;
+    for (const name of names) {
+      const variable = /var\((--[a-z0-9-]+)\)/.exec(resolve(name))?.[1];
+      if (!variable) {
+        fail(
+          COLUMN_COLORS,
+          `columnAccent resolves ${name} to ${resolve(name)}, which is not a var().`,
+        );
+      } else if (!hostKnows(variable)) {
+        fail(
+          "color.column",
+          `${name} resolves to ${variable}, which Obsidian does not document. The column palette is the host's extended colours, so a name outside them leaves the accent unresolved and the column falls back to the board accent — a colour the user never chose.`,
+        );
+      }
+    }
   }
 }
 

@@ -6818,3 +6818,55 @@ describe("a board read before a change can land after it (20260828.02)", () => {
     expect(await screen.findByRole("heading", { name: "Fresh card" })).toBeInTheDocument();
   });
 });
+
+describe("column colour — what the picker writes and what a legacy note still paints", () => {
+  const user = userEvent.setup();
+  const withColor = (color?: string): BoardConfig => ({
+    ...config,
+    columns: [
+      { id: "todo", title: "Todo", ...(color ? { color } : {}) },
+      ...config.columns.slice(1),
+    ],
+  });
+  const repoWith = (color?: string) =>
+    new FakeRepo(withColor(color), {
+      "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" },
+    });
+
+  it("writes the palette NAME into the board note, not a colour value", async () => {
+    // The half of the move to names that touches a user's file. A hex here would mean the note had
+    // silently kept the old format while the UI claimed otherwise.
+    const repo = repoWith();
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(screen.getByLabelText("Set color blue"));
+    await waitFor(() =>
+      expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBe("blue"),
+    );
+  });
+
+  it("paints a stored name through the host variable for it", async () => {
+    render_(repoWith("green"));
+    await screen.findByText("Alpha");
+    const column = document.querySelector('[data-column="todo"]') as HTMLElement;
+    expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-green)");
+  });
+
+  it("paints a hex a board note already carried exactly as written, and shows it as a ninth swatch", async () => {
+    // The compatibility promise: a note written before the palette moved to names loses nothing,
+    // and the colour it carries is visible in the picker rather than absent from it.
+    render_(repoWith("#9aa0a6"));
+    await screen.findByText("Alpha");
+    const column = document.querySelector('[data-column="todo"]') as HTMLElement;
+    expect(column.style.getPropertyValue("--folia-col-accent")).toBe("#9aa0a6");
+
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    const custom = screen.getByLabelText("Custom color #9aa0a6");
+    expect(custom.style.getPropertyValue("--folia-swatch-color")).toBe("#9aa0a6");
+    expect(custom).toBeDisabled();
+    expect(custom.className).toContain("is-active");
+    // ...and none of the eight claims to be the active one while the note carries something else.
+    expect(document.querySelectorAll(".folia-swatch.is-active")).toHaveLength(1);
+  });
+});
