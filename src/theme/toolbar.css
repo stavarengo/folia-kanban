@@ -36,12 +36,20 @@
   min-width: 0;
 }
 /* The field is the wrapper, not the input: the input is borderless and transparent and sits inside
-   the wrapper's padding, beside the clear button. So the board's blanket `:focus-visible` outline
-   drew a second accent rectangle 2px outside a borderless box — inside the first one, and across
-   the ✕. The wrapper's accent border plus ring above is the whole indication, the same one every
-   other field on the board carries, and it reaches the control the user is actually looking at. */
+   the wrapper's padding, beside the clear button. Anything the input draws for focus therefore
+   lands INSIDE the wrapper's own border and ring, and there were two such things. The board's
+   blanket `:focus-visible` rule drew an accent rectangle 2px outside a borderless box, which fell
+   across the ✕; and Obsidian's `input[type="text"]:focus` adds
+   `0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus)`, a second ring in
+   `#555555` dark and `#bdbdbd` light. Both are suppressed here, leaving the wrapper's accent border
+   plus ring as the one indication, on the box the user is actually looking at.
+   The host rule is matched on `:focus` rather than `:focus-visible` because that is the state it
+   itself uses, and it is beaten on source order rather than weight: both selectors compute to the
+   same specificity, and the plugin's sheet is appended after the app's. */
+.folia-search input:focus,
 .folia-search input:focus-visible {
   outline: none;
+  box-shadow: none;
 }
 /* Forced-colours mode drops every `box-shadow` and repaints both borders in the same system colour,
    so the wrapper's ring and its accent border both stop saying anything and the line above would
