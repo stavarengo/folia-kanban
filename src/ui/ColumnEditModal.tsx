@@ -177,7 +177,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
               <button
                 type="button"
                 className={"folia-swatch folia-swatch-none" + (draft.color ? "" : " is-active")}
-                aria-label="Clear color"
+                aria-label="No color"
                 title="No color"
                 aria-pressed={!draft.color}
                 onClick={() => set("color", undefined)}

@@ -150,7 +150,7 @@ export function ColumnMenu({
               ringing whichever of the eight it resolves to would claim a pick nobody made. */}
           <button
             className={"folia-swatch folia-swatch-none" + (column.color ? "" : " is-active")}
-            aria-label="Clear color"
+            aria-label="No color"
             title="No color"
             aria-pressed={!column.color}
             onClick={() => a.setColumnColor(column.id, null)}

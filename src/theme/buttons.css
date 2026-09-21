@@ -1,12 +1,14 @@
 /* ------------------------------------------------------------------ buttons */
 .folia-scope .folia-btn {
   font: inherit;
-  /* `--font-ui-small`, matching Obsidian's own buttons. Everything else about this face already
-     does — 30px tall, 5px radius, `4px 12px` padding, the host fills and the host shadow — and the
-     label was the last pixel of difference beside the real Settings window. The edit-column dialog
-     also disagreed with itself, its `<select>` elements inheriting the host's 13px beside 12px
-     buttons. The height does not move with the size: Obsidian pins every `button` to
-     `--input-height`. */
+  /* `--font-ui-small`, the size Obsidian's own buttons use. Height, radius, padding, fill and
+     shadow already matched, and the edit-column dialog had been disagreeing with itself: its
+     `<select>` elements inherit the host's 13px, beside 12px buttons. The height does not move with
+     the size, because Obsidian pins every `button` to `--input-height`.
+     This does not make the two identical, and the difference that remains is deliberate. The weight
+     below is 500 where the host's `--input-font-weight` is 400, `font: inherit` gives a different
+     line height, and the pointer outline draws something a native button never does. Those are the
+     board's own voice rather than oversights; the size was the one that had no reason. */
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-medium);
   padding: var(--folia-space-xs-plus) var(--folia-control-pad-x);
