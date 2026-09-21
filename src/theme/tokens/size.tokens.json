@@ -316,20 +316,20 @@
       "reason": "pulls the resize handle half outside the panel so it straddles the edge; Obsidian's own divider is a later phase (audit 02-17)."
     }
   },
-  "cue-thickness": {
-    "$value": "3px",
-    "cssVar": "--folia-cue-thickness",
-    "source": {
-      "owned": true,
-      "reason": "the thickness of every edge cue a card or column draws \u2014 the priority strip, the urgency band and the column accent \u2014 off Obsidian's 4px grid."
-    }
-  },
   "icon-baseline": {
     "$value": "-0.15em",
     "cssVar": "--folia-icon-baseline",
     "source": {
       "owned": true,
       "reason": "how far an inline icon drops below the text baseline, measured in that text; a typographic correction Obsidian does not publish."
+    }
+  },
+  "ctx-strip-inset": {
+    "$value": "5px",
+    "cssVar": "--folia-ctx-strip-inset",
+    "source": {
+      "owned": true,
+      "reason": "how far the context strip sits past the priority bar so it never draws on top of it; the number answers to border.cue-thickness, not to the spacing rhythm."
     }
   }
 }

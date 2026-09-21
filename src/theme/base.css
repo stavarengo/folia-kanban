@@ -59,7 +59,7 @@
   color: var(--link-color, var(--folia-accent));
   cursor: var(--folia-cursor-control);
   text-decoration: underline;
-  text-underline-offset: var(--folia-space-xxs);
+  text-underline-offset: var(--folia-underline-offset);
   padding: 0;
   font: inherit;
   text-align: left;

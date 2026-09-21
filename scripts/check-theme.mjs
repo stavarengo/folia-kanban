@@ -98,7 +98,7 @@ const NAMED_COLORS = new Set(
 );
 const COLOR_FUNCTIONS = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
 const DIMENSION =
-  /(?<![\w.#-])-?\d*\.?\d+(px|em|rem|ex|ch|vh|vw|vmin|vmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])/i;
+  /(?<![\w.#-])-?\d*\.?\d+(px|em|rem|ex|ch|cap|ic|lh|rlh|vh|vw|vmin|vmax|[dsl]v(?:h|w|min|max|i|b)|cq[whibx]|cqmin|cqmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])/i;
 const NUMERIC_PROPS = new Set(["font-size", "font-weight", "line-height", "z-index", "opacity"]);
 const SHADOW_PROPS = new Set(["box-shadow", "text-shadow"]);
 /** Unitless numbers that carry no design intent: ratios the layout engine reads as counts. */

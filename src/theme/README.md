@@ -9,7 +9,7 @@ Everything that paints the plugin lives here. `index.css` is the bundle esbuild 
 - **an alias** of a CSS variable Obsidian's developer docs publish, written as exactly `var(--radius-m)` with no fallback;
 - **owned**, with a reason in its JSON metadata saying what Obsidian has no answer for.
 
-Raw design values — a colour, a length with a unit, a duration, a weight, a shadow, a cursor — are allowed in `tokens.css` and nowhere else in the bundle. Everything below `tokens.css` reads `var(--folia-…)`.
+Raw design values — a colour, a length with a unit, a duration, an angle, a weight, a shadow, a cursor — are allowed in `tokens.css` and nowhere else in the bundle. The unitless numbers inside a `transform` are not among them: `scale(1.03)` is geometry the animation is made of, readable only next to the `translate` beside it, where `1.5deg` names a tilt that other rules share. Everything below `tokens.css` reads `var(--folia-…)`.
 
 `host/variables.json` is the registry of what Obsidian documents, generated from the developer-docs repository by `pnpm theme:sync`. `host/observed.json` is for the variables the running app defines but the docs do not list; each entry records the Obsidian version it was seen in and where, so the next reader can re-check it rather than trust it.
 

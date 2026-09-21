@@ -1,5 +1,5 @@
 {
-  "$description": "Border and outline widths.",
+  "$description": "Border and outline widths, and the thickness of the lines the board draws as elements rather than borders.",
   "width": {
     "$value": "var(--border-width)",
     "cssVar": "--folia-border-width",
@@ -45,6 +45,22 @@
     "source": {
       "owned": true,
       "reason": "the same distance inwards, for a control whose ring would otherwise be clipped by its own overflow."
+    }
+  },
+  "cue-thickness": {
+    "$value": "3px",
+    "cssVar": "--folia-cue-thickness",
+    "source": {
+      "owned": true,
+      "reason": "the thickness of every edge cue a card or column draws \u2014 the priority strip, the urgency band and the column accent \u2014 off Obsidian's 4px grid."
+    }
+  },
+  "ctx-strip-width": {
+    "$value": "2px",
+    "cssVar": "--folia-ctx-strip-w",
+    "source": {
+      "owned": true,
+      "reason": "the folder-context strip is drawn thinner than the priority bar beside it so the two left-edge cues read as different signals; it is a cue a plugin invented, so no host variable describes it."
     }
   }
 }

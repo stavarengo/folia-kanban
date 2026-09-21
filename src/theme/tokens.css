@@ -30,6 +30,7 @@
   --folia-r-lg: 10px;
   --folia-r-xl: 14px;
   --folia-r-pill: 999px;
+  --folia-r-nested-inset: 2px; /* how far a nested surface's corner tucks inside its parent's */
 
   /* The spacing rhythm. Where a rung lands exactly on a value Obsidian publishes it reads that
      variable, so the board already moves with the app there; the half-steps between the grid's
@@ -100,7 +101,7 @@
   --folia-divider-h: 1px;
   --folia-resize-w: var(--size-2-3);
   --folia-resize-offset: -3px;
-  --folia-cue-thickness: 3px; /* every edge cue a card or column draws: priority, urgency, accent */
+  --folia-ctx-strip-inset: 5px; /* the context strip is inset past the priority bar beside it */
   --folia-icon-baseline: -0.15em;
 
   /* borders */
@@ -110,6 +111,11 @@
   --folia-focus-ring-w: 2px;
   --folia-focus-ring-offset: 2px;
   --folia-focus-ring-offset-inset: -2px;
+  --folia-underline-offset: 2px;
+
+  /* the lines and strips the board draws itself, which are elements rather than borders */
+  --folia-cue-thickness: 3px; /* the priority strip, the urgency band and a column's accent rail */
+  --folia-ctx-strip-w: 2px; /* the context strip, thinner so it reads as a different cue */
 
   /* motion */
   --folia-dur-fast: 110ms;

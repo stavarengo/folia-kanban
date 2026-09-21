@@ -160,5 +160,13 @@
         "reason": "the same, a touch wider, for a section heading."
       }
     }
+  },
+  "underline-offset": {
+    "$value": "2px",
+    "cssVar": "--folia-underline-offset",
+    "source": {
+      "owned": true,
+      "reason": "how far a link's underline sits below its text \u2014 a typographic measurement rather than spacing, and Obsidian publishes no link-underline geometry."
+    }
   }
 }
