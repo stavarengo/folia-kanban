@@ -63,6 +63,8 @@
   text-overflow: ellipsis;
 }
 .folia-column-count {
+  --icon-size: var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xxs-plus);
@@ -102,6 +104,8 @@
   background: color-mix(in srgb, var(--folia-accent) 9%, transparent);
 }
 .folia-column-empty {
+  --icon-size: var(--icon-l);
+  --icon-stroke: var(--icon-l-stroke-width);
   display: flex;
   flex-direction: column;
   align-items: center;

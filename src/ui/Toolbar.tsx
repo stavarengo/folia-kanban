@@ -139,7 +139,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
       aria-pressed={hasToken(query, key, value)}
       onClick={() => toggle(key, value)}
     >
-      <Icon name={icon} size={13} />
+      <Icon name={icon} />
       {label}
     </button>
   );
@@ -184,7 +184,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
   return (
     <div className="folia-toolbar" role="search" aria-label="Filter board">
       <div className="folia-search">
-        <Icon name="search" size={15} />
+        <Icon name="search" />
         <input
           ref={inputRef}
           type="text"
@@ -216,7 +216,7 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
             title="Clear"
             onClick={() => onChange("")}
           >
-            <Icon name="close" size={13} />
+            <Icon name="close" />
           </button>
         )}
         {showList && (

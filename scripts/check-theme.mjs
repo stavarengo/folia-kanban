@@ -363,7 +363,11 @@ function checkRawValues(decl, where) {
   if (prop.startsWith("--")) {
     // A component rule may RE-declare a token (the urgency cue swaps its colour per due state), but
     // it may not invent one: a name with no entry in the block is a token nobody can find.
-    if (where !== TOKENS_CSS && !declared.has(prop)) {
+    if (
+      where !== TOKENS_CSS &&
+      !declared.has(prop) &&
+      !["--icon-size", "--icon-stroke"].includes(prop)
+    ) {
       fail(
         `${where}:${line}`,
         `${prop} is declared here but nowhere in ${TOKENS_CSS}, so it is a token no reader can look up. Declare it in the block (with its metadata) and override it here.`,
@@ -537,6 +541,7 @@ for (const file of (await readdir(TOKENS_JSON_DIR)).filter((f) => f.endsWith(".t
 const FAMILIES = {
   radius: /^--radius-/,
   cursor: /^--cursor(?:-link)?$/,
+  icon: /^--icon-(?:xs|s|m|l|xl)(?:-stroke-width)?$/,
   length: /^--size-\d+-\d+$/,
   "border-width": /^--border-width$/,
   "font-size": /^--font-ui-/,
@@ -549,6 +554,7 @@ const CATEGORIES = new Set([
   "border",
   "color",
   "cursor",
+  "icon",
   "motion",
   "opacity",
   "radius",
@@ -584,6 +590,7 @@ function familiesOf(token) {
   // A bare number is measured against the two host scales made of bare numbers, whatever file it
   // sits in: a font weight filed under opacity is still a font weight. (`--layer-*` is the third
   // such scale and is deliberately absent — the note in tokens.css says why.)
+  if (category === "icon") return ["icon"];
   if (category === "cursor") return ["cursor"];
   if (isNumber) return ["font-weight", "line-height"];
   if (!isLength) return [];

@@ -269,7 +269,7 @@ function CardItemInner({
             )}
             {chips.map((c) => (
               <span key={c.key} className={`folia-chip folia-chip-${c.tone}`} title={c.title}>
-                {c.icon && <Icon name={c.icon} size={11} />}
+                {c.icon && <Icon name={c.icon} />}
                 {c.label}
               </span>
             ))}
@@ -288,7 +288,7 @@ function CardItemInner({
               />
             </div>
             <span className="folia-progress-label">
-              {allDone ? <Icon name="check" size={12} /> : null}
+              {allDone ? <Icon name="check" /> : null}
               {stats.checklistDone}/{stats.checklist}
             </span>
           </div>
@@ -310,7 +310,7 @@ function CardItemInner({
                 title="Subcards"
                 aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}
               >
-                <Icon name="git-branch" size={13} /> {stats.subcards}
+                <Icon name="git-branch" /> {stats.subcards}
               </span>
             )}
             {stats.comments > 0 && (
@@ -319,7 +319,7 @@ function CardItemInner({
                 title={commentsTitle(stats.comments, unread)}
                 aria-label={commentsTitle(stats.comments, unread)}
               >
-                <Icon name="message" size={13} /> {stats.comments}
+                <Icon name="message" /> {stats.comments}
                 {/* Shape, not just colour: a plain dot for unread, an arrow for a reply — so the
                     two states stay apart for anyone who cannot tell blue from purple. */}
                 {unread.kind === "unread" && (
@@ -358,11 +358,7 @@ function CardItemInner({
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Icon
-            name="chevron-down"
-            size={13}
-            className={subitemsCollapsed ? "is-collapsed" : undefined}
-          />
+          <Icon name="chevron-down" className={subitemsCollapsed ? "is-collapsed" : undefined} />
           {subitemsCollapsed
             ? `${stats?.checklist ?? 0} subitem${(stats?.checklist ?? 0) === 1 ? "" : "s"}, ${stats?.checklistDone ?? 0} done`
             : "Subitems"}
@@ -399,7 +395,7 @@ function CardItemInner({
                 actions.complete(card);
               }}
             >
-              <Icon name="check-circle" size={15} />
+              <Icon name="check-circle" />
             </button>
           )}
           <button
@@ -420,7 +416,7 @@ function CardItemInner({
               actions.openNote(notePath, e.nativeEvent);
             }}
           >
-            <Icon name="external-link" size={15} />
+            <Icon name="external-link" />
           </button>
           <button
             className="folia-icon-btn folia-action-delete"
@@ -432,7 +428,7 @@ function CardItemInner({
               setConfirming(true);
             }}
           >
-            <Icon name="trash" size={15} />
+            <Icon name="trash" />
           </button>
         </div>
       )}

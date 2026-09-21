@@ -139,7 +139,7 @@ export function ColumnMenu({
             title="No color"
             onClick={() => a.setColumnColor(column.id, null)}
           >
-            <Icon name="close" size={11} />
+            <Icon name="close" />
           </button>
         </div>
       </div>
@@ -171,7 +171,7 @@ export function ColumnMenu({
           onEdit();
         }}
       >
-        <Icon name="pencil" size={14} /> Edit column…
+        <Icon name="pencil" /> Edit column…
       </button>
 
       <div className="folia-menu-divider" />
@@ -182,7 +182,7 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="chevron-down" size={14} /> Collapse all subitems
+        <Icon name="chevron-down" /> Collapse all subitems
       </button>
       <button
         className="folia-menu-item"
@@ -191,7 +191,7 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="chevron-down" size={14} className="is-collapsed" /> Expand all subitems
+        <Icon name="chevron-down" className="is-collapsed" /> Expand all subitems
       </button>
 
       <div className="folia-menu-divider" />
@@ -203,7 +203,7 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="arrow-left" size={14} /> Move left
+        <Icon name="arrow-left" /> Move left
       </button>
       <button
         className="folia-menu-item"
@@ -213,13 +213,13 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="arrow-right" size={14} /> Move right
+        <Icon name="arrow-right" /> Move right
       </button>
 
       <div className="folia-menu-divider" />
       {!confirmDel ? (
         <button className="folia-menu-item folia-menu-danger" onClick={() => setConfirmDel(true)}>
-          <Icon name="trash" size={14} /> Delete column
+          <Icon name="trash" /> Delete column
         </button>
       ) : (
         <div className="folia-menu-confirm" role="alertdialog" aria-label="Confirm delete column">

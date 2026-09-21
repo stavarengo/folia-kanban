@@ -59,6 +59,8 @@
    a rule that only refines another button rule has to carry the same weight, or the refinement is
    quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
 .folia-mini.folia-mini {
+  --icon-size: var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   width: var(--folia-hit-sm);
   height: var(--folia-hit-sm);
   margin-left: auto;

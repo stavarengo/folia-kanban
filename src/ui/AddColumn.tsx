@@ -17,7 +17,7 @@ export function AddColumn() {
   if (!adding) {
     return (
       <button className="folia-add-column" aria-label="Add column" onClick={() => setAdding(true)}>
-        <Icon name="plus" size={16} />
+        <Icon name="plus" />
         Add column
       </button>
     );

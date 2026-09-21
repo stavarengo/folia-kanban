@@ -1132,7 +1132,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
                         role="status"
                         aria-live="polite"
                       >
-                        <Icon name={toast.tone === "error" ? "alert" : "check-circle"} size={16} />
+                        <Icon name={toast.tone === "error" ? "alert" : "check-circle"} />
                         {toast.text}
                       </div>
                     )}

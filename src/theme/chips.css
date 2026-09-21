@@ -5,6 +5,8 @@
   gap: var(--folia-space-xs-plus);
 }
 .folia-chip {
+  --icon-size: var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xxs-plus);

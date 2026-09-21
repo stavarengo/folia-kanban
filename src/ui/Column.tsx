@@ -497,7 +497,7 @@ export function Column({
                 : `${count} cards`
           }
         >
-          {overLimit && <Icon name="alert" size={12} />}
+          {overLimit && <Icon name="alert" />}
           {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
         <button
@@ -514,7 +514,7 @@ export function Column({
             setMenuOpen((o) => !o);
           }}
         >
-          <Icon name="more" size={16} />
+          <Icon name="more" />
         </button>
         {menuOpen && (
           <ColumnMenu
@@ -610,7 +610,7 @@ export function Column({
             </div>
           ) : (
             <div className="folia-column-empty" aria-hidden="true">
-              <Icon name="inbox" size={20} />
+              <Icon name="inbox" />
               <span>Nothing here</span>
             </div>
           ))}
@@ -660,7 +660,7 @@ export function Column({
           aria-label={`Add card to ${column.title}`}
           onClick={onAddClick}
         >
-          <Icon name="plus" size={15} />
+          <Icon name="plus" />
           Add a card
         </button>
       )}

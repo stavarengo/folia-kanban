@@ -162,7 +162,7 @@ export function CardContextMenu({
             : undefined
         }
       >
-        <Icon name={icon} size={14} /> {label}
+        <Icon name={icon} /> {label}
       </button>
     );
   };
@@ -271,7 +271,7 @@ export function CardContextMenu({
                 onClose();
               }}
             >
-              <Icon name="close" size={11} />
+              <Icon name="close" />
             </button>
           </div>
 

@@ -136,10 +136,9 @@ const PATHS: Record<IconName, JSX.Element> = {
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
-  size?: number;
 }
 
-export function Icon({ name, size = 16, className, ...rest }: IconProps): JSX.Element {
+export function Icon({ name, className, ...rest }: IconProps): JSX.Element {
   return (
     <svg
       // `{...rest}` still wins for every other prop (a caller override is deliberate there), but
@@ -147,12 +146,9 @@ export function Icon({ name, size = 16, className, ...rest }: IconProps): JSX.El
       // whenever a caller passes one (e.g. a state class like `is-collapsed`), and every consumer
       // relies on `folia-icon` for sizing/alignment as well as any state-scoped CSS selector.
       className={className ? `folia-icon ${className}` : "folia-icon"}
-      width={size}
-      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

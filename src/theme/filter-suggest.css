@@ -72,6 +72,9 @@
 }
 
 .folia-icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  stroke-width: var(--icon-stroke);
   flex: 0 0 auto;
   vertical-align: var(--folia-icon-baseline);
 }

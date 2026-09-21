@@ -121,7 +121,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
         <div className="folia-modal-header">
           <h2 className="folia-modal-title">Edit column</h2>
           <button className="folia-icon-btn" aria-label="Close" onClick={onClose}>
-            <Icon name="close" size={16} />
+            <Icon name="close" />
           </button>
         </div>
 
@@ -163,7 +163,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
                 title="No color"
                 onClick={() => set("color", undefined)}
               >
-                <Icon name="close" size={11} />
+                <Icon name="close" />
               </button>
             </div>
           </div>

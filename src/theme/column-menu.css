@@ -70,6 +70,8 @@
   box-shadow: var(--folia-shadow-swatch-active);
 }
 .folia-swatch-none.folia-swatch-none {
+  --icon-size: var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   display: grid;
   place-items: center;
   background: var(--background-modifier-hover);
@@ -81,6 +83,8 @@
   margin: var(--folia-space-hair) 0;
 }
 .folia-menu-item.folia-menu-item {
+  --icon-size: var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   display: flex;
   align-items: center;
   gap: var(--folia-space-md);

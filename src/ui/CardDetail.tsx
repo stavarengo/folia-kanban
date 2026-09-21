@@ -143,7 +143,7 @@ function PropRow({
         title="Remove property"
         onClick={onRemove}
       >
-        <Icon name="close" size={13} />
+        <Icon name="close" />
       </button>
     </div>
   );
@@ -353,7 +353,7 @@ function CommentItem({
               setEditing(true);
             }}
           >
-            <Icon name="pencil" size={13} />
+            <Icon name="pencil" />
           </button>
           <button
             className="folia-icon-btn folia-mini"
@@ -361,7 +361,7 @@ function CommentItem({
             title="Delete"
             onClick={onDelete}
           >
-            <Icon name="trash" size={13} />
+            <Icon name="trash" />
           </button>
         </div>
       )}
@@ -599,7 +599,7 @@ function RelationRow({
           title="Remove"
           onClick={onRemove}
         >
-          <Icon name="close" size={13} />
+          <Icon name="close" />
         </button>
       ) : note ? (
         <span className="folia-relation-note folia-muted" title={note.title}>
@@ -1800,7 +1800,7 @@ export function CardDetail({
                   beginEditDesc();
                 }}
               >
-                <Icon name="pencil" size={13} />
+                <Icon name="pencil" />
               </button>
             </div>
           ) : (
@@ -1923,7 +1923,7 @@ export function CardDetail({
                   title="Remove"
                   onClick={() => void mutate(() => repo.removeSubtask(path, s))}
                 >
-                  <Icon name="close" size={13} />
+                  <Icon name="close" />
                 </button>
               </li>
             ))}
