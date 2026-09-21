@@ -33,18 +33,18 @@
     }
   },
   "menu-height-max": {
-    "$value": "var(--popover-max-height)",
+    "$value": "calc(var(--size-4-1) * 110)",
     "cssVar": "--folia-menu-h-max",
     "source": {
-      "alias": "--popover-max-height"
+      "owned": true,
+      "reason": "How tall an action menu may grow before it scrolls. The host's --popover-max-height belongs to the file-preview card (its siblings are --popover-width 450px, --popover-height 400px and the --popover-pdf-* pair) and is 95vh, which is a ceiling for a floating preview rather than a size for a compact menu; see docs/decisions.md."
     }
   },
   "modal-width": {
-    "$value": "min(var(--dialog-width), var(--dialog-max-width))",
+    "$value": "var(--dialog-width)",
     "cssVar": "--folia-modal-w",
     "source": {
-      "owned": true,
-      "reason": "The edit-column dialog is the confirmation shape Obsidian calls a dialog, so it follows --dialog-width, held under --dialog-max-width because that cap is a viewport fraction the default width can exceed on a narrow window."
+      "alias": "--dialog-width"
     }
   },
   "menu-padding": {

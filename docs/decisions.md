@@ -166,7 +166,7 @@ Obsidian 1.13.7 dresses every bare `<select>` through `select, .combobox-button,
 
 The only way to the glyph is putting `.dropdown` on the element, which is the undocumented-class contract the owner ruled out (`docs/ai/reports/…/02…md` decision 5 in the phase context). Drawing a chevron from Folia's own icon set is not available to a `<select>`, whose shadow DOM takes no children. Leaving `appearance` alone and letting the platform draw its native arrow would restore an indicator and lose the app's look, which is the divergence 02-19 is about.
 
-This has a visible cost and it is worth naming. The board's selects show no dropdown indicator, which was already true before this decision — the app's own rule sets `appearance: none` on every bare select — but the decision is what keeps it true. `--dropdown-padding` is therefore not adopted either: its `2.4em` end padding exists to clear the glyph, and reserving that space while drawing nothing in it would advertise the gap. The selects use the board's own symmetric padding and its own type size, so they sit correctly beside the text inputs in the same field grid; everything else about them is the app's.
+This has a visible cost and it is worth naming. The board's selects show no dropdown indicator, which was already true before this decision — the app's own rule sets `appearance: none` on every bare select — but the decision is what keeps it true. `--dropdown-padding` is therefore not adopted either: its `2.4em` end padding exists to clear the glyph, and reserving that space while drawing nothing in it would advertise the gap. The selects use the board's own symmetric padding and its own type size, so they sit correctly beside the text inputs in the same field grid; everything else about them, hover and focus included, is the app's.
 
 **What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
 
@@ -189,3 +189,16 @@ Obsidian's toggle is a track with a sliding thumb, and its eleven variables desc
 Nothing is lost by waiting. The same build styles every bare `input[type="checkbox"]` from the `--checkbox-*` set, so the row already shows Obsidian's own checkbox, correctly sized, filled and ticked. What is left is the difference between a checkbox and a toggle on a settings-shaped row, which is a markup question rather than a variable one.
 
 **What would change this:** the board adopting the host's `checkbox-container` markup for that row, which is the same decision as whether these panels should be built from Obsidian's `Setting` API at all.
+
+## A host variable has to describe the object, not sit near it
+
+**Decided 2026-09-21 during Phase 3, after two unprimed reviews. Four host variables the phase brief named are not used, because each describes a different object from the one the board would have spent it on.**
+
+The theme domain's rule is that a `--folia-*` token is an alias or an owned value with a reason. It says nothing about whether the aliased variable *means* the thing it is attached to, and a guard cannot: `pnpm theme:check` validates registry membership and token shape, not fit. These four are where fit failed, and they are recorded together because the same mistake produced all of them — reaching for the nearest published name rather than the one whose object matches.
+
+- **`--popover-max-height` on the column menu.** The `--popover-*` family is the file-preview card: `--popover-width: 450px`, `--popover-height: 400px`, `--popover-pdf-width`, `--popover-pdf-height`. Its `95vh` ceiling would have raised a 440px action menu to roughly 760px on an 800px window. A ceiling looked generic enough to borrow while rejecting the family's widths; it is not, and `none` is a legal value for it, which would have made the call site's `min()` invalid and removed the cap entirely.
+- **`--blockquote-border-thickness` on the comment rail.** That left border's colour is how read, unread and reply are told apart, so a theme that draws borderless quotes would erase a state cue by changing something about quotations. Comments are not quotations.
+- **`--checkbox-radius` on the to-do preview marker.** The radius is the corner chosen for a 16px control, and the marker is 8px and keeps its own size on purpose. Half of a coupled pair leaves a theme free to turn the marker into a dot.
+- **`--metadata-property-radius` on the property input.** That is the property *row's* corner; the row is `.folia-prop-row` and the input is the value inside it. The input takes `--input-radius`, because with the border the board keeps on it, a text input is what it is.
+
+**What would change this:** for the menu, Obsidian publishing dimensions for its own action menus. For the others, the board changing what the element is — a comment rail that no longer carries state, a preview marker that follows the host checkbox size, a property row drawn as Obsidian draws one, without a border.

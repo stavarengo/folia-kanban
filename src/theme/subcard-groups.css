@@ -18,7 +18,7 @@
      above", and the theme's neutral guide colour would flatten that. */
   margin-left: var(--nav-item-children-margin-start);
   padding: var(--folia-space-sm) 0 var(--folia-space-sm) var(--nav-item-children-padding-start);
-  border-left: var(--indentation-guide-width) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
+  border-left: var(--nav-indentation-guide-width) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
   background: color-mix(in srgb, var(--folia-col-accent) 5%, transparent);
   border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
 }

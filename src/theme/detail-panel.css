@@ -167,18 +167,15 @@
    does not wear that class (see docs/decisions.md): adopting it would leave a wide empty gutter with
    nothing in it. And the casing the surrounding label hands down.
 
-   The hover is added rather than kept back: the app publishes `--dropdown-background-hover` and
-   then spends it only on `select.mobile-tap`. */
+   Hover and focus are the app's too: `@media (hover: hover) select:not(:disabled):not(.mod-disabled):hover`
+   already paints `--dropdown-background-hover`, with the disabled guard and the raised-shadow half
+   that a rule written here would drop. */
 .folia-fields select,
 .folia-field select {
   font: inherit;
   padding: 0 var(--folia-space-md);
   text-transform: none;
   letter-spacing: normal;
-}
-.folia-fields select:hover,
-.folia-field select:hover {
-  background-color: var(--dropdown-background-hover);
 }
 
 /* The assignee field spans both columns: it carries a button beside its input, and half a row is
@@ -246,9 +243,11 @@
   color: var(--metadata-input-text-color);
   /* Obsidian's property inputs carry no border, because the editor pane has other lines to place
      them against. This panel does not: with a transparent fill and no border the row would be
-     invisible between edits, so the board keeps its own hairline. */
+     invisible between edits, so the board keeps its own hairline — and with a border it is a text
+     input, which is why the corner is `--input-radius` and not the property row's own radius. The
+     row here is `.folia-prop-row`; this element is the value inside it. */
   border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--metadata-property-radius);
+  border-radius: var(--input-radius);
   padding: var(--folia-space-xs) var(--folia-space-sm-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
@@ -587,11 +586,12 @@
   gap: var(--folia-space-hair);
   font-size: var(--folia-font-size-md);
   padding-left: var(--folia-gap);
-  /* The shape is a blockquote — an indented body behind a coloured left rule — so the rule's
-     thickness follows the theme's. Its colour does not: `--blockquote-border-color` resolves to the
-     accent, and this exact border is the unread signal, where read, unread and reply are told apart
-     by hue. An accent-coloured resting rule would collide with the reply hue on any accent near it. */
-  border-left: var(--blockquote-border-thickness) solid var(--folia-border);
+  /* Shaped like a blockquote and deliberately not drawn from the blockquote variables. This border
+     IS the unread signal — read, unread and reply are told apart by its hue — and a comment is not a
+     quotation. `--blockquote-border-color` resolves to the accent, which collides with the reply
+     hue; `--blockquote-border-thickness` would let a theme that draws borderless quotes erase the
+     rail and the state with it. Both stay the board's; see docs/decisions.md. */
+  border-left: var(--folia-border-width-thick) solid var(--folia-border);
 }
 .folia-comment-row {
   display: flex;

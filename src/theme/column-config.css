@@ -60,6 +60,10 @@
    stays Folia's: no host variable covers a dimmer. */
 .folia-modal {
   width: min(var(--folia-modal-w), 100%);
+  /* Its own declaration rather than a second argument to that `min()`: `--dialog-max-width` may
+     legitimately be `none`, and `min(560px, none)` is invalid, which would drop the width entirely
+     and collapse the dialog to its intrinsic size. `max-width: none` is simply no cap. */
+  max-width: var(--dialog-max-width);
   max-height: var(--dialog-max-height);
   display: flex;
   flex-direction: column;

@@ -15,15 +15,17 @@
   color: var(--text-muted);
 }
 /* An unchecked checkbox drawn as an ornament, not a control: it previews a to-do the card holds and
-   cannot be clicked. It borrows the app's checkbox radius and unchecked border, but not
-   `--checkbox-size` — that is a control's size (16px) and this sits on an 11px preview line, where
-   it would out-weigh the words it annotates. */
+   cannot be clicked. It takes the app's unchecked border colour, and nothing about its shape.
+   `--checkbox-size` is a control's size (16px) and this sits on an 11px preview line, where it
+   would out-weigh the words it annotates — and `--checkbox-radius` is the corner chosen FOR that
+   size, so spending it on an 8px box means a theme with round checkboxes turns this one into a dot
+   that no longer reads as a to-do. Half of a coupled pair is worse than neither. */
 .folia-card-next-todo-mark {
   flex-shrink: 0;
   width: var(--folia-todo-mark);
   height: var(--folia-todo-mark);
   border: var(--folia-border-width-hair) solid var(--checkbox-border-color);
-  border-radius: var(--checkbox-radius);
+  border-radius: var(--folia-r-sm);
 }
 .folia-card-next-todo-text {
   min-width: 0;
