@@ -18,8 +18,21 @@
               "icon": "layout-grid",
               "title": "Showcase Board - Folia Kanban"
             }
+          },
+          {
+            "id": "f7dd1c11c63fc931",
+            "type": "leaf",
+            "state": {
+              "type": "folia-kanban-view",
+              "state": {
+                "file": "feature-showcase/Showcase Board.md"
+              },
+              "icon": "layout-grid",
+              "title": "Showcase Board - Folia Kanban"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -57,6 +70,21 @@
               "state": {},
               "icon": "lucide-bookmark",
               "title": "Bookmarks"
+            }
+          },
+          {
+            "id": "4313a51e849106a0",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
             }
           }
         ]
@@ -159,17 +187,17 @@
   },
   "left-ribbon": {
     "hiddenItems": {
-      "folia-kanban:Open Folia Kanban board": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "folia-kanban:Open Folia Kanban board": false
     }
   },
-  "active": "e187bf3435ae4c0b",
+  "active": "f7dd1c11c63fc931",
   "lastOpenFiles": [
     "feature-showcase/Cards/Plan the v1.0 launch.md",
     "basic/Cards/Duplicate.md",
