@@ -25,8 +25,6 @@
   padding: var(--folia-space-xxs) var(--folia-space-xs);
 }
 .folia-scope .folia-menu-prio {
-  background: var(--interactive-normal);
-  color: var(--text-muted);
   box-shadow: none;
   font: inherit;
   font-size: var(--folia-font-size-sm);
@@ -44,7 +42,7 @@
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: grid;
   place-items: center;
-  background: var(--interactive-normal);
+  background: var(--background-modifier-hover);
   color: var(--text-muted);
 }
 
@@ -69,9 +67,4 @@
 .folia-scope .folia-menu-column.is-active {
   color: var(--text-normal);
   box-shadow: var(--folia-shadow-choice-active);
-}
-
-.folia-scope .folia-menu-prio-none:hover:where(:not(:disabled)),
-.folia-scope .folia-menu-column:hover:where(:not(:disabled)) {
-  background: var(--interactive-hover);
 }

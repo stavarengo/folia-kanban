@@ -16,8 +16,7 @@
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
   box-shadow: none;
 }
-.folia-scope .folia-add-column:hover:where(:not(:disabled)) {
-  background: var(--interactive-hover);
+.folia-scope .folia-add-column:hover:where(:not(:disabled, .is-editing)) {
   color: var(--text-normal);
   border-color: var(--folia-border-strong);
 }

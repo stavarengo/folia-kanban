@@ -376,4 +376,44 @@ describe("theme button contract", () => {
     );
     reject("needs a scoped resting rule for background, color, box-shadow");
   });
+
+  it.each(["prio-1", "prio-2", "prio-3", "prio-4", "muted"])(
+    "requires the dynamic priority face %s",
+    (tone) => {
+      edit("src/theme/chips.css", (s) =>
+        s.replace(new RegExp(`\\.folia-scope \\.folia-chip-${tone} \\{[^}]*\\}`), ""),
+      );
+      reject("needs a scoped resting rule for background, color");
+    },
+  );
+
+  it("requires a newly declared tone to have a face", () => {
+    edit("src/ui/cardView.ts", (s) => s.replace('| "muted";', '| "muted" | "new-tone";'));
+    reject("needs a scoped resting rule for background, color");
+  });
+
+  it.each(["hover", "active"])("requires the priority %s outline consumer", (state) => {
+    edit("src/theme/buttons.css", (s) =>
+      s.replace(`.folia-menu-prio:${state}:`, `.folia-menu-prio-none:${state}:`),
+    );
+    reject("Button signal .folia-scope .folia-menu-prio");
+  });
+
+  it("requires the keyboard suggestion marker consumer", () => {
+    edit("src/theme/filter-suggest.css", (s) =>
+      s.replace("box-shadow: var(--folia-suggestion-marker)", "box-shadow: none"),
+    );
+    reject("needs box-shadow: var(--folia-suggestion-marker)");
+  });
+
+  it.each([
+    ["--folia-control-outline", "none"],
+    ["--folia-border-width-thick", "0px"],
+    ["--folia-suggestion-marker", "none"],
+  ])("protects owned signal %s from being zeroed", (name, value) => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace(new RegExp(`${name}: [^;]+;`), `${name}: ${value};`),
+    );
+    reject(`Owned button signal ${name} must retain`);
+  });
 });

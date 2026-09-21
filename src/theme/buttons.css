@@ -106,7 +106,7 @@
 .folia-scope .folia-menu-item:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-filter-suggest-item:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-prio-none:hover:where(:not(:disabled, :focus-visible)) {
+.folia-scope .folia-menu-prio:hover:where(:not(:disabled, :focus-visible)) {
   outline: var(--folia-control-outline);
   outline-offset: calc(-1 * var(--folia-border-width-thick));
 }
@@ -118,7 +118,7 @@
 .folia-scope .folia-menu-item:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-filter-suggest-item:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-prio-none:active:where(:not(:disabled, :focus-visible)) {
+.folia-scope .folia-menu-prio:active:where(:not(:disabled, :focus-visible)) {
   outline: var(--folia-control-outline);
   outline-width: var(--folia-border-width-thick);
   outline-offset: calc(-1 * var(--folia-border-width-thick));

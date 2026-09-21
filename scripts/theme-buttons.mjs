@@ -6,21 +6,30 @@ import ts from "typescript";
 
 // Unknown expressions cannot supply the stable base class a button needs. Conditional branches
 // stay separate so a styled branch cannot hide an unstyled one.
-function classValues(node) {
+function classValues(node, literalReturns) {
   if (!node) return [""];
   if (ts.isStringLiteralLike(node)) return [node.text];
-  if (ts.isJsxExpression(node)) return classValues(node.expression);
-  if (ts.isParenthesizedExpression(node)) return classValues(node.expression);
+  if (ts.isJsxExpression(node)) return classValues(node.expression, literalReturns);
+  if (ts.isParenthesizedExpression(node)) return classValues(node.expression, literalReturns);
   if (ts.isConditionalExpression(node)) {
-    return [...classValues(node.whenTrue), ...classValues(node.whenFalse)];
+    return [
+      ...classValues(node.whenTrue, literalReturns),
+      ...classValues(node.whenFalse, literalReturns),
+    ];
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-    return classValues(node.left).flatMap((a) => classValues(node.right).map((b) => a + b));
+    return classValues(node.left, literalReturns).flatMap((a) =>
+      classValues(node.right, literalReturns).map((b) => a + b),
+    );
   }
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression))
+    return literalReturns.get(node.expression.text) ?? ["?"];
   if (ts.isTemplateExpression(node)) {
     return node.templateSpans.reduce(
       (values, span) =>
-        values.flatMap((a) => classValues(span.expression).map((b) => a + b + span.literal.text)),
+        values.flatMap((a) =>
+          classValues(span.expression, literalReturns).map((b) => a + b + span.literal.text),
+        ),
       [node.head.text],
     );
   }
@@ -44,6 +53,36 @@ function hasButtonSubject(nodes) {
 }
 
 export async function checkButtons(roots, fail) {
+  // This declared finite return type supplies the dynamic priority face. Typecheck enforces the
+  // function's implementation; the guard checks every tone, including the muted fallback.
+  const cardView = ts.createSourceFile(
+    "cardView.ts",
+    await readFile("src/ui/cardView.ts", "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const toneType = cardView.statements.find(
+    (node) => ts.isTypeAliasDeclaration(node) && node.name.text === "ChipTone",
+  )?.type;
+  const priorityReturn = cardView.statements.find(
+    (node) => ts.isFunctionDeclaration(node) && node.name?.text === "priorityTone",
+  )?.type;
+  const tones = toneType && ts.isUnionTypeNode(toneType) ? toneType.types : [];
+  const literalReturns = new Map();
+  if (
+    priorityReturn?.getText(cardView) !== "ChipTone" ||
+    !tones.length ||
+    tones.some((node) => !ts.isLiteralTypeNode(node) || !ts.isStringLiteral(node.literal))
+  )
+    fail(
+      "src/ui/cardView.ts",
+      "priorityTone must declare the finite ChipTone string union for button face coverage.",
+    );
+  else
+    literalReturns.set(
+      "priorityTone",
+      tones.map((node) => node.literal.text),
+    );
   const buttons = [];
   const families = new Set();
   for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
@@ -65,10 +104,10 @@ export async function checkButtons(roots, fail) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
         );
-        for (const value of classValues(attr?.initializer)) {
-          for (const part of value.split(/\s+/)) {
+        for (const value of classValues(attr?.initializer, new Map()))
+          for (const part of value.split(/\s+/))
             if (/^folia-[\w-]+\?$/.test(part)) families.add(part.slice(0, -1));
-          }
+        for (const value of classValues(attr?.initializer, literalReturns)) {
           const classes = value.split(/\s+/).filter((c) => /^folia-[\w-]+$/.test(c));
           const where = `${path}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
           if (!classes.length)
@@ -88,6 +127,7 @@ export async function checkButtons(roots, fail) {
   const names = new Set(buttons.flatMap((b) => b.classes));
   const bases = [];
   const orderedSelectors = [];
+  const unconditionalRules = new Map();
   for (const root of roots)
     root.walkRules((rule) => {
       const face = new Set(
@@ -98,6 +138,12 @@ export async function checkButtons(roots, fail) {
       );
       for (const selector of postcss.list.comma(rule.selector)) {
         orderedSelectors.push(selector);
+        if (rule.parent.type === "root") {
+          const declarations = unconditionalRules.get(selector) ?? new Map();
+          for (const node of rule.nodes)
+            if (node.type === "decl") declarations.set(node.prop, node.value);
+          unconditionalRules.set(selector, declarations);
+        }
         const nodes = subjectNodes(selectorParser().astSync(selector).first);
         const own = nodes.map((node) => node.toString()).join("");
         const classes = [];
@@ -142,6 +188,52 @@ export async function checkButtons(roots, fail) {
     )
       fail("src/theme/index.css", `${refinement} must follow the base icon hover rule.`);
   }
+  // Pin the two owned signals and their consumers, not arbitrary state interactions.
+  const requireSignal = (selector, property, value) => {
+    if (unconditionalRules.get(selector)?.get(property) !== value)
+      fail("src/theme", `Button signal ${selector} needs ${property}: ${value}.`);
+  };
+  const pointerClasses = [
+    "folia-btn",
+    "folia-filter-chip",
+    "folia-add-column",
+    "folia-column-add",
+    "folia-menu-item",
+    "folia-filter-suggest-item",
+    "folia-menu-column",
+    "folia-menu-prio",
+  ];
+  for (const name of pointerClasses) {
+    for (const state of ["hover", "active"]) {
+      const excluded =
+        name === "folia-add-column"
+          ? ":disabled, :focus-visible, .is-editing"
+          : ":disabled, :focus-visible";
+      const selector = `.folia-scope .${name}:${state}:where(:not(${excluded}))`;
+      requireSignal(selector, "outline", "var(--folia-control-outline)");
+      requireSignal(selector, "outline-offset", "calc(-1 * var(--folia-border-width-thick))");
+      if (state === "active")
+        requireSignal(selector, "outline-width", "var(--folia-border-width-thick)");
+    }
+  }
+  requireSignal(
+    ".folia-scope .folia-filter-suggest-item.is-active",
+    "box-shadow",
+    "var(--folia-suggestion-marker)",
+  );
+  const signalTokens = new Map([
+    ["--folia-control-outline", "1px solid currentColor"],
+    ["--folia-border-width-thick", "2px"],
+    ["--folia-suggestion-marker", "inset var(--folia-border-width-thick) 0 0 var(--text-normal)"],
+  ]);
+  const tokens = postcss.parse(await readFile("src/theme/tokens.css", "utf8"));
+  tokens.walkDecls((decl) => {
+    if (signalTokens.has(decl.prop) && decl.value !== signalTokens.get(decl.prop))
+      fail(
+        "src/theme/tokens.css",
+        `Owned button signal ${decl.prop} must retain ${signalTokens.get(decl.prop)}.`,
+      );
+  });
   // These raised controls deliberately inherit the host shadow. Every flat control must say so
   // in its own resting rule; a state-only reset does not cover the resting face.
   const hostShadow = new Set(["folia-btn", "folia-filter-chip", "folia-column-add"]);
