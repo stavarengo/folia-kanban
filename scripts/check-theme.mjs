@@ -7,7 +7,7 @@
 //   A  every var(--x) resolves — a --folia-* token, a documented host variable, or an observed one
 //   B  src/theme/host/observed.json is the only home for a host variable the docs do not list
 //   C  no raw design value outside src/theme/tokens.css
-//   D  src/theme/tokens.css and src/theme/tokens/*.tokens.json describe the same set of tokens
+//   D  tokens.css and tokens/*.tokens.json agree on base values and light/dark overrides
 //   E  an owned token whose value is already a documented default must alias that variable
 //   F  the eight column hexes match src/ui/columnColors.ts
 //
@@ -78,69 +78,60 @@ const hostKnows = (name) => (name in registry && !publishOnly(name)) || name in 
 const tokensCss = await readFile(TOKENS_CSS, "utf8");
 const tokensRoot = postcss.parse(tokensCss, { from: TOKENS_CSS });
 
-/** name → { value, line } for every --folia-* declared in the one .folia-scope rule. */
+/** Base declarations and optional scheme overrides, all in tokens.css. */
 const declared = new Map();
-{
-  // The brief's words are "the .folia-scope rule and nothing else", and the whole layer rests on
-  // that: every guard and every reader takes this one rule for the complete list of tokens. So the
-  // file is checked for what it contains, not only for what it contains that was looked for — a
-  // second rule, an at-rule wrapping the block, or a second declaration of a token further down
-  // would each leave the browser reading something this map does not.
-  for (const node of tokensRoot.nodes) {
-    if (node.type === "comment") continue;
-    if (node.type !== "rule" || node.selector.trim() !== ".folia-scope") {
-      fail(
-        `${TOKENS_CSS}:${node.source.start.line}`,
-        `${node.type === "atrule" ? `@${node.name}` : node.selector || node.type} does not belong here — ${TOKENS_CSS} holds the one \`.folia-scope\` rule and nothing else, so that rule is the whole list of tokens.`,
-      );
-    }
-  }
-  const scopes = tokensRoot.nodes.filter(
-    (n) => n.type === "rule" && n.selector.trim() === ".folia-scope",
-  );
-  if (scopes.length !== 1) {
+const themed = new Map([
+  ["light", new Map()],
+  ["dark", new Map()],
+]);
+const selectors = new Map([
+  [".folia-scope", declared],
+  [".theme-light .folia-scope", themed.get("light")],
+  [".theme-dark .folia-scope", themed.get("dark")],
+]);
+const seenRules = new Set();
+for (const rule of tokensRoot.nodes) {
+  if (rule.type === "comment") continue;
+  const map = rule.type === "rule" && selectors.get(rule.selector.trim());
+  if (!map) {
     fail(
       TOKENS_CSS,
-      `${scopes.length} \`.folia-scope { … }\` rules; the token block must be the only one, or a declaration could hide in the second.`,
+      "Only .folia-scope and .theme-light/.theme-dark .folia-scope rules belong in the token file.",
     );
+    continue;
   }
-  for (const rule of scopes) {
-    for (const d of rule.nodes ?? []) {
-      if (d.type === "comment") continue;
-      if (d.type !== "decl") {
-        // A rule nested inside the block — `& { --folia-r: 999px; }` — is applied by the browser
-        // and is not a declaration, so the map below would never see it while every reader went on
-        // believing the block said something else.
-        fail(
-          `${TOKENS_CSS}:${d.source.start.line}`,
-          `${d.type === "atrule" ? `@${d.name}` : d.selector} is nested inside the token block. The block is a flat list of declarations; anything else in it changes what the tokens are without changing what they say.`,
-        );
-        continue;
-      }
-      if (!d.prop.startsWith("--folia-")) continue;
-      if (d.important) {
-        fail(
-          `${TOKENS_CSS}:${d.source.start.line}`,
-          `${d.prop} is !important. A token is a value to be read, not a fight to be won; whatever this was meant to beat should be fixed where it is.`,
-        );
-      }
-      if (declared.has(d.prop)) {
-        fail(
-          `${TOKENS_CSS}:${d.source.start.line}`,
-          `${d.prop} is declared twice in the block. The browser takes the last one and every reader takes the first, which is how a token comes to mean two things at once.`,
-        );
-      }
-      declared.set(d.prop, { value: d.value.trim(), line: d.source.start.line });
+  if (seenRules.has(map)) fail(TOKENS_CSS, `Duplicate token rule: ${rule.selector}.`);
+  if (map !== declared && !seenRules.has(declared))
+    fail(TOKENS_CSS, "Theme overrides must follow the base token block.");
+  seenRules.add(map);
+  for (const d of rule.nodes ?? []) {
+    if (d.type === "comment") continue;
+    const at = `${TOKENS_CSS}:${d.source.start.line}`;
+    if (d.type !== "decl") {
+      fail(at, "Token blocks must be flat lists of declarations.");
+      continue;
     }
+    if (!d.prop.startsWith("--folia-")) {
+      if (map !== declared) fail(at, "Theme overrides may only redeclare --folia-* tokens.");
+      continue;
+    }
+    if (d.important) fail(at, `${d.prop} may not use !important.`);
+    if (map.has(d.prop)) fail(at, `${d.prop} is declared twice in ${rule.selector}.`);
+    if (map !== declared && !declared.has(d.prop)) fail(at, `${d.prop} has no base declaration.`);
+    map.set(d.prop, { value: d.value.trim(), line: d.source.start.line });
   }
 }
+if (!seenRules.has(declared)) fail(TOKENS_CSS, "Missing .folia-scope token block.");
 
 // A token may read another token, and a chain of those may close on itself. CSS calls that cycle
 // invalid at computed-value time: not "falls back to the previous value" but "this declaration and
 // every declaration that reads it are thrown away", which is a blank board from one edit. Nothing
 // in the browser reports it, so "every var() resolves" has to mean resolves, not merely names
 // something that exists.
-{
+for (const effective of [
+  declared,
+  ...[...themed.values()].map((overrides) => new Map([...declared, ...overrides])),
+]) {
   const reads = (value) => [...value.matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map((m) => m[1]);
   const state = new Map();
   const walk = (name, trail) => {
@@ -148,18 +139,18 @@ const declared = new Map();
     if (state.get(name) === "open") {
       const loop = trail.slice(trail.indexOf(name));
       fail(
-        `${TOKENS_CSS}:${declared.get(name).line}`,
+        `${TOKENS_CSS}:${effective.get(name).line}`,
         `${loop.concat(name).join(" → ")} is a cycle. CSS throws away every declaration in it, and every declaration that reads one, so the rules that use these tokens would compute to nothing at all.`,
       );
       return;
     }
     state.set(name, "open");
-    for (const next of reads(declared.get(name).value)) {
-      if (declared.has(next)) walk(next, [...trail, name]);
+    for (const next of reads(effective.get(name).value)) {
+      if (effective.has(next)) walk(next, [...trail, name]);
     }
     state.set(name, "done");
   };
-  for (const name of declared.keys()) walk(name, []);
+  for (const name of effective.keys()) walk(name, []);
 }
 
 // ------------------------------------------------------------------ value scanning (rules A + C)
@@ -327,6 +318,12 @@ function checkTokenOverride(decl, where, selector) {
     fail(
       `${where}:${line}`,
       `${prop} is declared on \`.folia-scope\` here, which re-declares the token block for everything below this rule. ${TOKENS_CSS} is the one place a token is defined.`,
+    );
+  }
+  if (/\.theme-(?:light|dark)\b/.test(selector)) {
+    fail(
+      `${where}:${line}`,
+      "Theme token overrides belong only in tokens.css with matching theme metadata.",
     );
   }
   const seen = new Set([prop]);
@@ -609,11 +606,44 @@ const defaultsBy = new Map(
   ]),
 );
 
+const variants = [];
+for (const token of tokens) {
+  if (token.node.themes === undefined) continue;
+  if (
+    !token.node.themes ||
+    typeof token.node.themes !== "object" ||
+    Array.isArray(token.node.themes)
+  ) {
+    fail(token.file, `${token.path}.themes must be an object keyed by light or dark.`);
+    continue;
+  }
+  for (const [theme, variant] of Object.entries(token.node.themes)) {
+    if (
+      !themed.has(theme) ||
+      !variant ||
+      typeof variant !== "object" ||
+      Object.keys(variant).some((key) => !["$value", "source"].includes(key))
+    ) {
+      fail(
+        token.file,
+        `${token.path}.themes.${theme} must contain only $value and source for light or dark.`,
+      );
+      continue;
+    }
+    variants.push({
+      ...token,
+      theme,
+      path: `${token.path}.themes.${theme}`,
+      node: { ...variant, cssVar: token.node.cssVar },
+    });
+  }
+}
+
 // ------------------------------------------------------------------ rules D + E + F
 const columnTokens = [];
 const backed = new Set();
 
-for (const t of tokens) {
+for (const t of [...tokens, ...variants]) {
   const { file, path, node } = t;
   const at = `${file} (${path})`;
   if (/(^|\.)column\.\d+$/.test(path)) {
@@ -639,13 +669,14 @@ for (const t of tokens) {
       `${basename(file)} is not one of the token categories (${[...CATEGORIES].join(", ")}). The category decides which host scale a value is measured against, so a new file is a new rule and has to be taught to the guard, not just created.`,
     );
   }
-  if (backed.has(cssVar)) {
+  const backingKey = t.theme ? `${t.theme}:${cssVar}` : cssVar;
+  if (backed.has(backingKey)) {
     fail(
       at,
       `${cssVar} already has metadata elsewhere in ${TOKENS_JSON_DIR}. Two entries for one token means two reasons and two categories for the same value, and only one of them is being read.`,
     );
   }
-  backed.add(cssVar);
+  backed.add(backingKey);
   const source = node.source;
   const isAlias = typeof source?.alias === "string";
   const isOwned = source?.owned === true;
@@ -656,11 +687,11 @@ for (const t of tokens) {
     );
     continue;
   }
-  const decl = declared.get(cssVar);
+  const decl = (t.theme ? themed.get(t.theme) : declared).get(cssVar);
   if (!decl) {
     fail(
       at,
-      `expects ${cssVar} in the .folia-scope block of ${TOKENS_CSS}, but it is not declared there.`,
+      `expects ${cssVar} in the ${t.theme ? `.theme-${t.theme} .folia-scope` : ".folia-scope"} block of ${TOKENS_CSS}, but it is not declared there.`,
     );
     continue;
   }
@@ -740,12 +771,14 @@ for (const t of tokens) {
   }
 }
 
-for (const [cssVar, decl] of declared) {
-  if (!backed.has(cssVar)) {
-    fail(
-      `${TOKENS_CSS}:${decl.line}`,
-      `${cssVar} has no metadata in ${TOKENS_JSON_DIR} — a token without a recorded source is neither an alias nor an owned value, which is the one thing this layer does not allow.`,
-    );
+for (const [theme, declarations] of [[null, declared], ...themed]) {
+  for (const [cssVar, decl] of declarations) {
+    if (!backed.has(theme ? `${theme}:${cssVar}` : cssVar)) {
+      fail(
+        `${TOKENS_CSS}:${decl.line}`,
+        `${cssVar}${theme ? ` (${theme})` : ""} has no metadata in ${TOKENS_JSON_DIR}.`,
+      );
+    }
   }
 }
 

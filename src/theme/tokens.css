@@ -273,3 +273,12 @@
   --folia-urgency-color: transparent;
   --folia-urgency-tint: transparent;
 }
+
+.theme-light .folia-scope {
+  --folia-shadow-card: 0 1px 1px rgba(0, 0, 0, 0.08);
+  --folia-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --folia-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --folia-shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.14);
+  --folia-shadow-panel: -4px 0 16px rgba(0, 0, 0, 0.1);
+  --folia-scrim: rgba(0, 0, 0, 0.2);
+}

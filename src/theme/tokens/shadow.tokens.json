@@ -6,6 +6,15 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    },
+    "themes": {
+      "light": {
+        "$value": "0 1px 1px rgba(0, 0, 0, 0.08)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "card-hover": {
@@ -14,6 +23,15 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    },
+    "themes": {
+      "light": {
+        "$value": "0 2px 8px rgba(0, 0, 0, 0.12)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "overlay": {
@@ -22,6 +40,15 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    },
+    "themes": {
+      "light": {
+        "$value": "0 8px 24px rgba(0, 0, 0, 0.2)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "popover": {
@@ -30,6 +57,15 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    },
+    "themes": {
+      "light": {
+        "$value": "0 4px 12px rgba(0, 0, 0, 0.14)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "panel": {
@@ -38,6 +74,15 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    },
+    "themes": {
+      "light": {
+        "$value": "-4px 0 16px rgba(0, 0, 0, 0.1)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "ring": {

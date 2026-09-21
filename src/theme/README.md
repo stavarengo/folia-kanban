@@ -4,7 +4,7 @@ Everything that paints the plugin lives here. `index.css` is the bundle esbuild 
 
 ## The one rule: alias or owned
 
-`tokens.css` holds the `.folia-scope` block and nothing else. Every `--folia-*` token in it is one of two things:
+`tokens.css` holds one `.folia-scope` base block, followed by optional `.theme-light .folia-scope` and `.theme-dark .folia-scope` overrides. Every `--folia-*` token in it is one of two things:
 
 - **an alias** of a CSS variable Obsidian's developer docs publish, written as exactly `var(--radius-m)` with no fallback;
 - **owned**, with a reason in its JSON metadata saying what Obsidian has no answer for.
@@ -31,3 +31,9 @@ The guard asks an owned token to become an alias whenever Obsidian already docum
 Plain pixel lengths in spacing, size and runtime tokens must use the host grid, including arithmetic for dimensions larger than its published rungs. An off-grid exception must name the nearest rung with `despite` and explain why it cannot follow that rung.
 
 Icon containers set the documented `--icon-size` and `--icon-stroke` shorthands from the host icon scale. These two host properties may be assigned in component rules; their values still pass the raw-value and variable checks. `Icon` reads them through CSS and has no numeric size prop.
+
+## Scheme overrides
+
+A token may add `themes.light` or `themes.dark` metadata containing its scheme-specific `$value` and `source`. The CSS override must match that value and appear in the corresponding rule in `tokens.css`. Rule D rejects other selectors, duplicate rules or declarations, overrides without a base token, missing metadata and non-token declarations in scheme rules. Source validation and cycle checks run for each scheme as well as the base. Component files cannot declare scheme overrides.
+
+The five elevation shadows and the scrim use lighter light-mode values. Base values remain the dark-mode defaults. Declare scheme values on `.folia-scope` descendants of the theme class so body-portalled menus and dialogs receive them too.

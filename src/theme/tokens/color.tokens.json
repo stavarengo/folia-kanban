@@ -35,6 +35,15 @@
     "source": {
       "owned": true,
       "reason": "the dimming behind a dialog; Obsidian's modal background is a later phase (audit 02-34)."
+    },
+    "themes": {
+      "light": {
+        "$value": "rgba(0, 0, 0, 0.2)",
+        "source": {
+          "owned": true,
+          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+        }
+      }
     }
   },
   "priority": {
