@@ -48,14 +48,22 @@
   height: var(--folia-hit-md);
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--folia-icon-color);
   cursor: var(--folia-cursor-control);
   border-radius: var(--folia-r-sm);
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
 .folia-icon-btn:hover {
   background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  color: var(--folia-icon-color-hover);
+}
+.folia-icon-btn:focus-visible {
+  color: var(--folia-icon-color-focused);
+}
+/* After :hover and :focus-visible on purpose: all three weigh the same, so the pressed state only
+   wins while the pointer is down if it is written last. */
+.folia-icon-btn:active:not(:disabled) {
+  color: var(--folia-icon-color-active);
 }
 /* Doubled to stay above `.folia-icon-btn.folia-icon-btn`, which is doubled for the theme's sake:
    a rule that only refines another button rule has to carry the same weight, or the refinement is

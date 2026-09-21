@@ -17,8 +17,15 @@
 .folia-card-subitems-toggle:focus-visible {
   color: var(--text-normal);
 }
+/* The chevron carries its own colour rather than the label's, and a different one when collapsed:
+   that pair is what Obsidian uses for every collapse arrow in the app, and it is the one distinction
+   this control was not making at all. */
 .folia-card-subitems-toggle .folia-icon {
+  color: var(--folia-collapse-icon);
   transition: transform var(--folia-dur-fast) var(--folia-ease);
+}
+.folia-card-subitems-toggle .folia-icon.is-collapsed {
+  color: var(--folia-collapse-icon-collapsed);
 }
 /* Unscoped so the same "points right when collapsed" reading also works for the static
    collapse-all/expand-all menu icons (ColumnMenu), which aren't inside `.folia-card-subitems-toggle`. */

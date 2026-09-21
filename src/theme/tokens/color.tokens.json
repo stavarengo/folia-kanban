@@ -192,6 +192,48 @@
       "alias": "--color-green"
     }
   },
+  "icon-color": {
+    "$value": "var(--icon-color)",
+    "cssVar": "--folia-icon-color",
+    "source": {
+      "alias": "--icon-color"
+    }
+  },
+  "icon-color-hover": {
+    "$value": "var(--icon-color-hover)",
+    "cssVar": "--folia-icon-color-hover",
+    "source": {
+      "alias": "--icon-color-hover"
+    }
+  },
+  "icon-color-active": {
+    "$value": "var(--icon-color-active)",
+    "cssVar": "--folia-icon-color-active",
+    "source": {
+      "alias": "--icon-color-active"
+    }
+  },
+  "icon-color-focused": {
+    "$value": "var(--icon-color-focused)",
+    "cssVar": "--folia-icon-color-focused",
+    "source": {
+      "alias": "--icon-color-focused"
+    }
+  },
+  "collapse-icon": {
+    "$value": "var(--nav-collapse-icon-color)",
+    "cssVar": "--folia-collapse-icon",
+    "source": {
+      "alias": "--nav-collapse-icon-color"
+    }
+  },
+  "collapse-icon-collapsed": {
+    "$value": "var(--nav-collapse-icon-color-collapsed)",
+    "cssVar": "--folia-collapse-icon-collapsed",
+    "source": {
+      "alias": "--nav-collapse-icon-color-collapsed"
+    }
+  },
   "column": {
     "1": {
       "$value": "#4c9aff"
