@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Produces the documented host-variable registry so theme guards can check Obsidian aliases.
+// Conflicting fields keep the first non-empty value in sorted page order and record its page.
 
 import { execFileSync } from "node:child_process";
 import {
@@ -14,11 +15,18 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const docsRoot = resolve(process.argv[2] ?? join(root, "tmp/docs/obsidian-developer-docs"));
-const candidates = ["en/Reference/CSS variables", "Reference/CSS variables"].map((path) =>
-  join(docsRoot, path),
-);
-const docsPath = candidates.find((path) => existsSync(path));
+const args = process.argv.slice(2);
+const check = args.includes("--check");
+const positional = args.filter((arg) => arg !== "--check");
+if (positional.length > 1 || positional.some((arg) => arg.startsWith("--"))) {
+  console.error("Usage: sync-host-variables.mjs [docs-root] [--check]");
+  process.exit(1);
+}
+const docsRoot = resolve(positional[0] ?? join(root, "tmp/docs/obsidian-developer-docs"));
+const layouts = ["en/Reference/CSS variables", "Reference/CSS variables"];
+const sourcePath = layouts.find((path) => existsSync(join(docsRoot, path)));
+const candidates = layouts.map((path) => join(docsRoot, path));
+const docsPath = sourcePath && join(docsRoot, sourcePath);
 if (!docsPath) {
   console.error(
     `sync-host-variables: No CSS-variable docs found. Tried ${candidates.join(" and ")}. Get a checkout with: git clone --depth 1 https://github.com/obsidianmd/obsidian-developer-docs`,
@@ -76,6 +84,7 @@ function warn(message) {
 for (const page of pages) {
   const lines = readFileSync(join(docsPath, page), "utf8").split(/\r?\n/);
   let columns = null;
+  let defaultColumns = [];
   let fence = null;
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
@@ -104,11 +113,22 @@ for (const page of pages) {
     const separator = cells(lines[index + 1] ?? "");
     if (separator?.length === row.length && separator.every((cell) => /^:?-+:?$/.test(cell))) {
       columns = row.map((cell) => cell.replace(/`/g, "").trim().toLowerCase());
-      const defaults = columns.filter((column) => /^default(?:\b|_)/.test(column));
-      if (defaults.length > 1) {
-        warn(
-          `${page}:${index + 1}: multiple default columns (${defaults.join(", ")}); keeping ${defaults[0]}`,
-        );
+      defaultColumns = columns.flatMap((column, index) =>
+        /^default(?:\b|_)/.test(column)
+          ? [{ index, mode: /\b(light|dark)\b/.exec(column)?.[1] }]
+          : [],
+      );
+      if (
+        defaultColumns.length > 0 &&
+        !(defaultColumns.length === 1 && !defaultColumns[0].mode) &&
+        !(
+          defaultColumns.length === 2 &&
+          new Set(defaultColumns.map(({ mode }) => mode)).size === 2 &&
+          defaultColumns.every(({ mode }) => mode)
+        )
+      ) {
+        warn(`${page}:${index + 1}: unsupported default columns`);
+        defaultColumns = [];
       }
       index++;
       continue;
@@ -121,25 +141,47 @@ for (const page of pages) {
     }
     const entry = variables.get(name) ?? { pages: [] };
     if (!entry.pages.includes(page)) entry.pages.push(page);
-    for (const [field, column] of [
-      ["default", columns.findIndex((value) => /^default(?:\b|_)/.test(value))],
-      ["description", columns.findIndex((value) => value === "description")],
-    ]) {
-      if (column < 0) continue;
-      const value = (row[column] ?? "").replace(/`/g, "");
-      const originKey = `${name}:${field}`;
-      if (Object.hasOwn(entry, field)) {
-        if (entry[field] !== value) {
-          warn(
-            `${name} ${field} differs between ${origins.get(originKey)} and ${page}; keeping the first`,
-          );
-        }
+    const valueAt = (column) => row[column]?.replace(/`/g, "").trim();
+    let defaultValue;
+    if (defaultColumns.length === 1) {
+      defaultValue = valueAt(defaultColumns[0].index);
+    } else if (defaultColumns.length === 2) {
+      const values = defaultColumns.map(({ index, mode }) => [mode, valueAt(index)]);
+      if (values.every(([, value]) => value)) {
+        defaultValue = Object.fromEntries(values.sort(([a], [b]) => a.localeCompare(b)));
       } else {
-        entry[field] = value;
-        origins.set(originKey, page);
+        warn(`${page}:${index + 1}: ${name} has an incomplete mode-specific default`);
       }
     }
+    for (const [field, value] of [
+      ["default", defaultValue],
+      ["description", valueAt(columns.indexOf("description"))],
+    ]) {
+      if (value === undefined) continue;
+      const originKey = `${name}:${field}`;
+      const observations = origins.get(originKey) ?? [];
+      observations.push({ page, value });
+      origins.set(originKey, observations);
+      if (value && !Object.hasOwn(entry, field)) entry[field] = value;
+    }
     variables.set(name, entry);
+  }
+}
+
+for (const [name, entry] of variables) {
+  entry.scope = entry.pages.every((page) => page.startsWith("Publish/")) ? "publish" : "app";
+  for (const field of ["default", "description"]) {
+    if (!Object.hasOwn(entry, field)) continue;
+    const observations = origins.get(`${name}:${field}`);
+    const winner = observations.find(({ value }) => value);
+    if (
+      observations.some(
+        ({ page, value }) =>
+          page !== winner.page && JSON.stringify(value) !== JSON.stringify(winner.value),
+      )
+    ) {
+      entry[`${field}From`] = winner.page;
+    }
   }
 }
 
@@ -156,14 +198,12 @@ function sortedKeys(value) {
 const output = sortedKeys({
   $source: {
     repository: "obsidianmd/obsidian-developer-docs",
-    path: "en/Reference/CSS variables",
+    path: sourcePath,
     commit,
-    syncedOn: new Date().toISOString().slice(0, 10),
   },
   variables: Object.fromEntries(variables),
 });
 const destination = join(root, "src/theme/host/variables.json");
-mkdirSync(dirname(destination), { recursive: true });
 // Keep short page arrays inline to match the repository's JSON formatting without dependencies.
 const json = JSON.stringify(output, null, 2).replace(
   /^( +)"pages": \[\n([\s\S]*?)\n\1\]/gm,
@@ -175,7 +215,16 @@ const json = JSON.stringify(output, null, 2).replace(
     return compact.length <= 100 ? compact : block;
   },
 );
-writeFileSync(destination, json + "\n");
+if (check) {
+  if (!existsSync(destination) || readFileSync(destination, "utf8") !== json + "\n") {
+    console.error("sync-host-variables: registry has drifted; run without --check to regenerate");
+    process.exitCode = 1;
+  }
+} else if (warnings === 0) {
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, json + "\n");
+}
+if (warnings > 0) process.exitCode = 1;
 console.error(
   `sync-host-variables: ${pages.length} pages read, ${variables.size} variables found, ${warnings} warnings`,
 );

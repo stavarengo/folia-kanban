@@ -2,2709 +2,3485 @@
   "$source": {
     "commit": "c56c7e770ba25dd0ea392aacf4588f9425970d36",
     "path": "en/Reference/CSS variables",
-    "repository": "obsidianmd/obsidian-developer-docs",
-    "syncedOn": "2026-09-21"
+    "repository": "obsidianmd/obsidian-developer-docs"
   },
   "variables": {
     "--accent-h": {
       "default": "258",
       "description": "Accent hue",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--accent-l": {
       "default": "66%",
       "description": "Accent lightness",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--accent-s": {
       "default": "88%",
       "description": "Accent saturation",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-active-hover": {
       "description": "Active hovered elements",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-border": {
       "description": "Border color",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-border-focus": {
       "description": "Border color (focus)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-border-hover": {
       "description": "Border color (hover)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-error": {
       "description": "Error background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-error-hover": {
       "description": "Error background (hover)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-error-rgb": {
       "description": "Error background, RGB value",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-form-field": {
       "description": "Form field background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-hover": {
       "description": "Hovered elements",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-message": {
       "description": "Messages background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-success": {
       "description": "Success background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-modifier-success-rgb": {
       "description": "Success background, RGB value",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-primary": {
       "description": "Primary background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-primary-alt": {
       "description": "Background for surfaces on top of primary background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-secondary": {
       "description": "Secondary background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--background-secondary-alt": {
       "description": "Background for surfaces on top of secondary background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--bases-cards-background": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-border-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-container-background": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-cover-background": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-group-padding": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-line-height": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-scale": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-shadow": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-cards-shadow-hover": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-embed-border-color": {
       "description": "Border color around base view when embedded",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-embed-border-radius": {
       "description": "Radius around base view when embedded",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-embed-border-width": {
       "description": "Border width around base view when embedded",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-filter-menu-width": {
       "description": "Width of the filter menu",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-header-border-width": {
       "description": "Width of border around the header area",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-header-height": {
       "description": "Height of the base header area that contains the toolbar",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-header-padding-end": {
       "description": "End padding (right in [[Right-to-left|LTR]] mode)",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-header-padding-start": {
       "description": "Start padding (left in [[Right-to-left|LTR]] mode)",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-border-color": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-cell-background-active": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-cell-background-disabled": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-cell-radius-active": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-cell-shadow-active": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-column-border-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-column-max-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-column-min-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-container-border-radius": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-container-border-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-background": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-background-hover": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-color": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-icon-display": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-sort-mask": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-header-weight": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-row-background-hover": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-row-border-width": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-row-height": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-table-text-size": {
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-toolbar-badge-display": {
       "description": "Display of toolbar number badges",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--bases-toolbar-label-display": {
       "description": "Display of toolbar button labels",
-      "pages": ["Editor/Bases.md"]
+      "pages": ["Editor/Bases.md"],
+      "scope": "app"
     },
     "--blockquote-background-color": {
       "description": "Blockquote background color",
-      "pages": ["Editor/Blockquote.md"]
+      "pages": ["Editor/Blockquote.md"],
+      "scope": "app"
     },
     "--blockquote-border-color": {
       "description": "Blockquote left border color",
-      "pages": ["Editor/Blockquote.md"]
+      "pages": ["Editor/Blockquote.md"],
+      "scope": "app"
     },
     "--blockquote-border-thickness": {
       "description": "Blockquote left border thickness",
-      "pages": ["Editor/Blockquote.md"]
+      "pages": ["Editor/Blockquote.md"],
+      "scope": "app"
     },
     "--blockquote-color": {
       "description": "Blockquote text color",
-      "pages": ["Editor/Blockquote.md"]
+      "pages": ["Editor/Blockquote.md"],
+      "scope": "app"
     },
     "--blockquote-font-style": {
       "description": "Blockquote font style (e.g. normal, italic)",
-      "pages": ["Editor/Blockquote.md"]
+      "pages": ["Editor/Blockquote.md"],
+      "scope": "app"
     },
     "--bold-color": {
       "description": "Bold text color",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--bold-modifier": {
       "description": "Added weight for bolded text",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--bold-weight": {
       "description": "Bold text font weight",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--border-width": {
       "default": "1px",
-      "pages": ["Foundations/Borders.md"]
+      "pages": ["Foundations/Borders.md"],
+      "scope": "app"
     },
     "--button-radius": {
       "description": "Button radius",
-      "pages": ["Components/Button.md"]
+      "pages": ["Components/Button.md"],
+      "scope": "app"
     },
     "--callout-blend-mode": {
       "description": "Callout blend mode, allows color mixing for nested callouts",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-border-opacity": {
       "description": "Callout border opacity",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-border-width": {
       "description": "Callout border width",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-bug": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-color": {
       "description": "Callout background color. Accepts any valid CSS color, for example a hex code (#000000) or an rgb() value",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-content-background": {
       "description": "Callout content background color",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-content-padding": {
       "description": "Callout content padding",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-default": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-error": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-example": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-fail": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-icon": {
       "description": "Callout icon. Accepts an icon ID from [lucide.dev](https://lucide.dev), or an SVG element",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-important": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-info": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-padding": {
       "description": "Callout padding",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-question": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-quote": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-radius": {
       "description": "Callout radius",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-success": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-summary": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-tip": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-title-color": {
       "description": "Callout title text color",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-title-padding": {
       "description": "Callout title padding",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-title-size": {
       "description": "Callout title font size",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-title-weight": {
       "description": "Callout title weight",
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-todo": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--callout-warning": {
-      "pages": ["Editor/Callout.md"]
+      "pages": ["Editor/Callout.md"],
+      "scope": "app"
     },
     "--canvas-background": {
       "description": "Canvas background color",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-card-label-color": {
       "description": "Canvas card label text color",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-1": {
       "description": "Canvas card color 1, var(--color-red) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-2": {
       "description": "Canvas card color 2, var(--color-orange) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-3": {
       "description": "Canvas card color 3, var(--color-yellow) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-4": {
       "description": "Canvas card color 4, var(--color-green) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-5": {
       "description": "Canvas card color 5, var(--color-cyan) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-color-6": {
       "description": "Canvas card color 6, var(--color-purple) by default",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--canvas-dot-pattern": {
       "description": "Canvas dot pattern color",
-      "pages": ["Plugins/Canvas.md"]
+      "pages": ["Plugins/Canvas.md"],
+      "scope": "app"
     },
     "--caret-color": {
       "description": "Caret color",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--checkbox-border-color": {
       "description": "Unchecked border color",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-border-color-hover": {
       "description": "Unchecked border color (hover)",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-color": {
       "description": "Background color",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-color-hover": {
       "description": "Background color (hover)",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-margin-inline-start": {
       "description": "start margin",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-marker-color": {
       "description": "Marker color for the check itself",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-radius": {
       "description": "Radius",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checkbox-size": {
       "description": "Height and width",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checklist-done-color": {
       "description": "Checked text color",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--checklist-done-decoration": {
       "description": "Checked text decoration",
-      "pages": ["Components/Checkbox.md"]
+      "pages": ["Components/Checkbox.md"],
+      "scope": "app"
     },
     "--clickable-icon-radius": {
       "description": "Clickable icon button radius",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--code-background": {
       "description": "Code background color",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-comment": {
       "description": "Comments",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-function": {
       "description": "Functions",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-important": {
       "description": "Important, regex",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-keyword": {
       "description": "Keywords",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-normal": {
       "description": "Non-highlighted syntax",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-operator": {
       "description": "Operators",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-property": {
       "description": "Properties",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-punctuation": {
       "description": "Punctuation",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-size": {
       "description": "Code font size",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-string": {
       "description": "Strings",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-tag": {
       "description": "Tags, symbols, constants",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-value": {
       "description": "Values",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--code-white-space": {
       "description": "Code white-space",
-      "pages": ["Editor/Code.md"]
+      "pages": ["Editor/Code.md"],
+      "scope": "app"
     },
     "--color-accent": {
       "description": "The accent color",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-accent-1": {
       "description": "A shifted accent shade, used for hover and active states",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-accent-2": {
       "description": "A further-shifted accent shade, used for hover and active states",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-00": {
-      "default": "#ffffff",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#1c1c1c",
+        "light": "#ffffff"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-05": {
-      "default": "#fcfcfc",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#212121",
+        "light": "#fcfcfc"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-10": {
-      "default": "#fafafa",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#232323",
+        "light": "#fafafa"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-100": {
-      "default": "#222222",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#dadada",
+        "light": "#222222"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-20": {
-      "default": "#f6f6f6",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#282828",
+        "light": "#f6f6f6"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-25": {
-      "default": "#efefef",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#2e2e2e",
+        "light": "#efefef"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-30": {
-      "default": "#e4e4e4",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#333333",
+        "light": "#e4e4e4"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-35": {
-      "default": "#dadada",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#3f3f3f",
+        "light": "#dadada"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-40": {
-      "default": "#bdbdbd",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#555555",
+        "light": "#bdbdbd"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-50": {
-      "default": "#ababab",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#666666",
+        "light": "#ababab"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-60": {
-      "default": "#707070",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#999999",
+        "light": "#707070"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-base-70": {
-      "default": "#5c5c5c",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#b3b3b3",
+        "light": "#5c5c5c"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-blue": {
-      "default": "#086ddd",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#027aff",
+        "light": "#086ddd"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-blue-rgb": {
-      "default": "8, 109, 221",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "2, 122, 255",
+        "light": "8, 109, 221"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-cyan": {
-      "default": "#00bfbc",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#53dfdd",
+        "light": "#00bfbc"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-cyan-rgb": {
-      "default": "0, 191, 188",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "83, 223, 221",
+        "light": "0, 191, 188"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-green": {
-      "default": "#08b94e",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#44cf6e",
+        "light": "#08b94e"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-green-rgb": {
-      "default": "8, 185, 78",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "68, 207, 110",
+        "light": "8, 185, 78"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-orange": {
-      "default": "#ec7500",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#e9973f",
+        "light": "#ec7500"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-orange-rgb": {
-      "default": "236, 117, 0",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "233, 151, 63",
+        "light": "236, 117, 0"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-pink": {
-      "default": "#d53984",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#fa99cd",
+        "light": "#d53984"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-pink-rgb": {
-      "default": "213, 57, 132",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "250, 153, 205",
+        "light": "213, 57, 132"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-purple": {
-      "default": "#7852ee",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#a882ff",
+        "light": "#7852ee"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-purple-rgb": {
-      "default": "120, 82, 238",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "168, 130, 255",
+        "light": "120, 82, 238"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-red": {
-      "default": "#e93147",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#fb464c",
+        "light": "#e93147"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-red-rgb": {
-      "default": "233, 49, 71",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "251, 70, 76",
+        "light": "233, 49, 71"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-yellow": {
-      "default": "#e0ac00",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "#e0de71",
+        "light": "#e0ac00"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--color-yellow-rgb": {
-      "default": "224, 172, 0",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "224, 222, 113",
+        "light": "224, 172, 0"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--component-title-color": {
       "description": "Font color",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-font": {
       "description": "Font family",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-size": {
       "description": "Font size",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-style": {
       "description": "Font style, e.g. normal or italic",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-transform": {
       "description": "Text transform, e.g. uppercase",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-variant": {
       "description": "Font variant",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--component-title-weight": {
       "description": "Font weight",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--cursor": {
       "default": "default",
       "description": "Cursor for interactive elements",
-      "pages": ["Foundations/Cursor.md"]
+      "pages": ["Foundations/Cursor.md"],
+      "scope": "app"
     },
     "--cursor-link": {
       "default": "pointer",
       "description": "Cursor for links",
-      "pages": ["Foundations/Cursor.md"]
+      "pages": ["Foundations/Cursor.md"],
+      "scope": "app"
     },
     "--dialog-max-height": {
       "description": "Dialog maximum height",
-      "pages": ["Components/Dialog.md"]
+      "pages": ["Components/Dialog.md"],
+      "scope": "app"
     },
     "--dialog-max-width": {
       "description": "Dialog maximum width",
-      "pages": ["Components/Dialog.md"]
+      "pages": ["Components/Dialog.md"],
+      "scope": "app"
     },
     "--dialog-width": {
       "description": "Dialog default width",
-      "pages": ["Components/Dialog.md"]
+      "pages": ["Components/Dialog.md"],
+      "scope": "app"
     },
     "--divider-color": {
       "description": "Divider border color",
-      "pages": ["Window/Divider.md"]
+      "pages": ["Window/Divider.md"],
+      "scope": "app"
     },
     "--divider-color-hover": {
       "description": "Divider border color (hover)",
-      "pages": ["Window/Divider.md"]
+      "pages": ["Window/Divider.md"],
+      "scope": "app"
     },
     "--divider-vertical-height": {
       "description": "Divider vertical height",
-      "pages": ["Window/Divider.md"]
+      "pages": ["Window/Divider.md"],
+      "scope": "app"
     },
     "--divider-width": {
       "description": "Divider border width",
-      "pages": ["Window/Divider.md"]
+      "pages": ["Window/Divider.md"],
+      "scope": "app"
     },
     "--divider-width-hover": {
       "description": "Divider border width (hover)",
-      "pages": ["Window/Divider.md"]
+      "pages": ["Window/Divider.md"],
+      "scope": "app"
     },
     "--drag-ghost-background": {
       "description": "Drag ghost background color",
-      "pages": ["Components/Dragging.md"]
+      "pages": ["Components/Dragging.md"],
+      "scope": "app"
     },
     "--drag-ghost-text-color": {
       "description": "Drag ghost text color",
-      "pages": ["Components/Dragging.md"]
+      "pages": ["Components/Dragging.md"],
+      "scope": "app"
     },
     "--dropdown-background": {
       "description": "Background color",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--dropdown-background-blend-mode": {
       "description": "Background blend mode",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--dropdown-background-hover": {
       "description": "Background color (hover)",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--dropdown-background-position": {
       "description": "Background position",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--dropdown-background-size": {
       "description": "Background size",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--dropdown-padding": {
       "description": "Padding",
-      "pages": ["Components/Dropdowns.md"]
+      "pages": ["Components/Dropdowns.md"],
+      "scope": "app"
     },
     "--embed-background": {
       "description": "Embed background color",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-block-shadow-hover": {
       "description": "Hover shadow for rendered embed blocks in Live Preview",
-      "pages": ["Editor/Block.md"]
+      "pages": ["Editor/Block.md"],
+      "scope": "app"
     },
     "--embed-border-bottom": {
       "description": "Embed bottom border, shorthand property",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-border-end": {
       "description": "Embed end border, shorthand property",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-border-start": {
       "description": "Embed start border, shorthand property",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-border-top": {
       "description": "Embed top border, shorthand property",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-canvas-max-height": {
       "description": "Embedded Canvas element max height",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-font-style": {
       "description": "Embed font-style",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-max-height": {
       "description": "Embed max height",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--embed-padding": {
       "description": "Embedd padding",
-      "pages": ["Editor/Embed.md"]
+      "pages": ["Editor/Embed.md"],
+      "scope": "app"
     },
     "--file-folding-offset": {
       "description": "Width of the line offset for fold indicators",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-header-border": {
       "description": "File header border-bottom property",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-header-font-size": {
       "description": "File header font size",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-header-font-weight": {
       "description": "File header font weight",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-header-justify": {
       "description": "File header text alignment, uses justify-content",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-line-width": {
       "description": "Width of a line when readable line width is turned on",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--file-margins": {
       "description": "File margins",
-      "pages": ["Editor/File.md"]
+      "pages": ["Editor/File.md"],
+      "scope": "app"
     },
     "--font-black": {
       "default": "900",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-bold": {
       "default": "700",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-extrabold": {
       "default": "800",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-extralight": {
       "default": "200",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-interface-theme": {
       "description": "Font used for UI elements",
-      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"]
+      "descriptionFrom": "Foundations/Typography.md",
+      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"],
+      "scope": "app"
     },
     "--font-light": {
       "default": "300",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-medium": {
       "default": "500",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-monospace-theme": {
       "description": "Font used for monospaced content such as code blocks and inline code",
-      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"]
+      "descriptionFrom": "Foundations/Typography.md",
+      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"],
+      "scope": "app"
     },
     "--font-normal": {
       "default": "400",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-semibold": {
       "default": "600",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-small": {
       "default": "0.933em",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-smaller": {
       "default": "0.875em",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-smallest": {
       "default": "0.8em",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-text-size": {
       "default": "16px",
       "description": "Editor font size. Defined by the user under Appearance settings.",
-      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"]
+      "descriptionFrom": "Foundations/Typography.md",
+      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"],
+      "scope": "app"
     },
     "--font-text-theme": {
       "description": "Font used for text in the editor",
-      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"]
+      "descriptionFrom": "Foundations/Typography.md",
+      "pages": ["Foundations/Typography.md", "Publish/Site fonts.md"],
+      "scope": "app"
     },
     "--font-thin": {
       "default": "100",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-ui-large": {
       "default": "20px",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-ui-medium": {
       "default": "15px",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-ui-small": {
       "default": "13px",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-ui-smaller": {
       "default": "12px",
-      "description": "",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--font-weight": {
       "description": "Regular text weight",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--footer-display": {
       "description": "Footer display",
-      "pages": ["Publish/Site footer.md"]
+      "pages": ["Publish/Site footer.md"],
+      "scope": "publish"
     },
     "--footnote-size": {
       "description": "Footnote font size",
-      "pages": ["Editor/Footnote.md"]
+      "pages": ["Editor/Footnote.md"],
+      "scope": "app"
     },
     "--graph-controls-width": {
       "description": "Graph controls width",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-height": {
       "description": "Height of the graph component",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--graph-line": {
       "description": "Line color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-node": {
       "description": "Resolved node color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-node-attachment": {
       "description": "Attachment node color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-node-focused": {
       "description": "Focused node color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-node-tag": {
       "description": "Tag node color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-node-unresolved": {
       "description": "Unresolved node color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--graph-text": {
       "description": "Node text color",
-      "pages": ["Plugins/Graph.md"]
+      "pages": ["Plugins/Graph.md"],
+      "scope": "app"
     },
     "--h1-color": {
       "description": "H1 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-font": {
       "description": "H1 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-line-height": {
       "description": "H1 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-size": {
       "description": "H1 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-style": {
       "description": "H1 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-variant": {
       "description": "H1 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h1-weight": {
       "description": "H1 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-color": {
       "description": "H2 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-font": {
       "description": "H2 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-line-height": {
       "description": "H2 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-size": {
       "description": "H2 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-style": {
       "description": "H2 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-variant": {
       "description": "H2 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h2-weight": {
       "description": "H2 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-color": {
       "description": "H3 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-font": {
       "description": "H3 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-line-height": {
       "description": "H3 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-size": {
       "description": "H3 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-style": {
       "description": "H3 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-variant": {
       "description": "H3 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h3-weight": {
       "description": "H3 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-color": {
       "description": "H4 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-font": {
       "description": "H4 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-line-height": {
       "description": "H4 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-size": {
       "description": "H4 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-style": {
       "description": "H4 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-variant": {
       "description": "H4 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h4-weight": {
       "description": "H4 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-color": {
       "description": "H5 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-font": {
       "description": "H5 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-line-height": {
       "description": "H5 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-size": {
       "description": "H5 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-style": {
       "description": "H5 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-variant": {
       "description": "H5 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h5-weight": {
       "description": "H5 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-color": {
       "description": "H6 text color",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-font": {
       "description": "H6 font family",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-line-height": {
       "description": "H6 line height",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-size": {
       "description": "H6 font size",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-style": {
       "description": "H6 font style",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-variant": {
       "description": "H6 font variant",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--h6-weight": {
       "description": "H6 font weight",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--header-height": {
       "description": "Height of the site header",
-      "pages": ["Publish/Site header.md", "Window/Window frame.md"]
+      "descriptionFrom": "Publish/Site header.md",
+      "pages": ["Publish/Site header.md", "Window/Window frame.md"],
+      "scope": "app"
     },
     "--heading-formatting": {
       "description": "Text color for Markdown heading depth syntax",
-      "pages": ["Editor/Headings.md"]
+      "pages": ["Editor/Headings.md"],
+      "scope": "app"
     },
     "--heading-spacing": {
       "description": "Spacing above headings, see [[Typography]]",
-      "pages": ["Editor/Headings.md", "Foundations/Typography.md"]
+      "descriptionFrom": "Editor/Headings.md",
+      "pages": ["Editor/Headings.md", "Foundations/Typography.md"],
+      "scope": "app"
     },
     "--hr-color": {
       "description": "Horizontal rule border color",
-      "pages": ["Editor/Horizontal rule.md"]
+      "pages": ["Editor/Horizontal rule.md"],
+      "scope": "app"
     },
     "--hr-thickness": {
       "description": "Horizontal rule border thickness",
-      "pages": ["Editor/Horizontal rule.md"]
+      "pages": ["Editor/Horizontal rule.md"],
+      "scope": "app"
     },
     "--icon-color": {
       "description": "Icon color",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-color-active": {
       "description": "Icon color (active)",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-color-focused": {
       "description": "Icon color (focused)",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-color-hover": {
       "description": "Icon color (hovered)",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-l": {
       "default": "18px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-l-stroke-width": {
       "default": "1.75px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-m": {
       "default": "18px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-m-stroke-width": {
       "default": "1.75px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-opacity": {
       "description": "Icon opacity",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-opacity-active": {
       "description": "Icon opacity (active)",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-opacity-hover": {
       "description": "Icon opacity (hovered)",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-s": {
       "default": "16px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-s-stroke-width": {
       "default": "2px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-size": {
       "description": "Shorthand for icon width and length",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-stroke": {
       "description": "Shorthand for icon stroke width",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-xl": {
       "default": "32px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-xl-stroke-width": {
       "default": "1.25px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-xs": {
       "default": "14px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--icon-xs-stroke-width": {
       "default": "2px",
-      "pages": ["Foundations/Icons.md"]
+      "pages": ["Foundations/Icons.md"],
+      "scope": "app"
     },
     "--indentation-guide-color": {
       "description": "Indentation guide border color",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-color-active": {
       "description": "Indentation guide border color (active)",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-editing-indent": {
       "description": "Width of the indent in edit mode",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-reading-indent": {
       "description": "Width of the indent in read mode",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-source-indent": {
       "description": "Width of the indent in source mode",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-width": {
       "description": "Indentation guide border width",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--indentation-guide-width-active": {
       "description": "Indentation guide border width (active)",
-      "pages": ["Components/Indentation guides.md"]
+      "pages": ["Components/Indentation guides.md"],
+      "scope": "app"
     },
     "--inline-title-color": {
       "description": "Inline title text color",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-font": {
       "description": "Inline title font family",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-line-height": {
       "description": "Inline title line height",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-size": {
       "description": "Inline title font size",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-style": {
       "description": "Inline title font style",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-variant": {
       "description": "Inline title font variant",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--inline-title-weight": {
       "description": "Inline title font weight",
-      "pages": ["Editor/Inline title.md"]
+      "pages": ["Editor/Inline title.md"],
+      "scope": "app"
     },
     "--input-border-width": {
       "description": "Input border width",
-      "pages": ["Components/Text input.md"]
+      "pages": ["Components/Text input.md"],
+      "scope": "app"
     },
     "--input-font-weight": {
       "description": "Input font weight",
-      "pages": ["Components/Text input.md"]
+      "pages": ["Components/Text input.md"],
+      "scope": "app"
     },
     "--input-height": {
       "description": "Input height",
-      "pages": ["Components/Text input.md"]
+      "pages": ["Components/Text input.md"],
+      "scope": "app"
     },
     "--input-radius": {
       "description": "Input radius",
-      "pages": ["Components/Text input.md"]
+      "pages": ["Components/Text input.md"],
+      "scope": "app"
     },
     "--interactive-accent": {
       "description": "Background for accented interactive elements",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--interactive-accent-hover": {
       "description": "Background for accented interactive elements (hover)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--interactive-accent-hsl": {
       "description": "Background for accented interactive elements in HSL",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--interactive-hover": {
       "description": "Background for standard interactive elements (hover)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--interactive-normal": {
       "description": "Background for standard interactive elements",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--italic-color": {
       "description": "Italic text color",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--layer-cover": {
       "default": "5",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-dragged-item": {
       "default": "80",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-menu": {
       "default": "65",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-modal": {
       "default": "50",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-notice": {
       "default": "60",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-popover": {
       "default": "30",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-sidedock": {
       "default": "10",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-slides": {
       "default": "45",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-status-bar": {
       "default": "15",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--layer-tooltip": {
       "default": "70",
-      "pages": ["Foundations/Layers.md"]
+      "pages": ["Foundations/Layers.md"],
+      "scope": "app"
     },
     "--line-height-normal": {
       "default": "1.5",
       "description": "Default line height",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--line-height-tight": {
       "default": "1.3",
       "description": "Used in search results, tree items, tooltips, and other smaller spaces",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--link-color": {
       "description": "Resolved link text color",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-color-hover": {
       "description": "Resolved link text color (hover)",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-decoration": {
       "description": "Resolved link text decoration",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-decoration-hover": {
       "description": "Resolved link text decoration (hover)",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-decoration-thickness": {
       "description": "Resolved link text decoration thickness",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-external-color": {
       "description": "External link text color",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-external-color-hover": {
       "description": "External link text color (hover)",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-external-decoration": {
       "description": "External link text decoration",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-external-decoration-hover": {
       "description": "External link text decoration (hover)",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-unresolved-color": {
       "description": "Unresolved link text color",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-unresolved-decoration-color": {
       "description": "Unresolved link text decoration color",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-unresolved-decoration-style": {
       "description": "Unresolved link text decoration style",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-unresolved-filter": {
       "description": "Unresolved link filter, e.g. hue-rotate",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-unresolved-opacity": {
       "description": "Unresolved link opacity",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--link-weight": {
       "description": "Link font weight",
-      "pages": ["Editor/Link.md"]
+      "pages": ["Editor/Link.md"],
+      "scope": "app"
     },
     "--list-bullet-border": {
       "description": "Bullet border",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-bullet-end-padding": {
       "description": "Padding after the bullet",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-bullet-radius": {
       "description": "Bullet radius",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-bullet-size": {
       "description": "Bullet width/height",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-bullet-transform": {
       "description": "Bullet transform property",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-indent": {
       "description": "Indentation width for nested items",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-indent-editing": {
       "description": "Indent width in Live Preview",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-indent-source": {
       "description": "Indent width in source mode",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-marker-color": {
       "description": "Marker color",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-marker-color-collapsed": {
       "description": "Marker color for collapsed items",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-marker-color-hover": {
       "description": "Marker color (hover)",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-numbered-style": {
       "description": "list-style-type for numbered lists",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--list-spacing": {
       "description": "Vertical spacing between list items",
-      "pages": ["Editor/List.md"]
+      "pages": ["Editor/List.md"],
+      "scope": "app"
     },
     "--logo-height": {
       "description": "Logo default height",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--logo-max-height": {
       "description": "Logo max height",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--logo-max-width": {
       "description": "Logo max width",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--logo-radius": {
       "description": "Logo corner radius",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--logo-width": {
       "description": "Logo default width",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--metadata-background": {
       "description": "Background color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-border-color": {
       "description": "Border color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-border-radius": {
       "description": "Corner radius",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-border-width": {
       "description": "Border width",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-display-editing": {
       "description": "Display in editing mode",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-display-reading": {
       "description": "Display in reading mode",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-divider-color": {
       "description": "Color of divider lines between properties",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-divider-color-focus": {
       "description": "Color of dividers when property (focused)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-divider-color-hover": {
       "description": "Color of dividers when property (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-divider-width": {
       "description": "Width of divider lines",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-gap": {
       "description": "Gap between properties",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-background": {
       "description": "Property input background color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-background-active": {
       "description": "Property input background color (active)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-background-hover": {
       "description": "Property input background color (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-font-size": {
       "description": "Property input font size",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-height": {
       "description": "Property input height",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-input-text-color": {
       "description": "Property input text color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-background-active": {
       "description": "Property label background color (active)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-background-hover": {
       "description": "Property label background color (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-font-size": {
       "description": "Property label font size",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-font-weight": {
       "description": "Property label font weight",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-text-color": {
       "description": "Property label text color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-text-color-hover": {
       "description": "Property label text color (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-label-width": {
       "description": "Property label width",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-max-width": {
       "description": "Max width",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-padding": {
       "description": "Padding",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-background": {
       "description": "Property background color",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-background-active": {
       "description": "Property background color (active)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-background-hover": {
       "description": "Property background color (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-padding": {
       "description": "Property padding",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-radius": {
       "description": "Property corner radius",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-radius-focus": {
       "description": "Property corner radius (focus)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-property-radius-hover": {
       "description": "Property corner radius (hover)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-sidebar-input-font-size": {
       "description": "Property input font size (sidebar)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--metadata-sidebar-label-font-size": {
       "description": "Property label font size (sidebar)",
-      "pages": ["Editor/Properties.md"]
+      "pages": ["Editor/Properties.md"],
+      "scope": "app"
     },
     "--modal-background": {
       "description": "Modal background color",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-border-color": {
       "description": "Modal border color",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-border-width": {
       "description": "Modal border thickness",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-community-sidebar-width": {
       "description": "Community plugin/theme sidebar width",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-height": {
       "description": "Modal default height",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-max-height": {
       "description": "Modal maximum height",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-max-width": {
       "description": "Modal maximum width",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-max-width-narrow": {
       "description": "Narrow modal maximum width",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-radius": {
       "description": "Modal radius",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--modal-width": {
       "description": "Modal default width",
-      "pages": ["Components/Modal.md"]
+      "pages": ["Components/Modal.md"],
+      "scope": "app"
     },
     "--mono-0": {
-      "default": "white",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "black",
+        "light": "white"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--mono-100": {
-      "default": "black",
-      "pages": ["Foundations/Colors.md"]
+      "default": {
+        "dark": "white",
+        "light": "black"
+      },
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--nav-collapse-icon-color": {
       "description": "Nav item collapse chevron color",
-      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"]
+      "descriptionFrom": "Components/Navigation.md",
+      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"],
+      "scope": "app"
     },
     "--nav-collapse-icon-color-collapsed": {
       "description": "Nav item collapse chevron color (collapsed)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-collapse-icon-color-hover": {
       "description": "Collapse icon color (hovered)",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-heading-color": {
       "description": "Nav heading text color",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-heading-color-colapsed-hover": {
       "description": "Collapsed nav heading text color (hover)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-heading-color-collapsed": {
       "description": "Collapsed nav heading text color",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-heading-color-hover": {
       "description": "Nav heading text color (hover)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-heading-weight": {
       "description": "Nav heading font weight",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-heading-weight-hover": {
       "description": "Nav heading font weight (hover)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-indentation-guide-color": {
       "description": "Nav item indentation guide border color",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-indentation-guide-width": {
       "description": "Nav item indentation guide border width",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-background-active": {
       "description": "Nav item background color (active)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-background-hover": {
       "description": "Nav item background color (hover)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-background-selected": {
       "description": "Nav item background color (selected)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-border-color": {
       "description": "Border color for nested items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-item-border-color-active": {
       "description": "Border color for active nested items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-item-border-color-hover": {
       "description": "Border color for hovered nested items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-item-children-margin-start": {
       "description": "Nav item children start margin",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-children-padding-start": {
       "description": "Nav item children start padding",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-color": {
       "description": "Nav item text color",
-      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"]
+      "descriptionFrom": "Components/Navigation.md",
+      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"],
+      "scope": "app"
     },
     "--nav-item-color-active": {
       "description": "Nav item text color (active)",
-      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"]
+      "descriptionFrom": "Components/Navigation.md",
+      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"],
+      "scope": "app"
     },
     "--nav-item-color-highlighted": {
       "description": "Nav item text color (highlighted)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-color-hover": {
       "description": "Nav item text color (hover)",
-      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"]
+      "descriptionFrom": "Components/Navigation.md",
+      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"],
+      "scope": "app"
     },
     "--nav-item-color-selected": {
       "description": "Nav item text color (selected)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-padding": {
       "description": "Nav item padding",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-parent-padding": {
       "description": "Nav item padding for parent elements",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-size": {
       "description": "Nav item font size",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-weight": {
       "description": "Nav item font weight",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-weight-active": {
       "description": "Nav item font weight (active)",
-      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"]
+      "descriptionFrom": "Components/Navigation.md",
+      "pages": ["Components/Navigation.md", "Publish/Site navigation.md"],
+      "scope": "app"
     },
     "--nav-item-weight-hover": {
       "description": "Nav item font weight (hover)",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-item-white-space": {
       "description": "Nav item white-space",
-      "pages": ["Components/Navigation.md"]
+      "pages": ["Components/Navigation.md"],
+      "scope": "app"
     },
     "--nav-parent-item-color": {
       "description": "Font color for folders and top-level items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-parent-item-color-active": {
       "description": "Font color for active top-level items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--nav-parent-item-weight": {
       "description": "Font weight for top-level items",
-      "pages": ["Publish/Site navigation.md"]
+      "pages": ["Publish/Site navigation.md"],
+      "scope": "publish"
     },
     "--outline-heading-color": {
       "description": "Font color for inactive headings",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--outline-heading-color-active": {
       "description": "Font color for active heading",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--outline-heading-color-hover": {
       "description": "Font color for hovered heading",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--outline-heading-weight-active": {
       "description": "Font weight for active heading",
-      "pages": ["Publish/Site components.md"]
+      "pages": ["Publish/Site components.md"],
+      "scope": "publish"
     },
     "--p-spacing": {
       "description": "Spacing between paragraphs",
-      "pages": ["Foundations/Typography.md"]
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
     },
     "--page-padding": {
       "description": "Padding around a note",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-color": {
       "description": "Font color",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-font": {
       "description": "Font family for [[Site pages|page titles]]",
-      "pages": ["Publish/Site fonts.md", "Publish/Site pages.md"]
+      "descriptionFrom": "Publish/Site fonts.md",
+      "pages": ["Publish/Site fonts.md", "Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-line-height": {
       "description": "Line height",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-size": {
       "description": "Font size",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-style": {
       "description": "Font style, e.g. normal or italic",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-variant": {
       "description": "Font variant",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-title-weight": {
       "description": "Font weight",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--page-width": {
       "description": "Width of a note when readable line width is on",
-      "pages": ["Publish/Site pages.md"]
+      "pages": ["Publish/Site pages.md"],
+      "scope": "publish"
     },
     "--pill-background": {
       "description": "Pill background color",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-background-hover": {
       "description": "Pill background color (hover)",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-border-color": {
       "description": "Pill border color",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-border-color-hover": {
       "description": "Pill border color (hover)",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-border-width": {
       "description": "Pill border width",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-color": {
       "description": "Pill text color",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-color-hover": {
       "description": "Pill text color (hover)",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-color-remove": {
       "description": "Pill text color when removing",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-color-remove-hover": {
       "description": "Pill text color when removing (hover)",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-decoration": {
       "description": "Pill text decoration",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-decoration-hover": {
       "description": "Pill text decoration (hover)",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-padding-x": {
       "description": "Pill left/right padding",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-padding-y": {
       "description": "Pill top/bottom padding",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-radius": {
       "description": "Pill corner radius",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--pill-weight": {
       "description": "Pill font weight",
-      "pages": ["Components/Multi-select.md"]
+      "pages": ["Components/Multi-select.md"],
+      "scope": "app"
     },
     "--popover-font-size": {
       "description": "Popover font size",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--popover-height": {
       "description": "Popover default height",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--popover-max-height": {
       "description": "Popover maximum height",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--popover-pdf-height": {
       "description": "PDF file preview height",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--popover-pdf-width": {
       "description": "PDF file preview width",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--popover-width": {
       "description": "Popover default width",
-      "pages": ["Components/Popover.md"]
+      "pages": ["Components/Popover.md"],
+      "scope": "app"
     },
     "--prompt-border-color": {
       "description": "Prompt border color",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--prompt-border-width": {
       "description": "Prompt border width",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--prompt-input-height": {
       "description": "Prompt input height",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--prompt-max-height": {
       "description": "Prompt max height",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--prompt-max-width": {
       "description": "Prompt max width (for narrow windows)",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--prompt-width": {
       "description": "Prompt width",
-      "pages": ["Components/Prompt.md"]
+      "pages": ["Components/Prompt.md"],
+      "scope": "app"
     },
     "--radius-l": {
       "default": "12px",
-      "pages": ["Foundations/Radiuses.md"]
+      "pages": ["Foundations/Radiuses.md"],
+      "scope": "app"
     },
     "--radius-m": {
       "default": "8px",
-      "pages": ["Foundations/Radiuses.md"]
+      "pages": ["Foundations/Radiuses.md"],
+      "scope": "app"
     },
     "--radius-s": {
       "default": "4px",
-      "pages": ["Foundations/Radiuses.md"]
+      "pages": ["Foundations/Radiuses.md"],
+      "scope": "app"
     },
     "--radius-xl": {
       "default": "16px",
-      "pages": ["Foundations/Radiuses.md"]
+      "pages": ["Foundations/Radiuses.md"],
+      "scope": "app"
     },
     "--ribbon-background": {
       "description": "Ribbon background color",
-      "pages": ["Window/Ribbon.md"]
+      "pages": ["Window/Ribbon.md"],
+      "scope": "app"
     },
     "--ribbon-background-collapsed": {
       "description": "Ribbon background color (collapsed sidebar)",
-      "pages": ["Window/Ribbon.md"]
+      "pages": ["Window/Ribbon.md"],
+      "scope": "app"
     },
     "--ribbon-padding": {
       "description": "Ribbon padding",
-      "pages": ["Window/Ribbon.md"]
+      "pages": ["Window/Ribbon.md"],
+      "scope": "app"
     },
     "--ribbon-width": {
       "description": "Ribbon width",
-      "pages": ["Window/Ribbon.md"]
+      "pages": ["Window/Ribbon.md"],
+      "scope": "app"
     },
     "--scrollbar-active-thumb-bg": {
       "description": "Scrollbar thumb background color (active)",
-      "pages": ["Window/Scrollbar.md"]
+      "pages": ["Window/Scrollbar.md"],
+      "scope": "app"
     },
     "--scrollbar-bg": {
       "description": "Scrollbar background color",
-      "pages": ["Window/Scrollbar.md"]
+      "pages": ["Window/Scrollbar.md"],
+      "scope": "app"
     },
     "--scrollbar-thumb-bg": {
       "description": "Scrollbar thumb background color",
-      "pages": ["Window/Scrollbar.md"]
+      "pages": ["Window/Scrollbar.md"],
+      "scope": "app"
     },
     "--search-clear-button-color": {
       "description": "Clear search button color",
-      "pages": ["Plugins/Search.md"]
+      "pages": ["Plugins/Search.md"],
+      "scope": "app"
     },
     "--search-clear-button-size": {
       "description": "Clear search button size",
-      "pages": ["Plugins/Search.md"]
+      "pages": ["Plugins/Search.md"],
+      "scope": "app"
     },
     "--search-icon-color": {
       "description": "Search magnifying glass icon color",
-      "pages": ["Plugins/Search.md"]
+      "pages": ["Plugins/Search.md"],
+      "scope": "app"
     },
     "--search-icon-size": {
       "description": "Search icon size",
-      "pages": ["Plugins/Search.md"]
+      "pages": ["Plugins/Search.md"],
+      "scope": "app"
     },
     "--search-result-background": {
       "description": "Search result background color",
-      "pages": ["Plugins/Search.md"]
+      "pages": ["Plugins/Search.md"],
+      "scope": "app"
     },
     "--sidebar-left-background": {
       "description": "Background color of left sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-left-border-color": {
       "description": "Right border color of left sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-left-border-width": {
       "description": "Right border width of left sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-left-width": {
       "description": "Width of the left sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-markdown-font-size": {
       "description": "Font size for Markdown files in sidebars",
-      "pages": ["Window/Sidebar.md"]
+      "pages": ["Window/Sidebar.md"],
+      "scope": "app"
     },
     "--sidebar-right-background": {
       "description": "Background color of right sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-right-border-color": {
       "description": "Left border color of right sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-right-border-width": {
       "description": "Left border width of right sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-right-width": {
       "description": "Width of the right sidebar",
-      "pages": ["Publish/Site sidebars.md"]
+      "pages": ["Publish/Site sidebars.md"],
+      "scope": "publish"
     },
     "--sidebar-tab-text-display": {
       "description": "display property for tab text in sidebars",
-      "pages": ["Window/Sidebar.md"]
+      "pages": ["Window/Sidebar.md"],
+      "scope": "app"
     },
     "--site-menu-icon-color": {
       "description": "Mobile menu icon color",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-menu-icon-color-hover": {
       "description": "Mobile menu hovered icon color",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-menu-icon-size": {
       "description": "Mobile menu icon size",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-name-color": {
       "description": "Site name color",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-name-color-hover": {
       "description": "Site name hovered color",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-name-font": {
       "description": "Site name font family",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-name-size": {
       "description": "Site name font size",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--site-name-weight": {
       "description": "Site name font weight",
-      "pages": ["Publish/Site header.md"]
+      "pages": ["Publish/Site header.md"],
+      "scope": "publish"
     },
     "--size-2-1": {
       "default": "2px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-2-2": {
       "default": "4px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-2-3": {
       "default": "6px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-1": {
       "default": "4px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-12": {
       "default": "48px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-16": {
       "default": "64px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-18": {
       "default": "72px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-2": {
       "default": "8px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-3": {
       "default": "12px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-4": {
       "default": "16px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-5": {
       "default": "20px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-6": {
       "default": "24px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-8": {
       "default": "32px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--size-4-9": {
       "default": "36px",
-      "pages": ["Foundations/Spacing.md"]
+      "pages": ["Foundations/Spacing.md"],
+      "scope": "app"
     },
     "--slider-thumb-border-color": {
       "description": "Slider thumb border color",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-thumb-border-width": {
       "description": "Slider thumb border width",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-thumb-height": {
       "description": "Slider thumb height",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-thumb-radius": {
       "description": "Slider thumb radius",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-thumb-width": {
       "description": "Slider thumb width",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-thumb-y": {
       "description": "Slider thumb Y position",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-track-background": {
       "description": "Slider track background color",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--slider-track-height": {
       "description": "Slider track height and border radius",
-      "pages": ["Components/Slider.md"]
+      "pages": ["Components/Slider.md"],
+      "scope": "app"
     },
     "--status-bar-background": {
       "description": "Status bar background color",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-border-color": {
       "description": "Status bar border color",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-border-width": {
       "description": "Status bar border width",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-font-size": {
       "description": "Status bar font size",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-position": {
       "description": "Status bar position property",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-radius": {
       "description": "Status bar radius",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-scroll-padding": {
       "description": "Status bar scroll padding",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--status-bar-text-color": {
       "description": "Status bar text color",
-      "pages": ["Window/Status bar.md"]
+      "pages": ["Window/Status bar.md"],
+      "scope": "app"
     },
     "--swatch-height": {
       "description": "Color swatch height",
-      "pages": ["Components/Color input.md"]
+      "pages": ["Components/Color input.md"],
+      "scope": "app"
     },
     "--swatch-radius": {
       "description": "Color swatch radius",
-      "pages": ["Components/Color input.md"]
+      "pages": ["Components/Color input.md"],
+      "scope": "app"
     },
     "--swatch-shadow": {
       "description": "Color swatch shadow",
-      "pages": ["Components/Color input.md"]
+      "pages": ["Components/Color input.md"],
+      "scope": "app"
     },
     "--swatch-width": {
       "description": "Color swatch width",
-      "pages": ["Components/Color input.md"]
+      "pages": ["Components/Color input.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-1": {
       "description": "Avatar color 1, var(--color-red) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-2": {
       "description": "Avatar color 2, var(--color-orange) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-3": {
       "description": "Avatar color 3, var(--color-yellow) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-4": {
       "description": "Avatar color 4, var(--color-green) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-5": {
       "description": "Avatar color 5, var(--color-cyan) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-6": {
       "description": "Avatar color 6, var(--color-blue) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-7": {
       "description": "Avatar color 7, var(--color-purple) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-8": {
       "description": "Avatar color 8, var(--color-pink) by default",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--sync-avatar-color-current-user": {
       "description": "Avatar color for current user",
-      "pages": ["Plugins/Sync.md"]
+      "pages": ["Plugins/Sync.md"],
+      "scope": "app"
     },
     "--tab-background-active": {
       "description": "Tab background color (active tab)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-container-background": {
       "description": "Tab container background color",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-curve": {
       "description": "Tab curve radius",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-divider-color": {
       "description": "Tab divider color",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-font-size": {
       "description": "Tab font size",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-font-weight": {
       "description": "Tab font weight",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-max-width": {
       "description": "Tab maximum width",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-outline-color": {
       "description": "Tab outline color",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-outline-width": {
       "description": "Tab outline width",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-radius": {
       "description": "Tab outer radius",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-radius-active": {
       "description": "Tab outer radius (active tab)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-font-size": {
       "description": "Stacked tab font size",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-font-weight": {
       "description": "Stacked tab font weight",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-header-width": {
       "description": "Stacked header width",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-pane-width": {
       "description": "Stacked pane width",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-shadow": {
       "description": "Stacked tab shadow",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-text-align": {
       "description": "Stacked tab text alignment",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-text-transform": {
       "description": "Stacked tab text transform",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-stacked-text-writing-mode": {
       "description": "Stacked tab text writing mode",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color": {
       "description": "Tab text color",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color-active": {
       "description": "Tab text color (non-focused window, active)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color-focused": {
       "description": "Tab text color (focused window)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color-focused-active": {
       "description": "Tab text color (focused window, active)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color-focused-active-current": {
       "description": "Tab text color (focused window, current tab)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-text-color-focused-highlighted": {
       "description": "Tab text color (focused window, highlighted)",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--tab-width": {
       "description": "Tab default width",
-      "pages": ["Components/Tabs.md"]
+      "pages": ["Components/Tabs.md"],
+      "scope": "app"
     },
     "--table-add-button-background": {
       "description": "\"Add\" button background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-add-button-border-color": {
       "description": "\"Add\" button border color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-add-button-border-width": {
       "description": "\"Add\" button border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-background": {
       "description": "Table background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-border-color": {
       "description": "Table border color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-border-width": {
       "description": "Table border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-cell-vertical-alignment": {
       "description": "Cell vertical alignment",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-column-alt-background": {
       "description": "Alternating column background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-column-first-border-width": {
       "description": "First column left border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-column-last-border-width": {
       "description": "Last column right border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-column-max-width": {
       "description": "Column maximum width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-drag-handle-background": {
       "description": "Drag handle background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-drag-handle-background-active": {
       "description": "Drag handle background color (active)",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-drag-handle-color": {
       "description": "Drag handle icon color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-drag-handle-color-active": {
       "description": "Drag handle icon color (active)",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-background": {
       "description": "Table header background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-background-hover": {
       "description": "Table header background color (hover)",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-border-color": {
       "description": "Table header border color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-border-width": {
       "description": "Table header border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-color": {
       "description": "Table header text color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-font": {
       "description": "Table header font family",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-size": {
       "description": "Table header font size",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-header-weight": {
       "description": "Table header font weight",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-line-height": {
       "description": "Line height for cell text",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-row-alt-background": {
       "description": "Alternating row background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-row-alt-background-hover": {
       "description": "Alternating row background color (hover)",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-row-background-hover": {
       "description": "Row background color (hover)",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-row-last-border-width": {
       "description": "Last row bottom border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-selection": {
       "description": "Selection background color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-selection-blend-mode": {
       "description": "Selection blend mode",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-selection-border-color": {
       "description": "Selection border color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-selection-border-radius": {
       "description": "Selection border radius",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-selection-border-width": {
       "description": "Selection border width",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-text-color": {
       "description": "Cell text color",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-text-size": {
       "description": "Cell font size",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--table-white-space": {
       "description": "Table white-space property",
-      "pages": ["Editor/Table.md"]
+      "pages": ["Editor/Table.md"],
+      "scope": "app"
     },
     "--tag-background": {
       "description": "Tag background color",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-background-hover": {
       "description": "Tag background color (hover)",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-border-color": {
       "description": "Tag border color",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-border-color-hover": {
       "description": "Tag border color (hover)",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-border-width": {
       "description": "Tag border width",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-color": {
       "description": "Tag text color",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-color-hover": {
       "description": "Tag text color (hover)",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-decoration": {
       "description": "Tag text decoration",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-decoration-hover": {
       "description": "Tag text decoration (hover)",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-padding-x": {
       "description": "Tag left/right padding",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-padding-y": {
       "description": "Tag top/down padding",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-radius": {
       "description": "Tag radius",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-size": {
       "description": "Tag font size",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--tag-weight": {
       "description": "Tag font weight",
-      "pages": ["Editor/Tag.md"]
+      "pages": ["Editor/Tag.md"],
+      "scope": "app"
     },
     "--text-accent": {
       "description": "Accent text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-accent-hover": {
       "description": "Accent text (hover)",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-error": {
       "description": "Error text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-faint": {
       "description": "Faint text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-highlight-bg": {
       "description": "Highlighted text background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-muted": {
       "description": "Muted text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-normal": {
       "description": "Normal text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-on-accent": {
       "description": "Text on accent background when accent is dark",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-on-accent-inverted": {
       "description": "Text on accent background when accent is light",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-selection": {
       "description": "Selected text background",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-success": {
       "description": "Success text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--text-warning": {
       "description": "Warning text",
-      "pages": ["Foundations/Colors.md"]
+      "pages": ["Foundations/Colors.md"],
+      "scope": "app"
     },
     "--titlebar-background": {
       "description": "Titlebar background color",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-background-focused": {
       "description": "Titlebar background color (focused window)",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-border-color": {
       "description": "Titlebar border color",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-border-width": {
       "description": "Titlebar border width",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-text-color": {
       "description": "Titlebar text color",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-text-color-focused": {
       "description": "Titlebar text color (focused window)",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--titlebar-text-weight": {
       "description": "Titlebar font weight",
-      "pages": ["Window/Window frame.md"]
+      "pages": ["Window/Window frame.md"],
+      "scope": "app"
     },
     "--toggle-border-width": {
       "description": "Toggle border width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-radius": {
       "description": "Toggle radius",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-s-border-width": {
       "description": "Small toggle border width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-s-thumb-height": {
       "description": "Small toggle thumb height",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-s-thumb-width": {
       "description": "Small toggle thumb width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-s-width": {
       "description": "Small toggle width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-thumb-color": {
       "description": "Toggle thumb background color",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-thumb-height": {
       "description": "Toggle thumb height",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-thumb-radius": {
       "description": "Toggle thumb radius",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-thumb-width": {
       "description": "Toggle thumb width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--toggle-width": {
       "description": "Toggle width",
-      "pages": ["Components/Toggle.md"]
+      "pages": ["Components/Toggle.md"],
+      "scope": "app"
     },
     "--vault-profile-actions-display": {
       "description": "display property for the action buttons in the vault profile",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--vault-profile-color": {
       "description": "Text color",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--vault-profile-color-hover": {
       "description": "Text color (hover)",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--vault-profile-display": {
       "description": "display property for the vault profile",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--vault-profile-font-size": {
       "description": "Font size",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--vault-profile-font-weight": {
       "description": "Font weight",
-      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"]
+      "pages": ["Plugins/File explorer.md", "Window/Vault profile.md"],
+      "scope": "app"
     },
     "--workspace-background-translucent": {
       "description": "Background for translucent windows",
-      "pages": ["Window/Workspace.md"]
+      "pages": ["Window/Workspace.md"],
+      "scope": "app"
     }
   }
 }
