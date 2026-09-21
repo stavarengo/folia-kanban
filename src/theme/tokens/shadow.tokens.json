@@ -43,10 +43,10 @@
     },
     "themes": {
       "light": {
-        "$value": "0 8px 24px rgba(0, 0, 0, 0.2)",
+        "$value": "0 12px 32px rgba(0, 0, 0, 0.24)",
         "source": {
           "owned": true,
-          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+          "reason": "Lighter than the dark scheme's shadow and reaching about as far as Obsidian's own --shadow-l does on Moonstone, which is what its modals are lifted with. An earlier 0 8px 24px at 0.2 was softer than the host's own lift, so the dialog it draws sat flat on the board."
         }
       }
     }

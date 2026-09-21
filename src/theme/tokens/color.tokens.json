@@ -38,10 +38,10 @@
     },
     "themes": {
       "light": {
-        "$value": "rgba(0, 0, 0, 0.2)",
+        "$value": "rgba(0, 0, 0, 0.34)",
         "source": {
           "owned": true,
-          "reason": "Lower opacity and shorter reach keep elevation subtle on a white ground; Obsidian has no general elevation or modal scrim scale."
+          "reason": "Lighter than the dark scheme's 0.45, but still enough that the board reads as sent behind the dialog. An earlier 0.2 was chosen for subtlety and left the columns fully saturated, so nothing separated a dialog from the board under it; live comparison on Moonstone put the turn at roughly a third. Obsidian's own .modal-bg uses --background-modifier-cover, a light-grey veil rather than a black one, which on this board washes towards grey without sending anything back; adopting that variable is audit 02-34's call, not a value choice."
         }
       }
     }
