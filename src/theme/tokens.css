@@ -24,7 +24,6 @@
   font-size: var(--folia-font-size-md);
 
   /* radii */
-  --folia-r-xs: var(--radius-s);
   --folia-r-sm: var(--radius-s);
   --folia-r: var(--radius-m);
   --folia-r-lg: var(--radius-l);

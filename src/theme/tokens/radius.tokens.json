@@ -1,12 +1,5 @@
 {
   "$description": "Corner radii.",
-  "xs": {
-    "$value": "var(--radius-s)",
-    "cssVar": "--folia-r-xs",
-    "source": {
-      "alias": "--radius-s"
-    }
-  },
   "sm": {
     "$value": "var(--radius-s)",
     "cssVar": "--folia-r-sm",
