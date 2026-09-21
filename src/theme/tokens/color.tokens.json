@@ -1,0 +1,156 @@
+{
+  "$description": "Semantic colours, the priority ramp and the column product palette.",
+  "border": {
+    "$value": "var(--background-modifier-border)",
+    "cssVar": "--folia-border",
+    "source": {
+      "alias": "--background-modifier-border"
+    }
+  },
+  "border-strong": {
+    "$value": "var(--background-modifier-border-hover, var(--background-modifier-border))",
+    "cssVar": "--folia-border-strong",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's hover border with its own base border behind it, so a theme that defines only one still gets a line."
+    }
+  },
+  "card-bg": {
+    "$value": "var(--background-primary)",
+    "cssVar": "--folia-card-bg",
+    "source": {
+      "alias": "--background-primary"
+    }
+  },
+  "column-bg": {
+    "$value": "var(--background-secondary)",
+    "cssVar": "--folia-col-bg",
+    "source": {
+      "alias": "--background-secondary"
+    }
+  },
+  "scrim": {
+    "$value": "rgba(0, 0, 0, 0.45)",
+    "cssVar": "--folia-scrim",
+    "source": {
+      "owned": true,
+      "reason": "the dimming behind a dialog; Obsidian's modal background is a later phase (audit 02-34)."
+    }
+  },
+  "priority": {
+    "1": {
+      "$value": "var(--color-red, #e5534b)",
+      "cssVar": "--folia-prio-1",
+      "source": {
+        "owned": true,
+        "reason": "Obsidian's red with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+      }
+    },
+    "2": {
+      "$value": "var(--color-orange, #d9882f)",
+      "cssVar": "--folia-prio-2",
+      "source": {
+        "owned": true,
+        "reason": "Obsidian's orange with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+      }
+    },
+    "3": {
+      "$value": "var(--color-yellow, #c2a312)",
+      "cssVar": "--folia-prio-3",
+      "source": {
+        "owned": true,
+        "reason": "Obsidian's yellow with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+      }
+    },
+    "4": {
+      "$value": "var(--color-blue, #5b8def)",
+      "cssVar": "--folia-prio-4",
+      "source": {
+        "owned": true,
+        "reason": "Obsidian's blue with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+      }
+    }
+  },
+  "accent": {
+    "$value": "var(--interactive-accent)",
+    "cssVar": "--folia-accent",
+    "source": {
+      "alias": "--interactive-accent"
+    }
+  },
+  "on-accent": {
+    "$value": "var(--text-on-accent, #fff)",
+    "cssVar": "--folia-on-accent",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's text-on-accent with a literal behind it; the long note on the declaration explains why it is read flat and why the declaration site matters."
+    }
+  },
+  "on-fill": {
+    "$value": "#fff",
+    "cssVar": "--folia-on-fill",
+    "source": {
+      "owned": true,
+      "reason": "text drawn on a fill the board chose itself (the success and error toasts), where no host variable describes the pairing."
+    }
+  },
+  "danger": {
+    "$value": "var(--color-red, #e5534b)",
+    "cssVar": "--folia-danger",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's red with a literal behind it; --text-error and the semantic status colours are a later phase (audit 02-04)."
+    }
+  },
+  "unread": {
+    "$value": "var(--color-blue, #5b8def)",
+    "cssVar": "--folia-unread",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's blue with a literal behind it; removing the literal is a later phase (audit 02-03)."
+    }
+  },
+  "unread-reply": {
+    "$value": "var(--color-purple, #a882e0)",
+    "cssVar": "--folia-unread-reply",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's purple with a literal behind it; removing the literal is a later phase (audit 02-03)."
+    }
+  },
+  "success": {
+    "$value": "var(--color-green, #4caf7d)",
+    "cssVar": "--folia-success",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's green with a literal behind it; the semantic status colours are a later phase (audit 02-04)."
+    }
+  },
+  "column": {
+    "1": {
+      "$value": "#4c9aff"
+    },
+    "2": {
+      "$value": "#8fd14f"
+    },
+    "3": {
+      "$value": "#ffab00"
+    },
+    "4": {
+      "$value": "#9c8cff"
+    },
+    "5": {
+      "$value": "#ff5c5c"
+    },
+    "6": {
+      "$value": "#57d9a3"
+    },
+    "7": {
+      "$value": "#f78fb3"
+    },
+    "8": {
+      "$value": "#9aa0a6"
+    },
+    "$description": "The user-assignable column palette. Not theme-backed and not the priority ramp; src/ui/columnColors.ts is the single source of truth and this mirrors it. Moving these onto Obsidian's eight theme colours is a later phase (audit 02-02)."
+  }
+}

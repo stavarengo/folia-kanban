@@ -1,0 +1,67 @@
+{
+  "$description": "Stacking rungs: the board's own, and the two anchored on Obsidian's --layer-* scale.",
+  "base": {
+    "$value": "1",
+    "cssVar": "--folia-z-index-base",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "raised": {
+    "$value": "2",
+    "cssVar": "--folia-z-index-raised",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "sticky": {
+    "$value": "30",
+    "cssVar": "--folia-z-index-sticky",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "toast": {
+    "$value": "50",
+    "cssVar": "--folia-z-index-toast",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "scrim": {
+    "$value": "55",
+    "cssVar": "--folia-z-index-scrim",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "popover": {
+    "$value": "70",
+    "cssVar": "--folia-z-index-popover",
+    "source": {
+      "owned": true,
+      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
+    }
+  },
+  "app-menu": {
+    "$value": "var(--layer-menu, 65)",
+    "cssVar": "--folia-z-index-app-menu",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's menu rung with the number behind it: z-index does not inherit, so an unresolved var() computes to `auto` and would drop the surface behind the ribbon. The fallback is the failure mode, not a second opinion."
+    }
+  },
+  "app-modal": {
+    "$value": "var(--layer-modal, 50)",
+    "cssVar": "--folia-z-index-app-modal",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's modal rung with the number behind it, for the same reason as zindex.app-menu."
+    }
+  }
+}

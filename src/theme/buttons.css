@@ -3,12 +3,12 @@
   font: inherit;
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);
-  padding: 5px 11px;
+  padding: var(--folia-space-xs-plus) var(--folia-control-pad-x);
   border-radius: var(--folia-r-sm);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   background: var(--background-primary);
   color: var(--text-normal);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   transition: background var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
 }
 .folia-btn:hover {
@@ -42,12 +42,12 @@
 .folia-icon-btn.folia-icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: var(--folia-hit-md);
+  height: var(--folia-hit-md);
   background: transparent;
   border: none;
   color: var(--text-muted);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   border-radius: var(--folia-r-sm);
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
@@ -59,8 +59,8 @@
    a rule that only refines another button rule has to carry the same weight, or the refinement is
    quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
 .folia-mini.folia-mini {
-  width: 24px;
-  height: 24px;
+  width: var(--folia-hit-sm);
+  height: var(--folia-hit-sm);
   margin-left: auto;
 }
 /* The column header's menu button, doubled and placed here for the same reason as `.folia-mini`,
@@ -69,8 +69,8 @@
    drew at the base rule's full size and appeared without the fade this rule asks for. Its state
    rules follow it, so their `opacity: 1` still wins over the `opacity: 0` here. */
 .folia-column-menu-btn.folia-column-menu-btn {
-  width: 24px;
-  height: 24px;
+  width: var(--folia-hit-sm);
+  height: var(--folia-hit-sm);
   opacity: 0;
   transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }

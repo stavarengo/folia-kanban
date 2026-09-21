@@ -3,7 +3,7 @@
   position: relative; /* anchors the left-edge resize handle */
   flex: 0 0 var(--folia-detail-w);
   width: var(--folia-detail-w);
-  border-left: 1px solid var(--folia-border-strong);
+  border-left: var(--folia-border-width) solid var(--folia-border-strong);
   background: var(--folia-col-bg);
   box-shadow: var(--folia-shadow-panel);
   overflow-y: auto;
@@ -36,9 +36,9 @@
   /* A balanced dialog width DECOUPLED from the side-panel detailWidth (App never passes an inline
      width in modal mode). width:auto would collapse to the body's narrow intrinsic size — the sliver. */
   flex: 0 0 auto;
-  width: min(640px, 92vw);
-  max-height: 85vh;
-  border: 1px solid var(--folia-border-strong);
+  width: min(var(--folia-detail-modal-w), var(--folia-detail-modal-w-max));
+  max-height: var(--folia-detail-modal-h-max);
+  border: var(--folia-border-width) solid var(--folia-border-strong);
   border-radius: var(--folia-r-lg);
   box-shadow: var(--folia-shadow-overlay);
 }
@@ -46,23 +46,23 @@
 /* Left-border drag handle (side modes only). */
 .folia-detail-resize {
   position: absolute;
-  left: -3px;
+  left: var(--folia-resize-offset);
   top: 0;
   bottom: 0;
-  width: 6px;
-  cursor: col-resize;
+  width: var(--folia-resize-w);
+  cursor: var(--folia-cursor-resize);
   z-index: var(--folia-z-index-base);
 }
 @keyframes folia-slide-in {
-  from { transform: translateX(14px); opacity: 0; }
+  from { transform: translateX(var(--folia-detail-slide)); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
 .folia-detail-header {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 14px;
-  border-bottom: 1px solid var(--folia-border);
+  gap: var(--folia-space-md);
+  padding: var(--folia-space-lg);
+  border-bottom: var(--folia-border-width) solid var(--folia-border);
   position: sticky;
   top: 0;
   background: var(--folia-col-bg);
@@ -79,7 +79,7 @@
   margin: 0;
   font-size: var(--folia-font-size-xl);
   font-weight: var(--folia-font-weight-semibold);
-  line-height: 1.35;
+  line-height: var(--folia-line-height-heading);
   color: var(--text-normal);
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -94,37 +94,37 @@
 .folia-detail-confirm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: var(--folia-space-md);
+  padding: var(--folia-pad) var(--folia-space-lg);
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
   background: color-mix(in srgb, var(--folia-danger) 10%, var(--folia-col-bg));
-  border-bottom: 1px solid var(--folia-border);
+  border-bottom: var(--folia-border-width) solid var(--folia-border);
 }
 .folia-detail-body {
-  padding: 14px;
+  padding: var(--folia-space-lg);
   /* last content (History) clears Obsidian's fixed status bar in side modes; modal is centered. */
-  padding-bottom: calc(14px + var(--folia-statusbar-clearance));
+  padding-bottom: calc(var(--folia-space-lg) + var(--folia-statusbar-clearance));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--folia-space-xl-plus);
 }
 .folia-detail--modal .folia-detail-body {
-  padding-bottom: 14px;
+  padding-bottom: var(--folia-space-lg);
 }
 .folia-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--folia-gap);
 }
 .folia-fields label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--folia-space-xs);
   font-size: var(--folia-font-size-xs);
   font-weight: var(--folia-font-weight-medium);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--folia-tracking-label);
   color: var(--text-muted);
 }
 .folia-fields label:first-child {
@@ -135,9 +135,9 @@
   font: inherit;
   background: var(--background-primary);
   color: var(--text-normal);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 6px 8px;
+  padding: var(--folia-space-sm) var(--folia-space-md);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -149,7 +149,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-assignee-field label {
   flex: 1;
@@ -168,25 +168,25 @@
 .folia-props {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-prop-row,
 .folia-prop-add {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--folia-space-md);
 }
 .folia-prop-key {
-  flex: 0 0 86px;
+  flex: 0 0 var(--folia-prop-key-w);
   color: var(--text-faint, var(--text-muted));
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--folia-tracking-key);
   font-size: var(--folia-font-size-xxs);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .folia-prop-add .folia-prop-input:first-child {
-  flex: 0 0 86px;
+  flex: 0 0 var(--folia-prop-key-w);
 }
 .folia-prop-input {
   flex: 1 1 auto;
@@ -195,9 +195,9 @@
   font-size: var(--folia-font-size-sm);
   background: var(--background-primary);
   color: var(--text-normal);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 4px 7px;
+  padding: var(--folia-space-xs) var(--folia-space-sm-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 .folia-prop-input:focus {
@@ -220,7 +220,7 @@
    read-only on purpose — it is an outcome, not a third place to type. */
 .folia-title-fields {
   padding-bottom: var(--folia-gap);
-  border-bottom: 1px solid var(--folia-border);
+  border-bottom: var(--folia-border-width) solid var(--folia-border);
 }
 .folia-title-result {
   align-items: flex-start;
@@ -230,7 +230,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--folia-space-xxs);
 }
 /* The row reads as the card's title, not as a link, so it takes back the size, weight and colour
    `.folia-link.folia-link` hands every link — named twice to match that rule's weight, and sitting
@@ -281,14 +281,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-title-step {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px 8px;
-  padding-left: 8px;
-  border-left: 2px solid var(--folia-border);
+  gap: var(--folia-space-xxs) var(--folia-space-md);
+  padding-left: var(--folia-space-md);
+  border-left: var(--folia-border-width-thick) solid var(--folia-border);
 }
 .folia-title-step.is-winner {
   border-left-color: var(--folia-accent);
@@ -296,7 +296,7 @@
 .folia-title-step-source {
   font-size: var(--folia-font-size-xxs);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--folia-tracking-key);
   color: var(--text-faint, var(--text-muted));
 }
 .folia-title-step-value {
@@ -313,37 +313,37 @@
 }
 
 .folia-section h3 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--folia-space-md);
   font-size: var(--folia-font-size-xs);
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--folia-tracking-heading);
   color: var(--text-muted);
 }
 .folia-desc {
   width: 100%;
-  min-height: 72px;
+  min-height: var(--folia-desc-h-min);
   resize: vertical;
   font: inherit;
   /* Matches .folia-desc-rendered.markdown-rendered's pinned line-height, so entering edit mode
      doesn't change the line-box height under the preserved preview height. */
-  line-height: 1.5;
+  line-height: var(--folia-line-height);
   background: var(--background-primary);
   color: var(--text-normal);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  padding: var(--folia-space-md) var(--folia-gap);
+  margin-bottom: var(--folia-space-md);
 }
 
 /* Rendered-description view: click anywhere to edit; pencil surfaces on hover. */
 .folia-desc-view {
   position: relative;
-  cursor: text;
-  border: 1px solid transparent;
+  cursor: var(--folia-cursor-text);
+  border: var(--folia-border-width) solid transparent;
   border-radius: var(--folia-r-sm);
-  padding: 4px 6px;
-  margin: 0 -6px;
+  padding: var(--folia-space-xs) var(--folia-space-sm);
+  margin: 0 var(--folia-space-bleed);
   transition: background var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
 }
 
@@ -354,7 +354,7 @@
    positioned against the non-scrolling view box — stays pinned while the text scrolls. Works across
    split/float/modal: the measured value reflects each presentation's on-screen position. */
 .folia-desc-view .folia-desc-rendered {
-  max-height: var(--folia-desc-max-h, calc(100vh - 220px));
+  max-height: var(--folia-desc-max-h);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -366,8 +366,8 @@
    doubled weight the theme forces, so its own transition would otherwise never apply. */
 .folia-desc-edit.folia-desc-edit {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: var(--folia-space-xs);
+  right: var(--folia-space-xs);
   opacity: 0;
   transition: opacity var(--folia-dur-fast) ease;
 }
@@ -376,8 +376,8 @@
   opacity: 1;
 }
 .folia-desc-behind {
-  margin: 6px 0 0;
-  padding: 6px 10px;
+  margin: var(--folia-space-sm) 0 0;
+  padding: var(--folia-space-sm) var(--folia-gap);
   font-size: var(--folia-font-size-xs);
   color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
   background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
@@ -388,10 +388,10 @@
   width: 100%;
   text-align: left;
   background: transparent;
-  border: 1px dashed var(--folia-border);
+  border: var(--folia-border-width) dashed var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 8px 10px;
-  cursor: text;
+  padding: var(--folia-space-md) var(--folia-gap);
+  cursor: var(--folia-cursor-text);
 }
 
 /* Rendered markdown block: the container also carries Obsidian's own "markdown-rendered" class
@@ -409,7 +409,7 @@
    trimming the lead/trail margin the theme's prose rules leave around the block. */
 .folia-desc-rendered.markdown-rendered {
   font-size: var(--folia-font-size-md);
-  line-height: 1.5;
+  line-height: var(--folia-line-height);
   padding: 0;
   overflow-wrap: anywhere;
 }
@@ -424,7 +424,7 @@
    reason as above. */
 .folia-desc-rendered.markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
   font-size: var(--folia-font-size-md-plus);
-  line-height: 1.35;
+  line-height: var(--folia-line-height-heading);
   font-weight: var(--folia-font-weight-semibold);
 }
 
@@ -458,22 +458,22 @@
 .folia-comments,
 .folia-history {
   list-style: none;
-  margin: 0 0 8px;
+  margin: 0 0 var(--folia-space-md);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-subtask {
   display: flex;
   align-items: flex-start; /* keep checkbox + remove aligned to the first line of wrapped text */
-  gap: 8px;
+  gap: var(--folia-space-md);
   font-size: var(--folia-font-size-md);
-  line-height: 1.4;
+  line-height: var(--folia-line-height-title);
 }
 .folia-subtask input[type="checkbox"] {
   flex: 0 0 auto;
-  margin-top: 2px;
+  margin-top: var(--folia-space-xxs);
 }
 /* The subitem's own column. Quiet until hovered/focused: most subitems live with their card, so
    the control should not compete with the subtask text for attention. */
@@ -482,7 +482,7 @@
   margin-left: auto;
   max-width: 40%;
   font-size: var(--folia-font-size-xs);
-  padding: 1px 4px;
+  padding: var(--folia-space-hair) var(--folia-space-xs);
   opacity: var(--folia-opacity-subtle);
 }
 .folia-subtask:hover .folia-subtask-column,
@@ -494,14 +494,14 @@
 .folia-relation {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--folia-space-md);
   font-size: var(--folia-font-size-md);
-  line-height: 1.4;
+  line-height: var(--folia-line-height-title);
 }
 .folia-relation-note {
   /* Flushed right like the remove button on its sibling rows, so the list doesn't zig-zag. */
   margin-left: auto;
-  cursor: help;
+  cursor: var(--folia-cursor-help);
 }
 .folia-link-missing {
   color: var(--text-muted);
@@ -510,8 +510,8 @@
      shorthand as only partially supported, so the dashed underline has to come from somewhere
      else. The dashes now sit at the bottom of the inline box instead of 2px below the baseline —
      a slightly lower line, same signal. */
-  border-bottom: 1px dashed;
-  cursor: help;
+  border-bottom: var(--folia-border-width) dashed;
+  cursor: var(--folia-cursor-help);
 }
 .folia-done {
   /* Single-keyword shorthand on purpose — see the note above; the longhand form is flagged. */
@@ -526,15 +526,15 @@
 .folia-history li {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--folia-space-hair);
   font-size: var(--folia-font-size-md);
-  padding-left: 10px;
-  border-left: 2px solid var(--folia-border);
+  padding-left: var(--folia-gap);
+  border-left: var(--folia-border-width-thick) solid var(--folia-border);
 }
 .folia-comment-row {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--folia-space-xs);
 }
 .folia-comment-text {
   flex: 1 1 auto;
@@ -547,7 +547,7 @@
    including the inherited value from .folia-comments below, which a theme rule bypasses entirely. */
 .folia-comment-text.markdown-rendered {
   font-size: var(--folia-font-size-md);
-  line-height: 1.5;
+  line-height: var(--folia-line-height);
   /* Same reason as .folia-desc-rendered.markdown-rendered above: zero out any reading-view gutter
      a theme adds to .markdown-rendered — a comment row has no room to spare. */
   padding: 0;
@@ -563,18 +563,18 @@
 }
 .folia-comment-edit {
   width: 100%;
-  min-height: 48px;
+  min-height: var(--folia-comment-edit-h-min);
   resize: vertical;
   font: inherit;
   font-size: var(--folia-font-size-md);
   /* Matches .folia-comment-text.markdown-rendered's pinned line-height, for the same reason as
      .folia-desc above. */
-  line-height: 1.5;
+  line-height: var(--folia-line-height);
   background: var(--background-primary);
   color: var(--text-normal);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 6px 8px;
+  padding: var(--folia-space-sm) var(--folia-space-md);
 }
 .folia-comment-edit:focus {
   outline: none;
@@ -585,7 +585,7 @@
 .folia-comment-head {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-comment-author {
   font-size: var(--folia-font-size-xxs-plus);
@@ -599,9 +599,9 @@
   font-size: var(--folia-font-size-xxs);
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--folia-tracking-label);
   border-radius: var(--folia-r-pill);
-  padding: 0 6px;
+  padding: 0 var(--folia-space-sm);
   color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
   background: color-mix(in srgb, var(--folia-unread) 20%, transparent);
 }
@@ -611,7 +611,7 @@
 }
 .folia-comments li.folia-comment-unread,
 .folia-comments li.folia-comment-reply {
-  padding: 2px 6px 3px 10px;
+  padding: var(--folia-space-xxs) var(--folia-space-sm) var(--folia-space-xxs-plus) var(--folia-gap);
   border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
 }
 .folia-comments li.folia-comment-unread {
@@ -629,20 +629,20 @@
   flex-direction: row;
   border-left-color: transparent;
   align-items: center;
-  gap: 8px;
+  gap: var(--folia-space-md);
   font-size: var(--folia-font-size-xxs);
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--folia-tracking-label);
   color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
   /* Left padding matches the comments beneath it, so the word lines up with them instead of
      hanging out into the border gutter. */
-  padding: 2px 0 0 10px;
+  padding: var(--folia-space-xxs) 0 0 var(--folia-gap);
 }
 .folia-comments li.folia-comments-divider::after {
   content: "";
   flex: 1 1 auto;
-  height: 1px;
+  height: var(--folia-divider-h);
   background: color-mix(in srgb, var(--folia-unread) 45%, transparent);
 }
 .folia-ts {

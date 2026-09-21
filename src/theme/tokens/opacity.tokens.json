@@ -1,0 +1,35 @@
+{
+  "$description": "Standalone UI opacity.",
+  "muted": {
+    "$value": "0.7",
+    "cssVar": "--folia-opacity-muted",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
+    }
+  },
+  "subtle": {
+    "$value": "0.6",
+    "cssVar": "--folia-opacity-subtle",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
+    }
+  },
+  "faint": {
+    "$value": "0.5",
+    "cssVar": "--folia-opacity-faint",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
+    }
+  },
+  "disabled": {
+    "$value": "0.4",
+    "cssVar": "--folia-opacity-disabled",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
+    }
+  }
+}

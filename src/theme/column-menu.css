@@ -2,39 +2,39 @@
 .folia-menu {
   position: fixed;
   z-index: var(--folia-z-index-app-menu);
-  width: 224px;
-  max-height: min(440px, calc(100vh - 24px));
+  width: var(--folia-menu-w);
+  max-height: min(var(--folia-menu-h-max), calc(var(--folia-viewport-h) - var(--folia-space-xxl)));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 11px;
+  gap: var(--folia-gap);
+  padding: var(--folia-menu-pad);
   background: var(--background-primary);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r);
   box-shadow: var(--folia-shadow-pop);
   animation: folia-pop var(--folia-dur-fast) var(--folia-ease);
 }
 @keyframes folia-pop {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  from { opacity: 0; transform: translateY(calc(-1 * var(--folia-menu-rise))) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
 .folia-menu-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--folia-space-xs-plus);
 }
 .folia-menu-label {
   font-size: var(--folia-font-size-xxs);
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--folia-tracking-label);
   color: var(--text-faint, var(--text-muted));
 }
 .folia-menu-field input {
   font: inherit;
-  padding: 6px 8px;
-  border: 1px solid var(--folia-border);
+  padding: var(--folia-space-sm) var(--folia-space-md);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
   background: var(--background-primary);
   color: var(--text-normal);
@@ -47,18 +47,18 @@
 .folia-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-swatch.folia-swatch {
-  width: 24px;
+  width: var(--folia-hit-sm);
   /* The swatch shows a colour, not text, but the "no colour" one draws an icon on `currentColor`;
      inheriting keeps that icon the panel's colour instead of the theme's button text colour. */
   color: inherit;
-  height: 24px;
+  height: var(--folia-hit-sm);
   border-radius: var(--folia-r-pill);
-  border: 2px solid transparent;
+  border: var(--folia-border-width-thick) solid transparent;
   background-clip: padding-box;
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   padding: 0;
   transition: transform var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
@@ -67,7 +67,7 @@
 }
 .folia-swatch.is-active {
   /* two-tone ring readable over any swatch fill, in either theme */
-  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
+  box-shadow: var(--folia-shadow-swatch-active);
 }
 .folia-swatch-none.folia-swatch-none {
   display: grid;
@@ -76,23 +76,23 @@
   color: var(--text-muted);
 }
 .folia-menu-divider {
-  height: 1px;
+  height: var(--folia-divider-h);
   background: var(--folia-border);
-  margin: 1px 0;
+  margin: var(--folia-space-hair) 0;
 }
 .folia-menu-item.folia-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--folia-space-md);
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--folia-space-sm) var(--folia-space-md);
   border: none;
   background: transparent;
   color: var(--text-normal);
   font: inherit;
   font-size: var(--folia-font-size-md);
   border-radius: var(--folia-r-sm);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   text-align: left;
 }
 .folia-menu-item:hover:not(:disabled) {
@@ -100,7 +100,7 @@
 }
 .folia-menu-item:disabled {
   opacity: var(--folia-opacity-disabled);
-  cursor: default;
+  cursor: var(--folia-cursor-inert);
 }
 .folia-menu-danger.folia-menu-danger {
   color: var(--folia-danger);
@@ -111,7 +111,7 @@
 .folia-menu-confirm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--folia-space-md);
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
 }

@@ -2,14 +2,14 @@
 .folia-card-subitems-toggle.folia-card-subitems-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin: 2px 0 0;
+  gap: var(--folia-space-xs);
+  margin: var(--folia-space-xxs) 0 0;
   padding: 0;
   border: none;
   background: none;
   color: var(--text-muted);
   font-size: var(--folia-font-size-xs);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
 }
 .folia-card-subitems-toggle:hover,
 .folia-card-subitems-toggle:focus-visible {
@@ -21,5 +21,5 @@
 /* Unscoped so the same "points right when collapsed" reading also works for the static
    collapse-all/expand-all menu icons (ColumnMenu), which aren't inside `.folia-card-subitems-toggle`. */
 .folia-icon.is-collapsed {
-  transform: rotate(-90deg);
+  transform: rotate(var(--folia-rotate-collapsed));
 }

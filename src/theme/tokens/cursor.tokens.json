@@ -1,0 +1,59 @@
+{
+  "$description": "The cursors the board puts on its own surfaces.",
+  "control": {
+    "$value": "pointer",
+    "cssVar": "--folia-cursor-control",
+    "source": {
+      "owned": true,
+      "reason": "the hand the board puts on its controls today. Obsidian's convention is the arrow (--cursor), and moving to it is a decision of its own and a later phase (audit 02-28)."
+    }
+  },
+  "inert": {
+    "$value": "default",
+    "cssVar": "--folia-cursor-inert",
+    "source": {
+      "owned": true,
+      "reason": "what a control that cannot be used shows; kept beside the others so the whole set moves together in the later phase."
+    }
+  },
+  "grab": {
+    "$value": "grab",
+    "cssVar": "--folia-cursor-grab",
+    "source": {
+      "owned": true,
+      "reason": "a card or column can be picked up; Obsidian has no draggable-board convention to follow."
+    }
+  },
+  "grabbing": {
+    "$value": "grabbing",
+    "cssVar": "--folia-cursor-grabbing",
+    "source": {
+      "owned": true,
+      "reason": "the same, while it is being dragged."
+    }
+  },
+  "text": {
+    "$value": "text",
+    "cssVar": "--folia-cursor-text",
+    "source": {
+      "owned": true,
+      "reason": "a block that turns into an editor when clicked."
+    }
+  },
+  "help": {
+    "$value": "help",
+    "cssVar": "--folia-cursor-help",
+    "source": {
+      "owned": true,
+      "reason": "a word that explains itself on hover."
+    }
+  },
+  "resize": {
+    "$value": "col-resize",
+    "cssVar": "--folia-cursor-resize",
+    "source": {
+      "owned": true,
+      "reason": "the detail panel's edge; Obsidian's own divider is a later phase (audit 02-17)."
+    }
+  }
+}

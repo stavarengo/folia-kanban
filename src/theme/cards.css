@@ -2,7 +2,7 @@
 .folia-card {
   position: relative;
   background: var(--folia-card-bg);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-lg);
   box-shadow: var(--folia-shadow-card);
   transition: box-shadow var(--folia-dur) var(--folia-ease), border-color var(--folia-dur-fast) ease;
@@ -11,9 +11,9 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
+  top: var(--folia-space-sm);
+  bottom: var(--folia-space-sm);
+  width: var(--folia-cue-thickness);
   border-radius: var(--folia-r-pill);
   background: transparent;
 }
@@ -33,9 +33,10 @@
 .folia-card[data-urgency] {
   background:
     /* top accent band */
-    linear-gradient(var(--folia-urgency-color), var(--folia-urgency-color)) top / 100% 3px no-repeat,
+    linear-gradient(var(--folia-urgency-color), var(--folia-urgency-color)) top / 100%
+      var(--folia-cue-thickness) no-repeat,
     /* flat background tint over the whole card */
-    linear-gradient(var(--folia-urgency-tint, transparent), var(--folia-urgency-tint, transparent)),
+    linear-gradient(var(--folia-urgency-tint), var(--folia-urgency-tint)),
     var(--folia-card-bg);
 }
 .folia-card[data-urgency="overdue"] {
@@ -57,7 +58,7 @@
 }
 .folia-card.is-selected {
   border-color: var(--folia-accent);
-  box-shadow: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);
+  box-shadow: var(--folia-shadow-card-selected);
 }
 /* The dragged card stays in flow as a quiet "slot" — the lifted copy lives in the DragOverlay. We
    hollow the source out (drop its content, shadow and own border) and leave only a dashed accent
@@ -75,7 +76,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border: 1.5px dashed color-mix(in srgb, var(--folia-accent) 60%, transparent);
+  border: var(--folia-border-width-hair) dashed color-mix(in srgb, var(--folia-accent) 60%, transparent);
   border-radius: var(--folia-r-lg);
 }
 /* The priority strip would otherwise still show on the hollowed slot. */
@@ -86,25 +87,25 @@
 .folia-card-main {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 10px 12px;
-  cursor: grab;
+  gap: var(--folia-space-sm-plus);
+  padding: var(--folia-gap) var(--folia-pad);
+  cursor: var(--folia-cursor-grab);
   border-radius: var(--folia-r-lg);
 }
 .folia-card-main:active {
-  cursor: grabbing;
+  cursor: var(--folia-cursor-grabbing);
 }
 /* A tile that cannot be drag-reordered — nested inside a parent's group, or lifted to a column's
    top level by the active filter and so a member of no column bucket — must not offer a grab
    cursor it has no way to honour. Keyed to the same condition CardItem disables the sortable on. */
 .folia-card--static .folia-card-main,
 .folia-card--static .folia-card-main:active {
-  cursor: default;
+  cursor: var(--folia-cursor-inert);
 }
 .folia-card-title {
   font-size: var(--folia-font-size-md-plus);
   font-weight: var(--folia-font-weight-semibold);
-  line-height: 1.4;
+  line-height: var(--folia-line-height-title);
   color: var(--text-normal);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -116,7 +117,7 @@
      first line: 3×26px buttons + 2×1px gaps + 4px container padding + 6px right offset = 90px, plus
      2px breathing space. A permanent reserve (vs. only on hover) keeps the layout from jumping when
      the cluster appears. */
-  padding-right: 92px;
+  padding-right: var(--folia-card-title-pad-r);
 }
 
 /* #12 inline title edit — the <input> that replaces the title in place. Inherits the title's
@@ -125,13 +126,13 @@
   font: inherit;
   font-size: var(--folia-font-size-md-plus);
   font-weight: var(--folia-font-weight-semibold);
-  line-height: 1.4;
+  line-height: var(--folia-line-height-title);
   width: 100%;
   margin: 0;
-  padding: 1px 4px;
+  padding: var(--folia-space-hair) var(--folia-space-xs);
   color: var(--text-normal);
   background: var(--background-primary);
-  border: 1px solid var(--folia-accent);
+  border: var(--folia-border-width) solid var(--folia-accent);
   border-radius: var(--folia-r-sm);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent);
+  box-shadow: var(--folia-ring-soft);
 }

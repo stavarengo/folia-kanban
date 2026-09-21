@@ -2,7 +2,7 @@
 .folia-card-next-todos {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--folia-space-xxs-plus);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -10,16 +10,16 @@
 .folia-card-next-todo {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--folia-space-sm);
   font-size: var(--folia-font-size-xs);
   color: var(--text-muted);
 }
 .folia-card-next-todo-mark {
   flex-shrink: 0;
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid var(--text-faint, var(--text-muted));
-  border-radius: 3px;
+  width: var(--folia-todo-mark);
+  height: var(--folia-todo-mark);
+  border: var(--folia-border-width-hair) solid var(--text-faint, var(--text-muted));
+  border-radius: var(--folia-r-xs);
 }
 .folia-card-next-todo-text {
   min-width: 0;

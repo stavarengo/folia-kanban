@@ -1,0 +1,343 @@
+{
+  "$description": "The sizes the board's own furniture is cut to — widths, heights, hit targets and offsets.",
+  "column-width": {
+    "$value": "300px",
+    "cssVar": "--folia-col-w",
+    "source": {
+      "owned": true,
+      "reason": "a column's width is a product decision about how much of a card is readable at a glance; Obsidian has no variable for it."
+    }
+  },
+  "menu-width-min": {
+    "$value": "200px",
+    "cssVar": "--folia-menu-w-min",
+    "source": {
+      "owned": true,
+      "reason": "how narrow a popover may shrink; Obsidian's own menus are sized by their content, not by a published variable."
+    }
+  },
+  "menu-width-max": {
+    "$value": "320px",
+    "cssVar": "--folia-menu-w-max",
+    "source": {
+      "owned": true,
+      "reason": "how wide a popover may grow to fit its longest label; Obsidian publishes no popover width."
+    }
+  },
+  "menu-width": {
+    "$value": "224px",
+    "cssVar": "--folia-menu-w",
+    "source": {
+      "owned": true,
+      "reason": "the column popover's fixed width, chosen for its swatch grid; Obsidian publishes no popover width."
+    }
+  },
+  "menu-height-max": {
+    "$value": "440px",
+    "cssVar": "--folia-menu-h-max",
+    "source": {
+      "owned": true,
+      "reason": "how tall a popover may grow before it scrolls; Obsidian publishes no popover height."
+    }
+  },
+  "modal-width": {
+    "$value": "440px",
+    "cssVar": "--folia-modal-w",
+    "source": {
+      "owned": true,
+      "reason": "the edit-column dialog's width; Obsidian's modal variables are a later phase (audit 02-34)."
+    }
+  },
+  "menu-padding": {
+    "$value": "11px",
+    "cssVar": "--folia-menu-pad",
+    "source": {
+      "owned": true,
+      "reason": "the column popover's inside padding, off Obsidian's 4px grid; the later phase that adopts the grid is what removes it."
+    }
+  },
+  "detail-width": {
+    "$value": "380px",
+    "cssVar": "--folia-detail-w",
+    "source": {
+      "owned": true,
+      "reason": "the side panel's width, overridden live from the user's own setting; a user preference has no host variable."
+    }
+  },
+  "detail-modal-width": {
+    "$value": "640px",
+    "cssVar": "--folia-detail-modal-w",
+    "source": {
+      "owned": true,
+      "reason": "the detail panel's width when it opens as a dialog instead; Obsidian's modal variables are a later phase (audit 02-34)."
+    }
+  },
+  "detail-modal-width-max": {
+    "$value": "92vw",
+    "cssVar": "--folia-detail-modal-w-max",
+    "source": {
+      "owned": true,
+      "reason": "the share of the viewport the dialog may take on a narrow window; a viewport fraction is not something Obsidian names."
+    }
+  },
+  "detail-modal-height-max": {
+    "$value": "85vh",
+    "cssVar": "--folia-detail-modal-h-max",
+    "source": {
+      "owned": true,
+      "reason": "the share of the viewport height the dialog may take; a viewport fraction is not something Obsidian names."
+    }
+  },
+  "detail-slide": {
+    "$value": "14px",
+    "cssVar": "--folia-detail-slide",
+    "source": {
+      "owned": true,
+      "reason": "how far the panel travels as it opens — a motion distance, not a layout size."
+    }
+  },
+  "statusbar-clearance": {
+    "$value": "32px",
+    "cssVar": "--folia-statusbar-clearance",
+    "source": {
+      "owned": true,
+      "reason": "how much the last card must clear the app's floating status bar; App measures the real bar and writes the live value, and this is what stands in before it does."
+    }
+  },
+  "suggest-height-max": {
+    "$value": "280px",
+    "cssVar": "--folia-suggest-h-max",
+    "source": {
+      "owned": true,
+      "reason": "how tall the filter suggestions may grow before they scroll; Obsidian publishes no suggestion-list height."
+    }
+  },
+  "search-width": {
+    "$value": "320px",
+    "cssVar": "--folia-search-w",
+    "source": {
+      "owned": true,
+      "reason": "the search box's preferred width in the toolbar; Obsidian publishes no search-input width."
+    }
+  },
+  "add-column-width": {
+    "$value": "220px",
+    "cssVar": "--folia-add-column-w",
+    "source": {
+      "owned": true,
+      "reason": "the add-column placeholder is deliberately narrower than a real column."
+    }
+  },
+  "prop-key-width": {
+    "$value": "86px",
+    "cssVar": "--folia-prop-key-w",
+    "source": {
+      "owned": true,
+      "reason": "the fixed column the property keys line up in, chosen so the values align; Obsidian's property editor is a later phase (audit 02-41)."
+    }
+  },
+  "card-title-clearance": {
+    "$value": "92px",
+    "cssVar": "--folia-card-title-pad-r",
+    "source": {
+      "owned": true,
+      "reason": "the room a card's title leaves for the hover actions that sit over it."
+    }
+  },
+  "card-overlay-inset": {
+    "$value": "18px",
+    "cssVar": "--folia-card-overlay-inset",
+    "source": {
+      "owned": true,
+      "reason": "how much narrower the lifted drag copy is than the column it came from."
+    }
+  },
+  "description-height-min": {
+    "$value": "var(--size-4-18)",
+    "cssVar": "--folia-desc-h-min",
+    "source": {
+      "alias": "--size-4-18"
+    }
+  },
+  "description-height-offset": {
+    "$value": "220px",
+    "cssVar": "--folia-desc-h-max-offset",
+    "source": {
+      "owned": true,
+      "reason": "what the rendered description leaves of the viewport for everything above and below it; CardDetail measures the real figure and writes it live."
+    }
+  },
+  "comment-edit-height-min": {
+    "$value": "var(--size-4-12)",
+    "cssVar": "--folia-comment-edit-h-min",
+    "source": {
+      "alias": "--size-4-12"
+    }
+  },
+  "column-body-height-min": {
+    "$value": "var(--size-4-12)",
+    "cssVar": "--folia-column-body-h-min",
+    "source": {
+      "alias": "--size-4-12"
+    }
+  },
+  "viewport-height": {
+    "$value": "100vh",
+    "cssVar": "--folia-viewport-h",
+    "source": {
+      "owned": true,
+      "reason": "the viewport itself, which nothing in a theme can name; the caps measured against it read it from here."
+    }
+  },
+  "viewport-width": {
+    "$value": "100vw",
+    "cssVar": "--folia-viewport-w",
+    "source": {
+      "owned": true,
+      "reason": "the viewport itself, which nothing in a theme can name; the caps measured against it read it from here."
+    }
+  },
+  "column-park-margin": {
+    "$value": "60vw",
+    "cssVar": "--folia-col-park-margin",
+    "source": {
+      "owned": true,
+      "reason": "how far a parked column slides out of the row, leaving a strip of it on screen; a product behaviour with no host equivalent."
+    }
+  },
+  "toast-offset": {
+    "$value": "22px",
+    "cssVar": "--folia-toast-bottom",
+    "source": {
+      "owned": true,
+      "reason": "how far above the board's bottom edge the completion toast floats."
+    }
+  },
+  "toast-rise": {
+    "$value": "var(--size-4-3)",
+    "cssVar": "--folia-toast-rise",
+    "source": {
+      "alias": "--size-4-3"
+    }
+  },
+  "menu-rise": {
+    "$value": "var(--size-4-1)",
+    "cssVar": "--folia-menu-rise",
+    "source": {
+      "alias": "--size-4-1"
+    }
+  },
+  "action-rise": {
+    "$value": "var(--size-2-1)",
+    "cssVar": "--folia-action-rise",
+    "source": {
+      "alias": "--size-2-1"
+    }
+  },
+  "control-height": {
+    "$value": "30px",
+    "cssVar": "--folia-control-h",
+    "source": {
+      "owned": true,
+      "reason": "the height of the board's own inline controls; Obsidian's --input-height is the variable this becomes when per-control variables are adopted (audit 02-15)."
+    }
+  },
+  "control-padding-x": {
+    "$value": "11px",
+    "cssVar": "--folia-control-pad-x",
+    "source": {
+      "owned": true,
+      "reason": "the horizontal padding inside those controls, off Obsidian's 4px grid."
+    }
+  },
+  "hit-small": {
+    "$value": "var(--size-4-6)",
+    "cssVar": "--folia-hit-sm",
+    "source": {
+      "alias": "--size-4-6"
+    }
+  },
+  "hit-medium": {
+    "$value": "26px",
+    "cssVar": "--folia-hit-md",
+    "source": {
+      "owned": true,
+      "reason": "the icon buttons' hit target, off Obsidian's 4px grid; sizing them from --input-height or the icon scale is a later phase (audit 02-14, 02-15)."
+    }
+  },
+  "count-width-min": {
+    "$value": "var(--size-4-5)",
+    "cssVar": "--folia-count-w-min",
+    "source": {
+      "alias": "--size-4-5"
+    }
+  },
+  "column-dot": {
+    "$value": "var(--size-4-2)",
+    "cssVar": "--folia-dot",
+    "source": {
+      "alias": "--size-4-2"
+    }
+  },
+  "unread-dot": {
+    "$value": "var(--size-2-3)",
+    "cssVar": "--folia-unread-dot",
+    "source": {
+      "alias": "--size-2-3"
+    }
+  },
+  "todo-mark": {
+    "$value": "9px",
+    "cssVar": "--folia-todo-mark",
+    "source": {
+      "owned": true,
+      "reason": "the checkbox-like marker in a card's next-todo preview, off Obsidian's 4px grid; Obsidian's checkbox geometry is a later phase (audit 02-35)."
+    }
+  },
+  "progress-height": {
+    "$value": "var(--size-4-1)",
+    "cssVar": "--folia-progress-h",
+    "source": {
+      "alias": "--size-4-1"
+    }
+  },
+  "divider-height": {
+    "$value": "1px",
+    "cssVar": "--folia-divider-h",
+    "source": {
+      "owned": true,
+      "reason": "a one-pixel rule drawn as a filled element rather than a border, so the border width does not describe it."
+    }
+  },
+  "resize-handle-width": {
+    "$value": "var(--size-2-3)",
+    "cssVar": "--folia-resize-w",
+    "source": {
+      "alias": "--size-2-3"
+    }
+  },
+  "resize-handle-offset": {
+    "$value": "-3px",
+    "cssVar": "--folia-resize-offset",
+    "source": {
+      "owned": true,
+      "reason": "pulls the resize handle half outside the panel so it straddles the edge; Obsidian's own divider is a later phase (audit 02-17)."
+    }
+  },
+  "cue-thickness": {
+    "$value": "3px",
+    "cssVar": "--folia-cue-thickness",
+    "source": {
+      "owned": true,
+      "reason": "the thickness of every edge cue a card or column draws — the priority strip, the urgency band and the column accent — off Obsidian's 4px grid."
+    }
+  },
+  "icon-baseline": {
+    "$value": "-0.15em",
+    "cssVar": "--folia-icon-baseline",
+    "source": {
+      "owned": true,
+      "reason": "how far an inline icon drops below the text baseline, measured in that text; a typographic correction Obsidian does not publish."
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$description": "Durations, easing and the angles things are lifted at.",
+  "fast": {
+    "$value": "110ms",
+    "cssVar": "--folia-dur-fast",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no animation durations at all, so every duration the board uses is its own."
+    }
+  },
+  "base": {
+    "$value": "170ms",
+    "cssVar": "--folia-dur",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no animation durations at all, so every duration the board uses is its own."
+    }
+  },
+  "toast": {
+    "$value": "220ms",
+    "cssVar": "--folia-dur-toast",
+    "source": {
+      "owned": true,
+      "reason": "the completion toast's entrance, slower than the board's base so the celebration registers."
+    }
+  },
+  "none": {
+    "$value": "0.01ms",
+    "cssVar": "--folia-dur-none",
+    "source": {
+      "owned": true,
+      "reason": "what every transition shortens to under `prefers-reduced-motion`; not zero, so a transitionend still fires."
+    }
+  },
+  "ease": {
+    "$value": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "cssVar": "--folia-ease",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no easing curves."
+    }
+  },
+  "tilt": {
+    "$value": "1.5deg",
+    "cssVar": "--folia-tilt",
+    "source": {
+      "owned": true,
+      "reason": "the angle a dragged card or column is lifted at; an angle is not something Obsidian names."
+    }
+  },
+  "tilt-flat": {
+    "$value": "0deg",
+    "cssVar": "--folia-tilt-flat",
+    "source": {
+      "owned": true,
+      "reason": "the resting angle that tilt animates from."
+    }
+  },
+  "rotate-collapsed": {
+    "$value": "-90deg",
+    "cssVar": "--folia-rotate-collapsed",
+    "source": {
+      "owned": true,
+      "reason": "the quarter turn a disclosure chevron takes when its section is closed."
+    }
+  }
+}

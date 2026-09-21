@@ -1,0 +1,50 @@
+{
+  "$description": "Border and outline widths.",
+  "width": {
+    "$value": "var(--border-width)",
+    "cssVar": "--folia-border-width",
+    "source": {
+      "alias": "--border-width"
+    }
+  },
+  "width-hair": {
+    "$value": "1.5px",
+    "cssVar": "--folia-border-width-hair",
+    "source": {
+      "owned": true,
+      "reason": "a sub-pixel border for the dashed outlines that must read as lighter than a real edge; Obsidian documents one border width."
+    }
+  },
+  "width-thick": {
+    "$value": "2px",
+    "cssVar": "--folia-border-width-thick",
+    "source": {
+      "owned": true,
+      "reason": "the heavier border the board draws where an edge carries meaning (a selected swatch, an accent rail); Obsidian documents one border width."
+    }
+  },
+  "focus-ring-width": {
+    "$value": "2px",
+    "cssVar": "--folia-focus-ring-w",
+    "source": {
+      "owned": true,
+      "reason": "the focus outline's thickness; Obsidian draws its own focus ring as a box-shadow and publishes no width (audit 02-29)."
+    }
+  },
+  "focus-ring-offset": {
+    "$value": "2px",
+    "cssVar": "--folia-focus-ring-offset",
+    "source": {
+      "owned": true,
+      "reason": "how far the focus outline sits from the control it marks."
+    }
+  },
+  "focus-ring-offset-inset": {
+    "$value": "-2px",
+    "cssVar": "--folia-focus-ring-offset-inset",
+    "source": {
+      "owned": true,
+      "reason": "the same distance inwards, for a control whose ring would otherwise be clipped by its own overflow."
+    }
+  }
+}

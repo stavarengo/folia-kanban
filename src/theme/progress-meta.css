@@ -2,11 +2,11 @@
 .folia-progress {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--folia-space-sm-plus);
 }
 .folia-progress-track {
   flex: 1 1 auto;
-  height: 4px;
+  height: var(--folia-progress-h);
   border-radius: var(--folia-r-pill);
   background: var(--background-modifier-border);
   overflow: hidden;
@@ -23,7 +23,7 @@
 .folia-progress-label {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--folia-space-xxs);
   font-size: var(--folia-font-size-xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -34,14 +34,14 @@
 
 .folia-card-meta {
   display: flex;
-  gap: 12px;
+  gap: var(--folia-pad);
   font-size: var(--folia-font-size-xs);
   color: var(--text-muted);
 }
 .folia-card-meta span {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--folia-space-xxs-plus);
 }
 /* The comment badge picks up a colour + a dot when the card holds comments you haven't read. */
 .folia-card-meta .folia-comments-unread {
@@ -53,15 +53,15 @@
   font-weight: var(--folia-font-weight-semibold);
 }
 .folia-unread-dot {
-  width: 6px;
-  height: 6px;
+  width: var(--folia-unread-dot);
+  height: var(--folia-unread-dot);
   border-radius: var(--folia-r-pill);
   background: currentColor;
-  margin-left: 1px;
+  margin-left: var(--folia-space-hair);
 }
 /* The reply state's own shape, so the two unread cues differ by more than hue. */
 .folia-unread-reply-mark {
   font-size: var(--folia-font-size-xs);
-  line-height: 1;
-  margin-left: 1px;
+  line-height: var(--folia-line-height-mark);
+  margin-left: var(--folia-space-hair);
 }

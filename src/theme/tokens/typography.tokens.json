@@ -1,0 +1,164 @@
+{
+  "$description": "Font sizes, weights, line heights, tracking and the monospace stack.",
+  "font-size": {
+    "xxs": {
+      "$value": "10px",
+      "cssVar": "--folia-font-size-xxs",
+      "source": {
+        "owned": true,
+        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
+      }
+    },
+    "xxs-plus": {
+      "$value": "10.5px",
+      "cssVar": "--folia-font-size-xxs-plus",
+      "source": {
+        "owned": true,
+        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
+      }
+    },
+    "xs": {
+      "$value": "11px",
+      "cssVar": "--folia-font-size-xs",
+      "source": {
+        "owned": true,
+        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
+      }
+    },
+    "sm": {
+      "$value": "var(--font-ui-smaller)",
+      "cssVar": "--folia-font-size-sm",
+      "source": {
+        "alias": "--font-ui-smaller"
+      }
+    },
+    "sm-plus": {
+      "$value": "12.5px",
+      "cssVar": "--folia-font-size-sm-plus",
+      "source": {
+        "owned": true,
+        "reason": "a half-step between Obsidian's 12px and 13px UI sizes; the later phase that adopts the scale is what removes it."
+      }
+    },
+    "md": {
+      "$value": "var(--font-ui-small)",
+      "cssVar": "--folia-font-size-md",
+      "source": {
+        "alias": "--font-ui-small"
+      }
+    },
+    "md-plus": {
+      "$value": "13.5px",
+      "cssVar": "--folia-font-size-md-plus",
+      "source": {
+        "owned": true,
+        "reason": "a half-step between Obsidian's 13px and 15px UI sizes; the later phase that adopts the scale is what removes it."
+      }
+    },
+    "lg": {
+      "$value": "var(--font-ui-medium)",
+      "cssVar": "--folia-font-size-lg",
+      "source": {
+        "alias": "--font-ui-medium"
+      }
+    },
+    "xl": {
+      "$value": "16px",
+      "cssVar": "--folia-font-size-xl",
+      "source": {
+        "owned": true,
+        "reason": "between Obsidian's 15px and 20px UI sizes; the detail panel's title sits here until the scale is adopted."
+      }
+    }
+  },
+  "font-mono": {
+    "$value": "var(--font-monospace, monospace)",
+    "cssVar": "--folia-font-mono",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian's composed monospace stack, which the developer docs do not list (see host/observed.json), with the generic family behind it."
+    }
+  },
+  "weight": {
+    "medium": {
+      "$value": "var(--font-medium)",
+      "cssVar": "--folia-font-weight-medium",
+      "source": {
+        "alias": "--font-medium"
+      }
+    },
+    "semibold": {
+      "$value": "var(--font-semibold)",
+      "cssVar": "--folia-font-weight-semibold",
+      "source": {
+        "alias": "--font-semibold"
+      }
+    }
+  },
+  "line-height": {
+    "normal": {
+      "$value": "var(--line-height-normal)",
+      "cssVar": "--folia-line-height",
+      "source": {
+        "alias": "--line-height-normal"
+      }
+    },
+    "tight": {
+      "$value": "var(--line-height-tight)",
+      "cssVar": "--folia-line-height-tight",
+      "source": {
+        "alias": "--line-height-tight"
+      }
+    },
+    "title": {
+      "$value": "1.4",
+      "cssVar": "--folia-line-height-title",
+      "source": {
+        "owned": true,
+        "reason": "between Obsidian's tight and normal line heights; a card title wraps to two lines often enough that neither fits."
+      }
+    },
+    "heading": {
+      "$value": "1.35",
+      "cssVar": "--folia-line-height-heading",
+      "source": {
+        "owned": true,
+        "reason": "between Obsidian's tight and normal line heights, for headings inside rendered prose."
+      }
+    },
+    "mark": {
+      "$value": "1",
+      "cssVar": "--folia-line-height-mark",
+      "source": {
+        "owned": true,
+        "reason": "a glyph used as an icon, which must not add leading of its own."
+      }
+    }
+  },
+  "tracking": {
+    "label": {
+      "$value": "0.04em",
+      "cssVar": "--folia-tracking-label",
+      "source": {
+        "owned": true,
+        "reason": "the letter-spacing the board's uppercase micro-labels need to stay readable; Obsidian publishes no tracking."
+      }
+    },
+    "key": {
+      "$value": "0.03em",
+      "cssVar": "--folia-tracking-key",
+      "source": {
+        "owned": true,
+        "reason": "the same, a touch tighter, for the property keys and trace sources."
+      }
+    },
+    "heading": {
+      "$value": "0.05em",
+      "cssVar": "--folia-tracking-heading",
+      "source": {
+        "owned": true,
+        "reason": "the same, a touch wider, for a section heading."
+      }
+    }
+  }
+}

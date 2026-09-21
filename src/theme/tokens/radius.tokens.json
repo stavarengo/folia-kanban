@@ -1,0 +1,50 @@
+{
+  "$description": "Corner radii.",
+  "xs": {
+    "$value": "3px",
+    "cssVar": "--folia-r-xs",
+    "source": {
+      "owned": true,
+      "reason": "the smallest corner the board draws, on the next-todo marker; Obsidian's ladder starts at 4px."
+    }
+  },
+  "sm": {
+    "$value": "6px",
+    "cssVar": "--folia-r-sm",
+    "source": {
+      "owned": true,
+      "reason": "between Obsidian's 4px and 8px rungs; the board's small controls sit here until the radius ladder is adopted outright."
+    }
+  },
+  "md": {
+    "$value": "var(--radius-m)",
+    "cssVar": "--folia-r",
+    "source": {
+      "alias": "--radius-m"
+    }
+  },
+  "lg": {
+    "$value": "10px",
+    "cssVar": "--folia-r-lg",
+    "source": {
+      "owned": true,
+      "reason": "off Obsidian's radius ladder (8px then 12px); cards and popovers use it until the ladder is adopted outright."
+    }
+  },
+  "xl": {
+    "$value": "14px",
+    "cssVar": "--folia-r-xl",
+    "source": {
+      "owned": true,
+      "reason": "off Obsidian's radius ladder (12px then 16px); the detail panel and modal use it until the ladder is adopted outright."
+    }
+  },
+  "pill": {
+    "$value": "999px",
+    "cssVar": "--folia-r-pill",
+    "source": {
+      "owned": true,
+      "reason": "a fully rounded end, which is a shape rather than a size, so no radius rung can express it."
+    }
+  }
+}

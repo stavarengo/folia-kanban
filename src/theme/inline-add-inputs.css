@@ -2,8 +2,8 @@
 .folia-add-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 2px;
+  gap: var(--folia-space-sm);
+  padding: var(--folia-space-xxs);
 }
 .folia-add-card textarea,
 .folia-add-inline input,
@@ -13,9 +13,9 @@
   font: inherit;
   background: var(--background-primary);
   color: var(--text-normal);
-  border: 1px solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  padding: 7px 9px;
+  padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 .folia-add-card textarea:focus,
@@ -30,5 +30,5 @@
 }
 .folia-row-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }

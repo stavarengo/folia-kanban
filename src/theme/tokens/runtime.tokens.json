@@ -1,0 +1,59 @@
+{
+  "$description": "Tokens the board's JavaScript (or, for the urgency cue, a component rule) writes live; the value here is what everything else reads.",
+  "column-accent": {
+    "$value": "var(--folia-accent)",
+    "cssVar": "--folia-col-accent",
+    "source": {
+      "owned": true,
+      "reason": "the column's own colour, written onto the column element by Column.tsx; this is what a surface outside a coloured column reads."
+    }
+  },
+  "column-opacity": {
+    "$value": "1",
+    "cssVar": "--folia-col-opacity",
+    "source": {
+      "owned": true,
+      "reason": "how faded a parked column is, written onto the column element by Column.tsx; fully opaque is what every other column reads."
+    }
+  },
+  "column-hover-opacity": {
+    "$value": "1",
+    "cssVar": "--folia-col-hover-opacity",
+    "source": {
+      "owned": true,
+      "reason": "the same on hover, written by Column.tsx; fully opaque is what every other column reads."
+    }
+  },
+  "context-color": {
+    "$value": "initial",
+    "cssVar": "--folia-ctx-color",
+    "source": {
+      "owned": true,
+      "reason": "the folder context's colour, written onto the card by CardItem.tsx. Declared `initial` — the guaranteed-invalid value — because a card can have a context and no colour, and the strip and the chip answer that differently on purpose; a real value here would silently change both."
+    }
+  },
+  "description-height-max": {
+    "$value": "calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset))",
+    "cssVar": "--folia-desc-max-h",
+    "source": {
+      "owned": true,
+      "reason": "the height the rendered description is capped at, measured and written by CardDetail.tsx; this is the figure used before it measures."
+    }
+  },
+  "urgency-color": {
+    "$value": "transparent",
+    "cssVar": "--folia-urgency-color",
+    "source": {
+      "owned": true,
+      "reason": "the due-date cue's colour, set per urgency by the rules in cards.css; transparent is the resting value for a card with no urgency."
+    }
+  },
+  "urgency-tint": {
+    "$value": "transparent",
+    "cssVar": "--folia-urgency-tint",
+    "source": {
+      "owned": true,
+      "reason": "the faint wash behind the same cue, set per urgency by the rules in cards.css; the `soon` state deliberately leaves it at the resting value."
+    }
+  }
+}

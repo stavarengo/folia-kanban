@@ -1,0 +1,99 @@
+{
+  "$description": "Elevation, rings and blurs.",
+  "card": {
+    "$value": "0 1px 2px rgba(0, 0, 0, 0.16)",
+    "cssVar": "--folia-shadow-card",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    }
+  },
+  "card-hover": {
+    "$value": "0 4px 14px rgba(0, 0, 0, 0.22)",
+    "cssVar": "--folia-shadow-card-hover",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    }
+  },
+  "overlay": {
+    "$value": "0 14px 36px rgba(0, 0, 0, 0.4)",
+    "cssVar": "--folia-shadow-overlay",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    }
+  },
+  "popover": {
+    "$value": "0 6px 20px rgba(0, 0, 0, 0.28)",
+    "cssVar": "--folia-shadow-pop",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    }
+  },
+  "panel": {
+    "$value": "-8px 0 24px rgba(0, 0, 0, 0.18)",
+    "cssVar": "--folia-shadow-panel",
+    "source": {
+      "owned": true,
+      "reason": "Obsidian publishes no elevation scale, so every shadow the board draws is its own."
+    }
+  },
+  "ring": {
+    "$value": "0 0 0 2px color-mix(in srgb, var(--folia-accent) 30%, transparent)",
+    "cssVar": "--folia-ring",
+    "source": {
+      "owned": true,
+      "reason": "the accent ring a selected control wears; Obsidian's own focus ring is a later phase (audit 02-29)."
+    }
+  },
+  "ring-soft": {
+    "$value": "0 0 0 2px color-mix(in srgb, var(--folia-accent) 25%, transparent)",
+    "cssVar": "--folia-ring-soft",
+    "source": {
+      "owned": true,
+      "reason": "the same ring at a lower tint, for a control that is being edited rather than chosen."
+    }
+  },
+  "card-selected": {
+    "$value": "0 0 0 1px var(--folia-accent), var(--folia-shadow-card)",
+    "cssVar": "--folia-shadow-card-selected",
+    "source": {
+      "owned": true,
+      "reason": "a hairline accent outline over the card's own elevation, drawn as a shadow so it adds no layout."
+    }
+  },
+  "choice-active": {
+    "$value": "0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent)",
+    "cssVar": "--folia-shadow-choice-active",
+    "source": {
+      "owned": true,
+      "reason": "the double ring that marks the chosen priority or column in a menu, cut out of the surface behind it."
+    }
+  },
+  "swatch-active": {
+    "$value": "0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal)",
+    "cssVar": "--folia-shadow-swatch-active",
+    "source": {
+      "owned": true,
+      "reason": "the same idea for a colour swatch, where the ring must read against any swatch colour."
+    }
+  },
+  "blur-actions": {
+    "$value": "blur(3px)",
+    "cssVar": "--folia-blur-actions",
+    "source": {
+      "owned": true,
+      "reason": "the blur behind a card's floating hover actions; Obsidian publishes no blur values."
+    }
+  },
+  "blur-scrim": {
+    "$value": "blur(2px)",
+    "cssVar": "--folia-blur-scrim",
+    "source": {
+      "owned": true,
+      "reason": "the blur behind a dialog's dimming layer; Obsidian publishes no blur values."
+    }
+  }
+}

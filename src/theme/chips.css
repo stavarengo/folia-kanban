@@ -2,18 +2,18 @@
 .folia-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: var(--folia-space-xs-plus);
 }
 .folia-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--folia-space-xxs-plus);
   font-size: var(--folia-font-size-xs);
   font-weight: var(--folia-font-weight-medium);
-  line-height: 1.5;
-  padding: 1px 8px;
+  line-height: var(--folia-line-height);
+  padding: var(--folia-space-hair) var(--folia-space-md);
   border-radius: var(--folia-r-pill);
-  border: 1px solid transparent;
+  border: var(--folia-border-width) solid transparent;
   white-space: nowrap;
   color: var(--text-muted);
   background: var(--background-modifier-hover);

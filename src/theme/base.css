@@ -57,9 +57,9 @@
   background: transparent;
   border: none;
   color: var(--link-color, var(--folia-accent));
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: var(--folia-space-xxs);
   padding: 0;
   font: inherit;
   text-align: left;
@@ -105,25 +105,25 @@
 /* completion celebration */
 .folia-toast {
   position: absolute;
-  bottom: 22px;
+  bottom: var(--folia-toast-bottom);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
+  gap: var(--folia-space-md);
+  padding: var(--folia-space-md-plus) var(--folia-space-xl);
   border-radius: var(--folia-r-pill);
-  color: #fff;
+  color: var(--folia-on-fill);
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   box-shadow: var(--folia-shadow-overlay);
   z-index: var(--folia-z-index-toast);
   pointer-events: none;
-  animation: folia-toast-in 220ms var(--folia-ease);
+  animation: folia-toast-in var(--folia-dur-toast) var(--folia-ease);
 }
 .folia-toast-success { background: var(--folia-success); }
 .folia-toast-error { background: var(--folia-danger); }
 @keyframes folia-toast-in {
-  from { opacity: 0; transform: translate(-50%, 12px) scale(0.94); }
+  from { opacity: 0; transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }

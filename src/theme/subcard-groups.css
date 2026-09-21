@@ -7,22 +7,22 @@
 .folia-card-tree {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 .folia-subcard-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-left: 10px;
-  padding: 6px 0 6px 8px;
-  border-left: 2px solid color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 55%, transparent);
-  background: color-mix(in srgb, var(--folia-col-accent, var(--folia-accent)) 5%, transparent);
+  gap: var(--folia-space-sm);
+  margin-left: var(--folia-gap);
+  padding: var(--folia-space-sm) 0 var(--folia-space-sm) var(--folia-space-md);
+  border-left: var(--folia-border-width-thick) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--folia-col-accent) 5%, transparent);
   border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
 }
 .folia-subcard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--folia-space-sm);
 }
 /* Nested cards are a touch smaller and denser; the grab affordance they shed comes from
    `--static` above, which every non-draggable tile carries. */
@@ -31,8 +31,8 @@
   border-color: color-mix(in srgb, var(--folia-border) 80%, transparent);
 }
 .folia-card--nested .folia-card-main {
-  gap: 5px;
-  padding: 7px 10px;
+  gap: var(--folia-space-xs-plus);
+  padding: var(--folia-space-sm-plus) var(--folia-gap);
 }
 .folia-card--nested .folia-card-title {
   font-size: var(--folia-font-size-sm-plus);

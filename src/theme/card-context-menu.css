@@ -10,31 +10,31 @@
      top of the last few characters. */
   width: max-content;
   min-width: var(--folia-menu-w-min);
-  max-width: min(var(--folia-menu-w-max), calc(100vw - 2 * var(--folia-pad)));
+  max-width: min(var(--folia-menu-w-max), calc(var(--folia-viewport-w) - 2 * var(--folia-pad)));
   scrollbar-gutter: stable;
-  gap: 2px;
-  padding: 6px;
+  gap: var(--folia-space-xxs);
+  padding: var(--folia-space-sm);
 }
 .folia-card-context .folia-menu-label {
-  padding: 4px 8px 0;
+  padding: var(--folia-space-xs) var(--folia-space-md) 0;
 }
 .folia-menu-priorities {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  padding: 2px 4px;
+  gap: var(--folia-space-xs-plus);
+  padding: var(--folia-space-xxs) var(--folia-space-xs);
 }
 .folia-menu-prio {
   font: inherit;
   font-size: var(--folia-font-size-sm);
-  padding: 3px 9px;
-  border: 1px solid transparent;
+  padding: var(--folia-space-xxs-plus) var(--folia-space-md-plus);
+  border: var(--folia-border-width) solid transparent;
   border-radius: var(--folia-r-pill);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   text-transform: capitalize;
 }
 .folia-menu-prio.is-active {
-  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
+  box-shadow: var(--folia-shadow-choice-active);
 }
 .folia-menu-prio-none.folia-menu-prio-none {
   display: grid;
@@ -47,20 +47,20 @@
 .folia-menu-columns {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  padding: 2px 4px;
+  gap: var(--folia-space-xs-plus);
+  padding: var(--folia-space-xxs) var(--folia-space-xs);
 }
 .folia-menu-column.folia-menu-column {
   font: inherit;
   font-size: var(--folia-font-size-sm);
-  padding: 3px 9px;
-  border: 1px solid var(--folia-border);
+  padding: var(--folia-space-xxs-plus) var(--folia-space-md-plus);
+  border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-pill);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
 }
 .folia-menu-column.is-active {
   color: var(--text-normal);
-  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
+  box-shadow: var(--folia-shadow-choice-active);
 }

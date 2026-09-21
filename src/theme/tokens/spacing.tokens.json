@@ -1,0 +1,163 @@
+{
+  "$description": "The board's spacing rhythm: the space between things and inside them.",
+  "hair": {
+    "$value": "1px",
+    "cssVar": "--folia-space-hair",
+    "source": {
+      "owned": true,
+      "reason": "a one-pixel inset; Obsidian's finer grid starts at 2px."
+    }
+  },
+  "xxs": {
+    "$value": "var(--size-2-1)",
+    "cssVar": "--folia-space-xxs",
+    "source": {
+      "alias": "--size-2-1"
+    }
+  },
+  "xxs-plus": {
+    "$value": "3px",
+    "cssVar": "--folia-space-xxs-plus",
+    "source": {
+      "owned": true,
+      "reason": "a half-step off Obsidian's 2px grid; the board still uses it, and the later phase that adopts the grid outright is what removes it."
+    }
+  },
+  "xs": {
+    "$value": "var(--size-4-1)",
+    "cssVar": "--folia-space-xs",
+    "source": {
+      "alias": "--size-4-1"
+    }
+  },
+  "xs-plus": {
+    "$value": "5px",
+    "cssVar": "--folia-space-xs-plus",
+    "source": {
+      "owned": true,
+      "reason": "a half-step off Obsidian's 2px grid; the board still uses it, and the later phase that adopts the grid outright is what removes it."
+    }
+  },
+  "sm": {
+    "$value": "var(--size-2-3)",
+    "cssVar": "--folia-space-sm",
+    "source": {
+      "alias": "--size-2-3"
+    }
+  },
+  "sm-plus": {
+    "$value": "7px",
+    "cssVar": "--folia-space-sm-plus",
+    "source": {
+      "owned": true,
+      "reason": "a half-step off Obsidian's 2px grid; the board still uses it, and the later phase that adopts the grid outright is what removes it."
+    }
+  },
+  "md": {
+    "$value": "var(--size-4-2)",
+    "cssVar": "--folia-space-md",
+    "source": {
+      "alias": "--size-4-2"
+    }
+  },
+  "md-plus": {
+    "$value": "9px",
+    "cssVar": "--folia-space-md-plus",
+    "source": {
+      "owned": true,
+      "reason": "a half-step off Obsidian's 2px grid; the board still uses it, and the later phase that adopts the grid outright is what removes it."
+    }
+  },
+  "gap": {
+    "$value": "10px",
+    "cssVar": "--folia-gap",
+    "source": {
+      "owned": true,
+      "reason": "the board's default space BETWEEN things, at 10px off Obsidian's 4px grid; the later phase that adopts the grid decides whether it becomes 8 or 12."
+    }
+  },
+  "pad": {
+    "$value": "var(--size-4-3)",
+    "cssVar": "--folia-pad",
+    "source": {
+      "alias": "--size-4-3"
+    }
+  },
+  "lg": {
+    "$value": "14px",
+    "cssVar": "--folia-space-lg",
+    "source": {
+      "owned": true,
+      "reason": "off Obsidian's 4px grid (12px then 16px); the board's roomier paddings sit here until the grid is adopted outright."
+    }
+  },
+  "xl": {
+    "$value": "var(--size-4-4)",
+    "cssVar": "--folia-space-xl",
+    "source": {
+      "alias": "--size-4-4"
+    }
+  },
+  "xl-plus": {
+    "$value": "18px",
+    "cssVar": "--folia-space-xl-plus",
+    "source": {
+      "owned": true,
+      "reason": "off Obsidian's 4px grid (16px then 20px); used where a block needs more air than xl gives."
+    }
+  },
+  "xxl": {
+    "$value": "var(--size-4-6)",
+    "cssVar": "--folia-space-xxl",
+    "source": {
+      "alias": "--size-4-6"
+    }
+  },
+  "xxxl": {
+    "$value": "var(--size-4-12)",
+    "cssVar": "--folia-space-xxxl",
+    "source": {
+      "alias": "--size-4-12"
+    }
+  },
+  "bleed": {
+    "$value": "-6px",
+    "cssVar": "--folia-space-bleed",
+    "source": {
+      "owned": true,
+      "reason": "a negative inset that pulls a hover surface back out over its own padding, so the text does not move when the surface appears; Obsidian's scale is positive only."
+    }
+  },
+  "pull": {
+    "$value": "-5px",
+    "cssVar": "--folia-space-pull",
+    "source": {
+      "owned": true,
+      "reason": "a negative margin that closes the gap the block above already left; Obsidian's scale is positive only."
+    }
+  },
+  "block": {
+    "$value": "2em",
+    "cssVar": "--folia-pad-block",
+    "source": {
+      "owned": true,
+      "reason": "a full-pane state message is padded in its own text size, not in board pixels, so it stays proportionate when the user changes the font size."
+    }
+  },
+  "notice-y": {
+    "$value": "0.5em",
+    "cssVar": "--folia-pad-notice-y",
+    "source": {
+      "owned": true,
+      "reason": "a notice bar is padded in its own text size for the same reason as spacing.block."
+    }
+  },
+  "para": {
+    "$value": "0.25em",
+    "cssVar": "--folia-space-para",
+    "source": {
+      "owned": true,
+      "reason": "the space under a line of prose, sized in that prose's own text."
+    }
+  }
+}

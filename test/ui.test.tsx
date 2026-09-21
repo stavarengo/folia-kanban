@@ -6424,8 +6424,8 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // and moved below the base, every declaration lands; the state rules follow it, so the button
     // still shows on hover, on focus and while its menu is open.
     const own = rule(".folia-column-menu-btn.folia-column-menu-btn");
-    expect(own).toContain("width: 24px");
-    expect(own).toContain("height: 24px");
+    expect(own).toContain("width: var(--folia-hit-sm)");
+    expect(own).toContain("height: var(--folia-hit-sm)");
     expect(own).toContain("opacity: 0");
     expect(own).toContain("transition: opacity");
     // The three state selectors share one rule, so `at` (which anchors on a rule's own line) does

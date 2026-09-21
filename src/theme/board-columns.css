@@ -3,7 +3,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--folia-gap);
-  padding: 14px;
+  padding: var(--folia-space-lg);
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1 1 auto;
@@ -12,17 +12,17 @@
   scrollbar-width: thin;
 }
 .folia-board.is-pan-scrolling {
-  cursor: grabbing;
+  cursor: var(--folia-cursor-grabbing);
   user-select: none;
 }
 /* In "click and drag" mode the bare board background is itself draggable to pan, so it advertises a
    grab cursor. Columns/cards/buttons sit above and keep their own cursors, so the hint only shows on
    the empty space the pan actually responds to. */
 .folia-board[data-pan="empty"] {
-  cursor: grab;
+  cursor: var(--folia-cursor-grab);
 }
 .folia-board[data-pan="empty"].is-pan-scrolling {
-  cursor: grabbing;
+  cursor: var(--folia-cursor-grabbing);
 }
 
 .folia-column {
@@ -32,8 +32,8 @@
   width: var(--folia-col-w);
   max-height: 100%;
   background: var(--folia-col-bg);
-  border: 1px solid var(--folia-border);
-  border-top: 3px solid var(--folia-col-accent, var(--folia-accent));
+  border: var(--folia-border-width) solid var(--folia-border);
+  border-top: var(--folia-cue-thickness) solid var(--folia-col-accent);
   border-radius: var(--folia-r-lg);
   overflow: hidden;
 }
@@ -41,16 +41,16 @@
 .folia-column-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: var(--folia-space-md);
+  padding: var(--folia-space-md-plus) var(--folia-pad);
   background: var(--folia-col-bg);
   position: relative;
 }
 .folia-column-dot {
-  width: 8px;
-  height: 8px;
+  width: var(--folia-dot);
+  height: var(--folia-dot);
   border-radius: var(--folia-r-pill);
-  background: var(--folia-col-accent, var(--folia-accent));
+  background: var(--folia-col-accent);
   flex: 0 0 auto;
 }
 .folia-column-title {
@@ -65,14 +65,14 @@
 .folia-column-count {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--folia-space-xxs-plus);
   font-size: var(--folia-font-size-xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--background-modifier-border);
   border-radius: var(--folia-r-pill);
-  padding: 1px 8px;
-  min-width: 20px;
+  padding: var(--folia-space-hair) var(--folia-space-md);
+  min-width: var(--folia-count-w-min);
   justify-content: center;
 }
 .folia-column-count.is-over-limit {
@@ -89,11 +89,11 @@
 .folia-column-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: var(--folia-space-md);
+  padding: var(--folia-space-md);
   padding-bottom: var(--folia-statusbar-clearance); /* last card clears the fixed status bar */
   overflow-y: auto;
-  min-height: 48px;
+  min-height: var(--folia-column-body-h-min);
   flex: 1 1 auto;
   scrollbar-width: thin;
   transition: background var(--folia-dur-fast) ease;
@@ -106,17 +106,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 18px 8px;
+  gap: var(--folia-space-sm);
+  padding: var(--folia-space-xl-plus) var(--folia-space-md);
   color: var(--text-faint, var(--text-muted));
   font-size: var(--folia-font-size-sm);
-  border: 1px dashed var(--folia-border);
+  border: var(--folia-border-width) dashed var(--folia-border);
   border-radius: var(--folia-r);
   opacity: var(--folia-opacity-muted);
 }
 .folia-column-empty.is-filtered {
   border: none;
-  padding: 10px 8px;
+  padding: var(--folia-gap) var(--folia-space-md);
   opacity: var(--folia-opacity-faint);
   font-style: italic;
 }
@@ -124,16 +124,16 @@
 .folia-column-add.folia-column-add {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 8px 8px;
-  padding: 7px 9px;
+  gap: var(--folia-space-sm);
+  margin: 0 var(--folia-space-md) var(--folia-space-md);
+  padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
   background: transparent;
   border: none;
   border-radius: var(--folia-r);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);
-  cursor: pointer;
+  cursor: var(--folia-cursor-control);
   text-align: left;
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
