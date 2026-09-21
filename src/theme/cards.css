@@ -103,7 +103,7 @@
   cursor: var(--folia-cursor-inert);
 }
 .folia-card-title {
-  font-size: var(--folia-font-size-md-plus);
+  font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   line-height: var(--folia-line-height-title);
   color: var(--text-normal);
@@ -124,7 +124,7 @@
    metrics so swapping in/out doesn't shift the card; keeps the same right gutter as the title. */
 .folia-card-title-input {
   font: inherit;
-  font-size: var(--folia-font-size-md-plus);
+  font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   line-height: var(--folia-line-height-title);
   width: 100%;

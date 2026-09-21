@@ -8,11 +8,10 @@
     }
   },
   "width-hair": {
-    "$value": "1.5px",
+    "$value": "var(--border-width)",
     "cssVar": "--folia-border-width-hair",
     "source": {
-      "owned": true,
-      "reason": "a fractional pixel, for the two edges that must read as lighter than a real border: the dashed outline left where a dragged card came from, and the unchecked marker in a card's next-todo preview. Obsidian documents one border width."
+      "alias": "--border-width"
     }
   },
   "width-thick": {

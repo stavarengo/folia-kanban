@@ -401,7 +401,7 @@ function checkRawValues(decl, where) {
   if (prop === "cursor" && !/^\s*§\s*$/.test(bare)) {
     return say(
       `\`${decl.value}\` is a cursor keyword`,
-      `${TOKENISE} (Obsidian's own convention lives in --cursor and --cursor-link; which of Folia's controls follow it is a later decision, but the keyword still belongs in the token block.)`,
+      `${TOKENISE} (Use --cursor for controls and --cursor-link for links.)`,
     );
   }
   if (NUMERIC_PROPS.has(prop)) {
@@ -532,16 +532,11 @@ for (const file of (await readdir(TOKENS_JSON_DIR)).filter((f) => f.endsWith(".t
 // ------------------------------------------------------------------ rule E's candidate families
 //
 // A value is only asked to become an alias where the variable it would alias means the same thing.
-// The families below are the ones the owner's Phase 0 decision names: the 4px grid, the radius
-// ladder, the UI font sizes, the weight scale, the line heights and the border width. Three
-// families are deliberately absent, each because adopting it is a decision of its own and a later
-// phase: the cursor pair (--cursor/--cursor-link — Obsidian's arrow-on-controls convention, audit
-// 02-28), the icon sizes (audit 02-14) and the --layer-* scale, whose numbers collide with Folia's
-// in-board rungs by coincidence and not by meaning (audit 02-25, and the note on those rungs in
-// tokens.css). Aliasing any of them here would be a visual and semantic change wearing Phase 0's
-// clothes.
+// Layout lengths follow the host grid, and controls follow its cursor convention.
+// The --layer-* scale stays excluded: in-board stacking contexts are not app overlays.
 const FAMILIES = {
   radius: /^--radius-/,
+  cursor: /^--cursor(?:-link)?$/,
   length: /^--size-\d+-\d+$/,
   "border-width": /^--border-width$/,
   "font-size": /^--font-ui-/,
@@ -589,6 +584,7 @@ function familiesOf(token) {
   // A bare number is measured against the two host scales made of bare numbers, whatever file it
   // sits in: a font weight filed under opacity is still a font weight. (`--layer-*` is the third
   // such scale and is deliberately absent — the note in tokens.css says why.)
+  if (category === "cursor") return ["cursor"];
   if (isNumber) return ["font-weight", "line-height"];
   if (!isLength) return [];
   // Typography never falls through to the grid: a 16px font size is not a 16px margin, whatever
@@ -706,7 +702,30 @@ for (const t of tokens) {
       `${cssVar} owns ${node.$value}, which is exactly what Obsidian documents ${match[0]} as. Alias it: \`${cssVar}: var(${match[0]});\` with "source": { "alias": "${match[0]}" }. If the two only happen to be the same number and must not move together, keep it owned and say so: add "despite": "${match[0]}" and let the reason carry the argument.`,
     );
   }
-  if (source.despite !== undefined && !match) {
+  const category = basename(file).replace(".tokens.json", "");
+  const layoutLength =
+    ["spacing", "size", "runtime"].includes(category) && /^-?\d+(?:\.\d+)?px$/.test(node.$value);
+  const nearestGrid =
+    layoutLength &&
+    defaultsBy
+      .get("length")
+      .reduce((nearest, candidate) =>
+        Math.abs(parseFloat(candidate[1].default) - Math.abs(parseFloat(node.$value))) <
+        Math.abs(parseFloat(nearest[1].default) - Math.abs(parseFloat(node.$value)))
+          ? candidate
+          : nearest,
+      );
+  if (layoutLength && !match && source.despite !== nearestGrid[0]) {
+    fail(
+      at,
+      `${cssVar} owns a layout length outside the host grid. Use a --size-* alias or arithmetic on the grid; an intentional exception needs "despite": "${nearestGrid[0]}" and a reason.`,
+    );
+  }
+  if (
+    source.despite !== undefined &&
+    !match &&
+    (!layoutLength || source.despite !== nearestGrid[0])
+  ) {
     fail(
       at,
       `carries "despite": ${JSON.stringify(source.despite)}, but ${node.$value} is not what Obsidian documents that variable as any more. Drop the escape, or re-argue it against whatever the registry says now.`,

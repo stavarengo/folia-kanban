@@ -1,11 +1,10 @@
 {
   "$description": "The board's spacing rhythm: the space between things and inside them.",
   "hair": {
-    "$value": "1px",
+    "$value": "var(--size-2-1)",
     "cssVar": "--folia-space-hair",
     "source": {
-      "owned": true,
-      "reason": "the one-pixel inset: a hairline gap between icon buttons, a nudge on an inline marker, the padding inside a chip that must not look padded. Obsidian's finer grid starts at 2px, so there is nothing to read; the board still needs a step smaller than a step."
+      "alias": "--size-2-1"
     }
   },
   "xxs": {
@@ -16,11 +15,10 @@
     }
   },
   "xxs-plus": {
-    "$value": "3px",
+    "$value": "var(--size-4-1)",
     "cssVar": "--folia-space-xxs-plus",
     "source": {
-      "owned": true,
-      "reason": "the gap inside a cluster that must read as ONE thing \u2014 the count beside its icon, the tick beside its label, a chip's own contents. Obsidian's grid steps 2 then 4 and the board sits between them; the later phase that adopts the grid is what decides which way this whole cluster moves, together, which is the point of it having one name."
+      "alias": "--size-4-1"
     }
   },
   "xs": {
@@ -31,11 +29,10 @@
     }
   },
   "xs-plus": {
-    "$value": "5px",
+    "$value": "var(--size-4-1)",
     "cssVar": "--folia-space-xs-plus",
     "source": {
-      "owned": true,
-      "reason": "the gap BETWEEN inline siblings that stay a row \u2014 chips in the toolbar, priorities in a menu, fields in a dialog. Obsidian's grid steps 4 then 6 and the board sits between them. These move together or the rows stop matching each other, which is why they answer to one rung rather than one name each."
+      "alias": "--size-4-1"
     }
   },
   "sm": {
@@ -46,11 +43,10 @@
     }
   },
   "sm-plus": {
-    "$value": "7px",
+    "$value": "var(--size-4-2)",
     "cssVar": "--folia-space-sm-plus",
     "source": {
-      "owned": true,
-      "reason": "the padding of a control whose text must not touch its edge, and the gap of the rows inside a card. Obsidian's grid steps 6 then 8; this half-step is what the board uses for the inside of a small surface, and the later phase moves all of them at once."
+      "alias": "--size-4-2"
     }
   },
   "md": {
@@ -61,19 +57,17 @@
     }
   },
   "md-plus": {
-    "$value": "9px",
+    "$value": "var(--size-4-2)",
     "cssVar": "--folia-space-md-plus",
     "source": {
-      "owned": true,
-      "reason": "the step the board uses inside its own small surfaces \u2014 the padding of an input or a column header, the gap of a priority row, the space between a toggle and its label. Obsidian's grid steps 8 then 12, so there is no rung for it yet, and the later phase that adopts the grid moves all of them at once."
+      "alias": "--size-4-2"
     }
   },
   "gap": {
-    "$value": "10px",
+    "$value": "var(--size-4-2)",
     "cssVar": "--folia-gap",
     "source": {
-      "owned": true,
-      "reason": "the board's default space BETWEEN things: cards in a column, controls in a toolbar, fields in a panel. At 10px it sits between Obsidian's 8 and 12, and the later phase that adopts the grid decides which of the two it becomes \u2014 for all of them at once, because the board's rhythm is one decision and not nineteen."
+      "alias": "--size-4-2"
     }
   },
   "pad": {
@@ -84,11 +78,10 @@
     }
   },
   "lg": {
-    "$value": "14px",
+    "$value": "var(--size-4-3)",
     "cssVar": "--folia-space-lg",
     "source": {
-      "owned": true,
-      "reason": "the padding of a full surface: the board around its columns, the detail panel around its body, the dialog around its header. Obsidian's grid steps 12 then 16, and this is the board's own step between them."
+      "alias": "--size-4-3"
     }
   },
   "xl": {
@@ -99,11 +92,10 @@
     }
   },
   "xl-plus": {
-    "$value": "18px",
+    "$value": "var(--size-4-4)",
     "cssVar": "--folia-space-xl-plus",
     "source": {
-      "owned": true,
-      "reason": "the extra air a block of unrelated sections needs between them, more than the padding around them. Obsidian's grid steps 16 then 20."
+      "alias": "--size-4-4"
     }
   },
   "xxl": {
@@ -121,19 +113,19 @@
     }
   },
   "bleed": {
-    "$value": "-6px",
+    "$value": "calc(-1 * var(--size-2-3))",
     "cssVar": "--folia-space-bleed",
     "source": {
       "owned": true,
-      "reason": "a negative inset that pulls a hover surface back out over its own padding, so the text does not move when the surface appears; Obsidian's scale is positive only."
+      "reason": "Negates the padding that the hover surface overlaps."
     }
   },
   "pull": {
-    "$value": "-5px",
+    "$value": "calc(-1 * var(--size-4-1))",
     "cssVar": "--folia-space-pull",
     "source": {
       "owned": true,
-      "reason": "a negative margin that closes the gap the block above already left; Obsidian's scale is positive only."
+      "reason": "Closes one host-grid step of the preceding block gap."
     }
   },
   "block": {

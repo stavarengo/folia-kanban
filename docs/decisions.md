@@ -109,3 +109,11 @@ None of those classes is API. They are not in the developer docs, they carry no 
 The cost is real and accepted: every control the board draws is dressed by hand, and every hover, focus and disabled state with it. `src/theme/host/variables.json` is what makes that bearable — it is the registry of what Obsidian actually documents, so "is there a variable for this?" is a lookup rather than a memory, and `pnpm theme:check` fails any variable the board reads that is neither documented nor recorded as observed in `src/theme/host/observed.json`.
 
 **What would change this:** Obsidian documenting a class-name contract for plugins — a published list with a compatibility promise, the way the CSS variables have one. A theme-only convention, or a class that merely appears stable across a few releases, is not that.
+
+## Dense controls derive from the host input height
+
+**Decided 2026-09-21. Search and filter chips share `--input-height`; icon buttons subtract one grid step, and mini buttons subtract two.**
+
+The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print also follows the host UI font size, with one- and two-pixel reductions at the default grid. Pill ends remain an owned shape because a fixed radius rung cannot guarantee a rounded end at every control height.
+
+**What would change this:** live evidence of clipping or poor legibility in a supported desktop theme. The toolbar, cards, detail panel and edit-column dialog still need visual review in dark and light mode after this change.

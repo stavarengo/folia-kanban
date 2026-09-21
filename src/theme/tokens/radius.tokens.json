@@ -1,20 +1,17 @@
 {
   "$description": "Corner radii.",
   "xs": {
-    "$value": "3px",
+    "$value": "var(--radius-s)",
     "cssVar": "--folia-r-xs",
     "source": {
-      "owned": true,
-      "reason": "the smallest corner the board draws, on the next-todo marker; Obsidian's ladder starts at 4px."
+      "alias": "--radius-s"
     }
   },
   "sm": {
-    "$value": "6px",
+    "$value": "var(--radius-s)",
     "cssVar": "--folia-r-sm",
     "source": {
-      "owned": true,
-      "reason": "the corner the board's small controls wear. Obsidian's radius ladder steps 4 then 8 and this sits between them; it is not a spacing rung either, because a corner and a gap are different measurements that happen to share a number, and moving the grid must not reshape every small control.",
-      "despite": "--size-2-3"
+      "alias": "--radius-s"
     }
   },
   "md": {
@@ -25,19 +22,10 @@
     }
   },
   "lg": {
-    "$value": "10px",
+    "$value": "var(--radius-l)",
     "cssVar": "--folia-r-lg",
     "source": {
-      "owned": true,
-      "reason": "off Obsidian's radius ladder (8px then 12px); cards and popovers use it until the ladder is adopted outright."
-    }
-  },
-  "xl": {
-    "$value": "14px",
-    "cssVar": "--folia-r-xl",
-    "source": {
-      "owned": true,
-      "reason": "off Obsidian's radius ladder (12px then 16px); the detail panel and modal use it until the ladder is adopted outright."
+      "alias": "--radius-l"
     }
   },
   "pill": {

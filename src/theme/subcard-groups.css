@@ -35,5 +35,5 @@
   padding: var(--folia-space-sm-plus) var(--folia-gap);
 }
 .folia-card--nested .folia-card-title {
-  font-size: var(--folia-font-size-sm-plus);
+  font-size: var(--folia-font-size-sm);
 }

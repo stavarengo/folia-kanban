@@ -121,3 +121,7 @@ The three boards in `title-modes/` share one `Cards/` folder and differ in one l
 ## Learn more
 
 For full plugin docs, installation, and configuration, see [the repo's main README](../README.md).
+
+## Theme foundations
+
+Use the Feature Showcase board to compare the toolbar, a column with cards and chips, the card detail panel and the Edit column dialog in dark and light mode. Gaps, corners and control heights follow the active theme's variables. Search and filter chips should align; card actions should fit beside titles without overlap. Controls use the theme's arrow cursor, while note links use its link cursor. Switch a description between preview and editing to check that its line spacing stays consistent.

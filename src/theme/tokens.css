@@ -24,89 +24,84 @@
   font-size: var(--folia-font-size-md);
 
   /* radii */
-  --folia-r-xs: 3px;
-  --folia-r-sm: 6px;
+  --folia-r-xs: var(--radius-s);
+  --folia-r-sm: var(--radius-s);
   --folia-r: var(--radius-m);
-  --folia-r-lg: 10px;
-  --folia-r-xl: 14px;
+  --folia-r-lg: var(--radius-l);
   --folia-r-pill: 999px;
   --folia-r-nested-inset: 2px; /* how far a nested surface's corner tucks inside its parent's */
 
-  /* The spacing rhythm. Where a rung lands exactly on a value Obsidian publishes it reads that
-     variable, so the board already moves with the app there; the half-steps between the grid's
-     rungs are still Folia's own, and retiring them is the later phase that adopts the 4px grid
-     outright. `--folia-gap` and `--folia-pad` keep their names: they are the board's two defaults,
-     the space between things and the space inside a surface, and most rules reach for one of them. */
-  --folia-space-hair: 1px;
+  /* Gaps and padding follow the host grid; board dimensions use multiples of its base unit. */
+  --folia-space-hair: var(--size-2-1);
   --folia-space-xxs: var(--size-2-1);
-  --folia-space-xxs-plus: 3px;
+  --folia-space-xxs-plus: var(--size-4-1);
   --folia-space-xs: var(--size-4-1);
-  --folia-space-xs-plus: 5px;
+  --folia-space-xs-plus: var(--size-4-1);
   --folia-space-sm: var(--size-2-3);
-  --folia-space-sm-plus: 7px;
+  --folia-space-sm-plus: var(--size-4-2);
   --folia-space-md: var(--size-4-2);
-  --folia-space-md-plus: 9px;
-  --folia-gap: 10px;
+  --folia-space-md-plus: var(--size-4-2);
+  --folia-gap: var(--size-4-2);
   --folia-pad: var(--size-4-3);
-  --folia-space-lg: 14px;
+  --folia-space-lg: var(--size-4-3);
   --folia-space-xl: var(--size-4-4);
-  --folia-space-xl-plus: 18px;
+  --folia-space-xl-plus: var(--size-4-4);
   --folia-space-xxl: var(--size-4-6);
   --folia-space-xxxl: var(--size-4-12);
-  --folia-space-bleed: -6px; /* pulls a hover surface back out over its own padding */
-  --folia-space-pull: -5px; /* closes the gap a block above already left */
+  --folia-space-bleed: calc(-1 * var(--size-2-3)); /* pulls a hover surface back out over its own padding */
+  --folia-space-pull: calc(-1 * var(--size-4-1)); /* closes the gap a block above already left */
   --folia-pad-block: 2em; /* a state message that fills a pane, sized in its own text */
   --folia-pad-notice-y: 0.5em;
   --folia-space-para: 0.25em;
 
   /* layout — the sizes the board's own furniture is cut to */
-  --folia-col-w: 300px; /* single source for column width + drag-overlay width */
-  --folia-menu-w-min: 200px; /* narrowest a popover may shrink to */
-  --folia-menu-w-max: 320px; /* widest a popover may grow to fit its longest label */
-  --folia-menu-w: 224px;
-  --folia-menu-h-max: 440px;
-  --folia-modal-w: 440px;
-  --folia-menu-pad: 11px;
-  --folia-detail-w: 380px; /* the width before CardDetail writes the user's own, inline */
-  --folia-detail-modal-w: 640px;
+  --folia-col-w: calc(var(--size-4-1) * 75); /* single source for column width + drag-overlay width */
+  --folia-menu-w-min: calc(var(--size-4-1) * 50); /* narrowest a popover may shrink to */
+  --folia-menu-w-max: calc(var(--size-4-1) * 80); /* widest a popover may grow to fit its longest label */
+  --folia-menu-w: calc(var(--size-4-1) * 56);
+  --folia-menu-h-max: calc(var(--size-4-1) * 110);
+  --folia-modal-w: calc(var(--size-4-1) * 110);
+  --folia-menu-pad: var(--size-4-3);
+  --folia-detail-w: calc(var(--size-4-1) * 95); /* the width before CardDetail writes the user's own, inline */
+  --folia-detail-modal-w: calc(var(--size-4-1) * 160);
   --folia-detail-modal-w-max: 92vw;
   --folia-detail-modal-h-max: 85vh;
-  --folia-detail-slide: 14px; /* how far the panel travels as it opens */
-  --folia-suggest-h-max: 280px;
-  --folia-search-w: 320px;
-  --folia-add-column-w: 220px;
-  --folia-prop-key-w: 86px;
-  --folia-card-title-pad-r: 92px; /* the room the hover actions need beside a card's title */
-  --folia-card-overlay-inset: 18px; /* the lifted card is narrower than the column it came from */
+  --folia-detail-slide: var(--size-4-3); /* how far the panel travels as it opens */
+  --folia-suggest-h-max: calc(var(--size-4-1) * 70);
+  --folia-search-w: calc(var(--size-4-1) * 80);
+  --folia-add-column-w: calc(var(--size-4-1) * 55);
+  --folia-prop-key-w: calc(var(--size-4-1) * 22);
+  --folia-card-title-pad-r: calc(var(--size-4-1) * 24); /* the room the hover actions need beside a card's title */
+  --folia-card-overlay-inset: var(--size-4-4); /* the lifted card is narrower than the column it came from */
   --folia-desc-h-min: var(--size-4-18);
-  --folia-desc-h-max-offset: 220px; /* what the rendered description leaves of the viewport */
+  --folia-desc-h-max-offset: calc(var(--size-4-1) * 55); /* what the rendered description leaves of the viewport */
   --folia-comment-edit-h-min: var(--size-4-12);
   --folia-column-body-h-min: var(--size-4-12);
   --folia-viewport-h: 100vh;
   --folia-viewport-w: 100vw;
   --folia-col-park-margin: 60vw; /* how far a parked column slides out of the row */
-  --folia-toast-bottom: 22px;
+  --folia-toast-bottom: var(--size-4-6);
   --folia-toast-rise: var(--size-4-3);
   --folia-menu-rise: var(--size-4-1);
   --folia-action-rise: var(--size-2-1);
-  --folia-control-h: 30px;
-  --folia-control-pad-x: 11px;
-  --folia-hit-sm: var(--size-4-6);
-  --folia-hit-md: 26px;
+  --folia-control-h: var(--input-height);
+  --folia-control-pad-x: var(--size-4-3);
+  --folia-hit-sm: calc(var(--input-height) - var(--size-4-2));
+  --folia-hit-md: calc(var(--input-height) - var(--size-4-1));
   --folia-count-w-min: var(--size-4-5);
   --folia-dot: var(--size-4-2);
   --folia-unread-dot: var(--size-2-3);
-  --folia-todo-mark: 9px;
+  --folia-todo-mark: var(--size-4-2);
   --folia-progress-h: var(--size-4-1);
-  --folia-divider-h: 1px;
+  --folia-divider-h: var(--border-width);
   --folia-resize-w: var(--size-2-3);
-  --folia-resize-offset: -3px;
-  --folia-ctx-strip-inset: 5px; /* the context strip is inset past the priority bar beside it */
+  --folia-resize-offset: calc(var(--folia-resize-w) / -2);
+  --folia-ctx-strip-inset: var(--size-2-3); /* the context strip is inset past the priority bar beside it */
   --folia-icon-baseline: -0.15em;
 
   /* borders */
   --folia-border-width: var(--border-width);
-  --folia-border-width-hair: 1.5px;
+  --folia-border-width-hair: var(--border-width);
   --folia-border-width-thick: 2px;
   --folia-focus-ring-w: 2px;
   --folia-focus-ring-offset: var(--size-2-1);
@@ -185,12 +180,10 @@
   --folia-unread-reply: var(--color-purple, #a882e0);
   --folia-success: var(--color-green, #4caf7d);
 
-  /* Cursors. Obsidian's own convention is the arrow on controls and the hand on links, published as
-     --cursor and --cursor-link; which of Folia's controls should follow it is a decision of its own
-     and a later phase, so these keep the keywords the board uses today and only stop repeating them
-     in thirty-one places. */
-  --folia-cursor-control: pointer;
-  --folia-cursor-inert: default;
+  /* Controls follow the host arrow convention; links use the host link cursor. */
+  --folia-cursor-link: var(--cursor-link);
+  --folia-cursor-control: var(--cursor);
+  --folia-cursor-inert: var(--cursor);
   --folia-cursor-grab: grab;
   --folia-cursor-grabbing: grabbing;
   --folia-cursor-text: text;
@@ -198,15 +191,12 @@
   --folia-cursor-resize: col-resize;
 
   /* typography — font sizes */
-  --folia-font-size-xxs: 10px;
-  --folia-font-size-xxs-plus: 10.5px;
-  --folia-font-size-xs: 11px;
+  --folia-font-size-xxs: calc(var(--font-ui-smaller) - var(--size-2-1));
+  --folia-font-size-xs: calc(var(--font-ui-smaller) - var(--size-2-1) / 2);
   --folia-font-size-sm: var(--font-ui-smaller);
-  --folia-font-size-sm-plus: 12.5px;
   --folia-font-size-md: var(--font-ui-small);
-  --folia-font-size-md-plus: 13.5px;
   --folia-font-size-lg: var(--font-ui-medium);
-  --folia-font-size-xl: 16px;
+  --folia-font-size-xl: var(--font-ui-medium);
   --folia-font-mono: var(--font-monospace, monospace);
 
   /* typography — font weights */
@@ -216,8 +206,8 @@
   /* typography — line heights and tracking */
   --folia-line-height: var(--line-height-normal);
   --folia-line-height-tight: var(--line-height-tight);
-  --folia-line-height-title: 1.4;
-  --folia-line-height-heading: 1.35;
+  --folia-line-height-title: var(--line-height-tight);
+  --folia-line-height-heading: var(--line-height-tight);
   --folia-line-height-mark: 1;
   --folia-tracking-label: 0.04em;
   --folia-tracking-key: 0.03em;
@@ -279,7 +269,7 @@
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
-  --folia-statusbar-clearance: 32px;
+  --folia-statusbar-clearance: var(--size-4-8);
   --folia-urgency-color: transparent;
   --folia-urgency-tint: transparent;
 }

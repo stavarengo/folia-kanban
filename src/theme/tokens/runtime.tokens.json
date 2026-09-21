@@ -41,12 +41,10 @@
     }
   },
   "statusbar-clearance": {
-    "$value": "32px",
+    "$value": "var(--size-4-8)",
     "cssVar": "--folia-statusbar-clearance",
     "source": {
-      "owned": true,
-      "reason": "how much the last card must clear the app's floating status bar, written onto the board root by App.tsx once it has measured the real bar; this is what stands in before it does. A guess at a measurement is not a spacing decision \u2014 moving the grid must not move it, and measuring the bar must.",
-      "despite": "--size-4-8"
+      "alias": "--size-4-8"
     }
   },
   "urgency-color": {

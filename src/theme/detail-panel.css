@@ -423,7 +423,7 @@
    and let weight, not size, carry the structure; the compound scope is for the same specificity
    reason as above. */
 .folia-desc-rendered.markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
-  font-size: var(--folia-font-size-md-plus);
+  font-size: var(--folia-font-size-md);
   line-height: var(--folia-line-height-heading);
   font-weight: var(--folia-font-weight-semibold);
 }
@@ -588,7 +588,7 @@
   gap: var(--folia-space-sm);
 }
 .folia-comment-author {
-  font-size: var(--folia-font-size-xxs-plus);
+  font-size: var(--folia-font-size-xxs);
   color: var(--text-muted);
   font-weight: var(--folia-font-weight-medium);
 }
@@ -646,7 +646,7 @@
   background: color-mix(in srgb, var(--folia-unread) 45%, transparent);
 }
 .folia-ts {
-  font-size: var(--folia-font-size-xxs-plus);
+  font-size: var(--folia-font-size-xxs);
   color: var(--text-faint, var(--text-muted));
   font-variant-numeric: tabular-nums;
 }

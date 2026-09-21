@@ -57,7 +57,7 @@
   background: transparent;
   border: none;
   color: var(--link-color, var(--folia-accent));
-  cursor: var(--folia-cursor-control);
+  cursor: var(--folia-cursor-link);
   text-decoration: underline;
   text-underline-offset: var(--folia-underline-offset);
   padding: 0;

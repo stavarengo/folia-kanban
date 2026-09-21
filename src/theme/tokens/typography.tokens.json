@@ -2,27 +2,19 @@
   "$description": "Font sizes, weights, line heights, tracking and the monospace stack.",
   "font-size": {
     "xxs": {
-      "$value": "10px",
+      "$value": "calc(var(--font-ui-smaller) - var(--size-2-1))",
       "cssVar": "--folia-font-size-xxs",
       "source": {
         "owned": true,
-        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
-      }
-    },
-    "xxs-plus": {
-      "$value": "10.5px",
-      "cssVar": "--folia-font-size-xxs-plus",
-      "source": {
-        "owned": true,
-        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
+        "reason": "Compact uppercase badges remain two pixels below the smallest host UI font at the default grid."
       }
     },
     "xs": {
-      "$value": "11px",
+      "$value": "calc(var(--font-ui-smaller) - var(--size-2-1) / 2)",
       "cssVar": "--folia-font-size-xs",
       "source": {
         "owned": true,
-        "reason": "below Obsidian's smallest UI size (12px); the board's micro-labels sit here until they are re-sized onto the scale."
+        "reason": "Secondary labels remain one pixel below the smallest host UI font at the default grid."
       }
     },
     "sm": {
@@ -32,27 +24,11 @@
         "alias": "--font-ui-smaller"
       }
     },
-    "sm-plus": {
-      "$value": "12.5px",
-      "cssVar": "--folia-font-size-sm-plus",
-      "source": {
-        "owned": true,
-        "reason": "a half-step between Obsidian's 12px and 13px UI sizes; the later phase that adopts the scale is what removes it."
-      }
-    },
     "md": {
       "$value": "var(--font-ui-small)",
       "cssVar": "--folia-font-size-md",
       "source": {
         "alias": "--font-ui-small"
-      }
-    },
-    "md-plus": {
-      "$value": "13.5px",
-      "cssVar": "--folia-font-size-md-plus",
-      "source": {
-        "owned": true,
-        "reason": "a half-step between Obsidian's 13px and 15px UI sizes; the later phase that adopts the scale is what removes it."
       }
     },
     "lg": {
@@ -63,11 +39,10 @@
       }
     },
     "xl": {
-      "$value": "16px",
+      "$value": "var(--font-ui-medium)",
       "cssVar": "--folia-font-size-xl",
       "source": {
-        "owned": true,
-        "reason": "between Obsidian's 15px and 20px UI sizes; the detail panel's title sits here until the scale is adopted."
+        "alias": "--font-ui-medium"
       }
     }
   },
@@ -111,19 +86,17 @@
       }
     },
     "title": {
-      "$value": "1.4",
+      "$value": "var(--line-height-tight)",
       "cssVar": "--folia-line-height-title",
       "source": {
-        "owned": true,
-        "reason": "between Obsidian's tight and normal line heights; a card title wraps to two lines often enough that neither fits."
+        "alias": "--line-height-tight"
       }
     },
     "heading": {
-      "$value": "1.35",
+      "$value": "var(--line-height-tight)",
       "cssVar": "--folia-line-height-heading",
       "source": {
-        "owned": true,
-        "reason": "between Obsidian's tight and normal line heights, for headings inside rendered prose."
+        "alias": "--line-height-tight"
       }
     },
     "mark": {
