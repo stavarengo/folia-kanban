@@ -109,9 +109,9 @@
   --folia-border-width-hair: 1.5px;
   --folia-border-width-thick: 2px;
   --folia-focus-ring-w: 2px;
-  --folia-focus-ring-offset: 2px;
-  --folia-focus-ring-offset-inset: -2px;
-  --folia-underline-offset: 2px;
+  --folia-focus-ring-offset: var(--size-2-1);
+  --folia-focus-ring-offset-inset: calc(-1 * var(--folia-focus-ring-offset));
+  --folia-underline-offset: var(--size-2-1);
 
   /* the lines and strips the board draws itself, which are elements rather than borders */
   --folia-cue-thickness: 3px; /* the priority strip, the urgency band and a column's accent rail */
@@ -255,7 +255,10 @@
   --folia-z-index-app-menu: var(--layer-menu, 65);
   --folia-z-index-app-modal: var(--layer-modal, 50);
 
-  /* opacity */
+  /* opacity. `hidden` and `shown` are the two ends of a fade rather than a shade of anything —
+     they are named so the rules that reveal a hover affordance say which end they mean. */
+  --folia-opacity-hidden: 0;
+  --folia-opacity-shown: 1;
   --folia-opacity-muted: 0.7;
   --folia-opacity-subtle: 0.6;
   --folia-opacity-faint: 0.5;

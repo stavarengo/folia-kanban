@@ -1,0 +1,180 @@
+/* ================================================================== col-config (#1,#6,#8,#10) */
+
+/* #6 — in-column grouping. A group heading (only rendered when grouped) reads as a quiet
+   section label; a single ungrouped group renders no heading, so a plain column is unchanged. */
+.folia-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--folia-space-md);
+}
+.folia-card-group + .folia-card-group {
+  margin-top: var(--folia-space-xs);
+}
+.folia-card-group-heading {
+  font-size: var(--folia-font-size-xxs);
+  font-weight: var(--folia-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--folia-tracking-label);
+  color: var(--text-faint, var(--text-muted));
+  padding: var(--folia-space-xxs) var(--folia-space-xxs) 0;
+}
+
+/* #10 — per-column de-emphasis. opacity fades the resting column; on hover it reveals to
+   --folia-col-hover-opacity (default 1). The transition makes the reveal feel intentional. */
+.folia-column {
+  transition: opacity var(--folia-dur) var(--folia-ease), margin var(--folia-dur) var(--folia-ease);
+}
+.folia-column.is-faded {
+  opacity: var(--folia-col-opacity);
+}
+.folia-column.is-faded:hover:not(.is-dragging),
+.folia-column.is-faded:focus-within:not(.is-dragging) {
+  opacity: var(--folia-col-hover-opacity);
+}
+/* #10 — parked: shove the column to the far right with a large left margin so a rabbit-hole
+   column hides off-screen. Flex `order` moves it visually last without reordering the board's
+   logical column array (which still drives Move-left/right + dnd). */
+.folia-column.is-parked {
+  order: 1;
+  margin-left: var(--folia-col-park-margin);
+}
+
+/* #8 — Edit-column modal. A centered dialog over a dimming backdrop, portalled to <body>. */
+.folia-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--folia-z-index-app-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--folia-space-xxl);
+  background: var(--folia-scrim);
+  backdrop-filter: var(--folia-blur-scrim);
+  animation: folia-fade-in var(--folia-dur-fast) ease;
+}
+@keyframes folia-fade-in {
+  from { opacity: var(--folia-opacity-hidden); }
+  to { opacity: var(--folia-opacity-shown); }
+}
+.folia-modal {
+  width: min(var(--folia-modal-w), 100%);
+  max-height: calc(var(--folia-viewport-h) - var(--folia-space-xxxl));
+  display: flex;
+  flex-direction: column;
+  background: var(--background-primary);
+  border: var(--folia-border-width) solid var(--folia-border);
+  border-radius: var(--folia-r-lg);
+  box-shadow: var(--folia-shadow-pop);
+  animation: folia-pop var(--folia-dur-fast) var(--folia-ease);
+}
+.folia-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--folia-space-md);
+  padding: var(--folia-space-lg) var(--folia-space-xl);
+  border-bottom: var(--folia-border-width) solid var(--folia-border);
+}
+.folia-modal-title {
+  margin: 0;
+  font-size: var(--folia-font-size-lg);
+  font-weight: var(--folia-font-weight-semibold);
+  color: var(--text-normal);
+}
+.folia-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--folia-space-lg);
+  padding: var(--folia-space-xl);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.folia-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--folia-space-md);
+  padding: var(--folia-pad) var(--folia-space-xl);
+  border-top: var(--folia-border-width) solid var(--folia-border);
+}
+.folia-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--folia-space-xs-plus);
+}
+.folia-field-row {
+  display: flex;
+  gap: var(--folia-pad);
+}
+.folia-field-row .folia-field {
+  flex: 1 1 0;
+}
+.folia-field-label {
+  font-size: var(--folia-font-size-xxs);
+  font-weight: var(--folia-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--folia-tracking-label);
+  color: var(--text-faint, var(--text-muted));
+}
+.folia-field-hint {
+  font-size: var(--folia-font-size-xs);
+  color: var(--text-faint, var(--text-muted));
+}
+.folia-field input[type="text"],
+.folia-field input:not([type]),
+.folia-field input[type="number"],
+.folia-field select {
+  font: inherit;
+  padding: var(--folia-space-sm) var(--folia-space-md);
+  border: var(--folia-border-width) solid var(--folia-border);
+  border-radius: var(--folia-r-sm);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.folia-field input:focus,
+.folia-field select:focus {
+  outline: none;
+  border-color: var(--folia-accent);
+  box-shadow: var(--folia-ring);
+}
+.folia-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--folia-accent);
+}
+.folia-field-toggle {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--folia-space-md-plus);
+}
+.folia-field-toggle input[type="checkbox"] {
+  margin-top: var(--folia-space-xxs);
+  accent-color: var(--folia-accent);
+}
+.folia-field-toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--folia-space-xxs-plus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folia-scope *,
+  .folia-detail,
+  .folia-menu,
+  .folia-modal,
+  .folia-modal-backdrop,
+  .folia-toast {
+    transition-duration: var(--folia-dur-none);
+  }
+  /* No positional slide/scale for motion-sensitive users — these surfaces just appear. */
+  .folia-detail,
+  .folia-menu,
+  .folia-modal,
+  .folia-modal-backdrop,
+  .folia-toast {
+    animation: none;
+  }
+  /* The drag overlays still lift (their shadow/outline mark the grab), but without the scale/tilt tween. */
+  .folia-card-overlay,
+  .folia-column-overlay {
+    animation: none;
+    transform: none;
+  }
+}

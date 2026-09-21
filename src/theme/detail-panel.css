@@ -54,8 +54,8 @@
   z-index: var(--folia-z-index-base);
 }
 @keyframes folia-slide-in {
-  from { transform: translateX(var(--folia-detail-slide)); opacity: 0; }
-  to { transform: none; opacity: 1; }
+  from { transform: translateX(var(--folia-detail-slide)); opacity: var(--folia-opacity-hidden); }
+  to { transform: none; opacity: var(--folia-opacity-shown); }
 }
 .folia-detail-header {
   display: flex;
@@ -368,12 +368,12 @@
   position: absolute;
   top: var(--folia-space-xs);
   right: var(--folia-space-xs);
-  opacity: 0;
+  opacity: var(--folia-opacity-hidden);
   transition: opacity var(--folia-dur-fast) ease;
 }
 .folia-desc-view:hover .folia-desc-edit,
 .folia-desc-view:focus-within .folia-desc-edit {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
 }
 .folia-desc-behind {
   margin: var(--folia-space-sm) 0 0;
@@ -487,7 +487,7 @@
 }
 .folia-subtask:hover .folia-subtask-column,
 .folia-subtask-column:focus {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
 }
 /* One relationship row: the linked card, then either its remove button or a note saying the link
    is declared on the other card (see RelationRow). */
@@ -554,12 +554,12 @@
 }
 /* edit/delete affordances stay quiet until the comment is hovered/focused */
 .folia-comment-row .folia-mini {
-  opacity: 0;
+  opacity: var(--folia-opacity-hidden);
   transition: opacity var(--folia-dur-fast) ease;
 }
 .folia-comments li:hover .folia-mini,
 .folia-comments li:focus-within .folia-mini {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
 }
 .folia-comment-edit {
   width: 100%;

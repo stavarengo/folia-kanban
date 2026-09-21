@@ -28,23 +28,23 @@
     "cssVar": "--folia-focus-ring-w",
     "source": {
       "owned": true,
-      "reason": "the focus outline's thickness; Obsidian draws its own focus ring as a box-shadow and publishes no width (audit 02-29)."
+      "reason": "the focus outline's thickness. It is a drawn line, not a step of the spacing grid: widening the grid must not thicken every focus ring, and Obsidian draws its own ring as a box-shadow and publishes no width for it at all (audit 02-29).",
+      "despite": "--size-2-1"
     }
   },
   "focus-ring-offset": {
-    "$value": "2px",
+    "$value": "var(--size-2-1)",
     "cssVar": "--folia-focus-ring-offset",
     "source": {
-      "owned": true,
-      "reason": "how far the focus outline sits from the control it marks."
+      "alias": "--size-2-1"
     }
   },
   "focus-ring-offset-inset": {
-    "$value": "-2px",
+    "$value": "calc(-1 * var(--folia-focus-ring-offset))",
     "cssVar": "--folia-focus-ring-offset-inset",
     "source": {
       "owned": true,
-      "reason": "the same distance inwards, for a control whose ring would otherwise be clipped by its own overflow."
+      "reason": "the same distance inwards, for a control whose ring would otherwise be clipped by its own overflow; CSS has no way to alias a variable negated, so it is written as arithmetic on the positive one."
     }
   },
   "cue-thickness": {
@@ -60,7 +60,8 @@
     "cssVar": "--folia-ctx-strip-w",
     "source": {
       "owned": true,
-      "reason": "the folder-context strip is drawn thinner than the priority bar beside it so the two left-edge cues read as different signals; it is a cue a plugin invented, so no host variable describes it."
+      "reason": "the folder-context strip is drawn thinner than the priority bar beside it so the two left-edge cues read as different signals; the pair answers to each other, not to the spacing grid, and it is a cue a plugin invented, so no host variable describes it.",
+      "despite": "--size-2-1"
     }
   }
 }

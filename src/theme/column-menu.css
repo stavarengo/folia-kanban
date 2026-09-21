@@ -16,8 +16,8 @@
   animation: folia-pop var(--folia-dur-fast) var(--folia-ease);
 }
 @keyframes folia-pop {
-  from { opacity: 0; transform: translateY(calc(-1 * var(--folia-menu-rise))) scale(0.98); }
-  to { opacity: 1; transform: none; }
+  from { opacity: var(--folia-opacity-hidden); transform: translateY(calc(-1 * var(--folia-menu-rise))) scale(0.98); }
+  to { opacity: var(--folia-opacity-shown); transform: none; }
 }
 .folia-menu-field {
   display: flex;

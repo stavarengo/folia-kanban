@@ -10,14 +10,14 @@
   background: color-mix(in srgb, var(--folia-card-bg) 88%, transparent);
   backdrop-filter: var(--folia-blur-actions);
   box-shadow: var(--folia-shadow-pop);
-  opacity: 0;
+  opacity: var(--folia-opacity-hidden);
   transform: translateY(calc(-1 * var(--folia-action-rise)));
   transition: opacity var(--folia-dur-fast) ease, transform var(--folia-dur-fast) var(--folia-ease);
   pointer-events: none;
 }
 .folia-card:hover .folia-card-actions,
 .folia-card:focus-within .folia-card-actions {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
   transform: none;
   pointer-events: auto;
 }

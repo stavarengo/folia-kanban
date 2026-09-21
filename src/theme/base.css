@@ -124,6 +124,6 @@
 .folia-toast-success { background: var(--folia-success); }
 .folia-toast-error { background: var(--folia-danger); }
 @keyframes folia-toast-in {
-  from { opacity: 0; transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  from { opacity: var(--folia-opacity-hidden); transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
+  to { opacity: var(--folia-opacity-shown); transform: translate(-50%, 0) scale(1); }
 }

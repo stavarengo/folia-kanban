@@ -71,11 +71,11 @@
 .folia-column-menu-btn.folia-column-menu-btn {
   width: var(--folia-hit-sm);
   height: var(--folia-hit-sm);
-  opacity: 0;
+  opacity: var(--folia-opacity-hidden);
   transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
 .folia-column:hover .folia-column-menu-btn,
 .folia-column-menu-btn:focus-visible,
 .folia-column-menu-btn[aria-expanded="true"] {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
 }

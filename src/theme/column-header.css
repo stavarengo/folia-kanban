@@ -1,0 +1,40 @@
+/* --- col-header (#2 drag-to-reorder + #7 inline title edit) --- */
+/* The title doubles as the drag handle and the rename click target. Grab cursor signals drag;
+   the dnd distance:5 sensor still lets a clean click through to enter rename. */
+.folia-column-title {
+  cursor: var(--folia-cursor-grab);
+  user-select: none;
+}
+.folia-column-title:focus-visible {
+  outline: var(--folia-focus-ring-w) solid var(--folia-col-accent);
+  outline-offset: var(--folia-focus-ring-offset);
+  border-radius: var(--folia-r-sm);
+}
+/* The column being dragged: dim + lift it out of the row so the gap reads as the drop slot.
+   A faded column (#10 `--folia-col-opacity` < 1, e.g. parked) must still read as "dragging", so
+   this rule sets a visible opacity. The faded-hover rule above is scoped `:not(.is-dragging)`, so
+   mid-drag only `.is-faded` and `.is-dragging` match (equal specificity) and this later rule wins —
+   a parked+faded column never goes invisible mid-drag. */
+.folia-column.is-dragging {
+  opacity: var(--folia-opacity-subtle);
+  cursor: var(--folia-cursor-grabbing);
+  z-index: var(--folia-z-index-raised);
+}
+.folia-column.is-dragging .folia-column-title {
+  cursor: var(--folia-cursor-grabbing);
+}
+/* Inline rename input — sits in the title's slot, inheriting its weight/size so the swap is seamless. */
+.folia-column-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--folia-font-weight-semibold);
+  font-size: var(--folia-font-size-md);
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: var(--folia-border-width) solid var(--folia-col-accent);
+  border-radius: var(--folia-r-sm);
+  padding: var(--folia-space-hair) var(--folia-space-sm);
+}
+.folia-column-title-input:focus {
+  outline: none;
+}

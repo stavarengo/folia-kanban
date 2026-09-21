@@ -6426,7 +6426,7 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     const own = rule(".folia-column-menu-btn.folia-column-menu-btn");
     expect(own).toContain("width: var(--folia-hit-sm)");
     expect(own).toContain("height: var(--folia-hit-sm)");
-    expect(own).toContain("opacity: 0");
+    expect(own).toContain("opacity: var(--folia-opacity-hidden)");
     expect(own).toContain("transition: opacity");
     // The three state selectors share one rule, so `at` (which anchors on a rule's own line) does
     // not reach them; their position in the file is what matters here.

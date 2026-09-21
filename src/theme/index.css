@@ -6,6 +6,7 @@
 @import "./tokens.css";
 @import "./base.css";
 @import "./toolbar.css";
+@import "./filter-suggest.css";
 @import "./board-columns.css";
 @import "./column-menu.css";
 @import "./card-context-menu.css";
@@ -22,4 +23,6 @@
 @import "./inline-add-inputs.css";
 @import "./detail-panel.css";
 @import "./focus-visibility.css";
+@import "./column-config.css";
 @import "./context-grouping.css";
+@import "./column-header.css";

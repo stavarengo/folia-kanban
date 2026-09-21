@@ -162,11 +162,10 @@
     }
   },
   "underline-offset": {
-    "$value": "2px",
+    "$value": "var(--size-2-1)",
     "cssVar": "--folia-underline-offset",
     "source": {
-      "owned": true,
-      "reason": "how far a link's underline sits below its text \u2014 a typographic measurement rather than spacing, and Obsidian publishes no link-underline geometry."
+      "alias": "--size-2-1"
     }
   }
 }

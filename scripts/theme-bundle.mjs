@@ -5,15 +5,51 @@
 
 import { readFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import postcss from "postcss";
 
 export const THEME_DIR = "src/theme";
 export const THEME_ENTRY = join(THEME_DIR, "index.css");
 
-/** The files `index.css` imports, in order, as repo-relative paths. */
+/** The one import shape the theme uses: a relative path to a sibling .css file, double-quoted. */
+const IMPORT = /^"(\.\/[A-Za-z0-9._-]+\.css)"$/;
+
+/**
+ * The files `index.css` imports, in order, as repo-relative paths.
+ *
+ * Anything the entry contains that is not one of those imports is an error rather than something
+ * skipped. esbuild understands far more than this reader does — `@import url(…)`, single quotes,
+ * media conditions, a rule written straight into the entry — and every one of those would ship in
+ * the bundle while staying invisible to the guards, which is the one failure this file must not
+ * have.
+ */
 export async function themeFiles(entry = THEME_ENTRY) {
   const css = await readFile(entry, "utf8");
   const base = dirname(entry);
-  return [...css.matchAll(/@import\s+"([^"]+)"\s*;/g)].map((m) => join(base, m[1]));
+  const files = [];
+  const problems = [];
+  for (const node of postcss.parse(css, { from: entry }).nodes) {
+    if (node.type === "comment") continue;
+    if (node.type === "atrule" && node.name === "import") {
+      const match = IMPORT.exec(node.params.trim());
+      if (match) {
+        files.push(join(base, match[1]));
+        continue;
+      }
+      problems.push(
+        `${entry}:${node.source.start.line}: \`@import ${node.params}\` is not a form this reader understands, so the guards would never see that file while esbuild still bundles it. Write it as \`@import "./name.css";\`.`,
+      );
+      continue;
+    }
+    problems.push(
+      `${entry}:${node.source.start.line}: ${entry} is the import list and nothing else, but this is ${node.type === "rule" ? `a rule (\`${node.selector}\`)` : `\`@${node.name}\``}. Move it into the section file it belongs to.`,
+    );
+  }
+  if (problems.length) {
+    const error = new Error(problems.join("\n"));
+    error.problems = problems;
+    throw error;
+  }
+  return files;
 }
 
 /**

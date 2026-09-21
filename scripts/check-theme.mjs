@@ -40,7 +40,8 @@ for (const [name, entry] of Object.entries(observed)) {
       `${name} is documented (${registry[name].pages.join(", ")}), so it does not belong here — delete the entry and read it as a documented variable.`,
     );
   }
-  if (!entry?.observedIn || !entry?.where) {
+  const text = (v) => typeof v === "string" && v.trim() !== "";
+  if (!text(entry?.observedIn) || !text(entry?.where)) {
     fail(
       join(HOST_DIR, "observed.json"),
       `${name} needs both "observedIn" (the Obsidian version it was seen in) and "where" (where it was seen), so a later reader can re-check it.`,
@@ -57,10 +58,23 @@ const tokensRoot = postcss.parse(tokensCss, { from: TOKENS_CSS });
 /** name → { value, line } for every --folia-* declared in the one .folia-scope rule. */
 const declared = new Map();
 {
-  const scopes = [];
-  tokensRoot.walkRules((rule) => {
-    if (rule.selector.trim() === ".folia-scope") scopes.push(rule);
-  });
+  // The brief's words are "the .folia-scope rule and nothing else", and the whole layer rests on
+  // that: every guard and every reader takes this one rule for the complete list of tokens. So the
+  // file is checked for what it contains, not only for what it contains that was looked for — a
+  // second rule, an at-rule wrapping the block, or a second declaration of a token further down
+  // would each leave the browser reading something this map does not.
+  for (const node of tokensRoot.nodes) {
+    if (node.type === "comment") continue;
+    if (node.type !== "rule" || node.selector.trim() !== ".folia-scope") {
+      fail(
+        `${TOKENS_CSS}:${node.source.start.line}`,
+        `${node.type === "atrule" ? `@${node.name}` : node.selector || node.type} does not belong here — ${TOKENS_CSS} holds the one \`.folia-scope\` rule and nothing else, so that rule is the whole list of tokens.`,
+      );
+    }
+  }
+  const scopes = tokensRoot.nodes.filter(
+    (n) => n.type === "rule" && n.selector.trim() === ".folia-scope",
+  );
   if (scopes.length !== 1) {
     fail(
       TOKENS_CSS,
@@ -68,11 +82,51 @@ const declared = new Map();
     );
   }
   for (const rule of scopes) {
-    rule.walkDecls((d) => {
-      if (!d.prop.startsWith("--folia-")) return;
+    for (const d of rule.nodes ?? []) {
+      if (d.type !== "decl") continue;
+      if (!d.prop.startsWith("--folia-")) continue;
+      if (d.important) {
+        fail(
+          `${TOKENS_CSS}:${d.source.start.line}`,
+          `${d.prop} is !important. A token is a value to be read, not a fight to be won; whatever this was meant to beat should be fixed where it is.`,
+        );
+      }
+      if (declared.has(d.prop)) {
+        fail(
+          `${TOKENS_CSS}:${d.source.start.line}`,
+          `${d.prop} is declared twice in the block. The browser takes the last one and every reader takes the first, which is how a token comes to mean two things at once.`,
+        );
+      }
       declared.set(d.prop, { value: d.value.trim(), line: d.source.start.line });
-    });
+    }
   }
+}
+
+// A token may read another token, and a chain of those may close on itself. CSS calls that cycle
+// invalid at computed-value time: not "falls back to the previous value" but "this declaration and
+// every declaration that reads it are thrown away", which is a blank board from one edit. Nothing
+// in the browser reports it, so "every var() resolves" has to mean resolves, not merely names
+// something that exists.
+{
+  const reads = (value) => [...value.matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map((m) => m[1]);
+  const state = new Map();
+  const walk = (name, trail) => {
+    if (state.get(name) === "done") return;
+    if (state.get(name) === "open") {
+      const loop = trail.slice(trail.indexOf(name));
+      fail(
+        `${TOKENS_CSS}:${declared.get(name).line}`,
+        `${loop.concat(name).join(" → ")} is a cycle. CSS throws away every declaration in it, and every declaration that reads one, so the rules that use these tokens would compute to nothing at all.`,
+      );
+      return;
+    }
+    state.set(name, "open");
+    for (const next of reads(declared.get(name).value)) {
+      if (declared.has(next)) walk(next, [...trail, name]);
+    }
+    state.set(name, "done");
+  };
+  for (const name of declared.keys()) walk(name, []);
 }
 
 // ------------------------------------------------------------------ value scanning (rules A + C)
@@ -98,7 +152,7 @@ const NAMED_COLORS = new Set(
 );
 const COLOR_FUNCTIONS = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
 const DIMENSION =
-  /(?<![\w.#-])-?\d*\.?\d+(px|em|rem|ex|ch|cap|ic|lh|rlh|vh|vw|vmin|vmax|[dsl]v(?:h|w|min|max|i|b)|cq[whibx]|cqmin|cqmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])/i;
+  /(?<![\w.#-])-?\d*\.?\d+(px|em|rem|ex|ch|cap|ic|lh|rlh|vh|vw|vi|vb|vmin|vmax|[dsl]v(?:h|w|min|max|i|b)|cq[whibx]|cqmin|cqmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])/i;
 const NUMERIC_PROPS = new Set(["font-size", "font-weight", "line-height", "z-index", "opacity"]);
 const SHADOW_PROPS = new Set(["box-shadow", "text-shadow"]);
 /** Unitless numbers that carry no design intent: ratios the layout engine reads as counts. */
@@ -150,12 +204,18 @@ function* varCalls(value) {
   }
 }
 
-/** The value with every var() call replaced by a neutral placeholder, fallbacks included. */
+/**
+ * The value with every var() NAME replaced by a neutral placeholder — and every fallback left in,
+ * stripped the same way. A fallback is live CSS: `var(--x, 17px)` paints 17 pixels the moment
+ * `--x` is missing, so dropping it here would let a raw value in through the one door this rule
+ * exists to close.
+ */
 function stripVars(value) {
   let out = "";
   let last = 0;
-  for (const [, , start, end] of varCalls(value)) {
+  for (const [, fallback, start, end] of varCalls(value)) {
     out += value.slice(last, start) + " § ";
+    if (fallback !== null) out += ` ${stripVars(fallback)} `;
     last = end + 1;
   }
   return out + value.slice(last);
@@ -232,9 +292,7 @@ function checkRawValues(decl, where) {
   }
   if (NUMERIC_PROPS.has(prop)) {
     const number = bare.match(/(?<![\w.#-])-?\d*\.?\d+(?![\w.%-])/);
-    // 0 and 1 on opacity are the ends of a fade, an animation state rather than a design value.
-    const endpoint = prop === "opacity" && /^(0|1)$/.test(number?.[0] ?? "");
-    if (number && !endpoint) return say(`${prop} is written as a number`, TOKENISE);
+    if (number) return say(`${prop} is written as a number`, TOKENISE);
   }
   if (!NUMERIC_PROPS.has(prop) && !UNITLESS_OK.has(prop)) {
     // A bare number outside the properties above is almost always a length that lost its unit or a
@@ -265,7 +323,13 @@ function dimensionKind(unit) {
 
 // ------------------------------------------------------------------ rules A + C over the theme
 // The entry itself is scanned too: it is a file someone can write a declaration into.
-const componentFiles = [THEME_ENTRY, ...(await themeFiles())].filter((f) => f !== TOKENS_CSS);
+let imported = [];
+try {
+  imported = await themeFiles();
+} catch (e) {
+  for (const problem of e.problems ?? [e.message]) errors.push(problem);
+}
+const componentFiles = [THEME_ENTRY, ...imported].filter((f) => f !== TOKENS_CSS);
 for (const file of componentFiles) {
   const css = await readFile(file, "utf8");
   const root = postcss.parse(css, { from: file });
@@ -332,19 +396,44 @@ const FAMILIES = {
   "line-height": /^--line-height-/,
 };
 
-/** Which family a token's value should be measured against, from what the token is FOR. */
+/** The categories a token may be filed under; anything else is a filing mistake, not a new family. */
+const CATEGORIES = new Set([
+  "border",
+  "color",
+  "cursor",
+  "motion",
+  "opacity",
+  "radius",
+  "runtime",
+  "shadow",
+  "size",
+  "spacing",
+  "typography",
+  "zindex",
+]);
+
+/**
+ * Which family a token's value is measured against.
+ *
+ * A length falls back to Obsidian's `--size-*` grid wherever nothing more specific fits, because
+ * the spacing page says that grid is for "spacing and dimensions properties" — so a bare length
+ * with no better home still has to answer for itself. Without that fallback the answer would
+ * depend on which JSON file someone dropped the token into, which is not a rule, it is a filing
+ * cabinet. A token that genuinely must not follow the grid says so with `"despite"`.
+ */
 function familyOf(token) {
   const category = basename(token.file).replace(".tokens.json", "");
   if (category === "radius") return "radius";
-  if (category === "border") return token.path.startsWith("width") ? "border-width" : null;
+  if (category === "border" && token.path.startsWith("width")) return "border-width";
   if (category === "typography") {
     if (token.path.startsWith("weight")) return "font-weight";
     if (token.path.startsWith("line-height")) return "line-height";
     if (token.path.startsWith("font-size")) return "font-size";
-    return null;
   }
-  if (category === "spacing" || category === "size") return "length";
-  return null;
+  // Anything left that is a plain length is measured against the grid. A bare number is not: the
+  // only host scales made of bare numbers are the weights, the line heights and `--layer-*`, and
+  // the first two are already decided above while the third is the coincidence the note explains.
+  return /^-?\d*\.?\d+(px|em|rem|vh|vw|vmin|vmax)$/.test(token.node.$value) ? "length" : null;
 }
 
 const defaultsBy = new Map(
@@ -377,6 +466,18 @@ for (const t of tokens) {
       `no "cssVar" — every token outside color.column.* names the --folia-* declaration it describes.`,
     );
     continue;
+  }
+  if (!CATEGORIES.has(basename(file).replace(".tokens.json", ""))) {
+    fail(
+      at,
+      `${basename(file)} is not one of the token categories (${[...CATEGORIES].join(", ")}). The category decides which host scale a value is measured against, so a new file is a new rule and has to be taught to the guard, not just created.`,
+    );
+  }
+  if (backed.has(cssVar)) {
+    fail(
+      at,
+      `${cssVar} already has metadata elsewhere in ${TOKENS_JSON_DIR}. Two entries for one token means two reasons and two categories for the same value, and only one of them is being read.`,
+    );
   }
   backed.add(cssVar);
   const source = node.source;
@@ -434,16 +535,20 @@ for (const t of tokens) {
 
   // Rule E
   const family = familyOf(t);
-  if (family) {
-    for (const [name, entry] of defaultsBy.get(family)) {
-      if (entry.default === node.$value) {
-        fail(
-          `${TOKENS_CSS}:${decl.line}`,
-          `${cssVar} owns ${node.$value}, which is exactly what Obsidian documents ${name} as. Alias it: \`${cssVar}: var(${name});\` with "source": { "alias": "${name}" }.`,
-        );
-        break;
-      }
-    }
+  const match = family
+    ? defaultsBy.get(family).find(([, entry]) => entry.default === node.$value)
+    : undefined;
+  if (match && source.despite !== match[0]) {
+    fail(
+      `${TOKENS_CSS}:${decl.line}`,
+      `${cssVar} owns ${node.$value}, which is exactly what Obsidian documents ${match[0]} as. Alias it: \`${cssVar}: var(${match[0]});\` with "source": { "alias": "${match[0]}" }. If the two only happen to be the same number and must not move together, keep it owned and say so: add "despite": "${match[0]}" and let the reason carry the argument.`,
+    );
+  }
+  if (source.despite !== undefined && !match) {
+    fail(
+      at,
+      `carries "despite": ${JSON.stringify(source.despite)}, but ${node.$value} is not what Obsidian documents that variable as any more. Drop the escape, or re-argue it against whatever the registry says now.`,
+    );
   }
 }
 

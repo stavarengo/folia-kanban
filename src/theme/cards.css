@@ -64,13 +64,13 @@
    hollow the source out (drop its content, shadow and own border) and leave only a dashed accent
    outline, so the gap reads as "this is where it'll land" rather than a half-faded duplicate. */
 .folia-card.is-dragging {
-  opacity: 1;
+  opacity: var(--folia-opacity-shown);
   background: color-mix(in srgb, var(--folia-accent) 7%, transparent);
   border-color: transparent;
   box-shadow: none;
 }
 .folia-card.is-dragging > * {
-  opacity: 0;
+  opacity: var(--folia-opacity-hidden);
 }
 .folia-card.is-dragging::after {
   content: "";
