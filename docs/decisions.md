@@ -116,7 +116,19 @@ The cost is real and accepted: every control the board draws is dressed by hand,
 
 The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print uses five-sixths and eleven-twelfths of the smallest host UI font, producing 10px and 11px at its 12px default without depending on spacing. Pill ends remain an owned shape because a fixed radius rung cannot guarantee a rounded end at every control height.
 
-**What would change this:** live evidence of clipping or poor legibility in a supported desktop theme. The toolbar, cards, detail panel and edit-column dialog still need visual review in dark and light mode after this change.
+**Reviewed live 2026-09-21** in Obsidian 1.13.7, dark and light. The toolbar, cards, detail panel and edit-column dialog all hold: nothing clips, every control clears the 24px pointer-target minimum, and both schemes read the same. The review did surface that the mini tier never actually derives anything at Obsidian's own defaults, which is worth stating rather than leaving to be rediscovered: at `--input-height: 30px` the two-step reduction gives 22px, below the 24px minimum, so `--folia-hit-sm` resolves to a flat 24px and only starts tracking the host above `--input-height: 32px`. The floor binding is the intended outcome — a pointer target below 24px is not an acceptable thing to derive — and 24px is also what the token was before it became a formula, so this changes no pixels today. It is kept as a `max()` rather than rewritten as a literal because a theme with taller inputs should still get taller mini buttons.
+
+**What would change this:** live evidence of clipping or poor legibility in a supported desktop theme.
+
+## Popover icons are the host's extra-small tier
+
+**Decided 2026-09-21 after live review. Icons inside menu items, swatches and chips are `--icon-xs`; icons on card and header buttons are `--icon-s`.**
+
+A live review read the popover icons as having shrunk from 16px to 14px during the move onto the host icon scale. They had not. Before that move every menu-item icon was written `<Icon name="…" size={14} />` in `ColumnMenu.tsx` and `CardContextMenu.tsx`, and the theme carried no `.folia-icon` width rule, so the SVG attribute governed and those icons rendered at 14px. Deleting the `size` prop and setting `--folia-icon-size: var(--icon-xs)` on the containers reproduced the same 14px through the host variable that defines it. The two-tier reading — lighter icons inside a popover, full-weight icons on the buttons you click on the board — is therefore the pre-existing design, now expressed in Obsidian's own scale instead of in hand-written numbers, and it survives a user changing the host icon scale.
+
+Two icons did change size, both upward and both toward the scale: the "no colour" and "no priority" ✕ went from a hand-written 11px to 14px, and the card quick actions from 15px to 16px.
+
+**What would change this:** Obsidian redefining `--icon-xs` far from 14px, or live evidence that a popover icon at the extra-small tier is hard to recognise.
 
 ## Keep standard scrollbars and reduced-motion detection
 
