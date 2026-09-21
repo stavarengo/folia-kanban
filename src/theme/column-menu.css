@@ -116,7 +116,12 @@
   width: 100%;
   padding: var(--folia-space-sm) var(--folia-space-md);
   border: none;
-  background: var(--interactive-normal);
+  /* A menu row is not a raised button: Obsidian's own `.menu-item` has no fill of its own and takes
+     `--background-modifier-hover` only while it is hovered or keyboard-selected. The resting
+     `--interactive-normal` this rule used to carry was invisible in light mode, where that variable
+     and the menu surface are the same white, so the row only existed under the pointer there while
+     dark mode showed a face. Both schemes now say the same thing, and it is the host's sentence. */
+  background: transparent;
   color: var(--text-normal);
   font: inherit;
   font-size: var(--folia-font-size-md);
@@ -125,7 +130,7 @@
   text-align: left;
 }
 .folia-scope .folia-menu-item:hover:where(:not(:disabled)) {
-  background: var(--interactive-hover);
+  background: var(--background-modifier-hover);
 }
 
 .folia-scope .folia-menu-danger {

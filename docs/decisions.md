@@ -244,7 +244,7 @@ The plain warning and error surfaces beside them did move. The confirm bar mixes
 
 **Decided 2026-09-21. Neutral controls use the host interactive fills; links, disclosure controls, chips and swatches keep the shapes and signals that describe their purpose.**
 
-The filter chip keeps Phase 3's pill radius and coloured on-state. Priority and column-choice chips keep their selection rings, card chips keep their tag geometry and tuned tints, and colour swatches keep the host swatch radius and shadow. Applying the button radius or neutral fill to those would erase distinctions established in earlier phases. Links and disclosure controls remain transparent. Menu rows take the neutral interactive fill but remain flat. Dialog buttons and column-add buttons retain the host raised shadow; the dashed add-column tile stays transparent and flat so its border remains visible.
+The filter chip keeps Phase 3's pill radius and coloured on-state. Priority and column-choice chips keep their selection rings, card chips keep their tag geometry and tuned tints, and colour swatches keep the host swatch radius and shadow. Applying the button radius or neutral fill to those would erase distinctions established in earlier phases. Links and disclosure controls remain transparent. Menu rows are transparent at rest and flat, which is what Obsidian's own `.menu-item` is (see the section below). Dialog buttons and column-add buttons retain the host raised shadow; the dashed add-column tile stays transparent and flat so its border remains visible.
 
 The icon-button focus indicator remains the accent outline from Phase 3, with the icon radius preserved. The default host border-focus colour still has the contrast limitation recorded above. There is no toggled icon button, so `--icon-color-active` remains unused; pressed and menu-open icons use `--icon-color-focused`.
 
@@ -256,7 +256,7 @@ The icon-button focus indicator remains the accent outline from Phase 3, with th
 
 Obsidian 1.13.7 gives macOS the same resting and hover neutral fill, with no input shadow in either state. Its default error and error-hover fills are equal in dark and light on Linux too. A published pair therefore does not promise two distinct appearances. The earlier removal of the brightness filter lost the danger button's independent cue; adopting both host variables did not replace it.
 
-Neutral, primary and danger buttons, filter chips, menu rows, column-add controls and column/priority choices retain their appropriate host fills. Their hover adds a 1px inset outline in the label's current colour, and pressing thickens it to 2px. The outline width belongs to Folia because a theme may zero its border widths and shadows. It does not move layout, alter the selected-choice shadow, or recolour the entire control with a brightness filter. Keyboard focus keeps its separate 2px accent outline; disabled controls and the add-column form do not receive the pointer outline.
+Neutral, primary and danger buttons, filter chips, column-add controls and column/priority choices retain their appropriate host fills; menu rows rest transparent and take `--background-modifier-hover` under the pointer, as the host's own do. Their hover adds a 1px inset outline in the label's current colour, and pressing thickens it to 2px. The outline width belongs to Folia because a theme may zero its border widths and shadows. It does not move layout, alter the selected-choice shadow, or recolour the entire control with a brightness filter. Keyboard focus keeps its separate 2px accent outline; disabled controls and the add-column form do not receive the pointer outline.
 
 The keyboard-selected filter suggestion needs a persistent signal while focus stays in the search input. It has a fixed 2px inset marker in `--text-normal` in addition to `--background-modifier-hover`. This marker survives transparent hover backgrounds and equal button fills. The resting suggestion row is transparent because it is an option in a list, not a raised button.
 
@@ -267,3 +267,15 @@ A disabled custom-colour swatch is a read-only sample, so it retains full opacit
 The priority shape declares geometry and shadow only. Its coloured instances get background and text from the finite `ChipTone` variants returned by `priorityTone`; the No priority instance supplies its own neutral face. The button guard reads that declared string union and checks every possible variant, so it no longer requires unused base colours. Mutation tests protect the pointer-outline consumers, pressed width and keyboard suggestion marker, including their owned token values. These are source contracts, not a contrast or general state-cascade resolver: default-theme and macOS-variable checks in the running app remain the evidence for distinct appearances.
 
 **What would change this:** an equally dependable host contract for hover, pressed and keyboard-selected signals across platforms and themes. A difference in the default Linux values alone is not enough.
+
+## A menu row rests transparent, because that is what a menu row is
+
+**Decided 2026-09-21 after the final visual verification. `.folia-menu-item` drops `--interactive-normal` at rest and takes `--background-modifier-hover` under the pointer.**
+
+Read live in Obsidian 1.13.7, the app's own `.menu-item` declares no background at all; the only fill it ever has is `--background-modifier-hover`, applied by `.menu-item:not(.is-label):not(.is-disabled).selected` for hover and keyboard selection alike. The `--interactive-normal` rest fill appears exactly once, under `.is-phone`, where a menu is a sheet of tappable rows rather than a list of commands.
+
+The board had taken the raised-button reading, and light mode is where it broke: `--interactive-normal` and the menu surface are both `#ffffff` there, so thirteen rows of the card context menu were bare text on white while the same rows in dark mode wore a visible `#333333` face. Two schemes were making different claims about what is clickable, and the one that looked healthier was the one that happened to have two greys.
+
+Transparent at rest is not the board giving up a signal. It is the board stopping a promise it could not keep in both schemes, and it is the host's sentence: in an Obsidian menu the row is the pointer's, not the page's. The Folia-owned pointer outline recorded above still applies to these rows, so they retain an interaction cue that does not depend on a host colour pair.
+
+**What would change this:** Obsidian giving its desktop menu rows a resting fill, which would make `--interactive-normal` the right reading again.
