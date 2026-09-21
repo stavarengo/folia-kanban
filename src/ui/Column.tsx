@@ -23,7 +23,7 @@ import {
 } from "../model/filter";
 import { drawnPaths, fallbackColumnOf } from "../model/lanes";
 import { groupAndSortCards } from "./cardView";
-import { COLUMN_COLORS } from "./columnColors";
+import { columnAccent, COLUMN_COLORS } from "./columnColors";
 
 // Render a card's subtree of genuinely-nested children as a bordered group. Recursive: each child
 // renders a nested (non-sortable) CardItem and then, if it has its own children, its own group.
@@ -387,7 +387,7 @@ export function Column({
 
   const count = countPaths.length;
   const overLimit = wipLimit != null && count > wipLimit;
-  const accent = column.color || autoColor(column.id);
+  const accent = columnAccent(column.color || autoColor(column.id));
 
   // #10 — de-emphasis. opacity fades the resting column; hoverOpacity reveals it on hover (default:
   // reveal to full when faded). parked shoves the column to the far right (flex `order`) with a

@@ -7,6 +7,7 @@ import {
   titleCase,
 } from "../src/model/columns";
 import type { ColumnDef } from "../src/model/types";
+import { columnAccent, columnColorName, COLUMN_COLORS } from "../src/ui/columnColors";
 
 describe("normalizeColumns — reading the board frontmatter", () => {
   it("falls back to the default seven columns when raw is missing / empty / malformed", () => {
@@ -246,5 +247,39 @@ describe("titleCase", () => {
   it("turns ids into human titles", () => {
     expect(titleCase("in-progress")).toBe("In Progress");
     expect(titleCase("todo")).toBe("Todo");
+  });
+});
+
+describe("column colours — a name resolves, anything else is passed through", () => {
+  it("resolves each of the eight names to the host variable for it", () => {
+    expect(COLUMN_COLORS.map(columnAccent)).toEqual([
+      "var(--color-blue)",
+      "var(--color-green)",
+      "var(--color-orange)",
+      "var(--color-purple)",
+      "var(--color-red)",
+      "var(--color-cyan)",
+      "var(--color-pink)",
+      "var(--color-yellow)",
+    ]);
+  });
+
+  it("reads a name whatever case or padding a hand-written note gives it", () => {
+    expect(columnColorName(" Red ")).toBe("red");
+    expect(columnColorName("BLUE")).toBe("blue");
+  });
+
+  it("leaves a colour that is not a palette name exactly as the note wrote it", () => {
+    // The whole compatibility promise of the move to names: a board note written before it keeps
+    // painting the colour it always did, rather than losing its accent to an unresolved variable.
+    expect(columnAccent("#9aa0a6")).toBe("#9aa0a6");
+    expect(columnColorName("#9aa0a6")).toBeUndefined();
+    expect(columnColorName(undefined)).toBeUndefined();
+    expect(columnAccent("rebeccapurple")).toBe("rebeccapurple");
+  });
+
+  it("keeps a stored hex through a read and a write of the frontmatter", () => {
+    const raw = [{ id: "parked", title: "Parked", color: "#9aa0a6" }];
+    expect(serializeColumns(normalizeColumns(raw))).toEqual(raw);
   });
 });

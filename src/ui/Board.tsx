@@ -29,6 +29,7 @@ import {
   type DragReloc,
 } from "../model/board";
 import { Column } from "./Column";
+import { columnAccent } from "./columnColors";
 import { AddColumn } from "./AddColumn";
 import { useBoardActions, useSettings } from "./context";
 import type { Filter } from "../model/filter";
@@ -431,7 +432,11 @@ export function Board({
               // sortable but no overlay). A header-only ghost reads as "this column, picked up".
               <div
                 className="folia-column folia-column-overlay"
-                style={{ ["--folia-col-accent" as string]: activeColumn.color || undefined }}
+                style={{
+                  ["--folia-col-accent" as string]: activeColumn.color
+                    ? columnAccent(activeColumn.color)
+                    : undefined,
+                }}
               >
                 <div className="folia-column-header">
                   <span className="folia-column-dot" aria-hidden="true" />

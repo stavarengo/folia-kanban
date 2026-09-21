@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import type { ColumnDef } from "../model/types";
 import { useBoardActions, useBoardDocument, useBoardWindow } from "./context";
 import { Icon } from "./icons";
-import { COLUMN_COLORS } from "./columnColors";
+import { columnAccent, columnColorName, COLUMN_COLORS } from "./columnColors";
 
 const MENU_W = 224;
 
@@ -51,6 +51,10 @@ export function ColumnMenu({
   const [wip, setWip] = useState(column.limit != null ? String(column.limit) : "");
   const [confirmDel, setConfirmDel] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  /* A colour a board note carries that is not one of the eight — a hex written before the palette
+     moved to names. It is shown as a ninth swatch so the column's own colour is visible in the row
+     rather than missing from it, and it cannot be picked: the eight are what a new pick writes. */
+  const customColor = column.color && !columnColorName(column.color) ? column.color : null;
 
   // Fixed-position + portalled to <body> so the popover is never clipped by the column's
   // `overflow: hidden` (which would hide Move/Delete on a short column).
@@ -124,15 +128,21 @@ export function ColumnMenu({
           {COLUMN_COLORS.map((c) => (
             <button
               key={c}
-              className={
-                "folia-swatch" +
-                (column.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
-              }
-              style={{ ["--folia-swatch-color" as string]: c }}
+              className={"folia-swatch" + (columnColorName(column.color) === c ? " is-active" : "")}
+              style={{ ["--folia-swatch-color" as string]: columnAccent(c) }}
               aria-label={`Set color ${c}`}
               onClick={() => a.setColumnColor(column.id, c)}
             />
           ))}
+          {customColor ? (
+            <button
+              className="folia-swatch is-active"
+              style={{ ["--folia-swatch-color" as string]: customColor }}
+              aria-label={`Custom color ${customColor}`}
+              title={`Custom color ${customColor}`}
+              disabled
+            />
+          ) : null}
           <button
             className="folia-swatch folia-swatch-none"
             aria-label="Clear color"

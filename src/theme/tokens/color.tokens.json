@@ -271,29 +271,29 @@
   },
   "column": {
     "1": {
-      "$value": "#4c9aff"
+      "$value": "blue"
     },
     "2": {
-      "$value": "#8fd14f"
+      "$value": "green"
     },
     "3": {
-      "$value": "#ffab00"
+      "$value": "orange"
     },
     "4": {
-      "$value": "#9c8cff"
+      "$value": "purple"
     },
     "5": {
-      "$value": "#ff5c5c"
+      "$value": "red"
     },
     "6": {
-      "$value": "#57d9a3"
+      "$value": "cyan"
     },
     "7": {
-      "$value": "#f78fb3"
+      "$value": "pink"
     },
     "8": {
-      "$value": "#9aa0a6"
+      "$value": "yellow"
     },
-    "$description": "The user-assignable column palette. Not theme-backed and not the priority ramp; src/ui/columnColors.ts is the single source of truth and this mirrors it. Moving these onto Obsidian's eight theme colours is a later phase (audit 02-02)."
+    "$description": "The colours a column can take: the NAME of one of Obsidian's eight extended colours, stored in the board note and resolved to var(--color-<name>) at render time, so a column accent follows the theme and its light/dark pair. src/ui/columnColors.ts is the single source of truth and this mirrors it, in its order."
   }
 }

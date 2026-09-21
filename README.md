@@ -257,6 +257,8 @@ column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add
 plugin reads and writes that frontmatter list either way. A column entry may be a plain string
 (`- todo`) or an object (`{ id, title, color, limit }`).
 
+A column's `color` is one of Obsidian's eight theme colour names — `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `pink` — and the column is painted with whatever your theme makes of that name, in light mode and in dark. Earlier versions wrote a hex instead. A hex already in your board note keeps painting exactly the colour it always did, and the column menu shows it as an extra swatch beside the eight so you can see what the column is carrying; picking any of the eight replaces it with a name. Nothing rewrites your note on its own.
+
 ### Priorities are your scale, not ours
 
 A card's `priority` is any word you like. The board never imposes a vocabulary: the priority field and the right-click priority chips suggest **the values your own board uses** — what its cards carry right now, plus everything the board note remembers. Type something new and it becomes part of that vocabulary; there is no fixed list to fight.

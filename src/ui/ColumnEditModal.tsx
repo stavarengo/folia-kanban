@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import type { ColumnDef, ColumnGroup, ColumnSort } from "../model/types";
 import { useBoardActions, useBoardDocument, type ColumnPatch } from "./context";
 import { Icon } from "./icons";
-import { COLUMN_COLORS } from "./columnColors";
+import { columnAccent, columnColorName, COLUMN_COLORS } from "./columnColors";
 
 interface Props {
   column: ColumnDef;
@@ -52,6 +52,9 @@ export function ColumnEditModal({ column, onClose }: Props) {
   // which for a board in a pop-out window is not the one the modal belongs to.
   const doc = useBoardDocument();
   const [draft, setDraft] = useState<Draft>(() => toDraft(column));
+  /* See ColumnMenu: a colour the note carries that is not one of the eight gets a ninth, unpickable
+     swatch, so the column's own colour is visible in the row rather than absent from it. */
+  const draftCustomColor = draft.color && !columnColorName(draft.color) ? draft.color : null;
   const ref = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -147,15 +150,25 @@ export function ColumnEditModal({ column, onClose }: Props) {
                   key={c}
                   type="button"
                   className={
-                    "folia-swatch" +
-                    (draft.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
+                    "folia-swatch" + (columnColorName(draft.color) === c ? " is-active" : "")
                   }
-                  style={{ ["--folia-swatch-color" as string]: c }}
+                  style={{ ["--folia-swatch-color" as string]: columnAccent(c) }}
                   aria-label={`Set color ${c}`}
-                  aria-pressed={draft.color?.toLowerCase() === c.toLowerCase()}
+                  aria-pressed={columnColorName(draft.color) === c}
                   onClick={() => set("color", c)}
                 />
               ))}
+              {draftCustomColor ? (
+                <button
+                  type="button"
+                  className="folia-swatch is-active"
+                  style={{ ["--folia-swatch-color" as string]: draftCustomColor }}
+                  aria-label={`Custom color ${draftCustomColor}`}
+                  title={`Custom color ${draftCustomColor}`}
+                  aria-pressed={true}
+                  disabled
+                />
+              ) : null}
               <button
                 type="button"
                 className="folia-swatch folia-swatch-none"

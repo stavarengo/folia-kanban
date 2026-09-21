@@ -14,19 +14,19 @@ columns:
   - todo
   - id: next
     title: Next Up
-    color: "#8fd14f"
+    color: green
   - id: doing
     title: In Progress
-    color: "#ffab00"
+    color: orange
     limit: 2
     sort: priority
   - id: review
     title: In Review
-    color: "#9c8cff"
+    color: purple
     group: due
   - id: focus
     title: ⭐ A-priority lane
-    color: "#ff5c5c"
+    color: red
     filter: "priority:a"
   - id: parked
     title: Parked
@@ -36,7 +36,7 @@ columns:
     hoverOpacity: 0.95
   - id: done
     title: Done
-    color: "#57d9a3"
+    color: cyan
 ---
 
 # Showcase Board

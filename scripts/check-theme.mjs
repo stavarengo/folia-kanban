@@ -9,7 +9,7 @@
 //   C  no raw design value outside src/theme/tokens.css
 //   D  tokens.css and tokens/*.tokens.json agree on base values and light/dark overrides
 //   E  an owned token whose value is already a documented default must alias that variable
-//   F  the eight column hexes match src/ui/columnColors.ts
+//   F  the eight column colour names match src/ui/columnColors.ts, and each is one Obsidian has
 //
 // What it deliberately does not police, so the gaps are chosen rather than discovered:
 //
@@ -828,9 +828,12 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
   }
 }
 
-// Rule F — the column palette against its JavaScript source of truth.
+// Rule F — the column palette against its JavaScript source of truth. A column stores the NAME of
+// one of Obsidian's eight extended colours, so the palette is checked twice: that the two lists
+// agree, and that every name in it is a colour the host actually documents. The second half is
+// what stops a ninth colour being invented here and resolving to nothing at render time.
 {
-  const hexes = columnTokens
+  const names = columnTokens
     .sort((a, b) => Number(a.path.split(".").at(-1)) - Number(b.path.split(".").at(-1)))
     .map(({ node }) => node.$value);
   const src = await readFile(COLUMN_COLORS, "utf8");
@@ -838,15 +841,22 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
   if (!array) {
     fail(COLUMN_COLORS, "could not find the COLUMN_COLORS array.");
   } else {
-    const code = [...array[1].matchAll(/["'`](#[0-9a-fA-F]{3,8})["'`]/g)].map((m) => m[1]);
-    if (hexes.length !== code.length) {
-      fail("color.column", `${hexes.length} tokens vs ${code.length} COLUMN_COLORS entries.`);
+    const code = [...array[1].matchAll(/["'`]([a-z]+)["'`]/g)].map((m) => m[1]);
+    if (names.length !== code.length) {
+      fail("color.column", `${names.length} tokens vs ${code.length} COLUMN_COLORS entries.`);
     } else {
-      hexes.forEach((hex, i) => {
-        if (hex !== code[i])
-          fail(`color.column.${i + 1}`, `token ${hex} vs COLUMN_COLORS ${code[i]}.`);
+      names.forEach((name, i) => {
+        if (name !== code[i])
+          fail(`color.column.${i + 1}`, `token ${name} vs COLUMN_COLORS ${code[i]}.`);
       });
     }
+  }
+  for (const name of names) {
+    if (!hostKnows(`--color-${name}`))
+      fail(
+        `color.column`,
+        `${name} resolves to --color-${name}, which Obsidian does not document. The column palette is the host's extended colours; a name outside them paints nothing.`,
+      );
   }
 }
 
