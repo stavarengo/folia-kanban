@@ -27,12 +27,15 @@
 /* Nested cards are a touch smaller and denser; the grab affordance they shed comes from
    `--static` above, which every non-draggable tile carries. */
 .folia-card--nested {
+  /* The title's clearance for the hover cluster subtracts this, so the narrower side padding has to
+     be declared here rather than written into the padding shorthand below. */
+  --folia-card-pad-x: var(--folia-gap);
   box-shadow: none;
   border-color: color-mix(in srgb, var(--folia-border) 80%, transparent);
 }
 .folia-card--nested .folia-card-main {
   gap: var(--folia-space-xs-plus);
-  padding: var(--folia-space-sm-plus) var(--folia-gap);
+  padding: var(--folia-space-sm-plus) var(--folia-card-pad-x);
 }
 .folia-card--nested .folia-card-title {
   font-size: var(--folia-font-size-sm);

@@ -88,7 +88,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--folia-space-sm-plus);
-  padding: var(--folia-gap) var(--folia-pad);
+  padding: var(--folia-gap) var(--folia-card-pad-x);
   cursor: var(--folia-cursor-grab);
   border-radius: var(--folia-r-lg);
 }
@@ -112,9 +112,12 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  /* Reserve the hover cluster even while hidden so revealing it cannot reflow the title.
-     The token follows the cluster's input-derived button widths and grid spacing. */
-  padding-right: var(--folia-card-title-pad-r);
+  /* Reserve the hover cluster even while hidden so revealing it cannot reflow the title. The
+     cluster's reach is measured from the card's edge, so what the title reserves is that less the
+     side padding the card has already put between the two. Subtracted here rather than in the
+     token because `--folia-card-pad-x` is narrower on a nested card, and a custom property
+     substitutes its own var()s where it is declared. */
+  padding-right: calc(var(--folia-card-actions-reach) - var(--folia-card-pad-x));
 }
 
 /* #12 inline title edit — the <input> that replaces the title in place. Inherits the title's

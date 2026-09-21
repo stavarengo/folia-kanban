@@ -71,7 +71,17 @@
   --folia-search-w: calc(var(--size-4-1) * 80);
   --folia-add-column-w: calc(var(--size-4-1) * 55);
   --folia-prop-key-w: calc(var(--size-4-1) * 22);
-  --folia-card-title-pad-r: calc(3 * var(--folia-hit-md) + 2 * var(--folia-space-hair) + 3 * var(--folia-space-xxs) + var(--folia-space-sm)); /* the room the hover actions need beside a card's title */
+  --folia-card-pad-x: var(--folia-pad); /* a card's own side padding; a nested card narrows it */
+  /* How far `.folia-card-actions` reaches in from a card's edge: its inset, its own padding, the
+     three buttons and the two gaps between them, plus one hair so a title can stop short of it
+     rather than against it. Every term is a token that cluster is built from, so this cannot drift
+     from the thing it measures. What a title reserves is this less the card's own side padding,
+     which the title rule subtracts — a custom property substitutes where it is DECLARED, so doing
+     it here would freeze the scope's padding and miss the narrower one a nested card sets. */
+  --folia-card-actions-reach: calc(
+    var(--folia-space-sm) + 2 * var(--folia-space-xxs) + 3 * var(--folia-hit-md) +
+      2 * var(--folia-space-hair) + var(--folia-space-hair)
+  );
   --folia-card-overlay-inset: calc(2 * var(--folia-border-width) + 2 * var(--folia-space-md)); /* the lifted card is narrower than the column it came from */
   --folia-desc-h-min: var(--size-4-18);
   --folia-desc-h-max-offset: calc(var(--size-4-1) * 55); /* what the rendered description leaves of the viewport */
