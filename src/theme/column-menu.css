@@ -108,6 +108,10 @@
 }
 .folia-scope .folia-menu-item {
   box-shadow: none;
+  /* These rows are `<button>`s, and Obsidian centres every button's content; its own `.menu-item`
+     is a div and starts at the leading edge, with the icon first and the label after it. While the
+     row had a fill the centring read as a button; without one it reads as a ragged list. */
+  justify-content: flex-start;
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: flex;
