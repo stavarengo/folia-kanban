@@ -413,7 +413,10 @@
   font-size: var(--folia-font-size-xs);
   color: color-mix(in srgb, var(--folia-prio-2) 70%, var(--text-normal));
   background: color-mix(in srgb, var(--folia-prio-2) 12%, transparent);
-  border-radius: var(--folia-r-sm);
+  /* Read as a callout by anyone who uses Obsidian, so it is cornered like one. The rest of the
+     callout geometry stays out: its padding and title block would make a one-line inline notice
+     considerably heavier than this panel wants. */
+  border-radius: var(--callout-radius);
 }
 .folia-desc-empty.folia-desc-empty {
   display: block;
@@ -561,7 +564,11 @@
   gap: var(--folia-space-hair);
   font-size: var(--folia-font-size-md);
   padding-left: var(--folia-gap);
-  border-left: var(--folia-border-width-thick) solid var(--folia-border);
+  /* The shape is a blockquote — an indented body behind a coloured left rule — so the rule's
+     thickness follows the theme's. Its colour does not: `--blockquote-border-color` resolves to the
+     accent, and this exact border is the unread signal, where read, unread and reply are told apart
+     by hue. An accent-coloured resting rule would collide with the reply hue on any accent near it. */
+  border-left: var(--blockquote-border-thickness) solid var(--folia-border);
 }
 .folia-comment-row {
   display: flex;
