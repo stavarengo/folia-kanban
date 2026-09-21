@@ -105,13 +105,6 @@
       "alias": "--size-4-6"
     }
   },
-  "xxxl": {
-    "$value": "var(--size-4-12)",
-    "cssVar": "--folia-space-xxxl",
-    "source": {
-      "alias": "--size-4-12"
-    }
-  },
   "bleed": {
     "$value": "calc(-1 * var(--size-2-3))",
     "cssVar": "--folia-space-bleed",

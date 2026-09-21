@@ -40,11 +40,11 @@
     }
   },
   "modal-width": {
-    "$value": "calc(var(--size-4-1) * 110)",
+    "$value": "min(var(--dialog-width), var(--dialog-max-width))",
     "cssVar": "--folia-modal-w",
     "source": {
       "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
+      "reason": "The edit-column dialog is the confirmation shape Obsidian calls a dialog, so it follows --dialog-width, held under --dialog-max-width because that cap is a viewport fraction the default width can exceed on a narrow window."
     }
   },
   "menu-padding": {

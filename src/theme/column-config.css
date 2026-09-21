@@ -55,14 +55,17 @@
   from { opacity: var(--folia-opacity-hidden); }
   to { opacity: var(--folia-opacity-shown); }
 }
+/* Obsidian calls this shape a dialog — "a smaller modal that's primarily used for confirmation" —
+   so its box comes from the dialog variables and its chrome from the modal ones. The backdrop below
+   stays Folia's: no host variable covers a dimmer. */
 .folia-modal {
   width: min(var(--folia-modal-w), 100%);
-  max-height: calc(var(--folia-viewport-h) - var(--folia-space-xxxl));
+  max-height: var(--dialog-max-height);
   display: flex;
   flex-direction: column;
-  background: var(--background-primary);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-lg);
+  background: var(--modal-background);
+  border: var(--modal-border-width) solid var(--modal-border-color);
+  border-radius: var(--modal-radius);
   box-shadow: var(--folia-shadow-pop);
   animation: folia-pop var(--folia-dur-fast) var(--folia-ease);
 }

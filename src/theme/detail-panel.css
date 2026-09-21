@@ -41,8 +41,11 @@
   flex: 0 0 auto;
   width: min(var(--folia-detail-modal-w), var(--folia-detail-modal-w-max));
   max-height: var(--folia-detail-modal-h-max);
-  border: var(--folia-border-width) solid var(--folia-border-strong);
-  border-radius: var(--folia-r-lg);
+  /* Chrome from the host's modal variables; the box stays Folia's, because this width is what the
+     panel's two-column field grid needs and the surface colour is the same panel the docked
+     presentation shows. */
+  border: var(--modal-border-width) solid var(--modal-border-color);
+  border-radius: var(--modal-radius);
   box-shadow: var(--folia-shadow-overlay);
 }
 
