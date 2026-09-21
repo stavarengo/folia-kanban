@@ -131,6 +131,14 @@
   background-image: var(--folia-control-press-veil);
 }
 
+/* The tile's dashed border is the "nothing here yet" affordance, and a solid line drawn 2px inside
+   it overwhelms it: at the moment the pointer arrives the tile reads as an ordinary bordered button.
+   The pointer cue stays; it takes the tile's own line style so the tile stays a tile. */
+.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .is-editing)) {
+  outline-style: dashed;
+}
+
 .folia-scope .folia-btn:disabled,
 .folia-scope .folia-icon-btn:disabled,
 .folia-scope .folia-filter-chip:disabled,
