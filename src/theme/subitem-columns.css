@@ -9,10 +9,8 @@
 /* Sits BELOW `.folia-card-main` rather than inside it (that div is the drag handle and carries
    role="button"), pulled up tight against the card body and indented to its text through the same
    side-padding token the card body uses, so a narrower card keeps them aligned.
-   Selected through `.folia-card` on purpose: Obsidian themes style plain buttons through
-   `button:not(.clickable-icon)`, which out-specifies a lone class and would give this quiet
-   reference line a raised button face. */
-.folia-card .folia-card-parent-ref {
+   The shared token scope gives this reference the same weight as the other button rules. */
+.folia-scope .folia-card-parent-ref {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -30,7 +28,7 @@
   line-height: var(--folia-line-height-tight);
   cursor: var(--folia-cursor-control);
 }
-.folia-card .folia-card-parent-ref:hover {
+.folia-scope .folia-card-parent-ref:hover {
   color: var(--folia-text-accent-hover);
   text-decoration: underline;
 }

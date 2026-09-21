@@ -25,6 +25,8 @@
   padding: var(--folia-space-xxs) var(--folia-space-xs);
 }
 .folia-scope .folia-menu-prio {
+  background: var(--interactive-normal);
+  color: var(--text-muted);
   box-shadow: none;
   font: inherit;
   font-size: var(--folia-font-size-sm);
@@ -60,7 +62,7 @@
   padding: var(--folia-space-xxs-plus) var(--folia-space-md-plus);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-pill);
-  background: var(--interactive-normal);
+  background: var(--background-modifier-hover);
   color: var(--text-muted);
   cursor: var(--folia-cursor-control);
 }

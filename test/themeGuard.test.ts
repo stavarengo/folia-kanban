@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,8 +19,7 @@ const reject = (message: string) => {
 beforeEach(() => {
   fixture = mkdtempSync(join(tmpdir(), "folia-theme-"));
   cpSync("src/theme", join(fixture, "src/theme"), { recursive: true });
-  mkdirSync(join(fixture, "src/ui"));
-  cpSync("src/ui/columnColors.ts", join(fixture, "src/ui/columnColors.ts"));
+  cpSync("src/ui", join(fixture, "src/ui"), { recursive: true });
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
@@ -279,5 +278,52 @@ describe("theme guard column palette", () => {
       s.replace("var(--color-${name})", "var(--color-${name}) var(--totally-made-up)"),
     );
     reject("could not find the");
+  });
+});
+
+describe("theme button contract", () => {
+  it("rejects a face rule that loses its scope", () => {
+    edit("src/theme/buttons.css", (s) => s.replace(".folia-scope .folia-btn {", ".folia-btn {"));
+    reject("needs .folia-scope");
+  });
+
+  it("rejects a button without its own class", () => {
+    edit("src/ui/AddColumn.tsx", (s) => s.replace('className="folia-add-column"', 'className=""'));
+    reject("Every button branch needs");
+  });
+
+  it("checks both branches of a conditional class", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <button className={flag ? "folia-btn" : ""} />;\n',
+    );
+    reject("Every button branch needs");
+  });
+
+  it("requires an explicit resting shadow for a new flat control", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <button className="folia-probe" />;\n',
+    );
+    edit(
+      "src/theme/buttons.css",
+      (s) =>
+        s +
+        "\n.folia-scope .folia-probe { background: transparent; color: var(--text-normal); }\n.folia-scope .folia-probe:hover { box-shadow: none; }\n",
+    );
+    reject("needs a scoped resting rule for box-shadow");
+  });
+
+  it("checks face rules for runtime class families", () => {
+    edit("src/theme/chips.css", (s) => s + "\n.folia-chip-new { background: transparent; }\n");
+    reject("needs .folia-scope");
+  });
+
+  it("rejects rules that reach host-rendered buttons", () => {
+    edit(
+      "src/theme/buttons.css",
+      (s) => s + "\n.folia-scope button:disabled { opacity: var(--folia-opacity-disabled); }\n",
+    );
+    reject("not a bare button that reaches rendered Markdown");
   });
 });

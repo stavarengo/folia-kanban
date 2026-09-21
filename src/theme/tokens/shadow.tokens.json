@@ -147,5 +147,13 @@
     "source": {
       "alias": "--link-unresolved-filter"
     }
+  },
+  "suggestion-marker": {
+    "$value": "inset var(--folia-border-width-thick) 0 0 var(--text-normal)",
+    "cssVar": "--folia-suggestion-marker",
+    "source": {
+      "owned": true,
+      "reason": "The keyboard-selected suggestion needs a fixed-width marker even when a theme makes its resting and selected fills identical or removes input shadows."
+    }
   }
 }

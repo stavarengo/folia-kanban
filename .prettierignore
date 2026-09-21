@@ -11,7 +11,7 @@ examples/
 **/*.md
 
 # Hand-maintained design-system stylesheet is owned by ds:check
-# (theme:check + buttons:check + portals:check), not Prettier
+# (theme:check + portals:check), not Prettier
 src/theme/*.css
 
 # Lockfile

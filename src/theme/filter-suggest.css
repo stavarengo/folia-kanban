@@ -27,15 +27,18 @@
   padding: var(--folia-space-xs-plus) var(--folia-space-md);
   border: none;
   border-radius: var(--button-radius);
-  background: var(--interactive-normal);
+  background: transparent;
   color: var(--text-normal);
   font: inherit;
   text-align: left;
   cursor: var(--folia-cursor-control);
 }
-.folia-scope .folia-filter-suggest-item.is-active,
 .folia-scope .folia-filter-suggest-item:hover:where(:not(:disabled)) {
-  background: var(--interactive-hover);
+  background: var(--background-modifier-hover);
+}
+.folia-scope .folia-filter-suggest-item.is-active {
+  background: var(--background-modifier-hover);
+  box-shadow: var(--folia-suggestion-marker);
 }
 .folia-filter-suggest-key {
   font-family: var(--folia-font-mono);

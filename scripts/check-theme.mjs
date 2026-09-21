@@ -10,6 +10,7 @@
 //   D  tokens.css and tokens/*.tokens.json agree on base values and light/dark overrides
 //   E  an owned token whose value is already a documented default must alias that variable
 //   F  the eight column colour names match src/ui/columnColors.ts, and each is one Obsidian has
+//   G  JSX buttons have scoped resting faces; inherited raised shadows are explicit exceptions
 //
 // What it deliberately does not police, so the gaps are chosen rather than discovered:
 //
@@ -33,6 +34,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import process from "node:process";
 import postcss from "postcss";
+import { checkButtons } from "./theme-buttons.mjs";
 import { themeFiles, THEME_DIR, THEME_ENTRY } from "./theme-bundle.mjs";
 
 const TOKENS_CSS = join(THEME_DIR, "tokens.css");
@@ -472,9 +474,11 @@ try {
   for (const problem of e.problems ?? [e.message]) errors.push(problem);
 }
 const componentFiles = [THEME_ENTRY, ...imported].filter((f) => f !== TOKENS_CSS);
+const componentRoots = [];
 for (const file of componentFiles) {
   const css = await readFile(file, "utf8");
   const root = postcss.parse(css, { from: file });
+  componentRoots.push(root);
   root.walkDecls((decl) => {
     checkVarsResolve(read(decl.value), file, decl.source.start.line);
     checkRawValues(decl, file);
@@ -903,6 +907,8 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
     }
   }
 }
+
+await checkButtons(componentRoots, fail);
 
 // ------------------------------------------------------------------------ report
 if (errors.length) {

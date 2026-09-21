@@ -9,14 +9,13 @@
   background: var(--interactive-normal);
   color: var(--text-normal);
   cursor: var(--folia-cursor-control);
-  transition: background var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
+  transition: background var(--folia-dur-fast) ease;
 }
 .folia-scope .folia-btn:hover:where(:not(:disabled)) {
   background: var(--interactive-hover);
 }
 .folia-scope .folia-btn-primary {
   background: var(--folia-accent);
-  border-color: transparent;
   color: var(--folia-on-accent);
 }
 /* The accent/danger faces state their hover colours in full rather than inheriting half of them:
@@ -24,16 +23,13 @@
    the neutral hover face reach a button that is meant to stay accented. */
 .folia-scope .folia-btn-primary:hover:where(:not(:disabled)) {
   background: var(--interactive-accent-hover);
-  border-color: transparent;
 }
 .folia-scope .folia-btn-danger {
   color: var(--folia-on-accent);
   background: var(--background-modifier-error);
-  border-color: transparent;
 }
 .folia-scope .folia-btn-danger:hover:where(:not(:disabled)) {
   background: var(--background-modifier-error-hover);
-  border-color: transparent;
 }
 
 .folia-scope .folia-icon-btn {
@@ -103,7 +99,43 @@
   opacity: var(--folia-opacity-shown);
 }
 
-.folia-scope button:disabled {
+.folia-scope .folia-btn:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-filter-chip:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-column-add:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-item:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-filter-suggest-item:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-column:hover:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-prio-none:hover:where(:not(:disabled, :focus-visible)) {
+  outline: var(--folia-control-outline);
+  outline-offset: calc(-1 * var(--folia-border-width-thick));
+}
+
+.folia-scope .folia-btn:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-filter-chip:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-column-add:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-item:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-filter-suggest-item:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
+.folia-scope .folia-menu-prio-none:active:where(:not(:disabled, :focus-visible)) {
+  outline: var(--folia-control-outline);
+  outline-width: var(--folia-border-width-thick);
+  outline-offset: calc(-1 * var(--folia-border-width-thick));
+}
+
+.folia-scope .folia-btn:disabled,
+.folia-scope .folia-icon-btn:disabled,
+.folia-scope .folia-filter-chip:disabled,
+.folia-scope .folia-column-add:disabled,
+.folia-scope .folia-add-column:disabled,
+.folia-scope .folia-filter-suggest-item:disabled,
+.folia-scope .folia-menu-item:disabled,
+.folia-scope .folia-menu-prio:disabled,
+.folia-scope .folia-menu-column:disabled,
+.folia-scope .folia-link:disabled,
+.folia-scope .folia-card-subitems-toggle:disabled,
+.folia-scope .folia-desc-empty:disabled {
   opacity: var(--folia-opacity-disabled);
   cursor: var(--folia-cursor-inert);
 }

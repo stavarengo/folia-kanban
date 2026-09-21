@@ -112,6 +112,7 @@
   --folia-border-width: var(--border-width);
   --folia-border-width-hair: var(--border-width);
   --folia-border-width-thick: 2px;
+  --folia-control-outline: 1px solid currentColor;
   --folia-focus-ring-w: 2px;
   --folia-focus-ring-offset: var(--size-2-1);
   --folia-focus-ring-offset-inset: calc(-1 * var(--folia-focus-ring-offset));
@@ -147,6 +148,7 @@
   --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4);
   --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);
   --folia-shadow-panel: -8px 0 24px rgba(0, 0, 0, 0.18);
+  --folia-suggestion-marker: inset var(--folia-border-width-thick) 0 0 var(--text-normal);
   --folia-ring: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent);
   --folia-ring-soft: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent);
   --folia-shadow-card-selected: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);

@@ -87,10 +87,9 @@
   /* two-tone ring readable over any swatch fill, in either theme */
   box-shadow: var(--folia-shadow-swatch-active);
 }
-/* After the hover rule, which it has to beat at equal weight: `:hover` matches a disabled button
-   too, so the ninth swatch — the colour a note carries that is not one of the eight — would grow
-   under the pointer and then do nothing. */
+/* The disabled custom-colour swatch is a read-only colour sample, not an unavailable action. */
 .folia-scope .folia-swatch:disabled {
+  opacity: var(--folia-opacity-shown);
   cursor: var(--folia-cursor-inert);
   transform: none;
 }
@@ -128,10 +127,7 @@
 .folia-scope .folia-menu-item:hover:where(:not(:disabled)) {
   background: var(--interactive-hover);
 }
-.folia-scope .folia-menu-item:disabled {
-  opacity: var(--folia-opacity-disabled);
-  cursor: var(--folia-cursor-inert);
-}
+
 .folia-scope .folia-menu-danger {
   color: var(--folia-text-error);
 }

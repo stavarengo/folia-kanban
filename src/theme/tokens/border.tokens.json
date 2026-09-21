@@ -63,5 +63,13 @@
       "reason": "the folder-context strip is drawn thinner than the priority bar beside it so the two left-edge cues read as different signals; the pair answers to each other, not to the spacing grid, and it is a cue a plugin invented, so no host variable describes it.",
       "despite": "--size-2-1"
     }
+  },
+  "control-outline": {
+    "$value": "1px solid currentColor",
+    "cssVar": "--folia-control-outline",
+    "source": {
+      "owned": true,
+      "reason": "A pointer-state outline independent of host fills, shadows and border widths, which may be identical or zero on macOS and custom themes. It uses the label colour so the cue follows the foreground chosen for each neutral or filled control."
+    }
   }
 }

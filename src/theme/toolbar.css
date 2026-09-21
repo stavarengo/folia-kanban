@@ -56,7 +56,7 @@
   padding: 0 var(--folia-control-pad-x);
   border-radius: var(--pill-radius);
   border: var(--folia-border-width) solid var(--folia-border);
-  background: var(--interactive-normal);
+  background: var(--background-primary);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);

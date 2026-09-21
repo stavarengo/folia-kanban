@@ -6,3 +6,8 @@
 .folia-card-main:focus-visible {
   outline-offset: var(--folia-focus-ring-offset-inset);
 }
+
+.folia-column-title:focus-visible,
+.folia-card-parent-ref:focus-visible {
+  border-radius: var(--folia-r-sm);
+}
