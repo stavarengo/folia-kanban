@@ -38,6 +38,7 @@
    - 3.2. If the host path is unknown or this is not the devcontainer, ask your human to open it.
    - 3.3. If this is the host system, you can easily open the vault using instructions from 3.1. using the current repo root path instead of `$HOST_REPO_ROOT_REAL_PATH`.
 4. Watch and rebuild the plugin into the `examples/` vault on every change: `pnpm run dev:examplesVault` (watch mode — keeps running).
+   - 4.1. A build does not reach the running app. Obsidian keeps the stylesheet it loaded, so reload the plugin — `await app.plugins.disablePlugin('folia-kanban')` then `enablePlugin` — and confirm the live sheet's byte length equals the built `styles.css` before trusting any reading of it. Skipping this reports missing variables as missing features.
 5. `take_snapshot` hides the file tree — pass `verbose: true` for folder/file nodes.
 6. Breadcrumb and explorer both show the folder name, but the breadcrumb only selects — click the explorer node to open.
 7. Open a board yourself (a board = note with `folia-board: true`). Don't rely on the `folia-kanban:folia-open-kanban-board` command: Obsidian 1.12 defers background leaves, so an off-screen board stays empty until focused. Via `evaluate_script`: `leaf.setViewState({ type: 'folia-kanban-view', state: { file: '<vault path>' }, active: true })`, then `setActiveLeaf(leaf, { focus: true })`, `revealLeaf(leaf)`, wait a tick, `take_screenshot`. (`boardPath` is still read, for layouts saved before the view became a `FileView`, but `file` is the key now.)
