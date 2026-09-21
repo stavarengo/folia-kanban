@@ -1,7 +1,13 @@
 /* ------------------------------------------------------------------ buttons */
 .folia-scope .folia-btn {
   font: inherit;
-  font-size: var(--folia-font-size-sm);
+  /* `--font-ui-small`, matching Obsidian's own buttons. Everything else about this face already
+     does — 30px tall, 5px radius, `4px 12px` padding, the host fills and the host shadow — and the
+     label was the last pixel of difference beside the real Settings window. The edit-column dialog
+     also disagreed with itself, its `<select>` elements inheriting the host's 13px beside 12px
+     buttons. The height does not move with the size: Obsidian pins every `button` to
+     `--input-height`. */
+  font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-medium);
   padding: var(--folia-space-xs-plus) var(--folia-control-pad-x);
   border-radius: var(--button-radius);
