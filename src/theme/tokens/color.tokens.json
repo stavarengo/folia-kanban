@@ -32,6 +32,20 @@
       "alias": "--background-secondary"
     }
   },
+  "column-header-bg": {
+    "$value": "var(--background-secondary-alt)",
+    "cssVar": "--folia-col-header-bg",
+    "source": {
+      "alias": "--background-secondary-alt"
+    }
+  },
+  "drop-target-bg": {
+    "$value": "var(--background-modifier-active-hover)",
+    "cssVar": "--folia-drop-target-bg",
+    "source": {
+      "alias": "--background-modifier-active-hover"
+    }
+  },
   "field-bg": {
     "$value": "var(--background-modifier-form-field)",
     "cssVar": "--folia-field-bg",

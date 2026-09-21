@@ -43,7 +43,7 @@
   align-items: center;
   gap: var(--folia-space-md);
   padding: var(--folia-space-md-plus) var(--folia-pad);
-  background: var(--folia-col-bg);
+  background: var(--folia-col-header-bg);
   position: relative;
 }
 .folia-column-dot {
@@ -85,7 +85,7 @@
   border-color: color-mix(in srgb, var(--folia-danger) 50%, var(--folia-border));
 }
 .folia-column.is-over-limit .folia-column-header {
-  background: color-mix(in srgb, var(--folia-danger) 8%, var(--folia-col-bg));
+  background: color-mix(in srgb, var(--folia-danger) 8%, var(--folia-col-header-bg));
 }
 
 .folia-column-body {
@@ -101,7 +101,7 @@
   transition: background var(--folia-dur-fast) ease;
 }
 .folia-column-body.is-over {
-  background: color-mix(in srgb, var(--folia-accent) 9%, transparent);
+  background: var(--folia-drop-target-bg);
 }
 .folia-column-empty {
   --folia-icon-size: var(--icon-l);

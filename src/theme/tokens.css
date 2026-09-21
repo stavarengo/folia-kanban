@@ -137,6 +137,8 @@
   --folia-border-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
   --folia-card-bg: var(--background-primary);
   --folia-col-bg: var(--background-secondary);
+  --folia-col-header-bg: var(--background-secondary-alt);
+  --folia-drop-target-bg: var(--background-modifier-active-hover);
   --folia-field-bg: var(--background-modifier-form-field);
   --folia-scrim: rgba(0, 0, 0, 0.45);
 
