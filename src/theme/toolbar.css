@@ -35,6 +35,14 @@
   outline: none;
   min-width: 0;
 }
+/* The field is the wrapper, not the input: the input is borderless and transparent and sits inside
+   the wrapper's padding, beside the clear button. So the board's blanket `:focus-visible` outline
+   drew a second accent rectangle 2px outside a borderless box — inside the first one, and across
+   the ✕. The wrapper's accent border plus ring above is the whole indication, the same one every
+   other field on the board carries, and it reaches the control the user is actually looking at. */
+.folia-search input:focus-visible {
+  outline: none;
+}
 .folia-toolbar-filters {
   display: flex;
   gap: var(--folia-space-sm);
