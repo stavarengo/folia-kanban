@@ -11,6 +11,18 @@
 //   E  an owned token whose value is already a documented default must alias that variable
 //   F  the eight column hexes match src/ui/columnColors.ts
 //
+// What it deliberately does not police, so the gaps are chosen rather than discovered:
+//
+//   - A host variable read WITH a fallback — `var(--color-red, #e5534b)` — is an owned token, not
+//     an alias, and the guard never asks whether that fallback is reachable. For a variable
+//     Obsidian always defines it is dead text keeping a literal alive in the block, and it is also
+//     the shape that turns an alias into an owned value without arguing for it. Every one of them
+//     is inherited from the stylesheet this domain was built out of, and removing them is a phase
+//     of its own (the audit's 02-03 and 02-05). Until then the reason is what carries it.
+//   - The unitless numbers inside a `transform`. `translate(-50%, var(--x)) scale(0.94)` is one
+//     geometry, readable only whole; a scale factor named elsewhere would be worse, not better.
+//     Lengths and angles inside a transform ARE policed.
+//
 // Run: pnpm theme:check
 
 import { readFile, readdir } from "node:fs/promises";
@@ -151,8 +163,15 @@ const NAMED_COLORS = new Set(
   ).split(" "),
 );
 const COLOR_FUNCTIONS = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
-const DIMENSION =
-  /(?<![\w.#-])-?\d*\.?\d+(px|em|rem|ex|ch|cap|ic|lh|rlh|vh|vw|vi|vb|vmin|vmax|[dsl]v(?:h|w|min|max|i|b)|cq[whibx]|cqmin|cqmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])/i;
+// A CSS number may carry an exponent — `1e3px` is a thousand pixels — so every scan below spells
+// the number the way the grammar does rather than the way people write it.
+const NUMBER = String.raw`-?\d*\.?\d+(?:[eE][-+]?\d+)?`;
+const DIMENSION = new RegExp(
+  String.raw`(?<![\w.#-])` +
+    NUMBER +
+    String.raw`(px|em|rem|ex|ch|cap|ic|lh|rlh|vh|vw|vi|vb|vmin|vmax|[dsl]v(?:h|w|min|max|i|b)|cq[whibx]|cqmin|cqmax|cm|mm|in|pt|pc|q|ms|s|deg|rad|grad|turn)(?![\w%-])`,
+  "i",
+);
 const NUMERIC_PROPS = new Set(["font-size", "font-weight", "line-height", "z-index", "opacity"]);
 const SHADOW_PROPS = new Set(["box-shadow", "text-shadow"]);
 /** Unitless numbers that carry no design intent: ratios the layout engine reads as counts. */
@@ -176,10 +195,17 @@ const UNITLESS_OK = new Set([
   "-webkit-line-clamp",
 ]);
 
-/** Walk the top-level var() calls of a value, yielding [name, fallbackText|null]. */
+/**
+ * Walk the top-level var() calls of a value, yielding [name, fallbackText|null].
+ *
+ * CSS function names are case-insensitive, so `VAR(--anything)` is a var() call and a reader that
+ * only knows the lowercase spelling would wave it through — along with everything else this file
+ * checks, since every other rule reads the value through here.
+ */
 function* varCalls(value) {
+  const lower = value.toLowerCase();
   for (let i = 0; i < value.length; i++) {
-    if (!value.startsWith("var(", i)) continue;
+    if (!lower.startsWith("var(", i)) continue;
     let depth = 0;
     let j = i + 3;
     for (; j < value.length; j++) {
@@ -291,7 +317,11 @@ function checkRawValues(decl, where) {
     );
   }
   if (NUMERIC_PROPS.has(prop)) {
-    const number = bare.match(/(?<![\w.#-])-?\d*\.?\d+(?![\w.%-])/);
+    // A percentage counts here. `opacity: 50%` renders exactly as `opacity: 0.5`, so allowing one
+    // spelling while rejecting the other would only teach people which spelling to use.
+    const number = bare.match(
+      new RegExp(String.raw`(?<![\w.#-])` + NUMBER + String.raw`%?(?![\w.-])`),
+    );
     if (number) return say(`${prop} is written as a number`, TOKENISE);
   }
   if (!NUMERIC_PROPS.has(prop) && !UNITLESS_OK.has(prop)) {
@@ -305,7 +335,7 @@ function checkRawValues(decl, where) {
       " \u00a7 ",
     );
     const number = outsideMath
-      .match(/(?<![\w.#(-])-?\d*\.?\d+(?![\w.%-])/g)
+      .match(new RegExp(String.raw`(?<![\w.#(-])` + NUMBER + String.raw`(?![\w.%-])`, "g"))
       ?.filter((n) => Number(n) !== 0);
     if (number?.length && !/^\s*[§\s]*$/.test(bare) && prop !== "transform") {
       // transform's numbers are geometry (translate/scale factors), not design values.
@@ -339,6 +369,28 @@ for (const file of componentFiles) {
   });
   root.walkAtRules((at) => {
     if (at.params) checkVarsResolve(at.params, file, at.source.start.line);
+    // A prelude is a design decision too: `@media (min-width: 700px)` is a raw length deciding
+    // where the layout changes, and nothing above reads it because it is not a declaration.
+    if (/^(media|container|supports)$/.test(at.name) && at.params) {
+      const bare = stripVars(at.params);
+      const dim = bare.match(DIMENSION);
+      if (dim) {
+        fail(
+          `${file}:${at.source.start.line}`,
+          `\`@${at.name} ${at.params}\` — ${dim[0]} is a raw ${dimensionKind(dim[1])} in the prelude. A breakpoint is a design value like any other; name it in ${TOKENS_CSS} and read it here.`,
+        );
+      }
+    }
+    // `@property` re-declares a custom property's type, inheritance and initial value. Pointed at a
+    // token it can stop that token reaching any descendant, which changes what every rule reading
+    // it renders — from a file that declares no rule at all. Nothing in the bundle needs it, and a
+    // comparison of declarations cannot see it, so it does not get to be here quietly.
+    if (at.name === "property" && at.params.trim().startsWith("--folia-")) {
+      fail(
+        `${file}:${at.source.start.line}`,
+        `\`@property ${at.params}\` redefines a token's inheritance and initial value from outside the token block, which changes what every rule reading it renders while looking like nothing at all. ${TOKENS_CSS} is where a token is defined.`,
+      );
+    }
   });
 }
 // Inside the token block a --folia-* fallback would be a second value for the same token, so it is
@@ -413,27 +465,35 @@ const CATEGORIES = new Set([
 ]);
 
 /**
- * Which family a token's value is measured against.
+ * Which families a token's value is measured against, in order.
  *
- * A length falls back to Obsidian's `--size-*` grid wherever nothing more specific fits, because
- * the spacing page says that grid is for "spacing and dimensions properties" — so a bare length
- * with no better home still has to answer for itself. Without that fallback the answer would
- * depend on which JSON file someone dropped the token into, which is not a rule, it is a filing
- * cabinet. A token that genuinely must not follow the grid says so with `"despite"`.
+ * The category file says what kind of thing the token is; the VALUE says which scale it could be
+ * on. Neither is the key's spelling, deliberately: a rule that reads the key would answer
+ * differently for two identical values in one file depending on what someone called them, which is
+ * not a rule, it is a filing habit.
+ *
+ * A plain length falls through to Obsidian's `--size-*` grid wherever no narrower scale claims it,
+ * because the spacing page says that grid is for "spacing and dimensions properties" — so a bare
+ * length with no better home still has to answer for itself. Typography never falls through: a
+ * 16px font size is not a 16px margin, whatever the two numbers have in common. A token that
+ * genuinely must not follow the grid keeps `owned` and says `"despite"`.
  */
-function familyOf(token) {
+function familiesOf(token) {
   const category = basename(token.file).replace(".tokens.json", "");
-  if (category === "radius") return "radius";
-  if (category === "border" && token.path.startsWith("width")) return "border-width";
+  const value = token.node.$value;
+  const isLength = new RegExp(
+    String.raw`^` + NUMBER + String.raw`(px|em|rem|vh|vw|vmin|vmax)$`,
+  ).test(value);
+  const isNumber = new RegExp(String.raw`^` + NUMBER + String.raw`$`).test(value);
   if (category === "typography") {
-    if (token.path.startsWith("weight")) return "font-weight";
-    if (token.path.startsWith("line-height")) return "line-height";
-    if (token.path.startsWith("font-size")) return "font-size";
+    if (isLength) return ["font-size"];
+    if (isNumber) return [Number(value) >= 100 ? "font-weight" : "line-height"];
+    return [];
   }
-  // Anything left that is a plain length is measured against the grid. A bare number is not: the
-  // only host scales made of bare numbers are the weights, the line heights and `--layer-*`, and
-  // the first two are already decided above while the third is the coincidence the note explains.
-  return /^-?\d*\.?\d+(px|em|rem|vh|vw|vmin|vmax)$/.test(token.node.$value) ? "length" : null;
+  if (!isLength) return [];
+  if (category === "radius") return ["radius", "length"];
+  if (category === "border") return ["border-width", "length"];
+  return ["length"];
 }
 
 const defaultsBy = new Map(
@@ -534,10 +594,9 @@ for (const t of tokens) {
   }
 
   // Rule E
-  const family = familyOf(t);
-  const match = family
-    ? defaultsBy.get(family).find(([, entry]) => entry.default === node.$value)
-    : undefined;
+  const match = familiesOf(t)
+    .flatMap((family) => defaultsBy.get(family))
+    .find(([, entry]) => entry.default === node.$value);
   if (match && source.despite !== match[0]) {
     fail(
       `${TOKENS_CSS}:${decl.line}`,

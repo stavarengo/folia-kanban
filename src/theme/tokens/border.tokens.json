@@ -20,7 +20,8 @@
     "cssVar": "--folia-border-width-thick",
     "source": {
       "owned": true,
-      "reason": "the heavier border the board draws where an edge carries meaning (a selected swatch, an accent rail); Obsidian documents one border width."
+      "reason": "the heavier border the board draws where an edge carries meaning \u2014 a selected swatch, an accent rail. Obsidian documents one border width and this is not it; it is also not a step of the spacing grid, because widening the grid must not thicken every line the board draws.",
+      "despite": "--size-2-1"
     }
   },
   "focus-ring-width": {

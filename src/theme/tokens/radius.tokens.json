@@ -13,7 +13,8 @@
     "cssVar": "--folia-r-sm",
     "source": {
       "owned": true,
-      "reason": "between Obsidian's 4px and 8px rungs; the board's small controls sit here until the radius ladder is adopted outright."
+      "reason": "the corner the board's small controls wear. Obsidian's radius ladder steps 4 then 8 and this sits between them; it is not a spacing rung either, because a corner and a gap are different measurements that happen to share a number, and moving the grid must not reshape every small control.",
+      "despite": "--size-2-3"
     }
   },
   "md": {
@@ -52,7 +53,8 @@
     "cssVar": "--folia-r-nested-inset",
     "source": {
       "owned": true,
-      "reason": "how far a nested surface's corner is tucked inside its parent's so the two curves stay concentric; it is arithmetic on a radius rather than a radius of its own, and Obsidian publishes no such offset."
+      "reason": "how far a nested surface's corner is tucked inside its parent's so the two curves stay concentric. It is arithmetic on a radius, answerable to the radius it is subtracted from rather than to the spacing grid, and Obsidian publishes no such offset.",
+      "despite": "--size-2-1"
     }
   }
 }
