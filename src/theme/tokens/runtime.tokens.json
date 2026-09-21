@@ -64,5 +64,13 @@
       "owned": true,
       "reason": "the faint wash behind the same cue, set per urgency by the rules in cards.css; the `soon` state deliberately leaves it at the resting value."
     }
+  },
+  "swatch-color": {
+    "$value": "initial",
+    "cssVar": "--folia-swatch-color",
+    "source": {
+      "owned": true,
+      "reason": "the guaranteed-invalid value, so the one swatch rule can read a fill the palette row writes inline while the \"no colour\" swatch, which is the same class with nothing written onto it, falls through to its own background."
+    }
   }
 }

@@ -150,7 +150,7 @@ export function ColumnEditModal({ column, onClose }: Props) {
                     "folia-swatch" +
                     (draft.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
                   }
-                  style={{ background: c }}
+                  style={{ ["--folia-swatch-color" as string]: c }}
                   aria-label={`Set color ${c}`}
                   aria-pressed={draft.color?.toLowerCase() === c.toLowerCase()}
                   onClick={() => set("color", c)}

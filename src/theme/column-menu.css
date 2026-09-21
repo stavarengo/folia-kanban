@@ -65,6 +65,7 @@
   border-radius: var(--swatch-radius);
   box-shadow: var(--swatch-shadow);
   border: var(--folia-border-width-thick) solid transparent;
+  background: var(--folia-swatch-color);
   background-clip: padding-box;
   cursor: var(--folia-cursor-control);
   padding: 0;

@@ -320,6 +320,11 @@
      places that draw one disagree about what that should look like on purpose — the strip recedes
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
+  /* The swatch's fill, written inline by the two palette rows because there is one rule and eight
+     (soon nine) colours. `initial` for the same reason as --folia-ctx-color above: the "no colour"
+     swatch is the same class with nothing written onto it, and a guaranteed-invalid value is what
+     lets its own rule supply the background instead. */
+  --folia-swatch-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
   --folia-statusbar-clearance: 32px;
   --folia-urgency-color: transparent;

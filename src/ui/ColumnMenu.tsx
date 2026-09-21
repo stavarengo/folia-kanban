@@ -128,7 +128,7 @@ export function ColumnMenu({
                 "folia-swatch" +
                 (column.color?.toLowerCase() === c.toLowerCase() ? " is-active" : "")
               }
-              style={{ background: c }}
+              style={{ ["--folia-swatch-color" as string]: c }}
               aria-label={`Set color ${c}`}
               onClick={() => a.setColumnColor(column.id, c)}
             />
