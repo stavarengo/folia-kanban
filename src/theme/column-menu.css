@@ -69,9 +69,13 @@
      the position and five other longhands, and `background-clip` among them — which is what the
      inline `style={{ background: c }}` this replaced did, silently undoing the `padding-box` that
      used to be declared here. It had therefore never applied to a single swatch, so dropping it
-     keeps the pixels exactly as they are: the fill runs under the transparent border, which is what
-     makes the swatch read as a full circle with the active ring sitting outside it. */
+     keeps the fill running under the transparent border, which is what makes the swatch read as a
+     full circle with the active ring sitting outside it. */
   background-color: var(--folia-swatch-color);
+  /* The one longhand the shorthand used to reset that a swatch actually needs reset: a theme that
+     puts a gradient on plain buttons would otherwise paint it over the colour this swatch exists
+     to show. The rest of the shorthand's longhands are left alone deliberately. */
+  background-image: none;
   cursor: var(--folia-cursor-control);
   padding: 0;
   transition: transform var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;

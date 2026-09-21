@@ -59,9 +59,13 @@
   color: var(--folia-link-color);
   cursor: var(--folia-cursor-link);
   text-decoration: var(--folia-link-decoration);
-  /* Obsidian publishes a decoration and a thickness for a link but no offset, and an underline
-     sitting on the baseline cuts the descenders of a card title. The offset is the board's own and
-     costs nothing when the theme's decoration is `none`. */
+  /* The decoration, but not its thickness: `text-decoration-thickness` is one of the longhands the
+     community-directory CSS scan refuses (verified — `pnpm obsidian-scan:check` reports it), which
+     is the same wall `.folia-link-missing` meets over the unresolved decoration style. A theme that
+     thickens its links therefore does not reach the board, and cannot until the scan changes.
+     The underline offset is the board's own: Obsidian publishes no variable for it, an underline
+     on the baseline cuts the descenders of a card title, and it costs nothing when the theme's
+     decoration is `none`. */
   text-underline-offset: var(--folia-underline-offset);
   padding: 0;
   font: inherit;
