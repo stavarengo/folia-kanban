@@ -169,11 +169,17 @@ export function ColumnEditModal({ column, onClose }: Props) {
                   disabled
                 />
               ) : null}
+              {/* "No colour" is a choice like the eight, and it is the one a column that has never
+                  been given a colour is currently making. The board paints such a column from
+                  `autoColor`, but that is a colour derived from the id, not a colour anyone picked,
+                  so ringing the swatch it happens to land on would claim a decision the note does
+                  not hold. The ring goes where the stored value is. */}
               <button
                 type="button"
-                className="folia-swatch folia-swatch-none"
+                className={"folia-swatch folia-swatch-none" + (draft.color ? "" : " is-active")}
                 aria-label="Clear color"
                 title="No color"
+                aria-pressed={!draft.color}
                 onClick={() => set("color", undefined)}
               >
                 <Icon name="close" />

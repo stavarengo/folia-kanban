@@ -143,8 +143,11 @@ export function ColumnMenu({
               disabled
             />
           ) : null}
+          {/* Ringed when the note stores no colour, which is what this button means. A column in
+              that state is painted from `autoColor`, derived from its id rather than chosen, so
+              ringing whichever of the eight it resolves to would claim a pick nobody made. */}
           <button
-            className="folia-swatch folia-swatch-none"
+            className={"folia-swatch folia-swatch-none" + (column.color ? "" : " is-active")}
             aria-label="Clear color"
             title="No color"
             onClick={() => a.setColumnColor(column.id, null)}
