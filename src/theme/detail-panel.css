@@ -112,7 +112,13 @@
   padding: var(--folia-pad) var(--folia-space-lg);
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
-  background: var(--folia-error-bg);
+  /* A tenth of the error colour, not the whole of it. `--background-modifier-error` measures
+     #fb464c in 1.12.7 — a saturated red, not the recessed tint the name suggests — and this bar
+     carries --text-normal (#dadada in dark), so taking the surface whole would put near-white text
+     on a red band. What the finding is really about is the SOURCE: this used to mix the palette
+     red that also fills the danger button, and now mixes the error colour itself, so a theme that
+     recolours the error state reaches it. */
+  background: color-mix(in srgb, var(--folia-error-bg) 10%, var(--folia-col-bg));
   border-bottom: var(--folia-border-width) solid var(--folia-border);
 }
 .folia-detail-body {

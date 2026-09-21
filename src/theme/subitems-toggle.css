@@ -27,6 +27,13 @@
 .folia-card-subitems-toggle .folia-icon.is-collapsed {
   color: var(--folia-collapse-icon-collapsed);
 }
+/* On hover the chevron goes back to following its label. Without this it would sit at the nav
+   collapse colour whatever the control does, which in the default theme is a flat #666666 for both
+   states — the toggle would stop answering the pointer, having answered it before. */
+.folia-card-subitems-toggle:hover .folia-icon,
+.folia-card-subitems-toggle:focus-visible .folia-icon {
+  color: inherit;
+}
 /* Unscoped so the same "points right when collapsed" reading also works for the static
    collapse-all/expand-all menu icons (ColumnMenu), which aren't inside `.folia-card-subitems-toggle`. */
 .folia-icon.is-collapsed {

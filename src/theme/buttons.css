@@ -57,6 +57,21 @@
   background: var(--background-modifier-hover);
   color: var(--folia-icon-color-hover);
 }
+/* The opacity, not the colour, is what makes these buttons answer the pointer in the stock theme —
+   see the note on the tokens. It sits on the icon rather than on the button so it cannot fight
+   `.folia-column-menu-btn`'s own opacity fade or the card actions' reveal, both of which animate
+   the container from 0. */
+.folia-icon-btn .folia-icon {
+  opacity: var(--folia-icon-opacity);
+  transition: opacity var(--folia-dur-fast) ease;
+}
+.folia-icon-btn:hover .folia-icon {
+  opacity: var(--folia-icon-opacity-hover);
+}
+.folia-icon-btn:active:not(:disabled) .folia-icon,
+.folia-icon-btn[aria-expanded="true"] .folia-icon {
+  opacity: var(--folia-icon-opacity-active);
+}
 /* `--icon-color-focused` is Obsidian's pressed-and-engaged colour, not its focus colour: in the
    running app `.clickable-icon` uses it for `:active` and for a button whose menu is open, and
    answers `:focus-visible` with a ring rather than an icon colour, which is what Folia's own focus

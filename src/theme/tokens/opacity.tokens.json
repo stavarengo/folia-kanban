@@ -54,5 +54,26 @@
     "source": {
       "alias": "--link-unresolved-opacity"
     }
+  },
+  "icon": {
+    "$value": "var(--icon-opacity)",
+    "cssVar": "--folia-icon-opacity",
+    "source": {
+      "alias": "--icon-opacity"
+    }
+  },
+  "icon-hover": {
+    "$value": "var(--icon-opacity-hover)",
+    "cssVar": "--folia-icon-opacity-hover",
+    "source": {
+      "alias": "--icon-opacity-hover"
+    }
+  },
+  "icon-active": {
+    "$value": "var(--icon-opacity-active)",
+    "cssVar": "--folia-icon-opacity-active",
+    "source": {
+      "alias": "--icon-opacity-active"
+    }
   }
 }

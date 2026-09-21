@@ -207,6 +207,13 @@
   --folia-icon-color: var(--icon-color);
   --folia-icon-color-hover: var(--icon-color-hover);
   --folia-icon-color-focused: var(--icon-color-focused);
+  /* The opacities are not optional extras: measured in 1.12.7's default theme, --icon-color and
+     --icon-color-hover are the SAME colour (#b3b3b3), so an icon button that expressed hover
+     through colour alone would stop responding to hover at all. Obsidian carries that response in
+     the opacity pair, 0.85 to 1. Reading the colours without them is a regression, not a subset. */
+  --folia-icon-opacity: var(--icon-opacity);
+  --folia-icon-opacity-hover: var(--icon-opacity-hover);
+  --folia-icon-opacity-active: var(--icon-opacity-active);
   --folia-collapse-icon: var(--nav-collapse-icon-color);
   --folia-collapse-icon-collapsed: var(--nav-collapse-icon-color-collapsed);
 
