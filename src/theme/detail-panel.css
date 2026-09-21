@@ -208,14 +208,24 @@
   align-items: center;
   gap: var(--folia-space-md);
 }
+/* The same object Obsidian's own property editor draws — a note's frontmatter, label and typed
+   value — so type and colour come from the metadata variables. The label WIDTH does not:
+   `--metadata-label-width` is `9em`, sized for an editor pane, and this panel is much narrower. The
+   uppercase and the tracking stay too; they are what tells a property row from a form field here. */
 .folia-prop-key {
   flex: 0 0 var(--folia-prop-key-w);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--metadata-label-text-color);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
-  font-size: var(--folia-font-size-xxs);
+  font-size: var(--metadata-label-font-size);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Both hover variables resolve to their resting value in the default theme, so these two rules paint
+   nothing there. They are the theme's hook: a theme that lifts a property row on hover reaches the
+   board's rows too, and without them it could not. */
+.folia-prop-row:hover .folia-prop-key {
+  color: var(--metadata-label-text-color-hover);
 }
 .folia-prop-add .folia-prop-input:first-child {
   flex: 0 0 var(--folia-prop-key-w);
@@ -224,13 +234,19 @@
   flex: 1 1 auto;
   min-width: 0;
   font: inherit;
-  font-size: var(--folia-font-size-sm);
-  background: var(--background-primary);
+  font-size: var(--metadata-input-font-size);
+  background: var(--metadata-input-background);
   color: var(--text-normal);
+  /* Obsidian's property inputs carry no border, because the editor pane has other lines to place
+     them against. This panel does not: with a transparent fill and no border the row would be
+     invisible between edits, so the board keeps its own hairline. */
   border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-sm);
+  border-radius: var(--metadata-border-radius);
   padding: var(--folia-space-xs) var(--folia-space-sm-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
+}
+.folia-prop-input:hover {
+  background: var(--metadata-input-background-hover);
 }
 .folia-prop-input:focus {
   outline: none;
