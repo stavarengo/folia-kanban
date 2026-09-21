@@ -113,7 +113,7 @@
   font-size: var(--folia-font-size-sm);
   color: var(--text-normal);
   /* A tenth of the error colour, not the whole of it. `--background-modifier-error` measures
-     #fb464c in 1.12.7 — a saturated red, not the recessed tint the name suggests — and this bar
+     #fb464c in 1.13.7 — a saturated red, not the recessed tint the name suggests — and this bar
      carries --text-normal (#dadada in dark), so taking the surface whole would put near-white text
      on a red band. What the finding is really about is the SOURCE: this used to mix the palette
      red that also fills the danger button, and now mixes the error colour itself, so a theme that
@@ -283,6 +283,14 @@
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   color: var(--text-normal);
+}
+/* Source order alone no longer settles it: `.folia-link.folia-link:hover` carries a pseudo-class
+   this rule cannot match, so it out-weighs the refinement above and would hand the row the link
+   colour on hover — the one thing that rule exists to prevent. Matching the pseudo takes it back,
+   and re-states the underline the theme's hover decoration could otherwise remove. */
+.folia-title-value.folia-title-value:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
 }
 /* The clamp is written on the title's own element rather than on the button. On the engine a
    current Obsidian ships it makes no difference — measured, both placements clamp. It is a
@@ -556,7 +564,13 @@
      lines). The colour comes from the theme; the dashes stay a literal, because
      `--link-unresolved-decoration-style` can be `wavy`, which is not a border style, and a border
      that inherited it would collapse to no line at all. */
-  border-bottom: var(--folia-border-width) dashed var(--folia-link-unresolved-decoration-color);
+  border-bottom: var(--folia-border-width) dashed;
+  /* A separate longhand, not the third slot of the shorthand above: an unresolved value in the
+     shorthand is invalid at computed-value time and `border-bottom` does not inherit, so the whole
+     line would disappear rather than change colour. As a longhand it degrades to `currentColor`,
+     which is what drew these dashes before. That is the same failure this file's decision refuses
+     for `--link-unresolved-decoration-style`, and it applies to any variable put in that slot. */
+  border-bottom-color: var(--folia-link-unresolved-decoration-color);
   cursor: var(--folia-cursor-help);
 }
 .folia-done {

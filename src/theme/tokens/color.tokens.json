@@ -213,20 +213,6 @@
       "alias": "--icon-color-focused"
     }
   },
-  "collapse-icon": {
-    "$value": "var(--nav-collapse-icon-color)",
-    "cssVar": "--folia-collapse-icon",
-    "source": {
-      "alias": "--nav-collapse-icon-color"
-    }
-  },
-  "collapse-icon-collapsed": {
-    "$value": "var(--nav-collapse-icon-color-collapsed)",
-    "cssVar": "--folia-collapse-icon-collapsed",
-    "source": {
-      "alias": "--nav-collapse-icon-color-collapsed"
-    }
-  },
   "done-color": {
     "$value": "var(--checklist-done-color)",
     "cssVar": "--folia-done-color",

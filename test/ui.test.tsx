@@ -6853,6 +6853,39 @@ describe("column colour — what the picker writes and what a legacy note still 
     expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-green)");
   });
 
+  it("keeps the auto-colour a board already shows, which is what pins the palette's order", async () => {
+    // `autoColor` hashes a column id into COLUMN_COLORS, so the ARRAY ORDER decides what every
+    // column the note never assigned looks like. Reordering it would repaint those columns on every
+    // existing board with nothing stored to explain it, and no other check would notice: rule F
+    // compares the JSON mirror, which would be reordered along with it. This pins one id.
+    render_(repoWith());
+    await screen.findByText("Alpha");
+    const column = document.querySelector('[data-column="todo"]') as HTMLElement;
+    expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-pink)");
+  });
+
+  it("replaces a legacy hex when one of the eight is picked", async () => {
+    const repo = repoWith("#9aa0a6");
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(screen.getByLabelText("Set color cyan"));
+    await waitFor(() =>
+      expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBe("cyan"),
+    );
+  });
+
+  it("reads a bare CSS colour keyword as the palette name it spells", async () => {
+    // The eight names are also CSS colour keywords, so a note that already said `color: red` now
+    // paints the theme's red rather than #ff0000. It is the one case where this change alters what
+    // an existing note renders, and it is deliberate: a board that asked for "red" gets the red the
+    // rest of the app is using. Pinned here so the collision cannot be rediscovered as a surprise.
+    render_(repoWith("red"));
+    await screen.findByText("Alpha");
+    const column = document.querySelector('[data-column="todo"]') as HTMLElement;
+    expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-red)");
+  });
+
   it("paints a hex a board note already carried exactly as written, and shows it as a ninth swatch", async () => {
     // The compatibility promise: a note written before the palette moved to names loses nothing,
     // and the colour it carries is visible in the picker rather than absent from it.
@@ -6868,5 +6901,28 @@ describe("column colour — what the picker writes and what a legacy note still 
     expect(custom.className).toContain("is-active");
     // ...and none of the eight claims to be the active one while the note carries something else.
     expect(document.querySelectorAll(".folia-swatch.is-active")).toHaveLength(1);
+  });
+
+  it("shows the ninth swatch in the edit dialog too, and keeps the hex across an unrelated edit", async () => {
+    // The dialog has its own draft state and its own save path, so the compatibility promise has to
+    // hold there separately: renaming a column must not quietly drop the colour it was carrying.
+    const repo = repoWith("#9aa0a6");
+    render_(repo);
+    await screen.findByText("Alpha");
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(screen.getByText("Edit column…"));
+    const custom = await screen.findByLabelText("Custom color #9aa0a6");
+    expect(custom).toBeDisabled();
+    expect(custom).toHaveAttribute("aria-pressed", "true");
+
+    const title = screen.getByLabelText("Column title");
+    await user.clear(title);
+    await user.type(title, "Backlog");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      const col = repo.config.columns.find((c) => c.id === "todo");
+      expect(col?.title).toBe("Backlog");
+      expect(col?.color).toBe("#9aa0a6");
+    });
   });
 });

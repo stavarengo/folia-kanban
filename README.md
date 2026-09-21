@@ -257,7 +257,11 @@ column's `⋯` menu (rename, recolour, WIP limit, reorder, delete) and the **Add
 plugin reads and writes that frontmatter list either way. A column entry may be a plain string
 (`- todo`) or an object (`{ id, title, color, limit }`).
 
-A column's `color` is one of Obsidian's eight theme colour names — `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `pink` — and the column is painted with whatever your theme makes of that name, in light mode and in dark. Earlier versions wrote a hex instead, from a fixed palette of eight; those eight are gone, so a column you had picked a colour for, or one the board coloured for you, will look a little different after this change — the same hue, drawn by your theme instead of by the plugin. The one exception is the neutral grey, which has no counterpart among the eight. A hex already in your board note keeps painting exactly the colour it always did, and the column menu shows it as an extra swatch beside the eight so you can see what the column is carrying; picking any of the eight replaces it with a name. Nothing rewrites your note on its own.
+A column's `color` is one of Obsidian's eight theme colour names — `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `pink` — and the column is painted with whatever your theme makes of that name, in light mode and in dark. Earlier versions wrote a hex instead. **A hex already in your board note keeps painting exactly the colour it always did** — nothing rewrites your note on its own — and the column menu shows it as an extra swatch beside the eight, so you can see what the column is carrying; picking any of the eight replaces it with a name.
+
+What does change is the columns you never picked a colour for. The board colours those itself, and it now does it with theme colours, so they shift: mostly to the same hue drawn by your theme instead of by the plugin, except for two, where the old palette had colours the eight do not — a neutral grey, which becomes yellow, and a mint green, which becomes cyan.
+
+One narrow case is worth knowing if you write your board notes by hand: the eight names are ordinary CSS colour words, so a column that already said `color: red` now takes the theme's red rather than pure `#ff0000`. That is deliberate — a board asking for red gets the red the rest of the app is using.
 
 ### Priorities are your scale, not ours
 

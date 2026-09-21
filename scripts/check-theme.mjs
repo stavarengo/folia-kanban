@@ -13,12 +13,13 @@
 //
 // What it deliberately does not police, so the gaps are chosen rather than discovered:
 //
-//   - Whether a fallback can ever fire. `var(--color-red, #e5534b)` is an ALIAS of --color-red
-//     whose fallback is declared in the metadata, so the relationship is recorded either way and
-//     the fallback cannot turn an alias into an owned value by being there. What the guard asks of
-//     it is that the CSS and the metadata say the same thing, that it carries a reason, and that it
-//     agrees with the documented default when the registry has one. Reachability it cannot decide:
-//     the answer lives in the running app, not in the docs.
+//   - Whether a fallback can ever fire. `var(--layer-menu, 65)` is an ALIAS of --layer-menu whose
+//     fallback is declared in the metadata, so the relationship is recorded either way and the
+//     fallback cannot turn an alias into an owned value by being there. What the guard asks of it
+//     is that the CSS and the metadata say the same thing, that it carries a reason, that it agrees
+//     with a documented default that is a single value, and that it is not there at all where the
+//     documented default differs by scheme — one value cannot stand in for two. Reachability itself
+//     it cannot decide: the answer lives in the running app, not in the docs.
 //   - The unitless numbers inside a `transform`. `translate(-50%, var(--x)) scale(0.94)` is one
 //     geometry, readable only whole; a scale factor named elsewhere would be worse, not better.
 //     Lengths and angles inside a transform ARE policed, and a bare number anywhere else is not
@@ -753,7 +754,23 @@ for (const t of [...tokens, ...variants]) {
       if (typeof documented === "string" && fallback.value !== documented) {
         fail(
           at,
-          `falls back to ${JSON.stringify(fallback.value)} where Obsidian documents ${source.alias} as ${JSON.stringify(documented)}. A fallback is what the board renders when the app does not define the variable, so a value that disagrees with the documentation is a second opinion nobody chose. (A colour whose default differs between light and dark is recorded as an object and is exempt — there is no single value to agree with.)`,
+          `falls back to ${JSON.stringify(fallback.value)} where Obsidian documents ${source.alias} as ${JSON.stringify(documented)}. A fallback is what the board renders when the app does not define the variable, so a value that disagrees with the documentation is a second opinion nobody chose.`,
+        );
+      }
+      // A variable whose documented default differs by scheme cannot be stood in for by ONE value:
+      // whatever is written is wrong in the other mode. That is the whole of the audit's 02-03, and
+      // without this the nine literals that finding removed could be written straight back for the
+      // price of a sentence of prose, because the string comparison above never fires for a colour.
+      if (documented && typeof documented === "object") {
+        fail(
+          at,
+          `falls back to the single value ${JSON.stringify(fallback.value)}, but Obsidian documents ${source.alias} per scheme (${Object.entries(
+            documented,
+          )
+            .map(([k, v]) => `${k} ${v}`)
+            .join(
+              ", ",
+            )}). One value cannot stand in for two, so a fallback here is guaranteed wrong in one of the modes it would fire in — read the variable bare, or own the token and argue for the value in both schemes.`,
         );
       }
     }
