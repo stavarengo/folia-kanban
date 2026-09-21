@@ -33,11 +33,10 @@
     }
   },
   "menu-height-max": {
-    "$value": "calc(var(--size-4-1) * 110)",
+    "$value": "var(--popover-max-height)",
     "cssVar": "--folia-menu-h-max",
     "source": {
-      "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
+      "alias": "--popover-max-height"
     }
   },
   "modal-width": {

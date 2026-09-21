@@ -59,7 +59,7 @@
   --folia-menu-w-min: calc(var(--size-4-1) * 50); /* narrowest a popover may shrink to */
   --folia-menu-w-max: calc(var(--size-4-1) * 80); /* widest a popover may grow to fit its longest label */
   --folia-menu-w: calc(var(--size-4-1) * 56);
-  --folia-menu-h-max: calc(var(--size-4-1) * 110);
+  --folia-menu-h-max: var(--popover-max-height);
   --folia-modal-w: calc(var(--size-4-1) * 110);
   --folia-menu-pad: var(--size-4-3);
   --folia-detail-w: calc(var(--size-4-1) * 95); /* the width before CardDetail writes the user's own, inline */
