@@ -10,18 +10,24 @@
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xxs-plus);
-  font-size: var(--folia-font-size-xs);
+  /* A card chip is shaped like a vault tag, so its size, padding and radius come from the tag
+     variables. Its colours do not: a chip says priority, due state or context, which no tag means.
+     `--tag-weight` is not read — Obsidian declares the name but ships no value for it, so the chip
+     keeps its own medium. `--tag-border-width` is not read either; see the note below. */
+  font-size: var(--tag-size);
   font-weight: var(--folia-font-weight-medium);
   line-height: var(--folia-line-height);
-  padding: var(--folia-space-hair) var(--folia-space-md);
-  border-radius: var(--folia-r-pill);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  border-radius: var(--tag-radius);
   border: var(--folia-border-width) solid transparent;
   white-space: nowrap;
   color: var(--text-muted);
   background: var(--background-modifier-hover);
 }
 /* Chip text is mixed toward --text-normal so it keeps the hue but stays legible (WCAG AA) in
-   BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. */
+   BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. That
+   border is why `--tag-border-width` stays out of the rule above: Obsidian ships it at 0, and a
+   borderless chip loses the only edge these translucent tints have. */
 .folia-chip-prio-1.folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-1) 32%, transparent); }
 .folia-chip-prio-2.folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in srgb, var(--folia-prio-2) 32%, transparent); }
 .folia-chip-prio-3.folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in srgb, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in srgb, var(--folia-prio-3) 34%, transparent); }

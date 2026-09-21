@@ -45,10 +45,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xs-plus);
+  /* A filter chip is a multi-select pill with an on/off state, so it takes the pill's shape. Its
+     height stays the host input height instead of `--pill-padding-y`: the chips sit in one row with
+     the search box, and only a shared height keeps that row aligned. */
   height: var(--folia-control-h);
-  padding: 0 var(--folia-control-pad-x);
-  border-radius: var(--folia-r);
-  border: var(--folia-border-width) solid var(--folia-border);
+  padding: 0 var(--pill-padding-x);
+  border-radius: var(--pill-radius);
+  border: var(--pill-border-width) solid var(--folia-border);
   background: var(--background-primary);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
