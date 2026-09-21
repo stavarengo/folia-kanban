@@ -7,7 +7,8 @@
   border-left: var(--folia-border-width-thick) dashed color-mix(in srgb, var(--folia-col-accent) 60%, transparent);
 }
 /* Sits BELOW `.folia-card-main` rather than inside it (that div is the drag handle and carries
-   role="button"), pulled up tight against the card body and indented to its text.
+   role="button"), pulled up tight against the card body and indented to its text through the same
+   side-padding token the card body uses, so a narrower card keeps them aligned.
    Selected through `.folia-card` on purpose: Obsidian themes style plain buttons through
    `button:not(.clickable-icon)`, which out-specifies a lone class and would give this quiet
    reference line a raised button face. */
@@ -18,7 +19,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   margin: var(--folia-space-pull) 0 0;
-  padding: 0 var(--folia-pad) var(--folia-space-md-plus);
+  padding: 0 var(--folia-card-pad-x) var(--folia-space-md-plus);
   text-align: left;
   border: 0;
   border-radius: 0;
