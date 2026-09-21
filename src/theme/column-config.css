@@ -149,9 +149,11 @@
   align-items: flex-start;
   gap: var(--folia-space-md-plus);
 }
+/* Nothing about the box itself: Obsidian styles every bare `input[type="checkbox"]` from the
+   `--checkbox-*` set — size, radius, border, checked fill, marker and focus ring — with
+   `appearance: none`, which is also what made the `accent-color` that used to sit here inert. */
 .folia-field-toggle input[type="checkbox"] {
   margin-top: var(--folia-space-xxs);
-  accent-color: var(--folia-accent);
 }
 .folia-field-toggle > span {
   display: flex;

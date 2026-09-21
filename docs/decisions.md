@@ -177,3 +177,13 @@ The theme-authoring guide shows both declared on `:root` with system keywords (`
 What is adopted is `--background-modifier-border-focus` for the focused border. Folia's accent ring stays over it because that colour computes to `#555555`, close enough to the resting border that on its own it would weaken a focus indicator the audit calls a strength. Obsidian uses the same variable as a 3px ring on `select:focus-visible`, which is the same reading.
 
 **What would change this:** Obsidian defining the pair in a shipped build, or documenting it on a CSS-variables reference page. Either makes it a registry entry and the border colour question reopens with the OS colour on the table.
+
+## The settings-shaped on/off row stays a checkbox
+
+**Decided 2026-09-21. `.folia-field-toggle` keeps a native checkbox; the `--toggle-*` variables are not used.**
+
+Obsidian's toggle is a track with a sliding thumb, and its eleven variables describe exactly that: `--toggle-width`, `--toggle-radius`, `--toggle-border-width`, `--toggle-thumb-width/height/radius/color`, plus a small variant for dense rows. Read live in 1.12.7, the app builds it entirely out of `.checkbox-container` — a wrapper element with `::before` and `::after` pseudo-elements, holding a visually hidden `input` — so the shape exists in the markup, not in the input. A native checkbox cannot wear it: it has no children to make a thumb from, and faking one would mean drawing a whole control by hand to imitate a control the host already draws.
+
+Nothing is lost by waiting. The same build styles every bare `input[type="checkbox"]` from the `--checkbox-*` set, so the row already shows Obsidian's own checkbox, correctly sized, filled and ticked. What is left is the difference between a checkbox and a toggle on a settings-shaped row, which is a markup question rather than a variable one.
+
+**What would change this:** the board adopting the host's `checkbox-container` markup for that row, which is the same decision as whether these panels should be built from Obsidian's `Setting` API at all.

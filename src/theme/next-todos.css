@@ -14,12 +14,16 @@
   font-size: var(--folia-font-size-xs);
   color: var(--text-muted);
 }
+/* An unchecked checkbox drawn as an ornament, not a control: it previews a to-do the card holds and
+   cannot be clicked. It borrows the app's checkbox radius and unchecked border, but not
+   `--checkbox-size` — that is a control's size (16px) and this sits on an 11px preview line, where
+   it would out-weigh the words it annotates. */
 .folia-card-next-todo-mark {
   flex-shrink: 0;
   width: var(--folia-todo-mark);
   height: var(--folia-todo-mark);
-  border: var(--folia-border-width-hair) solid var(--text-faint, var(--text-muted));
-  border-radius: var(--folia-r-xs);
+  border: var(--folia-border-width-hair) solid var(--checkbox-border-color);
+  border-radius: var(--checkbox-radius);
 }
 .folia-card-next-todo-text {
   min-width: 0;
