@@ -167,3 +167,13 @@ Obsidian 1.12.7 dresses every bare `<select>` through `select, .combobox-button,
 The only way to the glyph is putting `.dropdown` on the element, which is the undocumented-class contract the owner ruled out (`docs/ai/reports/…/02…md` decision 5 in the phase context). Drawing a chevron from Folia's own icon set is not available to a `<select>`, whose shadow DOM takes no children. Leaving `appearance` alone and letting the platform draw its native arrow would restore an indicator and lose the app's look, which is the divergence 02-19 is about.
 
 **What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
+
+## Focus keeps Folia's ring; the host focus-outline pair stays out
+
+**Decided 2026-09-21. Focused borders read `--background-modifier-border-focus`; `--input-focus-outline` and `--input-focus-border-color` are not used.**
+
+The theme-authoring guide shows both declared on `:root` with system keywords (`Highlight`, `Canvas`), which would put focus on the operating system's own colour. Neither is on a `Reference/CSS variables` page, so neither is in the registry, and the theme guard refuses a host variable that is neither documented nor observed — a fallback does not buy an exemption, by design. Read live in Obsidian 1.12.7 both compute to the empty string on `body`: the application does not define them at all, and the only rules naming them belong to the bundled PDF.js annotation layer. So there is nothing to observe and nothing to record; using them would mean writing a value the board invented behind a host variable's name.
+
+What is adopted is `--background-modifier-border-focus` for the focused border. Folia's accent ring stays over it because that colour computes to `#555555`, close enough to the resting border that on its own it would weaken a focus indicator the audit calls a strength. Obsidian uses the same variable as a 3px ring on `select:focus-visible`, which is the same reading.
+
+**What would change this:** Obsidian defining the pair in a shipped build, or documenting it on a CSS-variables reference page. Either makes it a registry entry and the border colour question reopens with the OS colour on the table.

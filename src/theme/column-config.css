@@ -134,7 +134,7 @@
 }
 .folia-field input:focus {
   outline: none;
-  border-color: var(--folia-accent);
+  border-color: var(--background-modifier-border-focus);
   box-shadow: var(--folia-ring);
 }
 .folia-field input[type="range"] {

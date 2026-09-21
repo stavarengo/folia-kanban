@@ -231,7 +231,7 @@
 }
 .folia-prop-input:focus {
   outline: none;
-  border-color: var(--folia-accent);
+  border-color: var(--background-modifier-border-focus);
   box-shadow: var(--folia-ring);
 }
 .folia-prop-add .folia-btn {
@@ -607,7 +607,7 @@
 }
 .folia-comment-edit:focus {
   outline: none;
-  border-color: var(--folia-accent);
+  border-color: var(--background-modifier-border-focus);
   box-shadow: var(--folia-ring);
 }
 /* One row for a comment's metadata; the <li> itself stacks (metadata, then the comment body). */

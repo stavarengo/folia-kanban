@@ -37,6 +37,6 @@
 }
 .folia-add-column.is-editing input:focus {
   outline: none;
-  border-color: var(--folia-accent);
+  border-color: var(--background-modifier-border-focus);
   box-shadow: var(--folia-ring);
 }

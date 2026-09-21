@@ -23,7 +23,7 @@
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 .folia-search:focus-within {
-  border-color: var(--folia-accent);
+  border-color: var(--background-modifier-border-focus);
   box-shadow: var(--folia-ring);
 }
 .folia-search input {

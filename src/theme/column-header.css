@@ -35,6 +35,11 @@
   border-radius: var(--folia-r-sm);
   padding: var(--folia-space-hair) var(--folia-space-sm);
 }
+/* The resting state already carries the column's accent border, so suppressing the outline and
+   stopping there left focus indistinguishable from rest. Focus now moves the border to the host's
+   own focus colour and adds the board's ring, which is a change the eye can see. */
 .folia-column-title-input:focus {
   outline: none;
+  border-color: var(--background-modifier-border-focus);
+  box-shadow: var(--folia-ring);
 }
