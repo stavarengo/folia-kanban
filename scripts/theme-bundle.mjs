@@ -44,6 +44,24 @@ export async function themeFiles(entry = THEME_ENTRY) {
       `${entry}:${node.source.start.line}: ${entry} is the import list and nothing else, but this is ${node.type === "rule" ? `a rule (\`${node.selector}\`)` : `\`@${node.name}\``}. Move it into the section file it belongs to.`,
     );
   }
+  if (files[0] !== join(base, "tokens.css")) {
+    problems.push(
+      `${entry}: tokens.css must be the FIRST import. Every file below it reads its tokens, and a bundle that does not carry the block at all still passes every check that reads the block from disk.`,
+    );
+  }
+  // A section file that imports another one would put CSS in the bundle that no guard reading this
+  // list ever visits. The entry is the import list; the sections are leaves.
+  const bodies = await Promise.all(files.map((f) => readFile(f, "utf8").catch(() => "")));
+  for (let i = 0; i < files.length; i++) {
+    const at = postcss
+      .parse(bodies[i], { from: files[i] })
+      .nodes.find((n) => n.type === "atrule" && n.name === "import");
+    if (at) {
+      problems.push(
+        `${files[i]}:${at.source.start.line}: \`@import ${at.params}\` — only ${entry} imports. A file pulled in from here is in the bundle but not in the list the guards read, so nothing would ever check it.`,
+      );
+    }
+  }
   if (problems.length) {
     const error = new Error(problems.join("\n"));
     error.problems = problems;

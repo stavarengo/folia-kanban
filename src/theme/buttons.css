@@ -26,7 +26,7 @@
 .folia-btn-primary:hover {
   background: var(--interactive-accent-hover, var(--folia-accent));
   border-color: transparent;
-  filter: brightness(1.06);
+  filter: var(--folia-lift-hover);
 }
 .folia-btn-danger.folia-btn-danger {
   color: var(--folia-on-accent);
@@ -36,7 +36,7 @@
 .folia-btn-danger:hover {
   background: var(--folia-danger);
   border-color: transparent;
-  filter: brightness(1.06);
+  filter: var(--folia-lift-hover);
 }
 
 .folia-icon-btn.folia-icon-btn {

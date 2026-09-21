@@ -65,7 +65,7 @@
     "cssVar": "--folia-space-md-plus",
     "source": {
       "owned": true,
-      "reason": "the vertical padding of the board's own inputs and column headers \u2014 the step that makes a control taller without making it wider. Obsidian's grid steps 8 then 12, so there is no rung for it yet."
+      "reason": "the step the board uses inside its own small surfaces \u2014 the padding of an input or a column header, the gap of a priority row, the space between a toggle and its label. Obsidian's grid steps 8 then 12, so there is no rung for it yet, and the later phase that adopts the grid moves all of them at once."
     }
   },
   "gap": {

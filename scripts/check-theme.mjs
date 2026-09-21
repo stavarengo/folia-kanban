@@ -18,10 +18,14 @@
 //     Obsidian always defines it is dead text keeping a literal alive in the block, and it is also
 //     the shape that turns an alias into an owned value without arguing for it. Every one of them
 //     is inherited from the stylesheet this domain was built out of, and removing them is a phase
-//     of its own (the audit's 02-03 and 02-05). Until then the reason is what carries it.
+//     of its own (the audit's 02-03 and 02-05). Until then the reason is what carries it, and
+//     nothing stops a NEW token taking the same escape — which is wider than the reason for it.
 //   - The unitless numbers inside a `transform`. `translate(-50%, var(--x)) scale(0.94)` is one
 //     geometry, readable only whole; a scale factor named elsewhere would be worse, not better.
-//     Lengths and angles inside a transform ARE policed.
+//     Lengths and angles inside a transform ARE policed, and a bare number anywhere else is not
+//     exempt — `filter: brightness(1.06)` is a design value and has a token.
+//   - The properties in UNITLESS_OK, whose numbers are counts the layout engine reads rather than
+//     sizes anyone chose, and the multipliers 0, 1, -1 and 2 inside a math function.
 //
 // Run: pnpm theme:check
 
@@ -61,7 +65,14 @@ for (const [name, entry] of Object.entries(observed)) {
   }
 }
 
-const hostKnows = (name) => name in registry || name in observed;
+/**
+ * Obsidian documents two surfaces with one set of pages, and the registry records which: `app` for
+ * the application a plugin runs inside, `publish` for the static site Publish renders. A Publish
+ * variable is documented and real and still means nothing here, so it is not a host variable this
+ * board may read.
+ */
+const publishOnly = (name) => registry[name]?.scope === "publish";
+const hostKnows = (name) => (name in registry && !publishOnly(name)) || name in observed;
 
 // ------------------------------------------------------------------ the token block
 const tokensCss = await readFile(TOKENS_CSS, "utf8");
@@ -95,7 +106,17 @@ const declared = new Map();
   }
   for (const rule of scopes) {
     for (const d of rule.nodes ?? []) {
-      if (d.type !== "decl") continue;
+      if (d.type === "comment") continue;
+      if (d.type !== "decl") {
+        // A rule nested inside the block — `& { --folia-r: 999px; }` — is applied by the browser
+        // and is not a declaration, so the map below would never see it while every reader went on
+        // believing the block said something else.
+        fail(
+          `${TOKENS_CSS}:${d.source.start.line}`,
+          `${d.type === "atrule" ? `@${d.name}` : d.selector} is nested inside the token block. The block is a flat list of declarations; anything else in it changes what the tokens are without changing what they say.`,
+        );
+        continue;
+      }
       if (!d.prop.startsWith("--folia-")) continue;
       if (d.important) {
         fail(
@@ -198,6 +219,10 @@ const UNITLESS_OK = new Set([
 /**
  * Walk the top-level var() calls of a value, yielding [name, fallbackText|null].
  *
+ * The text has already been unescaped by `read()`: CSS lets any identifier be spelled with
+ * escapes, so `v\\61 r(--x)` is a var() call and `17p\\78` is seventeen pixels, and a reader that
+ * matched letters would wave both through.
+ *
  * CSS function names are case-insensitive, so `VAR(--anything)` is a var() call and a reader that
  * only knows the lowercase spelling would wave it through — along with everything else this file
  * checks, since every other rule reads the value through here.
@@ -247,6 +272,16 @@ function stripVars(value) {
   return out + value.slice(last);
 }
 
+/** A property or value as CSS means it: escapes decoded, and (for a property) lower-cased. */
+function read(text, { lower = false } = {}) {
+  const decoded = text.includes("\\")
+    ? text.replace(/\\([0-9a-fA-F]{1,6})[ \t\n]?|\\([^])/g, (_m, hex, ch) =>
+        hex === undefined ? ch : String.fromCodePoint(parseInt(hex, 16)),
+      )
+    : text;
+  return lower ? decoded.toLowerCase() : decoded;
+}
+
 /** Rule A, applied to one value wherever it appears. */
 function checkVarsResolve(value, where, line) {
   for (const [name, fallback] of varCalls(value)) {
@@ -262,6 +297,11 @@ function checkVarsResolve(value, where, line) {
           `var(${name}, ${fallback}) carries a fallback for a token that is always declared in ${TOKENS_CSS}, so the fallback is dead text that only hides a raw value. Write var(${name}). (A token declared \`initial\` is the exception — that one really can be absent.)`,
         );
       }
+    } else if (publishOnly(name)) {
+      fail(
+        `${where}:${line}`,
+        `var(${name}) is documented for Obsidian Publish (${registry[name].pages.join(", ")}), not for the app this plugin runs inside, so nothing defines it here. Use an app variable, or record it in ${join(HOST_DIR, "observed.json")} if you have actually seen the app define it.`,
+      );
     } else if (!hostKnows(name)) {
       fail(
         `${where}:${line}`,
@@ -273,12 +313,51 @@ function checkVarsResolve(value, where, line) {
 }
 
 /** Rule C, applied to one declaration outside tokens.css. */
+/**
+ * A `--folia-*` declaration in a component file is an OVERRIDE — the urgency cue swapping its
+ * colour per due state — and the two ways it can stop being that are both invisible in the file
+ * that does it: re-declaring at `.folia-scope`, which quietly replaces the block for everything
+ * below, and reading the token it is declaring, which CSS throws away along with every declaration
+ * that reads it.
+ */
+function checkTokenOverride(decl, where, selector) {
+  const prop = read(decl.prop, { lower: true });
+  const line = decl.source.start.line;
+  if (selector.split(",").some((s) => s.trim() === ".folia-scope")) {
+    fail(
+      `${where}:${line}`,
+      `${prop} is declared on \`.folia-scope\` here, which re-declares the token block for everything below this rule. ${TOKENS_CSS} is the one place a token is defined.`,
+    );
+  }
+  const seen = new Set([prop]);
+  const queue = [...read(decl.value).matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map((m) => m[1]);
+  while (queue.length) {
+    const next = queue.shift();
+    if (next === prop) {
+      fail(
+        `${where}:${line}`,
+        `${prop} reads itself here, directly or through the tokens it reads. CSS throws away a cycle and every declaration that reads one, so this rule and everything under it would render without any of them.`,
+      );
+      return;
+    }
+    if (seen.has(next) || !declared.has(next)) continue;
+    seen.add(next);
+    queue.push(
+      ...[...declared.get(next).value.matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map(
+        (m) => m[1],
+      ),
+    );
+  }
+}
+
 function checkRawValues(decl, where) {
   const line = decl.source.start.line;
-  const prop = decl.prop;
-  const bare = stripVars(decl.value);
+  // Read as CSS reads it: property names are case-insensitive and either side may be spelled with
+  // escapes. The message quotes what is actually written, so the reader can find the line.
+  const prop = read(decl.prop, { lower: true });
+  const bare = stripVars(read(decl.value));
   const say = (what, advice) =>
-    fail(`${where}:${line}`, `\`${prop}: ${decl.value}\` — ${what}. ${advice}`);
+    fail(`${where}:${line}`, `\`${decl.prop}: ${decl.value}\` — ${what}. ${advice}`);
   const TOKENISE = `Move the value into ${TOKENS_CSS} as a token named for what it is FOR, and read it here through var().`;
 
   if (prop.startsWith("--")) {
@@ -307,8 +386,17 @@ function checkRawValues(decl, where) {
   if (SHADOW_PROPS.has(prop) && !/^\s*(none|§|inherit|initial|unset)\s*$/.test(bare)) {
     return say("a shadow is written out here", TOKENISE);
   }
-  if (prop === "font-family" && !/^[\s\u00a7]*$/.test(bare)) {
-    return say("a font stack is written out here", TOKENISE);
+  if ((prop === "font-family" || prop === "font") && !/^[\s\u00a7]*$/.test(bare)) {
+    // `font` is the shorthand: it sets a family and a size at once. `font: inherit`, the one the
+    // board uses, sets neither.
+    if (!/^\s*(inherit|initial|unset|revert)\s*$/.test(bare)) {
+      return say(
+        prop === "font"
+          ? "the font shorthand sets a family and a size here"
+          : "a font stack is written out here",
+        TOKENISE,
+      );
+    }
   }
   if (prop === "cursor" && !/^\s*§\s*$/.test(bare)) {
     return say(
@@ -327,16 +415,26 @@ function checkRawValues(decl, where) {
   if (!NUMERIC_PROPS.has(prop) && !UNITLESS_OK.has(prop)) {
     // A bare number outside the properties above is almost always a length that lost its unit or a
     // value that should be named; `0` is the one that never carries design intent.
-    // A number inside calc()/min()/max()/clamp() is arithmetic on values that are already tokens —
-    // a multiplier, not a design value — and the raw-length scan above has already judged the
-    // lengths in there.
-    const outsideMath = bare.replace(
-      /\b(?:calc|min|max|clamp)\([^()]*(?:\([^()]*\)[^()]*)*\)/g,
-      " \u00a7 ",
-    );
-    const number = outsideMath
-      .match(new RegExp(String.raw`(?<![\w.#(-])` + NUMBER + String.raw`(?![\w.%-])`, "g"))
-      ?.filter((n) => Number(n) !== 0);
+    //
+    // Arithmetic on tokens is fine; arithmetic that SCALES one is a design decision hiding as a
+    // sum, so only the two multipliers that mean something structural pass a math function: -1,
+    // which negates a token CSS gives no other way to negate, and 2, a symmetric pair. The lengths
+    // inside those functions have already been judged by the raw-length scan above.
+    const MATH = /\b(?:calc|min|max|clamp)\([^()]*(?:\([^()]*\)[^()]*)*\)/g;
+    const NUMBERS = new RegExp(String.raw`(?<![\w.#-])` + NUMBER + String.raw`(?![\w.%-])`, "g");
+    for (const math of bare.match(MATH) ?? []) {
+      const odd = math.match(NUMBERS)?.find((n) => ![0, 1, -1, 2].includes(Number(n)));
+      if (odd) {
+        return say(
+          `\`${odd}\` scales a token inside \`${math}\``,
+          `That multiplier decides a size rather than doing arithmetic. ${TOKENISE}`,
+        );
+      }
+    }
+    // The lookbehind excludes a number that is part of an identifier or a hex colour, but NOT one
+    // opening a function argument: `filter: brightness(1.06)` is a design value like any other.
+    const outsideMath = bare.replace(MATH, " \u00a7 ");
+    const number = outsideMath.match(NUMBERS)?.filter((n) => Number(n) !== 0);
     if (number?.length && !/^\s*[§\s]*$/.test(bare) && prop !== "transform") {
       // transform's numbers are geometry (translate/scale factors), not design values.
       return say(`\`${number[0]}\` is an unnamed number`, TOKENISE);
@@ -364,8 +462,11 @@ for (const file of componentFiles) {
   const css = await readFile(file, "utf8");
   const root = postcss.parse(css, { from: file });
   root.walkDecls((decl) => {
-    checkVarsResolve(decl.value, file, decl.source.start.line);
+    checkVarsResolve(read(decl.value), file, decl.source.start.line);
     checkRawValues(decl, file);
+    if (read(decl.prop, { lower: true }).startsWith("--folia-")) {
+      checkTokenOverride(decl, file, decl.parent.selector ?? "");
+    }
   });
   root.walkAtRules((at) => {
     if (at.params) checkVarsResolve(at.params, file, at.source.start.line);
@@ -485,12 +586,14 @@ function familiesOf(token) {
     String.raw`^` + NUMBER + String.raw`(px|em|rem|vh|vw|vmin|vmax)$`,
   ).test(value);
   const isNumber = new RegExp(String.raw`^` + NUMBER + String.raw`$`).test(value);
-  if (category === "typography") {
-    if (isLength) return ["font-size"];
-    if (isNumber) return [Number(value) >= 100 ? "font-weight" : "line-height"];
-    return [];
-  }
+  // A bare number is measured against the two host scales made of bare numbers, whatever file it
+  // sits in: a font weight filed under opacity is still a font weight. (`--layer-*` is the third
+  // such scale and is deliberately absent — the note in tokens.css says why.)
+  if (isNumber) return ["font-weight", "line-height"];
   if (!isLength) return [];
+  // Typography never falls through to the grid: a 16px font size is not a 16px margin, whatever
+  // the two numbers have in common.
+  if (category === "typography") return ["font-size"];
   if (category === "radius") return ["radius", "length"];
   if (category === "border") return ["border-width", "length"];
   return ["length"];

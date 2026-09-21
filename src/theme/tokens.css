@@ -147,6 +147,7 @@
   --folia-shadow-swatch-active: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
   --folia-blur-actions: blur(3px);
   --folia-blur-scrim: blur(2px);
+  --folia-lift-hover: brightness(1.06);
 
   /* priority ramp (urgent -> trivial), tinted off the theme's accent palette */
   --folia-prio-1: var(--color-red, #e5534b);
