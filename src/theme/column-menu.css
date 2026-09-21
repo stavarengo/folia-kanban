@@ -65,8 +65,13 @@
   border-radius: var(--swatch-radius);
   box-shadow: var(--swatch-shadow);
   border: var(--folia-border-width-thick) solid transparent;
-  background: var(--folia-swatch-color);
-  background-clip: padding-box;
+  /* The colour longhand, not the `background` shorthand: the shorthand would also reset the image,
+     the position and five other longhands, and `background-clip` among them — which is what the
+     inline `style={{ background: c }}` this replaced did, silently undoing the `padding-box` that
+     used to be declared here. It had therefore never applied to a single swatch, so dropping it
+     keeps the pixels exactly as they are: the fill runs under the transparent border, which is what
+     makes the swatch read as a full circle with the active ring sitting outside it. */
+  background-color: var(--folia-swatch-color);
   cursor: var(--folia-cursor-control);
   padding: 0;
   transition: transform var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
@@ -77,6 +82,13 @@
 .folia-swatch.is-active {
   /* two-tone ring readable over any swatch fill, in either theme */
   box-shadow: var(--folia-shadow-swatch-active);
+}
+/* After the hover rule, which it has to beat at equal weight: `:hover` matches a disabled button
+   too, so the ninth swatch — the colour a note carries that is not one of the eight — would grow
+   under the pointer and then do nothing. */
+.folia-swatch:disabled {
+  cursor: var(--folia-cursor-inert);
+  transform: none;
 }
 .folia-swatch-none.folia-swatch-none {
   --folia-icon-size: var(--icon-xs);
