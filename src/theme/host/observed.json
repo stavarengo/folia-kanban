@@ -1,6 +1,6 @@
 {
   "--font-monospace": {
-    "observedIn": "1.13.7 (first seen 1.12.7)",
+    "observedIn": "1.13.7",
     "where": "declared on `body` in app.css as `var(--font-monospace-override), var(--font-monospace-theme), var(--font-monospace-default)`; the developer docs list only the three parts, not the variable the app composes from them. Read live through the DevTools bridge on 2026-08-29 (docs/ai/reports/20260829.what-obsidian-already-provides/02.styling-theme-and-design-language.md, \"Verified live\")."
   }
 }

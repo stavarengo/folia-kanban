@@ -724,9 +724,12 @@ for (const t of [...tokens, ...variants]) {
       );
     }
     // A fallback does not stop a token being an alias — it is still that variable the board reads —
-    // so the relationship stays recorded and the fallback is declared beside it. What the fallback
-    // costs is that it can never be seen to fire, so it is asked to say what it is for, and to
-    // agree with the documented default where there is one to agree with.
+    // so the relationship stays recorded and the fallback is declared beside it. What a fallback
+    // costs is that nothing can ever observe it, so the rule is narrow: it may only be a value
+    // Obsidian itself publishes for that variable, or another var() the board can justify on its
+    // own. A literal that the docs do not publish is a value somebody invented for a branch nobody
+    // can see, which is the whole of the audit's 02-03 — and the nine literals that finding removed
+    // are exactly the shape this refuses.
     const fallback = source.fallback;
     if (fallback === undefined) {
       if (decl.value !== `var(${source.alias})`) {
@@ -736,6 +739,7 @@ for (const t of [...tokens, ...variants]) {
         );
       }
     } else {
+      const documented = registry[source.alias]?.default;
       if (typeof fallback.value !== "string" || fallback.value.trim() === "") {
         fail(at, `declares a fallback with no "value".`);
       } else if (decl.value !== `var(${source.alias}, ${fallback.value})`) {
@@ -743,34 +747,35 @@ for (const t of [...tokens, ...variants]) {
           `${TOKENS_CSS}:${decl.line}`,
           `${cssVar} is ${JSON.stringify(decl.value)} but its metadata declares the fallback ${JSON.stringify(fallback.value)} — the CSS must read exactly \`var(${source.alias}, ${fallback.value})\`, or a reader is told one thing and the browser another.`,
         );
+      } else if (!/^var\(\s*--[a-z0-9-]+[\s\S]*\)$/i.test(fallback.value)) {
+        // Not a var() chain, so it is a literal, and a literal has exactly one defence.
+        if (documented === undefined) {
+          fail(
+            at,
+            `falls back to the literal ${JSON.stringify(fallback.value)}, but Obsidian publishes no default for ${source.alias} to agree with. A literal nobody documents is a value invented for a branch nothing can observe — read the variable bare, put another var() behind it, or own the token outright and argue for the value.`,
+          );
+        } else if (typeof documented === "object") {
+          fail(
+            at,
+            `falls back to the single value ${JSON.stringify(fallback.value)}, but Obsidian documents ${source.alias} per scheme (${Object.entries(
+              documented,
+            )
+              .map(([k, v]) => `${k} ${v}`)
+              .join(
+                ", ",
+              )}). One value cannot stand in for two, so a fallback here is guaranteed wrong in one of the modes it would fire in.`,
+          );
+        } else if (fallback.value !== documented) {
+          fail(
+            at,
+            `falls back to ${JSON.stringify(fallback.value)} where Obsidian documents ${source.alias} as ${JSON.stringify(documented)}. A fallback is what the board renders when the app does not define the variable, so a value that disagrees with the documentation is a second opinion nobody chose.`,
+          );
+        }
       }
       if (typeof fallback.reason !== "string" || fallback.reason.trim() === "") {
         fail(
           at,
           `declares a fallback with no "reason". A fallback is the branch nothing can observe — it only ever runs where the variable is missing — so the argument for it has to be written down or it cannot be reviewed at all.`,
-        );
-      }
-      const documented = registry[source.alias]?.default;
-      if (typeof documented === "string" && fallback.value !== documented) {
-        fail(
-          at,
-          `falls back to ${JSON.stringify(fallback.value)} where Obsidian documents ${source.alias} as ${JSON.stringify(documented)}. A fallback is what the board renders when the app does not define the variable, so a value that disagrees with the documentation is a second opinion nobody chose.`,
-        );
-      }
-      // A variable whose documented default differs by scheme cannot be stood in for by ONE value:
-      // whatever is written is wrong in the other mode. That is the whole of the audit's 02-03, and
-      // without this the nine literals that finding removed could be written straight back for the
-      // price of a sentence of prose, because the string comparison above never fires for a colour.
-      if (documented && typeof documented === "object") {
-        fail(
-          at,
-          `falls back to the single value ${JSON.stringify(fallback.value)}, but Obsidian documents ${source.alias} per scheme (${Object.entries(
-            documented,
-          )
-            .map(([k, v]) => `${k} ${v}`)
-            .join(
-              ", ",
-            )}). One value cannot stand in for two, so a fallback here is guaranteed wrong in one of the modes it would fire in — read the variable bare, or own the token and argue for the value in both schemes.`,
         );
       }
     }
@@ -871,7 +876,10 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
   // Which variable a name resolves to is decided by `columnAccent`, not by this file, so the
   // template is read out of it rather than repeated here. Repeating it would let the guard keep
   // reporting OK while the function it is guarding painted something else entirely.
-  const template = /return name \? `(var\(--[a-z-]*)\$\{name\}(\)?[^`]*)` : color;/.exec(src);
+  // Anchored on the whole template, and the trailing group is closed: `var(--color-${name})` and
+  // nothing else. A looser pattern would accept `var(--color-${name}) var(--invented)`, which
+  // computes to an invalid colour on every board while the guard went on printing OK.
+  const template = /return name \? `(var\(--[a-z0-9-]*)\$\{name\}(\))` : color;/.exec(src);
   if (!template) {
     fail(
       COLUMN_COLORS,
@@ -880,7 +888,7 @@ for (const [theme, declarations] of [[null, declared], ...themed]) {
   } else {
     const resolve = (name) => `${template[1]}${name}${template[2]}`;
     for (const name of names) {
-      const variable = /var\((--[a-z0-9-]+)\)/.exec(resolve(name))?.[1];
+      const variable = /^var\((--[a-z0-9-]+)\)$/.exec(resolve(name))?.[1];
       if (!variable) {
         fail(
           COLUMN_COLORS,

@@ -324,10 +324,12 @@
      places that draw one disagree about what that should look like on purpose — the strip recedes
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
-  /* The swatch's fill, written inline by the two palette rows because there is one rule and eight
-     (soon nine) colours. `initial` for the same reason as --folia-ctx-color above: the "no colour"
-     swatch is the same class with nothing written onto it, and a guaranteed-invalid value is what
-     lets its own rule supply the background instead. */
+  /* The swatch's fill, written inline by the two palette rows because there is one rule and nine
+     possible colours. `initial` is the guaranteed-invalid value, so on the "no colour" swatch —
+     the same class with nothing written onto it — the declaration that reads this token is thrown
+     away entirely. What then paints that swatch is `.folia-swatch-none.folia-swatch-none`, which
+     carries equal specificity and sits LATER in column-menu.css; move it above and the swatch goes
+     transparent. The `initial` makes the token safe to read, the source order is what fills it. */
   --folia-swatch-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
   --folia-statusbar-clearance: 32px;

@@ -84,7 +84,9 @@
 }
 /* Doubled to stay above `.folia-icon-btn.folia-icon-btn`, which is doubled for the theme's sake:
    a rule that only refines another button rule has to carry the same weight, or the refinement is
-   quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
+   quietly dropped. Nothing checks this: `pnpm buttons:check` measures plugin rules against the
+   THEME's, not against each other, so an under-weighted refinement passes it. Two of them lived in
+   card-quick-actions.css for releases before anyone noticed (see docs/decisions.md). */
 .folia-mini.folia-mini {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);

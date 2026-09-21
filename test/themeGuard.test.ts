@@ -226,3 +226,58 @@ describe("theme guard dependency parsing", () => {
     );
   });
 });
+
+describe("theme guard fallbacks", () => {
+  /** Turn a bare alias into one with a fallback, in both the CSS and the metadata, so the only
+   *  thing under test is whether the guard accepts that fallback. */
+  const giveFallback = (cssVar: string, alias: string, key: string, value: string) => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace(`${cssVar}: var(${alias});`, `${cssVar}: var(${alias}, ${value});`),
+    );
+    edit("src/theme/tokens/color.tokens.json", (s) =>
+      s.replace(
+        `"${key}": {\n    "$value": "var(${alias})",\n    "cssVar": "${cssVar}",\n    "source": {\n      "alias": "${alias}"\n    }\n  }`,
+        `"${key}": {\n    "$value": "var(${alias}, ${value})",\n    "cssVar": "${cssVar}",\n    "source": {\n      "alias": "${alias}",\n      "fallback": { "value": "${value}", "reason": "A sentence that sounds like an argument." }\n    }\n  }`,
+      ),
+    );
+  };
+
+  it("refuses a literal fallback on a variable whose default differs by scheme", () => {
+    // The audit's 02-03: one value cannot stand in for a light/dark pair, so whatever is written is
+    // guaranteed wrong in one of the two modes the branch could ever fire in.
+    giveFallback("--folia-danger", "--color-red", "danger", "#e5534b");
+    reject("documents --color-red per scheme");
+  });
+
+  it("refuses a literal fallback on a variable Obsidian publishes no default for", () => {
+    // The hole a reviewer found: only six of the variables this layer reads document a per-scheme
+    // default, so a rule that only caught those let the worst of the nine literals straight back in
+    // — `var(--text-on-accent, #fff)`, whose whole danger is freezing white for a pale accent.
+    giveFallback("--folia-on-accent", "--text-on-accent", "on-accent", "#fff");
+    reject("publishes no default for --text-on-accent to agree with");
+  });
+
+  it("keeps accepting a fallback that is another var(), which is not a second opinion", () => {
+    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
+      "check-theme: OK",
+    );
+  });
+});
+
+describe("theme guard column palette", () => {
+  it("refuses a palette name that resolves to a variable Obsidian does not document", () => {
+    edit("src/ui/columnColors.ts", (s) =>
+      s.replace("var(--color-${name})", "var(--colour-${name})"),
+    );
+    reject("which Obsidian does not document");
+  });
+
+  it("refuses a resolver that paints more than the one variable it claims to", () => {
+    // `var(--color-red) var(--invented)` computes to an invalid colour on every board. Reading only
+    // the first var() out of the template let that pass while the guard reported OK.
+    edit("src/ui/columnColors.ts", (s) =>
+      s.replace("var(--color-${name})", "var(--color-${name}) var(--totally-made-up)"),
+    );
+    reject("could not find the");
+  });
+});
