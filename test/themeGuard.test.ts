@@ -326,4 +326,54 @@ describe("theme button contract", () => {
     );
     reject("not a bare button that reaches rendered Markdown");
   });
+
+  it("rejects card-action hover refinements imported before the icon base", () => {
+    edit("src/theme/index.css", (s) =>
+      s.replace(
+        /@import "\.\/(buttons|card-quick-actions)\.css";/g,
+        (_, name: string) =>
+          `@import "./${name === "buttons" ? "card-quick-actions" : "buttons"}.css";`,
+      ),
+    );
+    reject("must follow the base icon hover rule");
+  });
+
+  it.each([
+    ":is(button)",
+    ":where(button)",
+    ":is(.folia-btn, button)",
+    ":where(:is(button, .folia-btn))",
+    ":is(.host-markdown button)",
+  ])("rejects a wrapped host-button subject: %s", (selector) => {
+    edit(
+      "src/theme/buttons.css",
+      (s) =>
+        s + `\n.folia-scope ${selector}:disabled { opacity: var(--folia-opacity-disabled); }\n`,
+    );
+    reject("not a bare button that reaches rendered Markdown");
+  });
+
+  it("still checks a Folia face hidden inside a selector wrapper", () => {
+    edit("src/theme/buttons.css", (s) => s + "\n:is(.folia-btn) { background: transparent; }\n");
+    reject("needs .folia-scope and a direct Folia subject class");
+  });
+
+  it.each([
+    "@media (width: 0px)",
+    "@supports (display: unknown)",
+    "@container (width: 0px)",
+    "@layer conditional",
+  ])("does not credit a resting face nested in %s", (condition) => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <button className="folia-guard-probe" />;\n',
+    );
+    edit(
+      "src/theme/buttons.css",
+      (s) =>
+        s +
+        `\n${condition} { .folia-scope .folia-guard-probe { background: transparent; color: var(--text-normal); box-shadow: none; } }\n`,
+    );
+    reject("needs a scoped resting rule for background, color, box-shadow");
+  });
 });

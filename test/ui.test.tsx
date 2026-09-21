@@ -6404,6 +6404,13 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
         ".folia-scope .folia-icon-btn",
         [".folia-scope .folia-mini", ".folia-scope .folia-column-menu-btn"],
       ],
+      [
+        ".folia-scope .folia-icon-btn:hover:where(:not(:disabled))",
+        [
+          ".folia-scope .folia-action-done:hover:where(:not(:disabled))",
+          ".folia-scope .folia-action-delete:hover:where(:not(:disabled))",
+        ],
+      ],
     ] as const) {
       expect(ruleAt(base)).toBeGreaterThan(-1);
       for (const refinement of refinements) {

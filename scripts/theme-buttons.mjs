@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import postcss from "postcss";
+import selectorParser from "postcss-selector-parser";
 import ts from "typescript";
 
 // Unknown expressions cannot supply the stable base class a button needs. Conditional branches
@@ -26,29 +27,20 @@ function classValues(node) {
   return ["?"];
 }
 
-function subject(selector) {
-  let depth = 0;
-  let quote = "";
-  let start = 0;
-  for (let i = 0; i < selector.length; i++) {
-    const char = selector[i];
-    if (char === "\\") {
-      i++;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) quote = "";
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === "(" || char === "[") depth++;
-    else if (char === ")" || char === "]") depth--;
-    else if (depth === 0 && /[\s>+~]/.test(char)) start = i + 1;
-  }
-  return selector.slice(start);
+// Only a class on the subject itself restricts every branch of :is() / :where().
+function subjectNodes(selector) {
+  const nodes = selector.nodes;
+  const lastCombinator = nodes.findLastIndex((node) => node.type === "combinator");
+  return nodes.slice(lastCombinator + 1);
+}
+
+function hasButtonSubject(nodes) {
+  return nodes.some((node) => {
+    if (node.type === "tag") return node.value.toLowerCase() === "button";
+    if (node.type !== "pseudo" || ![":is", ":where", ":matches"].includes(node.value.toLowerCase()))
+      return false;
+    return node.nodes.some((branch) => hasButtonSubject(subjectNodes(branch)));
+  });
 }
 
 export async function checkButtons(roots, fail) {
@@ -95,6 +87,7 @@ export async function checkButtons(roots, fail) {
     fail("src/ui", "Button guard found no JSX buttons; check the source location.");
   const names = new Set(buttons.flatMap((b) => b.classes));
   const bases = [];
+  const orderedSelectors = [];
   for (const root of roots)
     root.walkRules((rule) => {
       const face = new Set(
@@ -104,10 +97,19 @@ export async function checkButtons(roots, fail) {
           .filter((p) => ["background", "color", "box-shadow"].includes(p)),
       );
       for (const selector of postcss.list.comma(rule.selector)) {
-        const own = subject(selector);
-        const classes = [...own.matchAll(/\.(folia-[\w-]+)/g)].map((m) => m[1]);
+        orderedSelectors.push(selector);
+        const nodes = subjectNodes(selectorParser().astSync(selector).first);
+        const own = nodes.map((node) => node.toString()).join("");
+        const classes = [];
+        for (const node of nodes) {
+          if (node.type === "class") classes.push(node.value);
+          node.walkClasses?.((child) => classes.push(child.value));
+        }
+        const hasDirectClass = nodes.some(
+          (node) => node.type === "class" && node.value.startsWith("folia-"),
+        );
         const where = `${root.source.input.file}:${rule.source.start.line}`;
-        if (/^button(?:\W|$)/.test(own) && !classes.length)
+        if (hasButtonSubject(nodes) && !hasDirectClass)
           fail(
             where,
             "Select Folia buttons by their own class, not a bare button that reaches rendered Markdown.",
@@ -126,9 +128,20 @@ export async function checkButtons(roots, fail) {
           );
         }
         const match = /^\.folia-scope\s+((?:\.[\w-]+)+)$/.exec(selector);
-        if (match) bases.push({ classes: match[1].slice(1).split("."), face });
+        if (match && rule.parent.type === "root")
+          bases.push({ classes: match[1].slice(1).split("."), face });
       }
     });
+  // These equal-specificity hover colours must follow the shared icon hover face.
+  const iconHover = ".folia-scope .folia-icon-btn:hover:where(:not(:disabled))";
+  for (const action of ["done", "delete"]) {
+    const refinement = `.folia-scope .folia-action-${action}:hover:where(:not(:disabled))`;
+    if (
+      orderedSelectors.lastIndexOf(iconHover) < 0 ||
+      orderedSelectors.lastIndexOf(refinement) <= orderedSelectors.lastIndexOf(iconHover)
+    )
+      fail("src/theme/index.css", `${refinement} must follow the base icon hover rule.`);
+  }
   // These raised controls deliberately inherit the host shadow. Every flat control must say so
   // in its own resting rule; a state-only reset does not cover the resting face.
   const hostShadow = new Set(["folia-btn", "folia-filter-chip", "folia-column-add"]);

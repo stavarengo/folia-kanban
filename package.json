@@ -76,6 +76,7 @@
     "markdownlint-cli2": "^0.22.1",
     "obsidian": "^1.7.2",
     "postcss": "^8.5.26",
+    "postcss-selector-parser": "^7.1.6",
     "prettier": "^3.8.4",
     "release-it": "19.2.2",
     "stylelint": "17.6.0",
