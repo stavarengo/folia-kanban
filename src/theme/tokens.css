@@ -249,9 +249,7 @@
 
      The fallbacks are the failure mode, not a second opinion: `z-index` does not inherit, so an
      unresolved `var()` computes to `auto` and would drop a dialog behind the ribbon and the status
-     bar. The numbers repeat what the scale says today and are only ever read if it goes missing.
-     That fallback is also what makes these owned tokens rather than aliases: an alias is a bare
-     `var()`, and a bare `var()` is exactly what must not happen here. */
+     bar. The numbers repeat what the scale says today and are only ever read if it goes missing. */
   --folia-z-index-app-menu: var(--layer-menu, 65);
   --folia-z-index-app-modal: var(--layer-modal, 50);
 

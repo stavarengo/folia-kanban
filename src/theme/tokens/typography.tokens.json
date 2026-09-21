@@ -43,8 +43,11 @@
     "$value": "var(--font-monospace, monospace)",
     "cssVar": "--folia-font-mono",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's composed monospace stack, which the developer docs do not list (see host/observed.json), with the generic family behind it."
+      "alias": "--font-monospace",
+      "fallback": {
+        "value": "monospace",
+        "reason": "the generic family behind Obsidian's composed monospace stack, which the developer docs do not list (see host/observed.json); removing the literal is a later phase (audit 02-05)."
+      }
     }
   },
   "weight": {

@@ -13,13 +13,12 @@
 //
 // What it deliberately does not police, so the gaps are chosen rather than discovered:
 //
-//   - A host variable read WITH a fallback — `var(--color-red, #e5534b)` — is an owned token, not
-//     an alias, and the guard never asks whether that fallback is reachable. For a variable
-//     Obsidian always defines it is dead text keeping a literal alive in the block, and it is also
-//     the shape that turns an alias into an owned value without arguing for it. Every one of them
-//     is inherited from the stylesheet this domain was built out of, and removing them is a phase
-//     of its own (the audit's 02-03 and 02-05). Until then the reason is what carries it, and
-//     nothing stops a NEW token taking the same escape — which is wider than the reason for it.
+//   - Whether a fallback can ever fire. `var(--color-red, #e5534b)` is an ALIAS of --color-red
+//     whose fallback is declared in the metadata, so the relationship is recorded either way and
+//     the fallback cannot turn an alias into an owned value by being there. What the guard asks of
+//     it is that the CSS and the metadata say the same thing, that it carries a reason, and that it
+//     agrees with the documented default when the registry has one. Reachability it cannot decide:
+//     the answer lives in the running app, not in the docs.
 //   - The unitless numbers inside a `transform`. `translate(-50%, var(--x)) scale(0.94)` is one
 //     geometry, readable only whole; a scale factor named elsewhere would be worse, not better.
 //     Lengths and angles inside a transform ARE policed, and a bare number anywhere else is not
@@ -723,11 +722,40 @@ for (const t of [...tokens, ...variants]) {
         `aliases ${source.alias}, which Obsidian does not document — record it in ${join(HOST_DIR, "observed.json")} or alias a documented variable.`,
       );
     }
-    if (decl.value !== `var(${source.alias})`) {
-      fail(
-        `${TOKENS_CSS}:${decl.line}`,
-        `${cssVar} claims to alias ${source.alias}, so its value must be exactly \`var(${source.alias})\` — a fallback or a second value makes it an owned token, which is fine as long as it says so.`,
-      );
+    // A fallback does not stop a token being an alias — it is still that variable the board reads —
+    // so the relationship stays recorded and the fallback is declared beside it. What the fallback
+    // costs is that it can never be seen to fire, so it is asked to say what it is for, and to
+    // agree with the documented default where there is one to agree with.
+    const fallback = source.fallback;
+    if (fallback === undefined) {
+      if (decl.value !== `var(${source.alias})`) {
+        fail(
+          `${TOKENS_CSS}:${decl.line}`,
+          `${cssVar} claims to alias ${source.alias} with nothing behind it, so its value must be exactly \`var(${source.alias})\`. If the fallback is deliberate, record it: "source": { "alias": "${source.alias}", "fallback": { "value": "…", "reason": "…" } }.`,
+        );
+      }
+    } else {
+      if (typeof fallback.value !== "string" || fallback.value.trim() === "") {
+        fail(at, `declares a fallback with no "value".`);
+      } else if (decl.value !== `var(${source.alias}, ${fallback.value})`) {
+        fail(
+          `${TOKENS_CSS}:${decl.line}`,
+          `${cssVar} is ${JSON.stringify(decl.value)} but its metadata declares the fallback ${JSON.stringify(fallback.value)} — the CSS must read exactly \`var(${source.alias}, ${fallback.value})\`, or a reader is told one thing and the browser another.`,
+        );
+      }
+      if (typeof fallback.reason !== "string" || fallback.reason.trim() === "") {
+        fail(
+          at,
+          `declares a fallback with no "reason". A fallback is the branch nothing can observe — it only ever runs where the variable is missing — so the argument for it has to be written down or it cannot be reviewed at all.`,
+        );
+      }
+      const documented = registry[source.alias]?.default;
+      if (typeof documented === "string" && fallback.value !== documented) {
+        fail(
+          at,
+          `falls back to ${JSON.stringify(fallback.value)} where Obsidian documents ${source.alias} as ${JSON.stringify(documented)}. A fallback is what the board renders when the app does not define the variable, so a value that disagrees with the documentation is a second opinion nobody chose. (A colour whose default differs between light and dark is recorded as an object and is exempt — there is no single value to agree with.)`,
+        );
+      }
     }
     continue;
   }
@@ -735,11 +763,15 @@ for (const t of [...tokens, ...variants]) {
   if (!source.reason || typeof source.reason !== "string" || source.reason.trim() === "") {
     fail(at, `is owned, so it needs a non-empty "reason" saying what Obsidian has no answer for.`);
   }
-  const bareAlias = /^var\(\s*(--[a-z0-9-]+)\s*\)$/i.exec(decl.value);
-  if (bareAlias && hostKnows(bareAlias[1])) {
+  // An owned token may not BE a host variable, with or without something behind it: either shape
+  // is the board reading that variable, which is the relationship this layer exists to show.
+  const reads = /^var\(\s*(--[a-z0-9-]+)\s*(?:,\s*([\s\S]+?)\s*)?\)$/i.exec(decl.value);
+  if (reads && hostKnows(reads[1])) {
     fail(
       `${TOKENS_CSS}:${decl.line}`,
-      `${cssVar} is exactly \`var(${bareAlias[1]})\`, which is an alias, not an owned value — say so with "source": { "alias": "${bareAlias[1]}" }.`,
+      reads[2] === undefined
+        ? `${cssVar} is exactly \`var(${reads[1]})\`, which is an alias, not an owned value — say so with "source": { "alias": "${reads[1]}" }.`
+        : `${cssVar} reads ${reads[1]} with a fallback behind it, which is still an alias — say so with "source": { "alias": "${reads[1]}", "fallback": { "value": "${reads[2]}", "reason": "…" } }, so the relationship is recorded and the fallback carries its argument.`,
     );
   }
 
@@ -827,6 +859,6 @@ if (errors.length) {
 const aliases = tokens.filter((t) => typeof t.node.source?.alias === "string").length;
 const owned = tokens.filter((t) => t.node.source?.owned === true).length;
 console.log(
-  `check-theme: OK (${declared.size} tokens: ${aliases} aliases of documented variables, ${owned} owned; ` +
+  `check-theme: OK (${declared.size} tokens: ${aliases} aliases of host variables, ${owned} owned; ` +
     `${Object.keys(observed).length} observed host variable(s); ${columnTokens.length} column colours)`,
 );

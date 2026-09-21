@@ -11,8 +11,11 @@
     "$value": "var(--background-modifier-border-hover, var(--background-modifier-border))",
     "cssVar": "--folia-border-strong",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's hover border with its own base border behind it, so a theme that defines only one still gets a line."
+      "alias": "--background-modifier-border-hover",
+      "fallback": {
+        "value": "var(--background-modifier-border)",
+        "reason": "Obsidian's base border behind its hover border, so a theme that defines only one still draws a line. The fallback is a second variable rather than a literal: it keeps the board on the theme either way."
+      }
     }
   },
   "card-bg": {
@@ -51,32 +54,44 @@
       "$value": "var(--color-red, #e5534b)",
       "cssVar": "--folia-prio-1",
       "source": {
-        "owned": true,
-        "reason": "Obsidian's red with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        "alias": "--color-red",
+        "fallback": {
+          "value": "#e5534b",
+          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        }
       }
     },
     "2": {
       "$value": "var(--color-orange, #d9882f)",
       "cssVar": "--folia-prio-2",
       "source": {
-        "owned": true,
-        "reason": "Obsidian's orange with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        "alias": "--color-orange",
+        "fallback": {
+          "value": "#d9882f",
+          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        }
       }
     },
     "3": {
       "$value": "var(--color-yellow, #c2a312)",
       "cssVar": "--folia-prio-3",
       "source": {
-        "owned": true,
-        "reason": "Obsidian's yellow with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        "alias": "--color-yellow",
+        "fallback": {
+          "value": "#c2a312",
+          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        }
       }
     },
     "4": {
       "$value": "var(--color-blue, #5b8def)",
       "cssVar": "--folia-prio-4",
       "source": {
-        "owned": true,
-        "reason": "Obsidian's blue with a literal behind it, so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        "alias": "--color-blue",
+        "fallback": {
+          "value": "#5b8def",
+          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
+        }
       }
     }
   },
@@ -91,8 +106,11 @@
     "$value": "var(--text-on-accent, #fff)",
     "cssVar": "--folia-on-accent",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's text-on-accent with a literal behind it; the long note on the declaration explains why it is read flat and why the declaration site matters."
+      "alias": "--text-on-accent",
+      "fallback": {
+        "value": "#fff",
+        "reason": "the long note on the declaration in tokens.css explains why this variable is read flat and why the declaration site matters; removing the literal is a later phase (audit 02-03)."
+      }
     }
   },
   "on-fill": {
@@ -107,32 +125,44 @@
     "$value": "var(--color-red, #e5534b)",
     "cssVar": "--folia-danger",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's red with a literal behind it; --text-error and the semantic status colours are a later phase (audit 02-04)."
+      "alias": "--color-red",
+      "fallback": {
+        "value": "#e5534b",
+        "reason": "removing the literal is a later phase; --text-error and the semantic status colours are a later phase too (audit 02-03, 02-04)."
+      }
     }
   },
   "unread": {
     "$value": "var(--color-blue, #5b8def)",
     "cssVar": "--folia-unread",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's blue with a literal behind it; removing the literal is a later phase (audit 02-03)."
+      "alias": "--color-blue",
+      "fallback": {
+        "value": "#5b8def",
+        "reason": "removing the literal is a later phase (audit 02-03)."
+      }
     }
   },
   "unread-reply": {
     "$value": "var(--color-purple, #a882e0)",
     "cssVar": "--folia-unread-reply",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's purple with a literal behind it; removing the literal is a later phase (audit 02-03)."
+      "alias": "--color-purple",
+      "fallback": {
+        "value": "#a882e0",
+        "reason": "removing the literal is a later phase (audit 02-03)."
+      }
     }
   },
   "success": {
     "$value": "var(--color-green, #4caf7d)",
     "cssVar": "--folia-success",
     "source": {
-      "owned": true,
-      "reason": "Obsidian's green with a literal behind it; the semantic status colours are a later phase (audit 02-04)."
+      "alias": "--color-green",
+      "fallback": {
+        "value": "#4caf7d",
+        "reason": "removing the literal is a later phase; the semantic status colours are a later phase too (audit 02-03, 02-04)."
+      }
     }
   },
   "column": {
