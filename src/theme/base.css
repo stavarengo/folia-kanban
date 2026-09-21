@@ -56,12 +56,17 @@
 .folia-link.folia-link {
   background: transparent;
   border: none;
-  color: var(--link-color, var(--folia-accent));
+  color: var(--folia-link-color);
   cursor: var(--folia-cursor-link);
-  text-decoration: underline;
+  text-decoration: var(--folia-link-decoration);
+  /* Obsidian publishes a decoration and a thickness for a link but no offset, and an underline
+     sitting on the baseline cuts the descenders of a card title. The offset is the board's own and
+     costs nothing when the theme's decoration is `none`. */
   text-underline-offset: var(--folia-underline-offset);
   padding: 0;
   font: inherit;
+  /* After `font: inherit`, which resets the weight the shorthand does not mention. */
+  font-weight: var(--folia-link-weight);
   text-align: left;
   /* Obsidian's app.css does two things to every button that text drawn inside a paragraph cannot
      survive: `white-space: nowrap`, so a long card name never wraps and pushes its panel sideways
@@ -70,6 +75,10 @@
      from jsdom, where no Obsidian stylesheet is loaded. */
   white-space: normal;
   height: auto;
+}
+.folia-link.folia-link:hover {
+  color: var(--folia-link-color-hover);
+  text-decoration: var(--folia-link-decoration-hover);
 }
 .folia-muted.folia-muted {
   color: var(--text-faint);

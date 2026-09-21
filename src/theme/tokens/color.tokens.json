@@ -241,6 +241,34 @@
       "alias": "--checklist-done-color"
     }
   },
+  "link-color": {
+    "$value": "var(--link-color)",
+    "cssVar": "--folia-link-color",
+    "source": {
+      "alias": "--link-color"
+    }
+  },
+  "link-color-hover": {
+    "$value": "var(--link-color-hover)",
+    "cssVar": "--folia-link-color-hover",
+    "source": {
+      "alias": "--link-color-hover"
+    }
+  },
+  "link-unresolved-color": {
+    "$value": "var(--link-unresolved-color)",
+    "cssVar": "--folia-link-unresolved-color",
+    "source": {
+      "alias": "--link-unresolved-color"
+    }
+  },
+  "link-unresolved-decoration-color": {
+    "$value": "var(--link-unresolved-decoration-color)",
+    "cssVar": "--folia-link-unresolved-decoration-color",
+    "source": {
+      "alias": "--link-unresolved-decoration-color"
+    }
+  },
   "column": {
     "1": {
       "$value": "#4c9aff"

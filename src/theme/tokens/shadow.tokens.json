@@ -148,5 +148,12 @@
       "owned": true,
       "reason": "the barely-there brightening a filled button takes on hover, where a background change would fight the accent it is filled with; Obsidian publishes no hover filter."
     }
+  },
+  "link-unresolved-filter": {
+    "$value": "var(--link-unresolved-filter)",
+    "cssVar": "--folia-link-unresolved-filter",
+    "source": {
+      "alias": "--link-unresolved-filter"
+    }
   }
 }

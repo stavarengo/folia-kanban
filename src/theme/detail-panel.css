@@ -540,13 +540,17 @@
   cursor: var(--folia-cursor-help);
 }
 .folia-link-missing {
-  color: var(--text-muted);
-  /* Drawn as a border, not as `text-decoration: underline dashed`: Obsidian's community-directory
-     CSS scan flags every text-decoration-* longhand and every multi-keyword text-decoration
-     shorthand as only partially supported, so the dashed underline has to come from somewhere
-     else. The dashes now sit at the bottom of the inline box instead of 2px below the baseline —
-     a slightly lower line, same signal. */
-  border-bottom: var(--folia-border-width) dashed;
+  color: var(--folia-link-unresolved-color);
+  opacity: var(--folia-link-unresolved-opacity);
+  filter: var(--folia-link-unresolved-filter);
+  /* Still drawn as a border rather than as a text-decoration, and the reason survived the move onto
+     the link variables: the community-directory CSS scan flags the text-decoration longhands and
+     the multi-keyword shorthand as only partially supported, and it flags the PROPERTY, so putting
+     a variable in the value changes nothing (verified — `pnpm obsidian-scan:check` reports both
+     lines). The colour comes from the theme; the dashes stay a literal, because
+     `--link-unresolved-decoration-style` can be `wavy`, which is not a border style, and a border
+     that inherited it would collapse to no line at all. */
+  border-bottom: var(--folia-border-width) dashed var(--folia-link-unresolved-decoration-color);
   cursor: var(--folia-cursor-help);
 }
 .folia-done {

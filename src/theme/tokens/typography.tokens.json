@@ -139,5 +139,26 @@
     "source": {
       "alias": "--checklist-done-decoration"
     }
+  },
+  "link-decoration": {
+    "$value": "var(--link-decoration)",
+    "cssVar": "--folia-link-decoration",
+    "source": {
+      "alias": "--link-decoration"
+    }
+  },
+  "link-decoration-hover": {
+    "$value": "var(--link-decoration-hover)",
+    "cssVar": "--folia-link-decoration-hover",
+    "source": {
+      "alias": "--link-decoration-hover"
+    }
+  },
+  "link-weight": {
+    "$value": "var(--link-weight)",
+    "cssVar": "--folia-link-weight",
+    "source": {
+      "alias": "--link-weight"
+    }
   }
 }

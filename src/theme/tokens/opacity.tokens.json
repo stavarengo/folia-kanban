@@ -5,7 +5,7 @@
     "cssVar": "--folia-opacity-hidden",
     "source": {
       "owned": true,
-      "reason": "the far end of a fade \u2014 what a hover-revealed affordance rests at. Named so a rule says which end of the fade it means rather than writing a bare number."
+      "reason": "the far end of a fade — what a hover-revealed affordance rests at. Named so a rule says which end of the fade it means rather than writing a bare number."
     }
   },
   "shown": {
@@ -46,6 +46,13 @@
     "source": {
       "owned": true,
       "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
+    }
+  },
+  "link-unresolved": {
+    "$value": "var(--link-unresolved-opacity)",
+    "cssVar": "--folia-link-unresolved-opacity",
+    "source": {
+      "alias": "--link-unresolved-opacity"
     }
   }
 }
