@@ -214,7 +214,7 @@ export async function checkButtons(roots, fail) {
       requireSignal(selector, "outline-offset", "calc(-1 * var(--folia-border-width-thick))");
       if (state === "active") {
         requireSignal(selector, "outline-width", "var(--folia-border-width-thick)");
-        requireSignal(selector, "background-image", "var(--folia-control-press-veil)");
+        requireSignal(selector, "transform", "scale(0.97)");
       }
     }
   }
@@ -227,10 +227,6 @@ export async function checkButtons(roots, fail) {
     ["--folia-control-outline", "1px solid currentColor"],
     ["--folia-border-width-thick", "2px"],
     ["--folia-suggestion-marker", "inset var(--folia-border-width-thick) 0 0 var(--text-normal)"],
-    [
-      "--folia-control-press-veil",
-      "linear-gradient(color-mix(in oklch, currentColor 12%, transparent), color-mix(in oklch, currentColor 12%, transparent))",
-    ],
   ]);
   const tokens = postcss.parse(await readFile("src/theme/tokens.css", "utf8"));
   tokens.walkDecls((decl) => {

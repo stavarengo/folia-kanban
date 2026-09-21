@@ -399,11 +399,9 @@ describe("theme button contract", () => {
     reject("Button signal .folia-scope .folia-menu-prio");
   });
 
-  it("requires the pressed veil on a pointer-outline consumer", () => {
-    edit("src/theme/buttons.css", (s) =>
-      s.replace("background-image: var(--folia-control-press-veil);", ""),
-    );
-    reject("needs background-image: var(--folia-control-press-veil)");
+  it("requires the pressed shrink on a pointer-outline consumer", () => {
+    edit("src/theme/buttons.css", (s) => s.replace("transform: scale(0.97);", ""));
+    reject("needs transform: scale(0.97)");
   });
 
   it("requires the keyboard suggestion marker consumer", () => {
@@ -417,7 +415,6 @@ describe("theme button contract", () => {
     ["--folia-control-outline", "none"],
     ["--folia-border-width-thick", "0px"],
     ["--folia-suggestion-marker", "none"],
-    ["--folia-control-press-veil", "none"],
   ])("protects owned signal %s from being zeroed", (name, value) => {
     edit("src/theme/tokens.css", (s) =>
       s.replace(new RegExp(`${name}: [^;]+;`), `${name}: ${value};`),

@@ -128,13 +128,16 @@
   outline: var(--folia-control-outline);
   outline-width: var(--folia-border-width-thick);
   outline-offset: calc(-1 * var(--folia-border-width-thick));
-  /* Thickening the outline from 1px to 2px is the whole difference between hovered and pressed, and
-     at dpr 1 that is one pixel of line — on macOS, where the host fill pair collapses and the input
-     shadow is `none`, it is the only difference the control has. The veil tints the face itself. It
-     is a `background-image` rather than a fill or a shadow so it can sit on top of whatever the
-     resting rule painted without replacing it, which is what lets the same declaration read on a
-     filled button, a transparent menu row and the dashed add-column tile. */
-  background-image: var(--folia-control-press-veil);
+  /* Thickening the outline from 1px to 2px is one pixel of line at dpr 1, and under `.mod-macos`,
+     where the host fill pair collapses and `--input-shadow` is `none`, it was the only difference
+     hovered and pressed had. The control shrinks instead. Deliberately not a tint: any veil in the
+     label's own colour moves the face TOWARDS the label, and on a filled control that is exactly
+     the wrong way — measured at 12% it took the primary button from 4.26:1 to 2.40:1. A veil in the
+     other direction only relocates the problem, because "away from the label" is a different
+     direction on an accent face than on a neutral one, in each scheme. Scale costs no contrast at
+     all, reads the same on a filled button, a transparent menu row and the dashed tile, and moves
+     no layout. */
+  transform: scale(0.97);
 }
 
 /* The tile's dashed border is the "nothing here yet" affordance, and a solid line drawn 2px inside

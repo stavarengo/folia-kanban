@@ -131,6 +131,7 @@ export function ColumnMenu({
               className={"folia-swatch" + (columnColorName(column.color) === c ? " is-active" : "")}
               style={{ ["--folia-swatch-color" as string]: columnAccent(c) }}
               aria-label={`Set color ${c}`}
+              aria-pressed={columnColorName(column.color) === c}
               onClick={() => a.setColumnColor(column.id, c)}
             />
           ))}
@@ -140,6 +141,7 @@ export function ColumnMenu({
               style={{ ["--folia-swatch-color" as string]: customColor }}
               aria-label={`Custom color ${customColor}`}
               title={`Custom color ${customColor}`}
+              aria-pressed={true}
               disabled
             />
           ) : null}
@@ -150,6 +152,7 @@ export function ColumnMenu({
             className={"folia-swatch folia-swatch-none" + (column.color ? "" : " is-active")}
             aria-label="Clear color"
             title="No color"
+            aria-pressed={!column.color}
             onClick={() => a.setColumnColor(column.id, null)}
           >
             <Icon name="close" />

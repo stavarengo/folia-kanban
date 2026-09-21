@@ -43,6 +43,16 @@
 .folia-search input:focus-visible {
   outline: none;
 }
+/* Forced-colours mode drops every `box-shadow` and repaints both borders in the same system colour,
+   so the wrapper's ring and its accent border both stop saying anything and the line above would
+   leave the field with no focus indication at all. An outline survives that mode, and on the
+   wrapper it marks the whole field rather than the borderless input inside it. */
+@media (forced-colors: active) {
+  .folia-search:focus-within {
+    outline: var(--folia-focus-ring-w) solid var(--folia-accent);
+    outline-offset: var(--folia-focus-ring-offset);
+  }
+}
 .folia-toolbar-filters {
   display: flex;
   gap: var(--folia-space-sm);
