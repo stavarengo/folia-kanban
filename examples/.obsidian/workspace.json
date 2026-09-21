@@ -63,8 +63,8 @@
               "state": {
                 "file": "basic/Example Board.md"
               },
-              "icon": "layout-grid",
-              "title": "Example Board - Folia Kanban"
+              "icon": "lucide-ghost",
+              "title": "folia-kanban-view"
             }
           },
           {
@@ -78,9 +78,21 @@
               "icon": "layout-grid",
               "title": "Showcase Board - Folia Kanban"
             }
+          },
+          {
+            "id": "e971733c69aa47f5",
+            "type": "leaf",
+            "state": {
+              "type": "folia-kanban-view",
+              "state": {
+                "file": "feature-showcase/Showcase Board.md"
+              },
+              "icon": "layout-grid",
+              "title": "Showcase Board - Folia Kanban"
+            }
           }
         ],
-        "currentTab": 5
+        "currentTab": 6
       }
     ],
     "direction": "vertical"
@@ -246,7 +258,7 @@
       "folia-kanban:Open Folia Kanban board": false
     }
   },
-  "active": "71b795c167dd444a",
+  "active": "e971733c69aa47f5",
   "lastOpenFiles": [
     "feature-showcase/Cards/Plan the v1.0 launch.md",
     "basic/Cards/Duplicate.md",
