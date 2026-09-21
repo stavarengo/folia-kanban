@@ -135,10 +135,11 @@
     }
   },
   "card-overlay-inset": {
-    "$value": "var(--size-4-4)",
+    "$value": "calc(2 * var(--folia-border-width) + 2 * var(--folia-space-md))",
     "cssVar": "--folia-card-overlay-inset",
     "source": {
-      "alias": "--size-4-4"
+      "owned": true,
+      "reason": "A card fills the column body after both column borders and both body paddings; its drag overlay must subtract the same composite inset."
     }
   },
   "description-height-min": {
@@ -237,19 +238,19 @@
     }
   },
   "hit-small": {
-    "$value": "calc(var(--input-height) - var(--size-4-2))",
+    "$value": "max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-2)))",
     "cssVar": "--folia-hit-sm",
     "source": {
       "owned": true,
-      "reason": "Mini actions stay two grid steps shorter than inputs to fit dense card and comment rows."
+      "reason": "Compact actions follow input height with a grid reduction, but never shrink below the fixed minimum target size."
     }
   },
   "hit-medium": {
-    "$value": "calc(var(--input-height) - var(--size-4-1))",
+    "$value": "max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-1)))",
     "cssVar": "--folia-hit-md",
     "source": {
       "owned": true,
-      "reason": "Icon buttons stay one grid step shorter than toolbar inputs, while following theme control height."
+      "reason": "Compact actions follow input height with a grid reduction, but never shrink below the fixed minimum target size."
     }
   },
   "count-width-min": {
@@ -322,6 +323,15 @@
     "cssVar": "--folia-ctx-strip-inset",
     "source": {
       "alias": "--size-2-3"
+    }
+  },
+  "hit-min": {
+    "$value": "24px",
+    "cssVar": "--folia-hit-min",
+    "source": {
+      "owned": true,
+      "despite": "--size-4-6",
+      "reason": "Minimum pointer-target dimension in CSS pixels. A theme reducing its spacing grid must not shrink the interaction target below this floor."
     }
   }
 }

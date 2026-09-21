@@ -50,6 +50,8 @@
   gap: var(--folia-space-sm);
 }
 .folia-swatch.folia-swatch {
+  min-width: var(--folia-hit-min);
+  min-height: var(--folia-hit-min);
   width: var(--folia-hit-sm);
   /* The swatch shows a colour, not text, but the "no colour" one draws an icon on `currentColor`;
      inheriting keeps that icon the panel's colour instead of the theme's button text colour. */
@@ -70,8 +72,8 @@
   box-shadow: var(--folia-shadow-swatch-active);
 }
 .folia-swatch-none.folia-swatch-none {
-  --icon-size: var(--icon-xs);
-  --icon-stroke: var(--icon-xs-stroke-width);
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: grid;
   place-items: center;
   background: var(--background-modifier-hover);
@@ -83,8 +85,8 @@
   margin: var(--folia-space-hair) 0;
 }
 .folia-menu-item.folia-menu-item {
-  --icon-size: var(--icon-xs);
-  --icon-stroke: var(--icon-xs-stroke-width);
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: flex;
   align-items: center;
   gap: var(--folia-space-md);

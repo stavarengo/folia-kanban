@@ -72,7 +72,7 @@
   --folia-add-column-w: calc(var(--size-4-1) * 55);
   --folia-prop-key-w: calc(var(--size-4-1) * 22);
   --folia-card-title-pad-r: calc(3 * var(--folia-hit-md) + 2 * var(--folia-space-hair) + 3 * var(--folia-space-xxs) + var(--folia-space-sm)); /* the room the hover actions need beside a card's title */
-  --folia-card-overlay-inset: var(--size-4-4); /* the lifted card is narrower than the column it came from */
+  --folia-card-overlay-inset: calc(2 * var(--folia-border-width) + 2 * var(--folia-space-md)); /* the lifted card is narrower than the column it came from */
   --folia-desc-h-min: var(--size-4-18);
   --folia-desc-h-max-offset: calc(var(--size-4-1) * 55); /* what the rendered description leaves of the viewport */
   --folia-comment-edit-h-min: var(--size-4-12);
@@ -86,8 +86,9 @@
   --folia-action-rise: var(--size-2-1);
   --folia-control-h: var(--input-height);
   --folia-control-pad-x: var(--size-4-3);
-  --folia-hit-sm: calc(var(--input-height) - var(--size-4-2));
-  --folia-hit-md: calc(var(--input-height) - var(--size-4-1));
+  --folia-hit-min: 24px;
+  --folia-hit-sm: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-2)));
+  --folia-hit-md: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-1)));
   --folia-count-w-min: var(--size-4-5);
   --folia-dot: var(--size-4-2);
   --folia-unread-dot: var(--size-2-3);
@@ -97,6 +98,8 @@
   --folia-resize-w: var(--size-2-3);
   --folia-resize-offset: calc(var(--folia-resize-w) / -2);
   --folia-ctx-strip-inset: var(--size-2-3); /* the context strip is inset past the priority bar beside it */
+  --folia-icon-size: var(--icon-s);
+  --folia-icon-stroke: var(--icon-s-stroke-width);
   --folia-icon-baseline: -0.15em;
 
   /* borders */
@@ -191,12 +194,11 @@
   --folia-cursor-resize: col-resize;
 
   /* typography — font sizes */
-  --folia-font-size-xxs: calc(var(--font-ui-smaller) - var(--size-2-1));
-  --folia-font-size-xs: calc(var(--font-ui-smaller) - var(--size-2-1) / 2);
+  --folia-font-size-xxs: calc(var(--font-ui-smaller) * 5 / 6);
+  --folia-font-size-xs: calc(var(--font-ui-smaller) * 11 / 12);
   --folia-font-size-sm: var(--font-ui-smaller);
   --folia-font-size-md: var(--font-ui-small);
   --folia-font-size-lg: var(--font-ui-medium);
-  --folia-font-size-xl: var(--font-ui-medium);
   --folia-font-mono: var(--font-monospace, monospace);
 
   /* typography — font weights */
@@ -269,7 +271,7 @@
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
-  --folia-statusbar-clearance: var(--size-4-8);
+  --folia-statusbar-clearance: 32px;
   --folia-urgency-color: transparent;
   --folia-urgency-tint: transparent;
 }

@@ -1,0 +1,16 @@
+{
+  "size": {
+    "$value": "var(--icon-s)",
+    "cssVar": "--folia-icon-size",
+    "source": {
+      "alias": "--icon-s"
+    }
+  },
+  "stroke": {
+    "$value": "var(--icon-s-stroke-width)",
+    "cssVar": "--folia-icon-stroke",
+    "source": {
+      "alias": "--icon-s-stroke-width"
+    }
+  }
+}

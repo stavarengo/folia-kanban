@@ -112,9 +112,9 @@ The cost is real and accepted: every control the board draws is dressed by hand,
 
 ## Dense controls derive from the host input height
 
-**Decided 2026-09-21. Search and filter chips share `--input-height`; icon buttons subtract one grid step, and mini buttons subtract two.**
+**Decided 2026-09-21. Search and filter chips share `--input-height`; icon buttons subtract one grid step, and mini buttons subtract two, with a fixed 24px minimum for both.**
 
-The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print also follows the host UI font size, with one- and two-pixel reductions at the default grid. Pill ends remain an owned shape because a fixed radius rung cannot guarantee a rounded end at every control height.
+The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print uses five-sixths and eleven-twelfths of the smallest host UI font, producing 10px and 11px at its 12px default without depending on spacing. Pill ends remain an owned shape because a fixed radius rung cannot guarantee a rounded end at every control height.
 
 **What would change this:** live evidence of clipping or poor legibility in a supported desktop theme. The toolbar, cards, detail panel and edit-column dialog still need visual review in dark and light mode after this change.
 
@@ -125,3 +125,13 @@ The board keeps smaller actions inside cards and comments, but their height now 
 Custom scrollbar colours would add platform-specific styling for a small difference with no reported mismatch. The standard reduced-motion query already suppresses entrance animations and drag transforms, and the audit's earlier host inspection found no replacement facility. Phase 2 confirms both mechanisms in source; the unavailable DevTools bridge means it supplies no new live evidence about Obsidian itself.
 
 **What would change this:** a reported scrollbar mismatch in a supported desktop theme, or a documented host motion preference that the standard media query cannot express.
+
+## Hairlines follow visual purpose rather than drawing technique
+
+**Decided 2026-09-21 after Phase 2 review. Dashed drag placeholders, unchecked todo markers and filled separators follow `--border-width`.**
+
+The former 1.5px token was described as lighter than ordinary borders, but ordinary borders were 1px. Keeping that numeric difference would make these outlines heavier, and the dashed outline and unchecked shape already distinguish their roles. A separator drawn with a background fill serves the same purpose as a border, so its element height follows the host hairline too. This deliberately replaces the earlier argument that a different drawing technique requires a separate thickness.
+
+The status-bar clearance is different. Its 32px fallback estimates a runtime measurement until the board measures the host status bar; it remains owned with the `--size-4-8` exception. Grid changes must not change that estimate.
+
+**What would change this:** live evidence that a supported theme's border width makes the markers ambiguous or separators unusable. A runtime measurement changing the status-bar clearance is expected and does not reopen the spacing decision.

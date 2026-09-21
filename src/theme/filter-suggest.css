@@ -72,6 +72,8 @@
 }
 
 .folia-icon {
+  --icon-size: var(--folia-icon-size);
+  --icon-stroke: var(--folia-icon-stroke);
   width: var(--icon-size);
   height: var(--icon-size);
   stroke-width: var(--icon-stroke);

@@ -2,19 +2,19 @@
   "$description": "Font sizes, weights, line heights, tracking and the monospace stack.",
   "font-size": {
     "xxs": {
-      "$value": "calc(var(--font-ui-smaller) - var(--size-2-1))",
+      "$value": "calc(var(--font-ui-smaller) * 5 / 6)",
       "cssVar": "--folia-font-size-xxs",
       "source": {
         "owned": true,
-        "reason": "Compact uppercase badges remain two pixels below the smallest host UI font at the default grid."
+        "reason": "Compact badges use five sixths of the smallest host UI font, 10px at its 12px default, independently of layout spacing."
       }
     },
     "xs": {
-      "$value": "calc(var(--font-ui-smaller) - var(--size-2-1) / 2)",
+      "$value": "calc(var(--font-ui-smaller) * 11 / 12)",
       "cssVar": "--folia-font-size-xs",
       "source": {
         "owned": true,
-        "reason": "Secondary labels remain one pixel below the smallest host UI font at the default grid."
+        "reason": "Secondary labels use eleven twelfths of the smallest host UI font, 11px at its 12px default, independently of layout spacing."
       }
     },
     "sm": {
@@ -34,13 +34,6 @@
     "lg": {
       "$value": "var(--font-ui-medium)",
       "cssVar": "--folia-font-size-lg",
-      "source": {
-        "alias": "--font-ui-medium"
-      }
-    },
-    "xl": {
-      "$value": "var(--font-ui-medium)",
-      "cssVar": "--folia-font-size-xl",
       "source": {
         "alias": "--font-ui-medium"
       }

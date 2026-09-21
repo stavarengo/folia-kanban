@@ -127,8 +127,3 @@
   from { opacity: var(--folia-opacity-hidden); transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
   to { opacity: var(--folia-opacity-shown); transform: translate(-50%, 0) scale(1); }
 }
-
-.folia-scope {
-  --icon-size: var(--icon-s);
-  --icon-stroke: var(--icon-s-stroke-width);
-}

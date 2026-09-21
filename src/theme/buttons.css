@@ -40,6 +40,8 @@
 }
 
 .folia-icon-btn.folia-icon-btn {
+  min-width: var(--folia-hit-min);
+  min-height: var(--folia-hit-min);
   display: inline-grid;
   place-items: center;
   width: var(--folia-hit-md);
@@ -59,8 +61,8 @@
    a rule that only refines another button rule has to carry the same weight, or the refinement is
    quietly dropped. `pnpm buttons:check` catches this the moment it stops being true. */
 .folia-mini.folia-mini {
-  --icon-size: var(--icon-xs);
-  --icon-stroke: var(--icon-xs-stroke-width);
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   width: var(--folia-hit-sm);
   height: var(--folia-hit-sm);
   margin-left: auto;

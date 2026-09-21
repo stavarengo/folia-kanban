@@ -40,8 +40,8 @@
   gap: var(--folia-space-sm);
 }
 .folia-filter-chip.folia-filter-chip {
-  --icon-size: var(--icon-xs);
-  --icon-stroke: var(--icon-xs-stroke-width);
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xs-plus);

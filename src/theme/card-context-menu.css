@@ -37,6 +37,8 @@
   box-shadow: var(--folia-shadow-choice-active);
 }
 .folia-menu-prio-none.folia-menu-prio-none {
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: grid;
   place-items: center;
   background: var(--background-modifier-hover);

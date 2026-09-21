@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ subitems collapse toggle */
 .folia-card-subitems-toggle.folia-card-subitems-toggle {
-  --icon-size: var(--icon-xs);
-  --icon-stroke: var(--icon-xs-stroke-width);
+  --folia-icon-size: var(--icon-xs);
+  --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xs);

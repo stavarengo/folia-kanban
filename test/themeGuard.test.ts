@@ -125,7 +125,20 @@ describe("theme guard adopted foundations", () => {
   });
 
   it("rejects literal icon sizing in container rules", () => {
-    edit("src/theme/base.css", (s) => s.replace("--icon-size: var(--icon-s)", "--icon-size: 15px"));
+    edit("src/theme/chips.css", (s) =>
+      s.replace("--folia-icon-size: var(--icon-xs)", "--folia-icon-size: 15px"),
+    );
     reject("15px is a raw length");
+  });
+  it("requires icon aliases through the icon token family", () => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace("--folia-icon-size: var(--icon-s)", "--folia-icon-size: 14px"),
+    );
+    edit("src/theme/tokens/icon.tokens.json", (s) =>
+      s
+        .replace('"$value": "var(--icon-s)"', '"$value": "14px"')
+        .replace('"alias": "--icon-s"', '"owned": true, "reason": "Regression fixture."'),
+    );
+    reject("Alias it: `--folia-icon-size: var(--icon-xs);");
   });
 });

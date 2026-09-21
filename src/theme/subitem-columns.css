@@ -41,7 +41,7 @@
   box-shadow: var(--folia-shadow-overlay);
   border-color: var(--folia-accent);
   transform: scale(1.03) rotate(var(--folia-tilt));
-  /* matches a card's rendered width: column width minus its 1px borders + 8px body padding */
+  /* Subtract the same borders and body padding as the source column. */
   width: calc(var(--folia-col-w) - var(--folia-card-overlay-inset));
   /* The lift is the resting state; the drop animation tweens back to the slot from here. */
   animation: folia-card-lift var(--folia-dur-fast) var(--folia-ease);
