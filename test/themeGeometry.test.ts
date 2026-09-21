@@ -77,12 +77,16 @@ describe("composite dimensions", () => {
     expect(tokens["--folia-font-size-xxs"]).toBe("calc(var(--font-ui-smaller) * 5 / 6)");
     expect(tokens["--folia-font-size-xs"]).toBe("calc(var(--font-ui-smaller) * 11 / 12)");
     expect(tokens["--folia-hit-min"]).toBe("24px");
-    for (const selector of [".folia-icon-btn.folia-icon-btn", ".folia-swatch.folia-swatch"]) {
-      expect(declarations(selector)).toMatchObject({
-        "min-width": "var(--folia-hit-min)",
-        "min-height": "var(--folia-hit-min)",
-      });
-    }
+    expect(declarations(".folia-icon-btn.folia-icon-btn")).toMatchObject({
+      "min-width": "var(--folia-hit-min)",
+      "min-height": "var(--folia-hit-min)",
+    });
+    // The swatch holds the same floor, expressed once: its size follows the host colour input, and
+    // Obsidian's 22px swatch is under the target, so the floor has to win rather than sit beside it.
+    expect(declarations(".folia-swatch.folia-swatch")).toMatchObject({
+      width: "max(var(--folia-hit-min), var(--swatch-width))",
+      height: "max(var(--folia-hit-min), var(--swatch-height))",
+    });
     for (const [name, step] of [
       ["sm", "2"],
       ["md", "1"],

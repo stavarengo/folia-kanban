@@ -104,7 +104,6 @@
   --folia-progress-h: var(--size-4-1);
   --folia-divider-h: var(--border-width);
   --folia-resize-w: var(--size-2-3);
-  --folia-resize-offset: calc(var(--folia-resize-w) / -2);
   --folia-ctx-strip-inset: var(--size-2-3); /* the context strip is inset past the priority bar beside it */
   --folia-icon-size: var(--icon-s);
   --folia-icon-stroke: var(--icon-s-stroke-width);

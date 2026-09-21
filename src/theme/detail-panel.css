@@ -3,10 +3,13 @@
   position: relative; /* anchors the left-edge resize handle */
   flex: 0 0 var(--folia-detail-w);
   width: var(--folia-detail-w);
-  /* The panel's left edge is a resize divider, so it is drawn with the app's divider variables
-     rather than with the board's own border. `.folia-detail--modal` below resets `border` wholesale,
-     which keeps this to the side presentations, where the edge is actually draggable. */
-  border-left: var(--divider-width) solid var(--divider-color);
+  /* The left edge is a resize divider, and the handle below paints it rather than this border.
+     `overflow-y: auto` here computes `overflow-x` to `auto` as well, so anything a child draws
+     outside this padding box is clipped away — which is also why the handle now sits inside it.
+     The border stays, transparent and the divider's own width, so the inset the layout was built on
+     survives. `.folia-detail--modal` resets `border` wholesale, keeping all of this to the side
+     presentations, where the edge is actually draggable. */
+  border-left: var(--divider-width) solid transparent;
   background: var(--folia-col-bg);
   box-shadow: var(--folia-shadow-panel);
   overflow-y: auto;
@@ -49,29 +52,23 @@
   box-shadow: var(--folia-shadow-overlay);
 }
 
-/* Left-border drag handle (side modes only). */
+/* Left-edge drag handle (side modes only), and the divider itself: the strip is the grab target and
+   its own left border is the line. One element draws both states, so the edge never doubles, and it
+   thickens and recolours under the pointer the way every split handle in the window does. */
 .folia-detail-resize {
   position: absolute;
-  left: var(--folia-resize-offset);
+  left: 0;
   top: 0;
   bottom: 0;
   width: var(--folia-resize-w);
+  border-left: var(--divider-width) solid var(--divider-color);
   cursor: var(--folia-cursor-resize);
   z-index: var(--folia-z-index-base);
 }
-/* The strip is wider than the line it drags so it stays easy to grab; the line itself only appears
-   under the pointer, thickened and recoloured the way every split handle in the window behaves.
-   Drawn centred on the panel's own border rather than replacing it, so the edge never doubles. */
-.folia-detail-resize:hover::after,
-.folia-detail-resize:active::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: var(--divider-width-hover);
-  background: var(--divider-color-hover);
+.folia-detail-resize:hover,
+.folia-detail-resize:active {
+  border-left-width: var(--divider-width-hover);
+  border-left-color: var(--divider-color-hover);
 }
 @keyframes folia-slide-in {
   from { transform: translateX(var(--folia-detail-slide)); opacity: var(--folia-opacity-hidden); }
@@ -160,17 +157,27 @@
   text-transform: none;
   letter-spacing: normal;
 }
-/* A select is left to Obsidian's own `select, .combobox-button, .dropdown` rule, which already
-   dresses every bare <select> as a dropdown — `--dropdown-background`, `--dropdown-padding`,
-   `--input-height`, `--input-radius`, `--input-shadow` and a `:focus-visible` ring. Anything the
-   board declares here only pulls it back towards looking like the text input beside it. What is
-   left is the casing the surrounding label hands down, and the hover the app publishes a variable
-   for but only spends on a mobile tap. */
-.folia-fields select {
+/* Obsidian's own `select, .combobox-button, .dropdown` rule already dresses every bare <select> as
+   a dropdown — `--dropdown-background`, `--input-height`, `--input-radius`, `--input-shadow` and a
+   `:focus-visible` ring — so the board leaves all of that alone and keeps back three things.
+
+   Type, because a select sits beside a text input in the same field grid and the app's 13px next to
+   the panel's own size reads as a mistake rather than as citizenship. Padding, because
+   `--dropdown-padding` reserves 2.4em at the end for the chevron `.dropdown` paints, and the board
+   does not wear that class (see docs/decisions.md): adopting it would leave a wide empty gutter with
+   nothing in it. And the casing the surrounding label hands down.
+
+   The hover is added rather than kept back: the app publishes `--dropdown-background-hover` and
+   then spends it only on `select.mobile-tap`. */
+.folia-fields select,
+.folia-field select {
+  font: inherit;
+  padding: 0 var(--folia-space-md);
   text-transform: none;
   letter-spacing: normal;
 }
-.folia-fields select:hover {
+.folia-fields select:hover,
+.folia-field select:hover {
   background-color: var(--dropdown-background-hover);
 }
 
@@ -224,7 +231,7 @@
 /* Both hover variables resolve to their resting value in the default theme, so these two rules paint
    nothing there. They are the theme's hook: a theme that lifts a property row on hover reaches the
    board's rows too, and without them it could not. */
-.folia-prop-row:hover .folia-prop-key {
+.folia-prop-row:not(.folia-title-result):hover .folia-prop-key {
   color: var(--metadata-label-text-color-hover);
 }
 .folia-prop-add .folia-prop-input:first-child {
@@ -236,12 +243,12 @@
   font: inherit;
   font-size: var(--metadata-input-font-size);
   background: var(--metadata-input-background);
-  color: var(--text-normal);
+  color: var(--metadata-input-text-color);
   /* Obsidian's property inputs carry no border, because the editor pane has other lines to place
      them against. This panel does not: with a transparent fill and no border the row would be
      invisible between edits, so the board keeps its own hairline. */
   border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--metadata-border-radius);
+  border-radius: var(--metadata-property-radius);
   padding: var(--folia-space-xs) var(--folia-space-sm-plus);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }

@@ -166,6 +166,8 @@ Obsidian 1.13.7 dresses every bare `<select>` through `select, .combobox-button,
 
 The only way to the glyph is putting `.dropdown` on the element, which is the undocumented-class contract the owner ruled out (`docs/ai/reports/…/02…md` decision 5 in the phase context). Drawing a chevron from Folia's own icon set is not available to a `<select>`, whose shadow DOM takes no children. Leaving `appearance` alone and letting the platform draw its native arrow would restore an indicator and lose the app's look, which is the divergence 02-19 is about.
 
+This has a visible cost and it is worth naming. The board's selects show no dropdown indicator, which was already true before this decision — the app's own rule sets `appearance: none` on every bare select — but the decision is what keeps it true. `--dropdown-padding` is therefore not adopted either: its `2.4em` end padding exists to clear the glyph, and reserving that space while drawing nothing in it would advertise the gap. The selects use the board's own symmetric padding and its own type size, so they sit correctly beside the text inputs in the same field grid; everything else about them is the app's.
+
 **What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
 
 ## Focus keeps Folia's ring; the host focus-outline pair stays out

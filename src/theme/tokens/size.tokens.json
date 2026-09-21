@@ -309,14 +309,6 @@
       "alias": "--size-2-3"
     }
   },
-  "resize-handle-offset": {
-    "$value": "calc(var(--folia-resize-w) / -2)",
-    "cssVar": "--folia-resize-offset",
-    "source": {
-      "owned": true,
-      "reason": "Centers the resize target on the panel edge."
-    }
-  },
   "icon-baseline": {
     "$value": "-0.15em",
     "cssVar": "--folia-icon-baseline",

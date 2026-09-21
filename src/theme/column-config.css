@@ -131,10 +131,6 @@
   background: var(--background-primary);
   color: var(--text-normal);
 }
-/* Left to Obsidian's own select rule — see the note in detail-panel.css. */
-.folia-field select:hover {
-  background-color: var(--dropdown-background-hover);
-}
 .folia-field input:focus {
   outline: none;
   border-color: var(--background-modifier-border-focus);
