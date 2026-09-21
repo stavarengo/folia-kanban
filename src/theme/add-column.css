@@ -1,33 +1,34 @@
 /* ------------------------------------------------------------------ add column */
-.folia-add-column.folia-add-column {
+.folia-scope .folia-add-column {
   flex: 0 0 var(--folia-add-column-w);
   align-self: flex-start;
   display: flex;
   align-items: center;
   gap: var(--folia-space-sm);
   padding: var(--folia-gap) var(--folia-pad);
-  background: transparent;
+  background: var(--interactive-normal);
   border: var(--folia-border-width) dashed var(--folia-border);
-  border-radius: var(--folia-r-lg);
+  border-radius: var(--button-radius);
   color: var(--text-muted);
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-medium);
   cursor: var(--folia-cursor-control);
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
+  box-shadow: var(--input-shadow);
 }
-.folia-add-column:hover {
-  background: var(--background-modifier-hover);
+.folia-scope .folia-add-column:hover:where(:not(:disabled)) {
+  background: var(--interactive-hover);
   color: var(--text-normal);
   border-color: var(--folia-border-strong);
 }
-.folia-add-column.is-editing {
+.folia-scope .folia-add-column.is-editing {
   flex-direction: column;
   align-items: stretch;
   gap: var(--folia-space-md);
   cursor: var(--folia-cursor-inert);
   border-style: solid;
 }
-.folia-add-column.is-editing input {
+.folia-scope .folia-add-column.is-editing input {
   font: inherit;
   padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
   border: var(--folia-border-width) solid var(--folia-border);
@@ -35,7 +36,7 @@
   background: var(--folia-field-bg);
   color: var(--text-normal);
 }
-.folia-add-column.is-editing input:focus {
+.folia-scope .folia-add-column.is-editing input:focus {
   outline: none;
   border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);

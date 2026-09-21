@@ -126,15 +126,15 @@
   font-style: italic;
 }
 
-.folia-column-add.folia-column-add {
+.folia-scope .folia-column-add {
   display: flex;
   align-items: center;
   gap: var(--folia-space-sm);
   margin: 0 var(--folia-space-md) var(--folia-space-md);
   padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
-  background: transparent;
+  background: var(--interactive-normal);
   border: none;
-  border-radius: var(--folia-r);
+  border-radius: var(--button-radius);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);
@@ -142,7 +142,7 @@
   text-align: left;
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
-.folia-column-add:hover {
-  background: var(--background-modifier-hover);
+.folia-scope .folia-column-add:hover:where(:not(:disabled)) {
+  background: var(--interactive-hover);
   color: var(--text-normal);
 }

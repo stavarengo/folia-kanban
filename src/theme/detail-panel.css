@@ -271,24 +271,15 @@
   flex-direction: column;
   gap: var(--folia-space-xxs);
 }
-/* The row reads as the card's title, not as a link, so it takes back the size, weight and colour
-   `.folia-link.folia-link` hands every link — named twice to match that rule's weight, and sitting
-   below it so source order settles the rest. The underline stays: the row IS clickable, it expands
-   the clamped title. It is drawn from the button's own `currentColor`, so winning `color` here
-   colours the underline with it; a version that moved these declarations to an inner element left
-   a body-coloured title under an accent-coloured line, and `text-decoration-color` is not
-   available in this repo (see `.folia-link-missing`). */
-.folia-title-value.folia-title-value {
+
+.folia-scope .folia-title-value {
   display: block;
   font-size: var(--folia-font-size-md);
   font-weight: var(--folia-font-weight-semibold);
   color: var(--text-normal);
 }
-/* Source order alone no longer settles it: `.folia-link.folia-link:hover` carries a pseudo-class
-   this rule cannot match, so it out-weighs the refinement above and would hand the row the link
-   colour on hover — the one thing that rule exists to prevent. Matching the pseudo takes it back,
-   and re-states the underline the theme's hover decoration could otherwise remove. */
-.folia-title-value.folia-title-value:hover {
+
+.folia-scope .folia-title-value:hover:where(:not(:disabled)) {
   color: var(--text-normal);
   text-decoration: underline;
 }
@@ -305,19 +296,17 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.folia-title-value.is-expanded .folia-title-value-text {
+.folia-scope .folia-title-value.is-expanded .folia-title-value-text {
   display: block;
   -webkit-line-clamp: none;
   overflow: visible;
 }
-/* Both refine an element that also carries `.folia-muted` or `.folia-link`, whose rules are
-   doubled for the theme's sake, so a single class here would lose the font size without a trace.
-   Doubled to match, and below those rules so source order decides. */
-.folia-title-reason.folia-title-reason {
+
+.folia-scope .folia-title-reason {
   margin: 0;
   font-size: var(--folia-font-size-xs);
 }
-.folia-title-why.folia-title-why {
+.folia-scope .folia-title-why {
   align-self: flex-start;
   font-size: var(--folia-font-size-xs);
 }
@@ -352,9 +341,8 @@
   color: var(--text-normal);
   overflow-wrap: anywhere;
 }
-/* Doubled for the same reason as `.folia-title-reason`: it sits on an element wearing
-   `.folia-muted`. */
-.folia-title-step-reason.folia-title-step-reason {
+
+.folia-scope .folia-title-step-reason {
   grid-column: 1 / -1;
   font-size: var(--folia-font-size-xs);
 }
@@ -409,9 +397,8 @@
   background: var(--background-modifier-hover);
   border-color: var(--folia-border);
 }
-/* Doubled for the same reason as `.folia-mini`: it refines `.folia-icon-btn`, which carries the
-   doubled weight the theme forces, so its own transition would otherwise never apply. */
-.folia-desc-edit.folia-desc-edit {
+
+.folia-scope .folia-desc-edit {
   position: absolute;
   top: var(--folia-space-xs);
   right: var(--folia-space-xs);
@@ -433,7 +420,8 @@
      considerably heavier than this panel wants. */
   border-radius: var(--callout-radius);
 }
-.folia-desc-empty.folia-desc-empty {
+.folia-scope .folia-desc-empty {
+  box-shadow: none;
   display: block;
   width: 100%;
   text-align: left;
@@ -577,10 +565,7 @@
   text-decoration: var(--folia-done-decoration);
   color: var(--folia-done-color);
 }
-/* The empty-state row in either list is a bare `<li class="folia-muted">`, and `.folia-muted` is
-   doubled, so it takes the smaller italic size from this rule's `md`. That is the intent — the
-   placeholder should recede — and it is recorded here because a sweep for dead declarations finds
-   it and would otherwise find it again every time. */
+
 .folia-comments li,
 .folia-history li {
   display: flex;

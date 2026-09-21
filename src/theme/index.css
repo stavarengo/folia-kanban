@@ -1,8 +1,4 @@
-/* The bundle Obsidian loads. esbuild follows these imports in order and emits one stylesheet.
-
-   The order is load-bearing and not alphabetical: tokens first, then base.css, whose doubled-class
-   rules several later sections refine and which therefore only settle correctly by source order
-   (base.css says why). The section files below keep the order the single stylesheet had. */
+/* Base rules precede their refinements; esbuild preserves this import order. */
 @import "./tokens.css";
 @import "./base.css";
 @import "./toolbar.css";
@@ -18,8 +14,8 @@
 @import "./progress-meta.css";
 @import "./next-todos.css";
 @import "./subitems-toggle.css";
-@import "./card-quick-actions.css";
 @import "./buttons.css";
+@import "./card-quick-actions.css";
 @import "./inline-add-inputs.css";
 @import "./detail-panel.css";
 @import "./focus-visibility.css";

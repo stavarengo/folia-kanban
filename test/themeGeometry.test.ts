@@ -17,16 +17,16 @@ const declarations = (selector: string) => {
 
 describe("icon geometry contract", () => {
   it.each([
-    ".folia-menu-prio-none.folia-menu-prio-none",
-    ".folia-menu-item.folia-menu-item",
-    ".folia-chip",
-    ".folia-filter-chip.folia-filter-chip",
-    ".folia-mini.folia-mini",
-    ".folia-swatch-none.folia-swatch-none",
+    ".folia-scope .folia-menu-prio-none",
+    ".folia-scope .folia-menu-item",
+    ".folia-scope .folia-chip",
+    ".folia-scope .folia-filter-chip",
+    ".folia-scope .folia-mini",
+    ".folia-scope .folia-swatch-none",
     ".folia-column-count",
     ".folia-card-meta",
     ".folia-progress-label",
-    ".folia-card-subitems-toggle.folia-card-subitems-toggle",
+    ".folia-scope .folia-card-subitems-toggle",
   ])("keeps compact icons at the matching extra-small size and stroke: %s", (selector) => {
     expect(declarations(selector)).toMatchObject({
       "--folia-icon-size": "var(--icon-xs)",
@@ -77,7 +77,7 @@ describe("composite dimensions", () => {
     expect(tokens["--folia-font-size-xxs"]).toBe("calc(var(--font-ui-smaller) * 5 / 6)");
     expect(tokens["--folia-font-size-xs"]).toBe("calc(var(--font-ui-smaller) * 11 / 12)");
     expect(tokens["--folia-hit-min"]).toBe("24px");
-    for (const selector of [".folia-icon-btn.folia-icon-btn", ".folia-swatch.folia-swatch"]) {
+    for (const selector of [".folia-scope .folia-icon-btn", ".folia-scope .folia-swatch"]) {
       expect(declarations(selector)).toMatchObject({
         "min-width": "var(--folia-hit-min)",
         "min-height": "var(--folia-hit-min)",
@@ -85,7 +85,7 @@ describe("composite dimensions", () => {
     }
     // The swatch follows the host colour input upward as well, and Obsidian ships one under the
     // target, so the floor has to win inside the size too rather than only beside it.
-    expect(declarations(".folia-swatch.folia-swatch")).toMatchObject({
+    expect(declarations(".folia-scope .folia-swatch")).toMatchObject({
       width: "max(var(--folia-hit-min), var(--swatch-width))",
       height: "max(var(--folia-hit-min), var(--swatch-height))",
     });

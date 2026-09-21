@@ -1,6 +1,6 @@
 # The theme domain
 
-Everything that paints the plugin lives here. `index.css` is the bundle esbuild builds into `dist/styles.css`; it imports `tokens.css` first, then one file per section of the board. That order is not alphabetical and not cosmetic — several rules only beat the ones they refine because they come later in the file, which `base.css` explains — so a guard or a test that reads the stylesheet reads it through this import list, never through a directory listing.
+Everything that paints the plugin lives here. `index.css` is the bundle esbuild builds into `dist/styles.css`; it imports `tokens.css` first, then one file per section of the board. That order is not alphabetical and not cosmetic — several rules only beat the ones they refine because they come later in the file, as with link and icon-button refinements — so a guard or a test that reads the stylesheet reads it through this import list, never through a directory listing.
 
 ## The one rule: alias or owned
 
@@ -49,3 +49,9 @@ The five elevation shadows and the scrim use lighter light-mode values. Base val
 `test/themeGeometry.test.ts` checks the compact-container size/stroke pairs, the default and empty-state scales, and isolation from rendered Markdown. These source contracts complement the DOM snapshots; they do not replace live layout checks. The icon token file also has a mutation test proving that rule E refuses an owned value matching the host icon scale.
 
 The component cycle check is conservative: it checks possible overlap with a token scope rather than evaluating selectors and the CSS cascade. A descendant inherits already-computed custom-property values, so an apparent dependency loop spanning ancestors and descendants is not itself a browser cycle. The guard still rejects an override that would close a loop if placed on the scope element. It is not a proof covering every combination of component selectors.
+
+## Button faces and specificity
+
+Button rules use `.folia-scope .folia-btn` and the same scope for their variants and states. The existing board and portal scopes provide enough specificity to beat the host plain-button rule without repeating a class. Keep base rules before their refinements; disabled hover exclusions use `:where()` so they do not outweigh selected states.
+
+Neutral controls read `--interactive-normal` and `--interactive-hover`. Raised buttons retain the host input shadow; flat links, icon buttons and menu rows declare their shadow beside their own face. Chips and swatches keep their semantic geometry and selection rings. The host button and icon radiuses apply to their corresponding controls, while the accent focus outline follows the decision in `docs/decisions.md`.

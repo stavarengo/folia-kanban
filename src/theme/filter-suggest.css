@@ -18,23 +18,24 @@
 .folia-filter-suggest li {
   margin: 0;
 }
-.folia-filter-suggest-item.folia-filter-suggest-item {
+.folia-scope .folia-filter-suggest-item {
+  box-shadow: none;
   display: flex;
   align-items: baseline;
   gap: var(--folia-space-md);
   width: 100%;
   padding: var(--folia-space-xs-plus) var(--folia-space-md);
   border: none;
-  border-radius: calc(var(--folia-r) - var(--folia-r-nested-inset));
-  background: transparent;
+  border-radius: var(--button-radius);
+  background: var(--interactive-normal);
   color: var(--text-normal);
   font: inherit;
   text-align: left;
   cursor: var(--folia-cursor-control);
 }
-.folia-filter-suggest-item.is-active,
-.folia-filter-suggest-item:hover {
-  background: var(--background-modifier-hover);
+.folia-scope .folia-filter-suggest-item.is-active,
+.folia-scope .folia-filter-suggest-item:hover:where(:not(:disabled)) {
+  background: var(--interactive-hover);
 }
 .folia-filter-suggest-key {
   font-family: var(--folia-font-mono);

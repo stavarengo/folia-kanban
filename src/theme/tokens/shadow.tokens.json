@@ -141,14 +141,6 @@
       "reason": "the blur behind a dialog's dimming layer; Obsidian publishes no blur values."
     }
   },
-  "lift-hover": {
-    "$value": "brightness(1.06)",
-    "cssVar": "--folia-lift-hover",
-    "source": {
-      "owned": true,
-      "reason": "the barely-there brightening a filled button takes on hover, where a background change would fight the accent it is filled with; Obsidian publishes no hover filter."
-    }
-  },
   "link-unresolved-filter": {
     "$value": "var(--link-unresolved-filter)",
     "cssVar": "--folia-link-unresolved-filter",

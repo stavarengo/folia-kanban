@@ -16,7 +16,7 @@
 }
 /* The strip occupies left 5–7px; `.folia-card-main`'s existing 12px left padding already clears it,
    so no extra body inset is needed (and a folder-only card with no color must stay visually inert). */
-.folia-chip-context.folia-chip-context {
+.folia-scope .folia-chip-context {
   color: var(--folia-ctx-color, var(--text-muted));
   background: color-mix(in oklch, var(--folia-ctx-color, var(--text-muted)) 16%, transparent);
   border-color: color-mix(in oklch, var(--folia-ctx-color, var(--text-muted)) 30%, transparent);

@@ -2,18 +2,7 @@
 .folia-scope :focus-visible {
   outline: var(--folia-focus-ring-w) solid var(--folia-accent);
   outline-offset: var(--folia-focus-ring-offset);
-  border-radius: var(--folia-r-sm);
 }
 .folia-card-main:focus-visible {
   outline-offset: var(--folia-focus-ring-offset-inset);
-}
-/* The rule above rounds an element that has no radius of its own; these are pills and keep their
-   shape. They live only in portalled surfaces, which is where the rule started applying. */
-.folia-menu-prio:focus-visible,
-.folia-menu-column:focus-visible {
-  border-radius: var(--folia-r-pill);
-}
-/* Same purpose, its own shape: the swatch is a colour input and follows the app's swatch radius. */
-.folia-swatch:focus-visible {
-  border-radius: var(--swatch-radius);
 }

@@ -28,7 +28,6 @@
   --folia-r: var(--radius-m);
   --folia-r-lg: var(--radius-l);
   --folia-r-pill: 999px;
-  --folia-r-nested-inset: 2px; /* how far a nested surface's corner tucks inside its parent's */
 
   /* Gaps and padding follow the host grid; board dimensions use multiples of its base unit. */
   --folia-space-hair: var(--size-2-1);
@@ -155,7 +154,6 @@
   --folia-shadow-swatch-active: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
   --folia-blur-actions: blur(3px);
   --folia-blur-scrim: blur(2px);
-  --folia-lift-hover: brightness(1.06);
 
   /* priority ramp (urgent -> trivial), tinted off the theme's accent palette */
   --folia-prio-1: var(--color-red);
@@ -327,7 +325,7 @@
   /* The swatch's fill, written inline by the two palette rows because there is one rule and nine
      possible colours. `initial` is the guaranteed-invalid value, so on the "no colour" swatch —
      the same class with nothing written onto it — the declaration that reads this token is thrown
-     away entirely. What then paints that swatch is `.folia-swatch-none.folia-swatch-none`, which
+     away entirely. What then paints that swatch is `.folia-swatch-none`, which
      carries equal specificity and sits LATER in column-menu.css; move it above and the swatch goes
      transparent. The `initial` makes the token safe to read, the source order is what fills it. */
   --folia-swatch-color: initial;

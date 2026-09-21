@@ -39,7 +39,7 @@
   display: flex;
   gap: var(--folia-space-sm);
 }
-.folia-filter-chip.folia-filter-chip {
+.folia-scope .folia-filter-chip {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
@@ -56,18 +56,18 @@
   padding: 0 var(--folia-control-pad-x);
   border-radius: var(--pill-radius);
   border: var(--folia-border-width) solid var(--folia-border);
-  background: var(--background-primary);
+  background: var(--interactive-normal);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   font-weight: var(--folia-font-weight-medium);
   cursor: var(--folia-cursor-control);
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
 }
-.folia-filter-chip:hover {
-  background: var(--background-modifier-hover);
+.folia-scope .folia-filter-chip:hover:where(:not(:disabled)) {
+  background: var(--interactive-hover);
   color: var(--text-normal);
 }
-.folia-filter-chip.is-on {
+.folia-scope .folia-filter-chip.is-on {
   background: color-mix(in oklch, var(--folia-accent) 16%, transparent);
   border-color: color-mix(in oklch, var(--folia-accent) 45%, transparent);
   color: var(--folia-text-accent);

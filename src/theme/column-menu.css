@@ -51,7 +51,7 @@
 }
 /* The app's own colour-input geometry, floored at the board's minimum hit target: Obsidian ships a
    22px swatch, which is under it, so the board draws 24px until a theme asks for more. */
-.folia-swatch.folia-swatch {
+.folia-scope .folia-swatch {
   /* The floor is stated twice on purpose. `max()` follows the host swatch upward, and `min-width`
      holds the target when `max()` cannot: it goes invalid on a keyword value, and a flex item with
      no minimum is free to shrink below whatever its width says. */
@@ -80,21 +80,21 @@
   padding: 0;
   transition: transform var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
-.folia-swatch:hover {
+.folia-scope .folia-swatch:hover:where(:not(:disabled)) {
   transform: scale(1.1);
 }
-.folia-swatch.is-active {
+.folia-scope .folia-swatch.is-active {
   /* two-tone ring readable over any swatch fill, in either theme */
   box-shadow: var(--folia-shadow-swatch-active);
 }
 /* After the hover rule, which it has to beat at equal weight: `:hover` matches a disabled button
    too, so the ninth swatch — the colour a note carries that is not one of the eight — would grow
    under the pointer and then do nothing. */
-.folia-swatch:disabled {
+.folia-scope .folia-swatch:disabled {
   cursor: var(--folia-cursor-inert);
   transform: none;
 }
-.folia-swatch-none.folia-swatch-none {
+.folia-scope .folia-swatch-none {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: grid;
@@ -107,7 +107,8 @@
   background: var(--folia-border);
   margin: var(--folia-space-hair) 0;
 }
-.folia-menu-item.folia-menu-item {
+.folia-scope .folia-menu-item {
+  box-shadow: none;
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: flex;
@@ -116,25 +117,25 @@
   width: 100%;
   padding: var(--folia-space-sm) var(--folia-space-md);
   border: none;
-  background: transparent;
+  background: var(--interactive-normal);
   color: var(--text-normal);
   font: inherit;
   font-size: var(--folia-font-size-md);
-  border-radius: var(--folia-r-sm);
+  border-radius: var(--button-radius);
   cursor: var(--folia-cursor-control);
   text-align: left;
 }
-.folia-menu-item:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+.folia-scope .folia-menu-item:hover:where(:not(:disabled)) {
+  background: var(--interactive-hover);
 }
-.folia-menu-item:disabled {
+.folia-scope .folia-menu-item:disabled {
   opacity: var(--folia-opacity-disabled);
   cursor: var(--folia-cursor-inert);
 }
-.folia-menu-danger.folia-menu-danger {
+.folia-scope .folia-menu-danger {
   color: var(--folia-text-error);
 }
-.folia-menu-danger:hover:not(:disabled) {
+.folia-scope .folia-menu-danger:hover:where(:not(:disabled)) {
   background: color-mix(in oklch, var(--folia-text-error) 14%, transparent);
 }
 .folia-menu-confirm {

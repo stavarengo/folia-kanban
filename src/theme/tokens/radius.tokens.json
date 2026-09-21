@@ -28,14 +28,5 @@
       "owned": true,
       "reason": "a fully rounded end, which is a shape rather than a size, so no radius rung can express it."
     }
-  },
-  "nested-inset": {
-    "$value": "2px",
-    "cssVar": "--folia-r-nested-inset",
-    "source": {
-      "owned": true,
-      "reason": "how far a nested surface's corner is tucked inside its parent's so the two curves stay concentric. It is arithmetic on a radius, answerable to the radius it is subtracted from rather than to the spacing grid, and Obsidian publishes no such offset.",
-      "despite": "--size-2-1"
-    }
   }
 }

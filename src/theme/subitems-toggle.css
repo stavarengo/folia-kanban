@@ -1,5 +1,6 @@
 /* ------------------------------------------------------------------ subitems collapse toggle */
-.folia-card-subitems-toggle.folia-card-subitems-toggle {
+.folia-scope .folia-card-subitems-toggle {
+  box-shadow: none;
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
@@ -13,8 +14,8 @@
   font-size: var(--folia-font-size-xs);
   cursor: var(--folia-cursor-control);
 }
-.folia-card-subitems-toggle:hover,
-.folia-card-subitems-toggle:focus-visible {
+.folia-scope .folia-card-subitems-toggle:hover:where(:not(:disabled)),
+.folia-scope .folia-card-subitems-toggle:focus-visible {
   color: var(--text-normal);
 }
 /* The chevron keeps its label's colour. Obsidian's --nav-collapse-icon-color pair was the obvious
@@ -23,7 +24,7 @@
    #ababab on a card's --background-primary (#ffffff) is about 2.3:1 — under the 3:1 minimum for a
    non-text indicator. They are sidebar colours, tuned for --background-secondary, and this chevron
    is on a card. See docs/decisions.md. */
-.folia-card-subitems-toggle .folia-icon {
+.folia-scope .folia-card-subitems-toggle .folia-icon {
   transition: transform var(--folia-dur-fast) var(--folia-ease);
 }
 /* Unscoped so the same "points right when collapsed" reading also works for the static

@@ -4,7 +4,7 @@
   flex-wrap: wrap;
   gap: var(--folia-space-xs-plus);
 }
-.folia-chip {
+.folia-scope .folia-chip {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
@@ -32,11 +32,11 @@
    --text-warning / --text-error the way the plain warning surfaces now do: the numbers were tuned
    against these hues, and nothing in CI can re-check a contrast ratio (see docs/decisions.md and
    tracking/waivers/0002-automated-a11y-gate.md). Re-tuning without a check is guessing. */
-.folia-chip-prio-1.folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-1) 32%, transparent); }
-.folia-chip-prio-2.folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-2) 32%, transparent); }
-.folia-chip-prio-3.folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in oklch, var(--folia-prio-3) 34%, transparent); }
-.folia-chip-prio-4.folia-chip-prio-4 { color: color-mix(in srgb, var(--folia-prio-4) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-4) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-4) 32%, transparent); }
-.folia-chip-danger.folia-chip-danger { color: color-mix(in srgb, var(--folia-danger) 58%, var(--text-normal)); background: color-mix(in oklch, var(--folia-danger) 22%, transparent); border-color: color-mix(in oklch, var(--folia-danger) 36%, transparent); }
-.folia-chip-warn.folia-chip-warn { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-2) 32%, transparent); }
-.folia-chip-accent.folia-chip-accent { color: color-mix(in srgb, var(--folia-accent) 55%, var(--text-normal)); background: color-mix(in oklch, var(--folia-accent) 18%, transparent); border-color: color-mix(in oklch, var(--folia-accent) 32%, transparent); }
-.folia-chip-muted.folia-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }
+.folia-scope .folia-chip-prio-1 { color: color-mix(in srgb, var(--folia-prio-1) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-1) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-1) 32%, transparent); }
+.folia-scope .folia-chip-prio-2 { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-2) 32%, transparent); }
+.folia-scope .folia-chip-prio-3 { color: color-mix(in srgb, var(--folia-prio-3) 58%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-3) 22%, transparent); border-color: color-mix(in oklch, var(--folia-prio-3) 34%, transparent); }
+.folia-scope .folia-chip-prio-4 { color: color-mix(in srgb, var(--folia-prio-4) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-4) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-4) 32%, transparent); }
+.folia-scope .folia-chip-danger { color: color-mix(in srgb, var(--folia-danger) 58%, var(--text-normal)); background: color-mix(in oklch, var(--folia-danger) 22%, transparent); border-color: color-mix(in oklch, var(--folia-danger) 36%, transparent); }
+.folia-scope .folia-chip-warn { color: color-mix(in srgb, var(--folia-prio-2) 60%, var(--text-normal)); background: color-mix(in oklch, var(--folia-prio-2) 20%, transparent); border-color: color-mix(in oklch, var(--folia-prio-2) 32%, transparent); }
+.folia-scope .folia-chip-accent { color: color-mix(in srgb, var(--folia-accent) 55%, var(--text-normal)); background: color-mix(in oklch, var(--folia-accent) 18%, transparent); border-color: color-mix(in oklch, var(--folia-accent) 32%, transparent); }
+.folia-scope .folia-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }

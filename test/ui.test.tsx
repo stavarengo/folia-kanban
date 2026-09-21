@@ -6343,10 +6343,10 @@ describe("a title far wider than the panel (20260827.02)", () => {
     // visible from jsdom: `white-space: nowrap` would hold the whole title on one line whatever the
     // clamp says, and `height: var(--input-height)` would pin the box at one line's worth of
     // height, so the clamped lines would spill over the text underneath. The undo lives on
-    // `.folia-link.folia-link` now, once for every link the board draws (20260829.02), so what
+    // `.folia-scope .folia-link` now, once for every link the board draws (20260829.02), so what
     // this row needs is that rule AND the class that reaches it.
     expect(value).toHaveClass("folia-link");
-    const linkRule = rule(".folia-link.folia-link");
+    const linkRule = rule(".folia-scope .folia-link");
     expect(linkRule).toContain("white-space: normal");
     expect(linkRule).toContain("height: auto");
 
@@ -6367,7 +6367,7 @@ describe("a title far wider than the panel (20260827.02)", () => {
     expect(value).toHaveAttribute("aria-expanded", "true");
     // Expanding undoes every part of the clamp, the base rule's `overflow: hidden` included, so
     // no future change to the collapsed rule can leave the open state half-clipped.
-    const openRule = rule(".folia-title-value.is-expanded .folia-title-value-text");
+    const openRule = rule(".folia-scope .folia-title-value.is-expanded .folia-title-value-text");
     expect(openRule).toContain("-webkit-line-clamp: none");
     expect(openRule).toContain("overflow: visible");
   });
@@ -6384,31 +6384,25 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // Obsidian's `button:not(.clickable-icon)` gives every button `white-space: nowrap` and
     // `height: var(--input-height)`. A link sitting in a paragraph survives neither: a long card
     // name cannot wrap, so it pushes its panel sideways instead of breaking.
-    const base = rule(".folia-link.folia-link");
+    const base = rule(".folia-scope .folia-link");
     expect(base).toContain("white-space: normal");
     expect(base).toContain("height: auto");
   });
 
   it("writes each base class above the rules that refine it", () => {
-    // A doubled class is doubled to beat the theme, and it beats the plugin's own single-class
-    // rules as a side effect. Keeping the base above its refinements is what lets equal weights
-    // settle by source order again; the refinements below carry the same doubled weight so they
-    // are equal in the first place.
+    // Scoped base and refinement rules have equal specificity, so source order matters.
     for (const [base, refinements] of [
       [
-        ".folia-link.folia-link",
-        [".folia-title-value.folia-title-value", ".folia-title-why.folia-title-why"],
+        ".folia-scope .folia-link",
+        [".folia-scope .folia-title-value", ".folia-scope .folia-title-why"],
       ],
       [
-        ".folia-muted.folia-muted",
-        [
-          ".folia-title-reason.folia-title-reason",
-          ".folia-title-step-reason.folia-title-step-reason",
-        ],
+        ".folia-scope .folia-muted",
+        [".folia-scope .folia-title-reason", ".folia-scope .folia-title-step-reason"],
       ],
       [
-        ".folia-icon-btn.folia-icon-btn",
-        [".folia-mini.folia-mini", ".folia-column-menu-btn.folia-column-menu-btn"],
+        ".folia-scope .folia-icon-btn",
+        [".folia-scope .folia-mini", ".folia-scope .folia-column-menu-btn"],
       ],
     ] as const) {
       expect(ruleAt(base)).toBeGreaterThan(-1);
@@ -6420,10 +6414,10 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
 
   it("keeps the column menu button at the size and fade its own rule asks for", () => {
     // Written above `.folia-icon-btn` it declared nothing the base rule did not already declare,
-    // so the button drew at the base size and its opacity was switched without the fade. Doubled
+    // so the button drew at the base size and its opacity was switched without the fade. Scoped
     // and moved below the base, every declaration lands; the state rules follow it, so the button
     // still shows on hover, on focus and while its menu is open.
-    const own = rule(".folia-column-menu-btn.folia-column-menu-btn");
+    const own = rule(".folia-scope .folia-column-menu-btn");
     expect(own).toContain("width: var(--folia-hit-sm)");
     expect(own).toContain("height: var(--folia-hit-sm)");
     expect(own).toContain("opacity: var(--folia-opacity-hidden)");
@@ -6431,7 +6425,7 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // The three state selectors share one rule, so `at` (which anchors on a rule's own line) does
     // not reach them; their position in the file is what matters here.
     expect(styles.indexOf(".folia-column:hover .folia-column-menu-btn")).toBeGreaterThan(
-      ruleAt(".folia-column-menu-btn.folia-column-menu-btn"),
+      ruleAt(".folia-scope .folia-column-menu-btn"),
     );
   });
 
@@ -6441,10 +6435,10 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     const value = detail.querySelector(".folia-title-value") as HTMLElement;
-    // The row is a `.folia-link` button, so `.folia-link.folia-link` hands it the accent colour and
-    // `font: inherit`. Taking those back is the whole reason this rule is doubled.
+    // The row is a `.folia-link` button, so `.folia-scope .folia-link` hands it the accent colour and
+    // `font: inherit`. The scoped refinement restores the title styling.
     expect(value).toHaveClass("folia-link");
-    const own = rule(".folia-title-value.folia-title-value");
+    const own = rule(".folia-scope .folia-title-value");
     expect(own).toContain("font-size: var(--folia-font-size-md)");
     expect(own).toContain("font-weight: var(--folia-font-weight-semibold)");
     expect(own).toContain("color: var(--text-normal)");
@@ -6456,21 +6450,19 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     const reason = detail.querySelector(".folia-title-reason") as HTMLElement;
-    // The reason line wears `.folia-muted`, whose doubled rule sets a LARGER size than this line
-    // asks for, so the refinement only lands if it is doubled too.
+    // The reason line wears `.folia-muted`, whose base rule sets a larger size than this line
+    // asks for, so the refinement needs the same scope.
     expect(reason).toHaveClass("folia-muted");
-    expect(rule(".folia-title-reason.folia-title-reason")).toContain(
+    expect(rule(".folia-scope .folia-title-reason")).toContain(
       "font-size: var(--folia-font-size-xs)",
     );
     const why = within(detail).getByRole("button", { name: "Why this title?" });
     expect(why).toHaveClass("folia-link");
-    expect(rule(".folia-title-why.folia-title-why")).toContain(
-      "font-size: var(--folia-font-size-xs)",
-    );
+    expect(rule(".folia-scope .folia-title-why")).toContain("font-size: var(--folia-font-size-xs)");
     await user.click(why);
     const step = detail.querySelector(".folia-title-step-reason") as HTMLElement;
     expect(step).toHaveClass("folia-muted");
-    expect(rule(".folia-title-step-reason.folia-title-step-reason")).toContain(
+    expect(rule(".folia-scope .folia-title-step-reason")).toContain(
       "font-size: var(--folia-font-size-xs)",
     );
   });

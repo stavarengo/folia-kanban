@@ -1,59 +1,6 @@
-/* Rules that every later section leans on, which is why they are imported first.
-
-   Doubled class names — `.folia-btn.folia-btn { … }` — are deliberate, not a typo. Obsidian gives
-   every plain button a face through `button:not(.clickable-icon)`, which is an element plus a
-   pseudo-class and therefore out-specifies a lone class: a single-class rule setting `color`,
-   `background` or `box-shadow` on a <button> silently loses in the real app while looking correct
-   in jsdom, where no theme is loaded. Naming the class twice matches exactly the same elements one
-   specificity step higher, which is enough. `pnpm buttons:check` (scripts/check-button-styles.mjs)
-   holds the line so nobody has to remember the trap.
-
-   That borrowed weight has a second edge, and it is the one that bites: a doubled rule also
-   out-ranks the plugin's OWN single-class rules for the same element, so a refinement can lose to
-   the rule it meant to refine and still read correctly in the file. Two habits keep it honest.
-   A rule that refines an element wearing a doubled class is doubled too — see `.folia-mini`,
-   `.folia-title-why`. And a class that other rules refine has its base rule written ABOVE them,
-   which is why `.folia-link` and `.folia-muted` live in this file rather than in the sections that
-   use them, and why this file is imported first: past that point equal weights settle by source
-   order, the way CSS reads — so the import order in index.css is load-bearing, not alphabetical.
-   `buttons:check` enforces the first habit on every element the plugin dresses, whatever its tag.
-   It cannot enforce the second: a refinement written above its base loses on plain source order,
-   and that is indistinguishable from a variant class legitimately overriding a base one —
-   `.folia-chip` and `.folia-chip-prio-1.folia-chip-prio-1` are exactly that shape. Ordering is the
-   only guard there, which is the reason it is written down. Repeating a refinement's class a THIRD
-   time would win from anywhere and make the ordering habit unnecessary, but it turns every base
-   rule into something the guard reads as dead, so the habit is the cheaper half of that trade. */
-
-/* Every button the plugin draws itself, listed once so none of them inherits the theme's raised
-   face. Obsidian gives `button:not(.clickable-icon)` a `box-shadow`, and a rule that resets a
-   button's background while saying nothing about its shadow leaves the lift behind — the exact
-   shape of the bug this guards against. Each class is named twice to out-specify that theme rule
-   (see the note above), and this block sits ABOVE the component rules on purpose: a later rule of
-   equal weight, such as the selected-chip ring, still wins where a shadow IS wanted. */
-.folia-add-column.folia-add-column,
-.folia-btn.folia-btn,
-.folia-card-subitems-toggle.folia-card-subitems-toggle,
-.folia-column-add.folia-column-add,
-.folia-desc-empty.folia-desc-empty,
-.folia-filter-chip.folia-filter-chip,
-.folia-filter-suggest-item.folia-filter-suggest-item,
-.folia-icon-btn.folia-icon-btn,
-.folia-link.folia-link,
-.folia-menu-column.folia-menu-column,
-.folia-menu-item.folia-menu-item,
-.folia-menu-prio.folia-menu-prio,
-.folia-swatch.folia-swatch {
+/* Control rules use the token scope as their ancestor to beat the host button face. Keep base rules before their refinements so equal specificity resolves in source order. */
+.folia-scope .folia-link {
   box-shadow: none;
-}
-
-/* The two classes several components hang on an element and then refine: `.folia-link` for text
-   that acts as a link, `.folia-muted` for a line that recedes. Both land on <button> elements
-   somewhere in the board, so both are named twice for the reason above — and that
-   borrowed weight is precisely why they belong HERE, above every component rule. A refinement
-   written further down carries the same doubled weight and wins on source order; written below a
-   base rule that sits mid-file, it would have to out-weigh it instead, which is how three title
-   rows spent a release rendering something other than what they declared. */
-.folia-link.folia-link {
   background: transparent;
   border: none;
   color: var(--folia-link-color);
@@ -80,11 +27,11 @@
   white-space: normal;
   height: auto;
 }
-.folia-link.folia-link:hover {
+.folia-scope .folia-link:hover:where(:not(:disabled)) {
   color: var(--folia-link-color-hover);
   text-decoration: var(--folia-link-decoration-hover);
 }
-.folia-muted.folia-muted {
+.folia-scope .folia-muted {
   color: var(--text-faint);
   font-size: var(--folia-font-size-sm);
   font-style: italic;
