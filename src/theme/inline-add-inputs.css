@@ -11,7 +11,7 @@
   width: 100%;
   resize: vertical;
   font: inherit;
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);

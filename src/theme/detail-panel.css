@@ -146,7 +146,7 @@
 }
 .folia-fields input {
   font: inherit;
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
@@ -195,16 +195,10 @@
    uppercase and the tracking stay too; they are what tells a property row from a form field here. */
 .folia-prop-key {
   flex: 0 0 var(--folia-prop-key-w);
-<<<<<<< HEAD
   color: var(--metadata-label-text-color);
   /* The ellipsis below needs this: without it the label wraps inside its fixed column instead of
      truncating, and `text-overflow` never fires. */
   white-space: nowrap;
-||||||| parent of 8a07b4d (fix(theme): read Obsidian's colours without a literal behind them)
-  color: var(--text-faint, var(--text-muted));
-=======
-  color: var(--text-faint);
->>>>>>> 8a07b4d (fix(theme): read Obsidian's colours without a literal behind them)
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
   font-size: var(--metadata-label-font-size);
@@ -225,7 +219,7 @@
   min-width: 0;
   font: inherit;
   font-size: var(--metadata-input-font-size);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--metadata-input-text-color);
   /* The row's identity — the type and colour of the label and of the value — comes from the
      metadata family, because that is what makes this read as the same object the note's own
@@ -367,7 +361,7 @@
   /* Matches .folia-desc-rendered.markdown-rendered's pinned line-height, so entering edit mode
      doesn't change the line-box height under the preserved preview height. */
   line-height: var(--folia-line-height);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
@@ -617,7 +611,7 @@
   /* Matches .folia-comment-text.markdown-rendered's pinned line-height, for the same reason as
      .folia-desc above. */
   line-height: var(--folia-line-height);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);

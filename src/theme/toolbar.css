@@ -18,7 +18,7 @@
   height: var(--folia-control-h);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-muted);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }

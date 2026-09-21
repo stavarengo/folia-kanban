@@ -32,6 +32,13 @@
       "alias": "--background-secondary"
     }
   },
+  "field-bg": {
+    "$value": "var(--background-modifier-form-field)",
+    "cssVar": "--folia-field-bg",
+    "source": {
+      "alias": "--background-modifier-form-field"
+    }
+  },
   "scrim": {
     "$value": "rgba(0, 0, 0, 0.45)",
     "cssVar": "--folia-scrim",

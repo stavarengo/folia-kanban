@@ -137,6 +137,7 @@
   --folia-border-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
   --folia-card-bg: var(--background-primary);
   --folia-col-bg: var(--background-secondary);
+  --folia-field-bg: var(--background-modifier-form-field);
   --folia-scrim: rgba(0, 0, 0, 0.45);
 
   /* elevation (subtle in dark, structure carried by borders) */

@@ -138,7 +138,7 @@
   padding: var(--folia-space-sm) var(--folia-space-md);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
 }
 .folia-field input:focus {

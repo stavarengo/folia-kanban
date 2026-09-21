@@ -32,7 +32,7 @@
   padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
   border: var(--folia-border-width) solid var(--folia-border);
   border-radius: var(--folia-r-sm);
-  background: var(--background-primary);
+  background: var(--folia-field-bg);
   color: var(--text-normal);
 }
 .folia-add-column.is-editing input:focus {
