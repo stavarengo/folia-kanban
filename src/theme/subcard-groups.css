@@ -13,12 +13,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--folia-space-sm);
-  /* A nesting guide is a documented object, so its thickness and the distances it indents by come
-     from the app's. Its colour does not: the accent tint is what says "these belong to the card
-     above", and the theme's neutral guide colour would flatten that. */
+  /* A nesting guide is a documented object, so the distances it indents by come from the file
+     explorer's. Its colour and its thickness do not. The accent tint is what says "these belong to
+     the card above", which the theme's neutral guide colour would flatten, and the rule's existence
+     is that same signal: `--nav-indentation-guide-width` is `0` in any theme that hides indentation
+     guides, and a board is not a file tree — hiding one should not hide the other. */
   margin-left: var(--nav-item-children-margin-start);
   padding: var(--folia-space-sm) 0 var(--folia-space-sm) var(--nav-item-children-padding-start);
-  border-left: var(--nav-indentation-guide-width) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
+  border-left: var(--folia-border-width-thick) solid color-mix(in srgb, var(--folia-col-accent) 55%, transparent);
   background: color-mix(in srgb, var(--folia-col-accent) 5%, transparent);
   border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
 }

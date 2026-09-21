@@ -63,12 +63,12 @@
    so its box comes from the dialog variables and its chrome from the modal ones. The backdrop below
    stays Folia's: no host variable covers a dimmer. */
 .folia-modal {
-  width: min(var(--folia-modal-w), 100%);
-  /* Its own declaration rather than a second argument to that `min()`: `none` is an ordinary value
-     for a maximum and `min(560px, none)` is invalid, which would drop the width and collapse the
-     dialog to its intrinsic size. `max-width: none` is simply no cap. The `min()` above keeps the
-     `100%` guard because `--dialog-width` is a default width, where a keyword would be a far
-     stranger thing for a theme to write than it is for a maximum. */
+  /* No `min()` anywhere near these: a theme may write a keyword into any of them, and `min(560px,
+     none)` is invalid at computed-value time, which would drop the whole declaration and collapse
+     the dialog to its intrinsic width. Two plain caps cannot fail that way. `--dialog-max-width` is
+     `80vw`, so a narrow window shrinks the dialog on its own, and when a theme removes that cap the
+     backdrop below scrolls rather than hiding what overflows. */
+  width: var(--folia-modal-w);
   max-width: var(--dialog-max-width);
   max-height: var(--dialog-max-height);
   display: flex;
@@ -143,7 +143,7 @@
 }
 .folia-field input:focus {
   outline: none;
-  border-color: var(--background-modifier-border-focus);
+  border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-field input[type="range"] {

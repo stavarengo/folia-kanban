@@ -170,15 +170,17 @@ This has a visible cost and it is worth naming. The board's selects show no drop
 
 **What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
 
-## Focus keeps Folia's ring; the host focus-outline pair stays out
+## Focus stays the board's accent until Obsidian ships the focus outline
 
-**Decided 2026-09-21. Focused borders read `--background-modifier-border-focus`; `--input-focus-outline` and `--input-focus-border-color` are not used.**
+**Decided 2026-09-21. A focused border keeps `--folia-accent`; `--background-modifier-border-focus`, `--input-focus-outline` and `--input-focus-border-color` are not used.**
 
 The theme-authoring guide shows both declared on `:root` with system keywords (`Highlight`, `Canvas`), which would put focus on the operating system's own colour. Neither is on a `Reference/CSS variables` page, so neither is in the registry, and the theme guard refuses a host variable that is neither documented nor observed — a fallback does not buy an exemption, by design. Read live in Obsidian 1.13.7 both compute to the empty string on `body`: the application does not define them at all, and the only rules naming them belong to the bundled PDF.js annotation layer. So there is nothing to observe and nothing to record; using them would mean writing a value the board invented behind a host variable's name.
 
-What is adopted is `--background-modifier-border-focus` for the focused border. Folia's accent ring stays over it because that colour computes to `#555555`, close enough to the resting border that on its own it would weaken a focus indicator the audit calls a strength. Obsidian uses the same variable as a 3px ring on `select:focus-visible`, which is the same reading.
+`--background-modifier-border-focus` was adopted in their place and then withdrawn, which is the part worth recording. It computes to `#555555`: 2.3:1 against the panel and 1.7:1 against the resting `#333333` border, where the accent it replaced is about 4:1. Eight of the board's inputs suppress `outline` and carry their whole indication on that border plus a 2px accent ring, and at three of them the board's own `:focus-visible` outline is out-specified, so the weakened border *was* the indicator. The audit's plan was the border together with `--input-focus-outline`; with the outline half unavailable, the border half stops being a free swap and becomes a contrast loss.
 
-**What would change this:** Obsidian defining the pair in a shipped build, or documenting it on a CSS-variables reference page. Either makes it a registry entry and the border colour question reopens with the OS colour on the table.
+This is a general shape and not only a focus story: a variable that is right as part of a set can be wrong on its own, and "half of it is still an improvement" is the assumption to check rather than the conclusion to reach.
+
+**What would change this:** Obsidian defining the focus-outline pair in a shipped build, or documenting it on a CSS-variables reference page. Either makes it a registry entry, and then the whole set arrives together and the question reopens with the OS colour on the table.
 
 ## The settings-shaped on/off row stays a checkbox
 
@@ -200,5 +202,8 @@ The theme domain's rule is that a `--folia-*` token is an alias or an owned valu
 - **`--blockquote-border-thickness` on the comment rail.** That left border's colour is how read, unread and reply are told apart, so a theme that draws borderless quotes would erase a state cue by changing something about quotations. Comments are not quotations.
 - **`--checkbox-radius` on the to-do preview marker.** The radius is the corner chosen for a 16px control, and the marker is 8px and keeps its own size on purpose. Half of a coupled pair leaves a theme free to turn the marker into a dot.
 - **`--metadata-property-radius` on the property input.** That is the property *row's* corner; the row is `.folia-prop-row` and the input is the value inside it. The input takes `--input-radius`, because with the border the board keeps on it, a text input is what it is.
+- **`--pill-padding-x` on the filter chip.** Obsidian never spends it as box padding: `.multi-select-pill` sets `padding: var(--pill-padding-y) 0`, and this variable is an inline-start margin on the pill's content and an end margin on its remove button. Read as symmetric padding it is a number without its meaning, and it took 4.2px a side off every chip.
 
-**What would change this:** for the menu, Obsidian publishing dimensions for its own action menus. For the others, the board changing what the element is — a comment rail that no longer carries state, a preview marker that follows the host checkbox size, a property row drawn as Obsidian draws one, without a border.
+A second, narrower rule came out of the same reviews, and it is the reason three more variables are unused. **A variable a theme sets to zero must not be the only thing holding up a signal.** `--blockquote-border-thickness` on the comment rail, `--nav-indentation-guide-width` on the subcard group and `--pill-border-width` on the filter chip each govern the *existence* of a line that the board then colours to say something: read against unread against reply, "these belong to the card above", on against off. A theme that draws borderless quotes, hides indentation guides, or ships a flat pill — Obsidian's own property pills declare `--pill-border-width: 0` — would take the signal with the line. The same test is what keeps `--tag-border-width` out of the card chips, whose translucent tints have no other edge.
+
+**What would change this:** for the menu, Obsidian publishing dimensions for its own action menus. For the others, the board changing what the element is — a comment rail that no longer carries state, a preview marker that follows the host checkbox size, a property row drawn as Obsidian draws one without a border, a filter chip whose on-state stops using its border. For the zero rule specifically, a second cue strong enough to carry the state on its own would make the line safe to hand over.

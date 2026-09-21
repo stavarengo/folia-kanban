@@ -77,6 +77,31 @@
   font-style: italic;
 }
 
+/* Obsidian's own `select, .combobox-button, .dropdown` rule already dresses every bare <select> as
+   a dropdown — `--dropdown-background`, `--input-height`, `--input-radius`, `--input-shadow`, and
+   `@media (hover: hover)` hover on `--dropdown-background-hover` with a disabled guard the board
+   would drop if it wrote its own. All of that is left alone. Two things are kept back.
+
+   Type: the app's rule sets `--font-ui-small`, and in the detail panel a select sits beside a text
+   input inside a `<label>` that hands both a smaller size, where 13px against the panel's own reads
+   as a mistake rather than as citizenship. In the edit-column dialog the two already agree, so this
+   only ever has something to do in the panel. Padding: `--dropdown-padding` holds 2.4em at the end
+   for the chevron `.dropdown` paints, and the board does not wear that class (see
+   docs/decisions.md), so adopting it would open a gutter with nothing in it. The casing goes with
+   the type, for the same label.
+
+   Focus stays the board's. Obsidian rings a focused select with 3px of
+   `--background-modifier-border-focus`, which is `#555555` on `#333333` — around 1.7:1, under what
+   an indicator needs — so `.folia-scope :focus-visible` keeps drawing the board's accent outline
+   over it rather than deferring. */
+.folia-fields select,
+.folia-field select {
+  font: inherit;
+  padding: 0 var(--folia-space-md);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 /* The view content area has default padding; the board needs the full pane with no inset. */
 .workspace-leaf-content[data-type="folia-kanban-view"] {
   padding: 0;

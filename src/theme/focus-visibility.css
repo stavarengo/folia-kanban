@@ -17,12 +17,3 @@
 .folia-swatch:focus-visible {
   border-radius: var(--swatch-radius);
 }
-/* The one control the board does not give its own focus ring. Obsidian draws every bare <select>
-   itself, focus included — a 3px `--background-modifier-border-focus` ring — and the rule at the top
-   of this file would lay the board's accent outline outside that one, two rings deep. */
-.folia-scope select:focus-visible {
-  outline: none;
-  /* That same rule also rounds what it outlines, which would square the select's own corner off by
-     a pixel for as long as it is focused. */
-  border-radius: var(--input-radius);
-}

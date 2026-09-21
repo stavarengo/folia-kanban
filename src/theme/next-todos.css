@@ -17,9 +17,10 @@
 /* An unchecked checkbox drawn as an ornament, not a control: it previews a to-do the card holds and
    cannot be clicked. It takes the app's unchecked border colour, and nothing about its shape.
    `--checkbox-size` is a control's size (16px) and this sits on an 11px preview line, where it
-   would out-weigh the words it annotates — and `--checkbox-radius` is the corner chosen FOR that
-   size, so spending it on an 8px box means a theme with round checkboxes turns this one into a dot
-   that no longer reads as a to-do. Half of a coupled pair is worse than neither. */
+   would out-weigh the words it annotates. `--checkbox-radius` is the corner chosen FOR that 16px
+   box, and a corner only means something next to the size it was cut for, so taking one without the
+   other is half a coupled pair. Both values are 4px today, so this is about where the marker
+   follows when a theme moves, not about how it looks now. */
 .folia-card-next-todo-mark {
   flex-shrink: 0;
   width: var(--folia-todo-mark);

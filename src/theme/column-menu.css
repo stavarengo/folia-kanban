@@ -41,7 +41,7 @@
 }
 .folia-menu-field input:focus {
   outline: none;
-  border-color: var(--background-modifier-border-focus);
+  border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-swatches {

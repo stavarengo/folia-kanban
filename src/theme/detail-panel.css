@@ -154,26 +154,6 @@
   text-transform: none;
   letter-spacing: normal;
 }
-/* Obsidian's own `select, .combobox-button, .dropdown` rule already dresses every bare <select> as
-   a dropdown — `--dropdown-background`, `--input-height`, `--input-radius`, `--input-shadow` and a
-   `:focus-visible` ring — so the board leaves all of that alone and keeps back three things.
-
-   Type, because a select sits beside a text input in the same field grid and the app's 13px next to
-   the panel's own size reads as a mistake rather than as citizenship. Padding, because
-   `--dropdown-padding` reserves 2.4em at the end for the chevron `.dropdown` paints, and the board
-   does not wear that class (see docs/decisions.md): adopting it would leave a wide empty gutter with
-   nothing in it. And the casing the surrounding label hands down.
-
-   Hover and focus are the app's too: `@media (hover: hover) select:not(:disabled):not(.mod-disabled):hover`
-   already paints `--dropdown-background-hover`, with the disabled guard and the raised-shadow half
-   that a rule written here would drop. */
-.folia-fields select,
-.folia-field select {
-  font: inherit;
-  padding: 0 var(--folia-space-md);
-  text-transform: none;
-  letter-spacing: normal;
-}
 
 /* The assignee field spans both columns: it carries a button beside its input, and half a row is
    not enough for a name and "Assign to me" without either wrapping. */
@@ -225,9 +205,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Both hover variables resolve to their resting value in the default theme, so these two rules paint
-   nothing there. They are the theme's hook: a theme that lifts a property row on hover reaches the
-   board's rows too, and without them it could not. */
+/* `--metadata-label-text-color-hover` resolves to its resting value in the default theme, so this
+   rule paints nothing there. It is the theme's hook: a theme that lifts a property row on hover
+   reaches the board's rows too, and without it that could not happen. */
 .folia-prop-row:not(.folia-title-result):hover .folia-prop-key {
   color: var(--metadata-label-text-color-hover);
 }
@@ -255,7 +235,7 @@
 }
 .folia-prop-input:focus {
   outline: none;
-  border-color: var(--background-modifier-border-focus);
+  border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-prop-add .folia-btn {
@@ -639,7 +619,7 @@
 }
 .folia-comment-edit:focus {
   outline: none;
-  border-color: var(--background-modifier-border-focus);
+  border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
 /* One row for a comment's metadata; the <li> itself stacks (metadata, then the comment body). */

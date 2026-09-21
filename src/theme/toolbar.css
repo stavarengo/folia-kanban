@@ -23,7 +23,7 @@
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 .folia-search:focus-within {
-  border-color: var(--background-modifier-border-focus);
+  border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-search input {
@@ -45,13 +45,17 @@
   display: inline-flex;
   align-items: center;
   gap: var(--folia-space-xs-plus);
-  /* A filter chip is a multi-select pill with an on/off state, so it takes the pill's shape. Its
-     height stays the host input height instead of `--pill-padding-y`: the chips sit in one row with
+  /* A filter chip is a multi-select pill with an on/off state, so it takes the pill's corner. Not
+     its padding: Obsidian spends `--pill-padding-x` as an asymmetric inset on the pill's content and
+     its remove button, never as symmetric box padding, so reading it here would be borrowing a
+     number rather than a meaning. Not its border width either — Obsidian's own property pills set
+     `--pill-border-width: 0`, and this chip recolours its border to say it is on. And not
+     `--pill-padding-y`, because the height stays the host input height: these sit in one row with
      the search box, and only a shared height keeps that row aligned. */
   height: var(--folia-control-h);
-  padding: 0 var(--pill-padding-x);
+  padding: 0 var(--folia-control-pad-x);
   border-radius: var(--pill-radius);
-  border: var(--pill-border-width) solid var(--folia-border);
+  border: var(--folia-border-width) solid var(--folia-border);
   background: var(--background-primary);
   color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
