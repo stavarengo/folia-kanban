@@ -96,18 +96,21 @@ describe("theme guard scheme overrides", () => {
 });
 
 describe("theme guard adopted foundations", () => {
-  it("rejects an off-grid owned layout length", () => {
-    edit("src/theme/tokens.css", (s) =>
-      s.replace("--folia-gap: var(--size-4-2)", "--folia-gap: 9px"),
-    );
-    edit("src/theme/tokens/spacing.tokens.json", (s) =>
-      s.replace(
-        /"\$value": "var\(--size-4-2\)",\s*"cssVar": "--folia-gap",\s*"source": \{[^}]+\}/,
-        '"$value": "9px", "cssVar": "--folia-gap", "source": { "owned": true, "reason": "Regression fixture." }',
-      ),
-    );
-    reject("outside the host grid");
-  });
+  it.each(["9px", "9e0px", ".9px", "9PX"])(
+    "rejects an off-grid owned layout length %s",
+    (value) => {
+      edit("src/theme/tokens.css", (s) =>
+        s.replace("--folia-gap: var(--size-4-2)", `--folia-gap: ${value}`),
+      );
+      edit("src/theme/tokens/spacing.tokens.json", (s) =>
+        s.replace(
+          /"\$value": "var\(--size-4-2\)",\s*"cssVar": "--folia-gap",\s*"source": \{[^}]+\}/,
+          `"$value": "${value}", "cssVar": "--folia-gap", "source": { "owned": true, "reason": "Regression fixture." }`,
+        ),
+      );
+      reject("outside the host grid");
+    },
+  );
 
   it("requires aliases for cursor defaults", () => {
     edit("src/theme/tokens.css", (s) =>

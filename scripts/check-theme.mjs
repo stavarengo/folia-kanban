@@ -742,14 +742,15 @@ for (const t of [...tokens, ...variants]) {
   }
   const category = basename(file).replace(".tokens.json", "");
   const layoutLength =
-    ["spacing", "size", "runtime"].includes(category) && /^-?\d+(?:\.\d+)?px$/.test(node.$value);
+    ["spacing", "size", "runtime"].includes(category) &&
+    new RegExp(`^${NUMBER}px$`, "i").test(node.$value);
   const nearestGrid =
     layoutLength &&
     defaultsBy
       .get("length")
       .reduce((nearest, candidate) =>
-        Math.abs(parseFloat(candidate[1].default) - Math.abs(parseFloat(node.$value))) <
-        Math.abs(parseFloat(nearest[1].default) - Math.abs(parseFloat(node.$value)))
+        Math.abs(parseFloat(candidate[1].default) - Math.abs(Number(node.$value.slice(0, -2)))) <
+        Math.abs(parseFloat(nearest[1].default) - Math.abs(Number(node.$value.slice(0, -2))))
           ? candidate
           : nearest,
       );

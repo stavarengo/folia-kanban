@@ -117,3 +117,11 @@ The cost is real and accepted: every control the board draws is dressed by hand,
 The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print also follows the host UI font size, with one- and two-pixel reductions at the default grid. Pill ends remain an owned shape because a fixed radius rung cannot guarantee a rounded end at every control height.
 
 **What would change this:** live evidence of clipping or poor legibility in a supported desktop theme. The toolbar, cards, detail panel and edit-column dialog still need visual review in dark and light mode after this change.
+
+## Keep standard scrollbars and reduced-motion detection
+
+**Decided 2026-09-21. Keep `scrollbar-width: thin` and `prefers-reduced-motion`.**
+
+Custom scrollbar colours would add platform-specific styling for a small difference with no reported mismatch. The standard reduced-motion query already suppresses entrance animations and drag transforms, and the audit's earlier host inspection found no replacement facility. Phase 2 confirms both mechanisms in source; the unavailable DevTools bridge means it supplies no new live evidence about Obsidian itself.
+
+**What would change this:** a reported scrollbar mismatch in a supported desktop theme, or a documented host motion preference that the standard media query cannot express.

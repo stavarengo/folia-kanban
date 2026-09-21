@@ -127,11 +127,11 @@
     }
   },
   "card-title-clearance": {
-    "$value": "calc(var(--size-4-1) * 24)",
+    "$value": "calc(3 * var(--folia-hit-md) + 2 * var(--folia-space-hair) + 3 * var(--folia-space-xxs) + var(--folia-space-sm))",
     "cssVar": "--folia-card-title-pad-r",
     "source": {
       "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
+      "reason": "Reserves three action buttons, two inter-button gaps, both container paddings, the right inset and one small breathing gap. It must grow with input-derived button widths so themed controls never cover a title."
     }
   },
   "card-overlay-inset": {

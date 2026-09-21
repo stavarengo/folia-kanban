@@ -112,11 +112,8 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  /* #11 full-width title + right gutter: the title text uses the FULL card width, and a permanent
-     right gutter clears the (up to 3-button) hover action cluster so the buttons never overlap the
-     first line: 3×26px buttons + 2×1px gaps + 4px container padding + 6px right offset = 90px, plus
-     2px breathing space. A permanent reserve (vs. only on hover) keeps the layout from jumping when
-     the cluster appears. */
+  /* Reserve the hover cluster even while hidden so revealing it cannot reflow the title.
+     The token follows the cluster's input-derived button widths and grid spacing. */
   padding-right: var(--folia-card-title-pad-r);
 }
 

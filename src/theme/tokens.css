@@ -71,7 +71,7 @@
   --folia-search-w: calc(var(--size-4-1) * 80);
   --folia-add-column-w: calc(var(--size-4-1) * 55);
   --folia-prop-key-w: calc(var(--size-4-1) * 22);
-  --folia-card-title-pad-r: calc(var(--size-4-1) * 24); /* the room the hover actions need beside a card's title */
+  --folia-card-title-pad-r: calc(3 * var(--folia-hit-md) + 2 * var(--folia-space-hair) + 3 * var(--folia-space-xxs) + var(--folia-space-sm)); /* the room the hover actions need beside a card's title */
   --folia-card-overlay-inset: var(--size-4-4); /* the lifted card is narrower than the column it came from */
   --folia-desc-h-min: var(--size-4-18);
   --folia-desc-h-max-offset: calc(var(--size-4-1) * 55); /* what the rendered description leaves of the viewport */
