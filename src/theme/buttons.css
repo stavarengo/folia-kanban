@@ -24,7 +24,7 @@
    `.folia-btn:hover` sits right above and carries the same weight, so leaving a gap here would let
    the neutral hover face reach a button that is meant to stay accented. */
 .folia-btn-primary:hover {
-  background: var(--interactive-accent-hover, var(--folia-accent));
+  background: var(--interactive-accent-hover);
   border-color: transparent;
   filter: var(--folia-lift-hover);
 }

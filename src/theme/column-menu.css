@@ -29,7 +29,7 @@
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
 }
 .folia-menu-field input {
   font: inherit;

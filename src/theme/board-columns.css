@@ -112,7 +112,7 @@
   justify-content: center;
   gap: var(--folia-space-sm);
   padding: var(--folia-space-xl-plus) var(--folia-space-md);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
   font-size: var(--folia-font-size-sm);
   border: var(--folia-border-width) dashed var(--folia-border);
   border-radius: var(--folia-r);

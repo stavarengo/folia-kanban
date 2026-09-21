@@ -51,47 +51,31 @@
   },
   "priority": {
     "1": {
-      "$value": "var(--color-red, #e5534b)",
+      "$value": "var(--color-red)",
       "cssVar": "--folia-prio-1",
       "source": {
-        "alias": "--color-red",
-        "fallback": {
-          "value": "#e5534b",
-          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
-        }
+        "alias": "--color-red"
       }
     },
     "2": {
-      "$value": "var(--color-orange, #d9882f)",
+      "$value": "var(--color-orange)",
       "cssVar": "--folia-prio-2",
       "source": {
-        "alias": "--color-orange",
-        "fallback": {
-          "value": "#d9882f",
-          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
-        }
+        "alias": "--color-orange"
       }
     },
     "3": {
-      "$value": "var(--color-yellow, #c2a312)",
+      "$value": "var(--color-yellow)",
       "cssVar": "--folia-prio-3",
       "source": {
-        "alias": "--color-yellow",
-        "fallback": {
-          "value": "#c2a312",
-          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
-        }
+        "alias": "--color-yellow"
       }
     },
     "4": {
-      "$value": "var(--color-blue, #5b8def)",
+      "$value": "var(--color-blue)",
       "cssVar": "--folia-prio-4",
       "source": {
-        "alias": "--color-blue",
-        "fallback": {
-          "value": "#5b8def",
-          "reason": "so the ramp still reads on a theme that drops the palette; removing the literals is a later phase (audit 02-03)."
-        }
+        "alias": "--color-blue"
       }
     }
   },
@@ -103,14 +87,10 @@
     }
   },
   "on-accent": {
-    "$value": "var(--text-on-accent, #fff)",
+    "$value": "var(--text-on-accent)",
     "cssVar": "--folia-on-accent",
     "source": {
-      "alias": "--text-on-accent",
-      "fallback": {
-        "value": "#fff",
-        "reason": "the long note on the declaration in tokens.css explains why this variable is read flat and why the declaration site matters; removing the literal is a later phase (audit 02-03)."
-      }
+      "alias": "--text-on-accent"
     }
   },
   "on-fill": {
@@ -122,47 +102,31 @@
     }
   },
   "danger": {
-    "$value": "var(--color-red, #e5534b)",
+    "$value": "var(--color-red)",
     "cssVar": "--folia-danger",
     "source": {
-      "alias": "--color-red",
-      "fallback": {
-        "value": "#e5534b",
-        "reason": "removing the literal is a later phase; --text-error and the semantic status colours are a later phase too (audit 02-03, 02-04)."
-      }
+      "alias": "--color-red"
     }
   },
   "unread": {
-    "$value": "var(--color-blue, #5b8def)",
+    "$value": "var(--color-blue)",
     "cssVar": "--folia-unread",
     "source": {
-      "alias": "--color-blue",
-      "fallback": {
-        "value": "#5b8def",
-        "reason": "removing the literal is a later phase (audit 02-03)."
-      }
+      "alias": "--color-blue"
     }
   },
   "unread-reply": {
-    "$value": "var(--color-purple, #a882e0)",
+    "$value": "var(--color-purple)",
     "cssVar": "--folia-unread-reply",
     "source": {
-      "alias": "--color-purple",
-      "fallback": {
-        "value": "#a882e0",
-        "reason": "removing the literal is a later phase (audit 02-03)."
-      }
+      "alias": "--color-purple"
     }
   },
   "success": {
-    "$value": "var(--color-green, #4caf7d)",
+    "$value": "var(--color-green)",
     "cssVar": "--folia-success",
     "source": {
-      "alias": "--color-green",
-      "fallback": {
-        "value": "#4caf7d",
-        "reason": "removing the literal is a later phase; the semantic status colours are a later phase too (audit 02-03, 02-04)."
-      }
+      "alias": "--color-green"
     }
   },
   "column": {

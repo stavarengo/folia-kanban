@@ -15,7 +15,7 @@
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
   padding: var(--folia-space-xxs) var(--folia-space-xxs) 0;
 }
 
@@ -125,11 +125,11 @@
   font-weight: var(--folia-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
 }
 .folia-field-hint {
   font-size: var(--folia-font-size-xs);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
 }
 .folia-field input[type="text"],
 .folia-field input:not([type]),

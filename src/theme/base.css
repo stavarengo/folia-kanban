@@ -72,7 +72,7 @@
   height: auto;
 }
 .folia-muted.folia-muted {
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
   font-size: var(--folia-font-size-sm);
   font-style: italic;
 }

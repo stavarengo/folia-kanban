@@ -40,14 +40,10 @@
     }
   },
   "font-mono": {
-    "$value": "var(--font-monospace, monospace)",
+    "$value": "var(--font-monospace)",
     "cssVar": "--folia-font-mono",
     "source": {
-      "alias": "--font-monospace",
-      "fallback": {
-        "value": "monospace",
-        "reason": "the generic family behind Obsidian's composed monospace stack, which the developer docs do not list (see host/observed.json); removing the literal is a later phase (audit 02-05)."
-      }
+      "alias": "--font-monospace"
     }
   },
   "weight": {

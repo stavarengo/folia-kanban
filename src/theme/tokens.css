@@ -155,10 +155,10 @@
   --folia-lift-hover: brightness(1.06);
 
   /* priority ramp (urgent -> trivial), tinted off the theme's accent palette */
-  --folia-prio-1: var(--color-red, #e5534b);
-  --folia-prio-2: var(--color-orange, #d9882f);
-  --folia-prio-3: var(--color-yellow, #c2a312);
-  --folia-prio-4: var(--color-blue, #5b8def);
+  --folia-prio-1: var(--color-red);
+  --folia-prio-2: var(--color-orange);
+  --folia-prio-3: var(--color-yellow);
+  --folia-prio-4: var(--color-blue);
   --folia-accent: var(--interactive-accent);
   /* Read flat, on purpose. Obsidian publishes two variables for text on an accent fill —
      `--text-on-accent` for a dark accent, `--text-on-accent-inverted` for a light one — and app.css
@@ -176,19 +176,19 @@
      it only reaches rules that inherit from it. This block does, because `.folia-scope` is always a
      descendant of a body (see the header note, and scripts/check-portal-scope.mjs, which keeps it
      that way through every portal). Moved to `:root`/`html` — body's parent — the same declaration
-     would miss the override, fall through to the white fallback below and freeze there for good,
-     visible only to users with a pale accent. That move fails `pnpm theme:check`, which requires
+     would miss the override and freeze on the un-inverted white for good, visible only to users
+     with a pale accent. That move fails `pnpm theme:check`, which requires
      every token to be declared in this block and nowhere else — the guard is real, but it guards
      the site, so it only means anything if the reason is written down. Here it is. */
-  --folia-on-accent: var(--text-on-accent, #fff);
+  --folia-on-accent: var(--text-on-accent);
   --folia-on-fill: #fff; /* text on a fill the board chose itself, where no host variable applies */
-  --folia-danger: var(--color-red, #e5534b);
+  --folia-danger: var(--color-red);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
      answered you". Two hues, never a lone colour difference — the tile pairs each with its own
      shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
-  --folia-unread: var(--color-blue, #5b8def);
-  --folia-unread-reply: var(--color-purple, #a882e0);
-  --folia-success: var(--color-green, #4caf7d);
+  --folia-unread: var(--color-blue);
+  --folia-unread-reply: var(--color-purple);
+  --folia-success: var(--color-green);
 
   /* Controls follow the host arrow convention; links use the host link cursor. */
   --folia-cursor-link: var(--cursor-link);
@@ -206,7 +206,7 @@
   --folia-font-size-sm: var(--font-ui-smaller);
   --folia-font-size-md: var(--font-ui-small);
   --folia-font-size-lg: var(--font-ui-medium);
-  --folia-font-mono: var(--font-monospace, monospace);
+  --folia-font-mono: var(--font-monospace);
 
   /* typography — font weights */
   --folia-font-weight-medium: var(--font-medium);

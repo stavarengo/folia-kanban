@@ -195,10 +195,16 @@
    uppercase and the tracking stay too; they are what tells a property row from a form field here. */
 .folia-prop-key {
   flex: 0 0 var(--folia-prop-key-w);
+<<<<<<< HEAD
   color: var(--metadata-label-text-color);
   /* The ellipsis below needs this: without it the label wraps inside its fixed column instead of
      truncating, and `text-overflow` never fires. */
   white-space: nowrap;
+||||||| parent of 8a07b4d (fix(theme): read Obsidian's colours without a literal behind them)
+  color: var(--text-faint, var(--text-muted));
+=======
+  color: var(--text-faint);
+>>>>>>> 8a07b4d (fix(theme): read Obsidian's colours without a literal behind them)
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
   font-size: var(--metadata-label-font-size);
@@ -330,7 +336,7 @@
   font-size: var(--folia-font-size-xxs);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
 }
 .folia-title-step-value {
   min-width: 0;
@@ -688,6 +694,6 @@
 }
 .folia-ts {
   font-size: var(--folia-font-size-xxs);
-  color: var(--text-faint, var(--text-muted));
+  color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
