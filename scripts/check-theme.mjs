@@ -128,11 +128,11 @@ if (!seenRules.has(declared)) fail(TOKENS_CSS, "Missing .folia-scope token block
 // every declaration that reads it are thrown away", which is a blank board from one edit. Nothing
 // in the browser reports it, so "every var() resolves" has to mean resolves, not merely names
 // something that exists.
-for (const effective of [
-  declared,
-  ...[...themed.values()].map((overrides) => new Map([...declared, ...overrides])),
-]) {
-  const reads = (value) => [...value.matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map((m) => m[1]);
+const effectiveSchemes = new Map([
+  ["base", declared],
+  ...[...themed].map(([scheme, overrides]) => [scheme, new Map([...declared, ...overrides])]),
+]);
+for (const [scheme, effective] of effectiveSchemes) {
   const state = new Map();
   const walk = (name, trail) => {
     if (state.get(name) === "done") return;
@@ -140,12 +140,12 @@ for (const effective of [
       const loop = trail.slice(trail.indexOf(name));
       fail(
         `${TOKENS_CSS}:${effective.get(name).line}`,
-        `${loop.concat(name).join(" → ")} is a cycle. CSS throws away every declaration in it, and every declaration that reads one, so the rules that use these tokens would compute to nothing at all.`,
+        `${loop.concat(name).join(" → ")} is a cycle in the ${scheme} scheme. CSS throws away every declaration in it, and every declaration that reads one, so the rules that use these tokens would compute to nothing at all.`,
       );
       return;
     }
     state.set(name, "open");
-    for (const next of reads(effective.get(name).value)) {
+    for (const next of tokenDependencies(effective.get(name).value)) {
       if (effective.has(next)) walk(next, [...trail, name]);
     }
     state.set(name, "done");
@@ -246,6 +246,19 @@ function* varCalls(value) {
   }
 }
 
+// Fallback references participate in CSS cycles even when the fallback would not be used.
+function tokenDependencies(value) {
+  const dependencies = [];
+  const visit = (text) => {
+    for (const [name, fallback] of varCalls(text)) {
+      if (name.startsWith("--folia-")) dependencies.push(name);
+      if (fallback !== null) visit(fallback);
+    }
+  };
+  visit(read(value));
+  return dependencies;
+}
+
 /**
  * The value with every var() NAME replaced by a neutral placeholder — and every fallback left in,
  * stripped the same way. A fallback is live CSS: `var(--x, 17px)` paints 17 pixels the moment
@@ -326,24 +339,24 @@ function checkTokenOverride(decl, where, selector) {
       "Theme token overrides belong only in tokens.css with matching theme metadata.",
     );
   }
-  const seen = new Set([prop]);
-  const queue = [...read(decl.value).matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map((m) => m[1]);
-  while (queue.length) {
-    const next = queue.shift();
-    if (next === prop) {
-      fail(
-        `${where}:${line}`,
-        `${prop} reads itself here, directly or through the tokens it reads. CSS throws away a cycle and every declaration that reads one, so this rule and everything under it would render without any of them.`,
-      );
-      return;
+  // A component selector can match a token scope itself (for example a portalled menu).
+  // Check that possible overlap conservatively; this is not a selector/cascade evaluator.
+  for (const [scheme, effective] of effectiveSchemes) {
+    const seen = new Set([prop]);
+    const queue = tokenDependencies(decl.value);
+    while (queue.length) {
+      const next = queue.shift();
+      if (next === prop) {
+        fail(
+          `${where}:${line}`,
+          `${prop} reads itself directly or through the ${scheme} token map. This would form a cycle if the component rule and token declarations apply to the same element. Keep component overrides independent of tokens that read them.`,
+        );
+        return;
+      }
+      if (seen.has(next) || !effective.has(next)) continue;
+      seen.add(next);
+      queue.push(...tokenDependencies(effective.get(next).value));
     }
-    if (seen.has(next) || !declared.has(next)) continue;
-    seen.add(next);
-    queue.push(
-      ...[...declared.get(next).value.matchAll(/var\(\s*(--folia-[A-Za-z0-9-]+)/g)].map(
-        (m) => m[1],
-      ),
-    );
   }
 }
 

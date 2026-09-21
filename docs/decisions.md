@@ -135,3 +135,13 @@ The former 1.5px token was described as lighter than ordinary borders, but ordin
 The status-bar clearance is different. Its 32px fallback estimates a runtime measurement until the board measures the host status bar; it remains owned with the `--size-4-8` exception. Grid changes must not change that estimate.
 
 **What would change this:** live evidence that a supported theme's border width makes the markers ambiguous or separators unusable. A runtime measurement changing the status-bar clearance is expected and does not reopen the spacing decision.
+
+## Check component token dependencies conservatively
+
+**Decided 2026-09-21 after cycle-guard review. Component overrides must not lead back to themselves through any base, light or dark token map.**
+
+Portalled menus carry both their component class and `.folia-scope`, so a component declaration can close a cycle with declarations from the token block on that same element. The guard checks that possible overlap without attempting to evaluate every selector and cascade combination.
+
+This is stricter than browser cycle detection for descendants. [CSS resolves custom properties before inheritance](https://www.w3.org/TR/css-variables-1/#cycles), so a descendant can read an inherited computed value without reintroducing its ancestor's dependency edges. The guard deliberately rejects that pattern when it would become cyclic on a scope element. Its diagnostic names the possible overlap rather than claiming every descendant use is invalid.
+
+**What would change this:** a necessary component override that the conservative rule rejects despite demonstrably safe selector placement. That would require a narrower check with a regression test, not a claim that inheritance preserves unresolved dependency edges.

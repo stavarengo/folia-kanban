@@ -142,3 +142,87 @@ describe("theme guard adopted foundations", () => {
     reject("Alias it: `--folia-icon-size: var(--icon-xs);");
   });
 });
+
+describe("theme guard dependency parsing", () => {
+  const functions = ["var", "VAR", String.raw`v\61 r`];
+  const setSchemeShadow = (scheme: string, value: string) => {
+    edit("src/theme/tokens.css", (s) =>
+      scheme === "light"
+        ? s.replace("0 1px 1px rgba(0, 0, 0, 0.08)", value)
+        : s + `\n.theme-dark .folia-scope { --folia-shadow-card: ${value}; }\n`,
+    );
+    edit("src/theme/tokens/shadow.tokens.json", (s) => {
+      const metadata = JSON.parse(s) as {
+        card: {
+          themes: Record<string, { $value: string; source: { owned: boolean; reason: string } }>;
+        };
+      };
+      metadata.card.themes[scheme] = {
+        $value: value,
+        source: { owned: true, reason: "Dependency regression fixture." },
+      };
+      return JSON.stringify(metadata);
+    });
+  };
+
+  it.each(functions)("rejects base cycles spelled with %s()", (fn) => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace(
+        "--folia-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16)",
+        `--folia-shadow-card: ${fn}(--folia-shadow-card-selected)`,
+      ),
+    );
+    edit("src/theme/tokens/shadow.tokens.json", (s) =>
+      s.replace(
+        JSON.stringify("0 1px 2px rgba(0, 0, 0, 0.16)"),
+        JSON.stringify(`${fn}(--folia-shadow-card-selected)`),
+      ),
+    );
+    reject("is a cycle in the base scheme");
+  });
+
+  it.each(functions)("rejects direct component cycles spelled with %s()", (fn) => {
+    edit(
+      "src/theme/cards.css",
+      (s) => s + `\n.folia-card { --folia-accent: ${fn}(--folia-accent); }\n`,
+    );
+    reject("reads itself directly");
+  });
+
+  it.each(functions)("finds cycle edges inside fallback arguments spelled with %s()", (fn) => {
+    const value = `var(--interactive-accent, ${fn}(--folia-shadow-card-selected))`;
+    setSchemeShadow("light", value);
+    reject("is a cycle in the light scheme");
+  });
+
+  for (const scheme of ["light", "dark"]) {
+    it.each(functions)(`rejects a ${scheme}/component cycle with a %s() scheme edge`, (fn) => {
+      setSchemeShadow(scheme, `${fn}(--folia-accent)`);
+      edit(
+        "src/theme/column-menu.css",
+        (s) => s + "\n.folia-menu.folia-menu { --folia-accent: var(--folia-shadow-card); }\n",
+      );
+      reject(`through the ${scheme} token map`);
+    });
+
+    it.each(functions)(`rejects a ${scheme}/component cycle with a %s() component edge`, (fn) => {
+      setSchemeShadow(scheme, "var(--folia-accent)");
+      edit(
+        "src/theme/column-menu.css",
+        (s) => s + `\n.folia-menu.folia-menu { --folia-accent: ${fn}(--folia-shadow-card); }\n`,
+      );
+      reject(`through the ${scheme} token map`);
+    });
+  }
+
+  it("accepts a component reference when no scheme leads back to the overridden token", () => {
+    setSchemeShadow("light", "var(--folia-card-bg)");
+    edit(
+      "src/theme/column-menu.css",
+      (s) => s + "\n.folia-menu.folia-menu { --folia-accent: var(--folia-shadow-card); }\n",
+    );
+    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
+      "check-theme: OK",
+    );
+  });
+});
