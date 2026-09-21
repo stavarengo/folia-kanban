@@ -550,9 +550,8 @@
   cursor: var(--folia-cursor-help);
 }
 .folia-done {
-  /* Single-keyword shorthand on purpose — see the note above; the longhand form is flagged. */
-  text-decoration: line-through;
-  color: var(--text-muted);
+  text-decoration: var(--folia-done-decoration);
+  color: var(--folia-done-color);
 }
 /* The empty-state row in either list is a bare `<li class="folia-muted">`, and `.folia-muted` is
    doubled, so it takes the smaller italic size from this rule's `md`. That is the intent — the

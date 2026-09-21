@@ -132,5 +132,12 @@
     "source": {
       "alias": "--size-2-1"
     }
+  },
+  "done-decoration": {
+    "$value": "var(--checklist-done-decoration)",
+    "cssVar": "--folia-done-decoration",
+    "source": {
+      "alias": "--checklist-done-decoration"
+    }
   }
 }

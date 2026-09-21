@@ -234,6 +234,13 @@
       "alias": "--nav-collapse-icon-color-collapsed"
     }
   },
+  "done-color": {
+    "$value": "var(--checklist-done-color)",
+    "cssVar": "--folia-done-color",
+    "source": {
+      "alias": "--checklist-done-color"
+    }
+  },
   "column": {
     "1": {
       "$value": "#4c9aff"

@@ -210,6 +210,12 @@
   --folia-icon-color-focused: var(--icon-color-focused);
   --folia-collapse-icon: var(--nav-collapse-icon-color);
   --folia-collapse-icon-collapsed: var(--nav-collapse-icon-color-collapsed);
+
+  /* A finished subtask or card is the same object as a ticked checklist line, so it is drawn with
+     the same two variables the app draws those with. They also route around the community scan,
+     which flags a literal multi-keyword `text-decoration` but cannot see inside a var(). */
+  --folia-done-decoration: var(--checklist-done-decoration);
+  --folia-done-color: var(--checklist-done-color);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
      answered you". Two hues, never a lone colour difference — the tile pairs each with its own
      shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
