@@ -1,6 +1,7 @@
 {
   "--font-monospace": {
     "observedIn": "1.13.7",
-    "where": "declared on `body` in app.css as `var(--font-monospace-override), var(--font-monospace-theme), var(--font-monospace-default)`; the developer docs list only the three parts, not the variable the app composes from them. Read live through the DevTools bridge on 2026-08-29 (docs/ai/reports/20260829.what-obsidian-already-provides/02.styling-theme-and-design-language.md, \"Verified live\")."
+    "oldestChecked": "1.11.4",
+    "where": "declared on `body` in app.css as `var(--font-monospace-override), var(--font-monospace-theme), var(--font-monospace-default)`; the developer docs list only the three parts, not the variable the app composes from them. Read live through the DevTools bridge on 2026-08-29 (docs/ai/reports/20260829.what-obsidian-already-provides/02.styling-theme-and-design-language.md, \"Verified live\"). On 2026-09-26 the same declaration was found in the app bundles of 1.11.4, 1.11.5, 1.11.7, 1.12.4, 1.12.7, 1.13.4, 1.13.6 and 1.13.7 with `gh release download v<ver> -R obsidianmd/obsidian-releases -p 'obsidian-<ver>.asar.gz'` then `gunzip -c obsidian-<ver>.asar.gz | grep -ao -- '--font-monospace: var[^;]*'`; Insider-only builds were not checked."
   }
 }

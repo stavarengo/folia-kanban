@@ -20,6 +20,7 @@ beforeEach(() => {
   fixture = mkdtempSync(join(tmpdir(), "folia-theme-"));
   cpSync("src/theme", join(fixture, "src/theme"), { recursive: true });
   cpSync("src/ui", join(fixture, "src/ui"), { recursive: true });
+  cpSync("manifest.json", join(fixture, "manifest.json"));
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
@@ -223,6 +224,55 @@ describe("theme guard dependency parsing", () => {
     expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
       "check-theme: OK",
     );
+  });
+});
+
+describe("theme guard observed host variables", () => {
+  /** Pin the manifest floor and add an entry of the fixture's own, so the cases do not move when the
+   *  shipped floor or the shipped entries change. */
+  const observe = (minAppVersion: string, oldestChecked?: string) => {
+    edit("manifest.json", (s) => JSON.stringify({ ...JSON.parse(s), minAppVersion }));
+    edit("src/theme/host/observed.json", (s) =>
+      JSON.stringify({
+        ...JSON.parse(s),
+        "--fixture-host": { observedIn: "1.13.7", where: "Regression fixture.", oldestChecked },
+      }),
+    );
+  };
+  const accept = () =>
+    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
+      "check-theme: OK",
+    );
+
+  it("accepts the shipped entries against the shipped manifest", accept);
+
+  it("accepts an entry checked back to exactly minAppVersion", () => {
+    observe("1.11.4", "1.11.4");
+    accept();
+  });
+
+  it("refuses an entry checked only on builds newer than minAppVersion", () => {
+    observe("1.11.4", "1.13.7");
+    reject(
+      "--fixture-host is confirmed back to 1.13.7 only, but manifest.json admits Obsidian 1.11.4",
+    );
+  });
+
+  it("compares versions by number, not as text", () => {
+    observe("1.11.4", "1.9.0");
+    accept();
+    observe("1.9.0", "1.11.4");
+    reject("--fixture-host is confirmed back to 1.11.4 only");
+  });
+
+  it.each([undefined, "1.11", "latest"])("refuses an oldestChecked of %s", (value) => {
+    observe("1.11.4", value);
+    reject('--fixture-host needs "oldestChecked"');
+  });
+
+  it("refuses a minAppVersion it cannot compare", () => {
+    observe("1.11", "1.11.4");
+    reject("is not a MAJOR.MINOR.PATCH version");
   });
 });
 

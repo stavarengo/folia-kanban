@@ -5,7 +5,8 @@
 // documents or an owned value that says in writing why Obsidian has no answer for it.
 //
 //   A  every var(--x) resolves — a --folia-* token, a documented host variable, or an observed one
-//   B  src/theme/host/observed.json is the only home for a host variable the docs do not list
+//   B  src/theme/host/observed.json is the only home for a host variable the docs do not list, and
+//      each entry has been checked on an Obsidian no newer than manifest.json's minAppVersion
 //   C  no raw design value outside src/theme/tokens.css
 //   D  tokens.css and tokens/*.tokens.json agree on base values and light/dark overrides
 //   E  an owned token whose value is already a documented default must alias that variable
@@ -50,19 +51,52 @@ const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 // ------------------------------------------------------------------ the host registry
 const registry = (await json(join(HOST_DIR, "variables.json"))).variables;
 const observed = await json(join(HOST_DIR, "observed.json"));
+const { minAppVersion } = await json("manifest.json");
+
+/** `1.11.4` as [1, 11, 4], or null for anything that is not three dot-separated integers. */
+const version = (v) =>
+  typeof v === "string" && /^\d+\.\d+\.\d+$/.test(v) ? v.split(".").map(Number) : null;
+const newer = (a, b) => {
+  const i = a.findIndex((n, k) => n !== b[k]);
+  return i !== -1 && a[i] > b[i];
+};
+
+const floor = version(minAppVersion);
+if (!floor) {
+  fail(
+    "manifest.json",
+    `minAppVersion ${JSON.stringify(minAppVersion)} is not a MAJOR.MINOR.PATCH version, so no observed host variable can be checked against it.`,
+  );
+}
 
 for (const [name, entry] of Object.entries(observed)) {
+  const at = join(HOST_DIR, "observed.json");
   if (name in registry) {
     fail(
-      join(HOST_DIR, "observed.json"),
+      at,
       `${name} is documented (${registry[name].pages.join(", ")}), so it does not belong here — delete the entry and read it as a documented variable.`,
     );
   }
   const text = (v) => typeof v === "string" && v.trim() !== "";
   if (!text(entry?.observedIn) || !text(entry?.where)) {
     fail(
-      join(HOST_DIR, "observed.json"),
+      at,
       `${name} needs both "observedIn" (the Obsidian version it was seen in) and "where" (where it was seen), so a later reader can re-check it.`,
+    );
+  }
+  // Nothing tells the board a variable is missing: var() of an undefined name is invalid at
+  // computed-value time and the property quietly inherits. So an undocumented variable has to have
+  // been seen on the oldest app the manifest admits, not only on whichever build was open.
+  const oldest = version(entry?.oldestChecked);
+  if (!oldest) {
+    fail(
+      at,
+      `${name} needs "oldestChecked", the oldest Obsidian version (MAJOR.MINOR.PATCH) it was confirmed on, with how in "where", so the check can be repeated.`,
+    );
+  } else if (floor && newer(oldest, floor)) {
+    fail(
+      at,
+      `${name} is confirmed back to ${entry.oldestChecked} only, but manifest.json admits Obsidian ${minAppVersion}, where nothing says it is defined. Confirm it on ${minAppVersion} (the app bundle of every release is on obsidianmd/obsidian-releases) and lower "oldestChecked", raise minAppVersion, or stop reading the variable.`,
     );
   }
 }
