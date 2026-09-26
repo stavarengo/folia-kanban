@@ -16,3 +16,6 @@ src/theme/*.css
 
 # Lockfile
 pnpm-lock.yaml
+
+# Harness state and sibling worktrees, excluded from git only through .git/info/exclude, which Prettier does not read
+.claude/
