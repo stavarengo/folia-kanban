@@ -23,6 +23,7 @@ describe("obsidian import fence", () => {
     "leaves %s free to import it",
     async (file) => {
       const [result] = await importObsidian(file);
+      expect(result?.fatalErrorCount).toBe(0);
       expect(result?.messages.map((m) => m.ruleId)).not.toContain("no-restricted-imports");
     },
   );
