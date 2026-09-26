@@ -1,27 +1,29 @@
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
-const restrictedPackages = async (file: string) => {
-  const config = await new ESLint().calculateConfigForFile(file);
-  const [severity, options] = config?.rules?.["no-restricted-imports"] ?? [];
-  const paths: { name: string }[] = options?.paths ?? [];
-  return { severity, names: paths.map((p) => p.name) };
-};
-
-describe("obsidian import fence", () => {
-  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts"])(
-    "forbids the obsidian package in %s",
-    async (file) => {
-      const { severity, names } = await restrictedPackages(file);
-      expect(severity).toBe(2);
-      expect(names).toContain("obsidian");
+const eslint = new ESLint();
+const importObsidian = (filePath: string) =>
+  eslint.lintText(
+    'import { normalizePath } from "obsidian";\nexport const path = normalizePath;\n',
+    {
+      filePath,
     },
   );
 
-  it.each(["src/obsidian/vaultRepo.ts", "src/main.ts"])(
+describe("obsidian import fence", () => {
+  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts"])(
+    "rejects the obsidian package in %s",
+    async (file) => {
+      const [result] = await importObsidian(file);
+      expect(result?.messages.map((m) => m.ruleId)).toContain("no-restricted-imports");
+    },
+  );
+
+  it.each(["src/obsidian/vaultRepo.ts", "src/boardNote.ts", "src/view.tsx"])(
     "leaves %s free to import it",
     async (file) => {
-      expect((await restrictedPackages(file)).names).not.toContain("obsidian");
+      const [result] = await importObsidian(file);
+      expect(result?.messages.map((m) => m.ruleId)).not.toContain("no-restricted-imports");
     },
   );
 });
