@@ -102,26 +102,6 @@ export default [
     },
   },
   {
-    // Architecture boundary: the Obsidian API may be imported only by
-    // the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). The domain and
-    // the UI go through the CardRepository port (src/model/repo.ts).
-    files: ["src/model/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "obsidian",
-              message:
-                "UI and domain must not import the Obsidian API directly. Use the CardRepository port (src/model/repo.ts); only src/obsidian/** and the plugin shell may touch obsidian.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
     // Giant files and god functions are forbidden. New code must stay within
     // these limits; the pre-existing offenders are tracked under tracking/waivers/0004 and
     // relaxed in the override block below until they are split.
@@ -202,6 +182,27 @@ export default [
       ? c
       : { ...c, files: ["src/**/*.{ts,tsx}"] },
   ),
+  {
+    // Architecture boundary, placed after the obsidianmd preset spread because that preset turns
+    // `no-restricted-imports` off for src. The Obsidian API may be imported only by
+    // the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). The domain, the UI and
+    // the MCP surface go through the CardRepository port (src/model/repo.ts).
+    files: ["src/model/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}", "src/mcp/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "obsidian",
+              message:
+                "UI, domain and MCP must not import the Obsidian API directly. Use the CardRepository port (src/model/repo.ts); only src/obsidian/** and the plugin shell may touch obsidian.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // no-undef is redundant with the TS type-checker, and `activeWindow`/`activeDocument` are
     // valid Obsidian ambient globals. Disable it for the TS sources the preset enables it on.
