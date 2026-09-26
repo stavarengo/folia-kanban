@@ -24,11 +24,11 @@ The automated a11y gate is installed and enforced. It is **two-layered**:
 - **Static** — `eslint` + `eslint-plugin-jsx-a11y`, exposed as the `lint:a11y` script (which also runs `a11y-exceptions:check`, the fence around the file-scoped exceptions).
 - **Runtime** — `vitest-axe` over the UI suite, exposed as the `test:a11y` script.
 
-Both layers run under `ds:check` and the `lefthook` pre-commit/pre-push hooks, so the gate blocks regressions locally and in CI.
+Both layers run under `ds:check` and `pnpm verify`, which CI runs on every push to `main` and every pull request, so the gate blocks regressions in CI and in a local run of either. The pre-commit hook adds the static layer's `eslint` on the staged files.
 
 **Done:**
 
-- Automated a11y gate installed and **enforced** in `ds:check` / `lefthook` — static (`eslint` + `jsx-a11y`, `lint:a11y`) and runtime (`vitest-axe`, `test:a11y`).
+- Automated a11y gate installed and **enforced** in `ds:check` / `pnpm verify` — static (`eslint` + `jsx-a11y`, `lint:a11y`) and runtime (`vitest-axe`, `test:a11y`).
 - **0 serious/critical** axe violations in the unit-test environment.
 - Landmarks added: board `role=region`, toolbar `role=search`.
 - Dialog panels use `div role=dialog` (fixing the prior false `aria-modal` / region / `aria-prohibited-attr` / `aria-allowed-role` / banner-landmark findings).
@@ -48,4 +48,4 @@ These are careful, manually-tested interaction changes and are tracked under thi
 
 ## Exit plan
 
-Close this waiver only when all four remaining items are delivered and verified: (1) a real focus trap + background `inert` on the modal dialogs, (2) a keyboard path to the `CardItem` context menu, (3) arrow-key navigation that reaches the priority radio group in `CardContextMenu`, and (4) a real-browser / Lighthouse color-contrast audit confirming the palette passes. The per-component and per-pattern **Accessibility contracts** in `docs/design-system/components/` and `docs/design-system/patterns/` are the enforced source of truth, with the two-layer automated a11y gate (`lint:a11y` + `test:a11y`, run under `ds:check` / `lefthook`) as the conformance mechanism for `DS-PROCESS-CONFORMANCE-1` #4.
+Close this waiver only when all four remaining items are delivered and verified: (1) a real focus trap + background `inert` on the modal dialogs, (2) a keyboard path to the `CardItem` context menu, (3) arrow-key navigation that reaches the priority radio group in `CardContextMenu`, and (4) a real-browser / Lighthouse color-contrast audit confirming the palette passes. The per-component and per-pattern **Accessibility contracts** in `docs/design-system/components/` and `docs/design-system/patterns/` are the enforced source of truth, with the two-layer automated a11y gate (`lint:a11y` + `test:a11y`, run under `ds:check` / `pnpm verify`) as the conformance mechanism for `DS-PROCESS-CONFORMANCE-1` #4.

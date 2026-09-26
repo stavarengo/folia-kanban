@@ -1,5 +1,5 @@
-# Git hooks are convenience only. CI and `pnpm verify` are
-# authoritative — hooks can be bypassed locally with --no-verify, CI cannot.
+# Git hooks are convenience only and stay fast. CI runs `pnpm verify` on every
+# push to main and gates releases — hooks can be bypassed, CI cannot.
 pre-commit:
   parallel: true
   commands:
@@ -8,15 +8,22 @@ pre-commit:
       run: pnpm eslint {staged_files} && pnpm prettier --write {staged_files}
       stage_fixed: true
     format-data:
-      glob: "*.{json,mjs,cjs,yml,yaml}"
+      glob: "*.{json,jsonc,mjs,cjs,yml,yaml}"
       run: pnpm prettier --write {staged_files}
       stage_fixed: true
     lint-docs:
       glob: "*.md"
       run: pnpm markdownlint-cli2 {staged_files}
       stage_fixed: true
+    # ls-lint checks only the paths it is given, and a file path does not
+    # cover the directories above it, so pass those too.
+    lint-filenames:
+      run: |
+        for f in {staged_files}; do
+          while [ "$f" != . ]; do printf '%s\0' "$f"; f=$(dirname "$f"); done
+        done | sort -zu | xargs -0 pnpm ls-lint
 
 pre-push:
   commands:
-    verify:
-      run: pnpm verify
+    typecheck:
+      run: pnpm typecheck

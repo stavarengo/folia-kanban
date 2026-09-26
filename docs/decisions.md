@@ -84,6 +84,14 @@ Obsidian's [`obsidianmd/obsidian-workflows`](https://github.com/obsidianmd/obsid
 
 **What would change this:** the action learning to publish rather than draft, or the directory starting to require its release mode for listed plugins.
 
+## A push does not run `pnpm verify`
+
+**Decided 2026-09-10 (#45). The pre-push hook runs `pnpm typecheck` and nothing else.**
+
+The hook used to run the full `pnpm verify`, about a minute per push, and the `verify` job in `.github/workflows/pipeline.yml` runs the identical chain on every push to `main` and every pull request into it; `release` needs that job. CI checks after the push, not before: `main` takes direct pushes with no required check, so a commit that fails lands and leaves `main` red, and releases blocked, until the next fix. That is the accepted cost. The release job installs the hooks too, so release-it's push used to re-verify the version bump on top of the verified commit. That re-run goes too: the bump adds a changelog section and rewrites three version fields, and the push still typechecks it. The checks that take a file list run in pre-commit instead. `vitest related` was tried as a push-time subset and left out: a push touching a model file ran half the test files, the slow ones among them, and took as long as the full `pnpm test`.
+
+**What would change this:** a release cut from a machine rather than the pipeline, a release step that changes more than the version and the changelog, CI no longer running `verify` on every push to `main`, or a red `main` becoming common enough to cost more than the minute each push saved.
+
 ## Identical checklist lines are told apart by count, not by identity
 
 **Decided 2026-09-19. What occurrence counting cannot see stays, because closing it means writing into people's notes.**
