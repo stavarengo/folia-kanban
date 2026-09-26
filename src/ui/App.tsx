@@ -17,7 +17,6 @@ import {
 } from "../model/board";
 import { moveCardOver, moveCardTo, setCardPriority, setSubtaskDone } from "../model/boardOps";
 import { laneRefusal, prospectiveCard } from "../model/lanes";
-import { dateOnly } from "../model/dates";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
 import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
@@ -41,6 +40,7 @@ import { Board } from "./Board";
 import { CardDetail, type DetailMode } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
 import { Icon } from "./icons";
+import { useToday } from "./useToday";
 import { matchCard, parseFilter, type MatchContext } from "../model/filter";
 import { boardPriorities } from "./cardView";
 
@@ -153,7 +153,7 @@ interface Props {
   /** Pushes a settings patch back to the plugin (persist + re-render open views). The function
    *  form reads the settings as they are at write time — for patches to the path-keyed maps. */
   onUpdateSettings: (patch: SettingsPatch) => void;
-  /** Overridable for deterministic tests; defaults to the real date. */
+  /** Pins the date for deterministic tests; otherwise the real date, which follows the clock. */
   today?: string;
   /** The leaf hosting this board, when there is one. See {@link BoardHost}. */
   host?: BoardHost;
@@ -192,7 +192,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number | null>(null);
-  const todayValue = useMemo(() => today ?? dateOnly(), [today]);
+  const todayValue = useToday(today);
   const settingsValue = useMemo(
     () => ({ settings, update: onUpdateSettings }),
     [settings, onUpdateSettings],
