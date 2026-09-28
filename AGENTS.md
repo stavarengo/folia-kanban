@@ -32,6 +32,7 @@
    - 2.1. CDP `Page.captureScreenshot` hangs on Obsidian. Screenshot from inside the page instead: `(await require('@electron/remote').getCurrentWebContents().capturePage()).toPNG()`.
    - 2.2. Playwright's focus emulation, plus Wayland refusing `BrowserWindow.focus()`, means real window blur can't be driven.
    - 2.3. Menu actions can rewrite tracked notes in `examples/`. Run `git checkout -- examples` after testing.
+   - 2.4. An unfocused window stops painting, so `capturePage()` returns its last painted frame (even the loading splash). Resize the window by 1px and back (`getCurrentWindow().setSize`), wait a second, then capture.
 3. Use Obsidian only in your worktree's `examples/` vault. Confirm with `app.vault.getName()`. Several open board tabs put several copies of the board in the DOM, so scope queries to `app.workspace.activeLeaf.view.containerEl`.
 4. Watch and rebuild the plugin into the `examples/` vault on every change: `pnpm run dev:examplesVault` (watch mode — keeps running).
    - 4.1. A build does not reach the running app. Obsidian keeps the stylesheet it loaded, so reload the plugin — `await app.plugins.disablePlugin('folia-kanban')` then `enablePlugin` — and confirm the live sheet's byte length equals the built `styles.css` before trusting any reading of it. Skipping this reports missing variables as missing features.
