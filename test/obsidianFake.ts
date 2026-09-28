@@ -25,6 +25,15 @@ export function normalizePath(path: string): string {
   return tidied === "" ? "/" : tidied;
 }
 
+/**
+ * Obsidian's own `parseYaml`. Obsidian 1.13 bundles the same `yaml` package and calls its
+ * `parse(text, null, {})` with default options, which is exactly this. What the fake cannot pin is
+ * which `yaml` release a given Obsidian build carries.
+ */
+export function parseYaml(yaml: string): unknown {
+  return parse(yaml);
+}
+
 export class TAbstractFile {
   parent: TFolder | null = null;
   constructor(public path: string) {}

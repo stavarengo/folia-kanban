@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseFrontmatter } from "../src/model/card";
+import { parseFrontmatter } from "../src/obsidian/frontmatter";
 import {
   BoardFrontmatterSchema,
   ContextFrontmatterSchema,

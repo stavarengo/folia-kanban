@@ -28,6 +28,7 @@ import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
 import { VIEW_TYPE_KANBAN } from "../viewType";
+import { parseFrontmatter } from "./frontmatter";
 import { attachPropertySuggest } from "./propertySuggest";
 import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
@@ -42,7 +43,6 @@ import {
   cardStats,
   commentDrift,
   parseBody,
-  parseFrontmatter,
   parseSubtasks,
   pendingSubcardLinks,
   removeSubtask as removeSubtaskText,

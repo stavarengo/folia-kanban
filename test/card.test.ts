@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  parseFrontmatter,
   parseBody,
   parseSubtasks,
   splitFrontmatter,
@@ -24,6 +23,7 @@ import {
   commentDrift,
   SECTION,
 } from "../src/model/card";
+import { parseFrontmatter } from "../src/obsidian/frontmatter";
 import { historyAllows } from "../src/model/history";
 import type { LineRef } from "../src/model/types";
 

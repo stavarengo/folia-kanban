@@ -9,10 +9,9 @@
 // All functions take and return the FULL file text so callers can pipe them through
 // vault.process(file, text => ...).
 
-import { parse as parseYaml } from "yaml";
 import type { CardBody, CardStats, LineDrift, LineRef, SubItem, SubtaskRef } from "./types";
 import { fencedLines, unclosedFence } from "./fences";
-import { DataCorruptionError, FrontmatterSchema, decode } from "./schemas";
+import { FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
 
 const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
@@ -66,18 +65,15 @@ export function splitFrontmatter(text: string): { fmText: string; body: string }
   return { fmText, body: text.slice(fmText.length) };
 }
 
-export function parseFrontmatter(text: string): Record<string, unknown> {
+/** The YAML text between a note's `---` fences, or `null` when the note has no frontmatter. */
+export function frontmatterYaml(text: string): string | null {
   const { fmText } = splitFrontmatter(text);
-  if (!fmText) return {};
-  const inner = fmText.replace(/^---\r?\n/, "").replace(/\r?\n---\r?\n?$/, "");
-  let data: unknown;
-  try {
-    data = parseYaml(inner);
-  } catch (e) {
-    // §17: malformed YAML is corruption, not "no frontmatter" — surface it, don't hide it
-    // behind an empty object (which would silently drop the card's status/order/etc.).
-    throw new DataCorruptionError("Card frontmatter is not valid YAML", { cause: e });
-  }
+  if (!fmText) return null;
+  return fmText.replace(/^---\r?\n/, "").replace(/\r?\n---\r?\n?$/, "");
+}
+
+/** What a frontmatter block parsed to, checked: nothing is "no fields", and anything else must be a mapping. */
+export function frontmatterRecord(data: unknown): Record<string, unknown> {
   // An empty frontmatter block (`--- \n ---`) is legitimately "no fields".
   if (data == null) return {};
   // Anything present must be a mapping; a list or scalar in the `---` block is corruption.
