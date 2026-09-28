@@ -6,7 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
-import { DEFAULT_SETTINGS, applySettingsPatch, type KanbanSettings } from "../src/settings";
+import { applySettingsPatch, type BoardSettings } from "../src/settings";
+import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
 import { SettingsContext, useSettings } from "../src/ui/context";
 import { BLOCKS, normalizeRelationTypes } from "../src/model/relationships";
 
@@ -140,8 +141,8 @@ const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
  *  that has no visible DOM signal (e.g. exactly which paths `collapsedCards` holds). */
 function renderStateful(
   repo: FakeRepo,
-  initial: KanbanSettings,
-  settingsBox?: { current: KanbanSettings },
+  initial: BoardSettings,
+  settingsBox?: { current: BoardSettings },
 ) {
   function Stateful() {
     const [settings, setSettings] = useState(initial);
@@ -4794,7 +4795,7 @@ describe("unread comments", () => {
         body: "\n# Alpha\n\n## Comments\n- _2026-06-13 09:00 @rafa:_ mine\n- _2026-06-13 10:00 @agent:_ from the agent\n",
       },
     });
-  const asRafa: KanbanSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
+  const asRafa: BoardSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
 
   it("flags the tile as a reply when an unread comment follows one of yours", async () => {
     render_(conversation(), asRafa);
@@ -5268,7 +5269,7 @@ describe("relationship types beyond blocks", () => {
 });
 
 describe("is: and unread: in the search box and chips", () => {
-  const asRafa: KanbanSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
+  const asRafa: BoardSettings = { ...DEFAULT_SETTINGS, userName: "rafa" };
   const mixedRepo = () =>
     new FakeRepo(config, {
       "Tasks/Blocker.md": {
@@ -7094,7 +7095,7 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
 
 describe("assigning a card (20260827.03)", () => {
   /** The board plus a reader who has told the plugin their name. */
-  const named = (name: string): KanbanSettings => ({ ...DEFAULT_SETTINGS, userName: name });
+  const named = (name: string): BoardSettings => ({ ...DEFAULT_SETTINGS, userName: name });
 
   const openPanel = async (repo: FakeRepo, settings = DEFAULT_SETTINGS) => {
     const user = userEvent.setup();

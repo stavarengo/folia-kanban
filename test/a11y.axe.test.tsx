@@ -12,7 +12,7 @@ import { axe } from "vitest-axe";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
 import type { BoardConfig } from "../src/model/types";
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
 import { BLOCKS } from "../src/model/relationships";
 
 const config: BoardConfig = {

@@ -38,24 +38,21 @@ describe("hydrateSettings", () => {
 
   it("stamps it on upgrade from a data.json written before the field existed, keeping the rest", () => {
     const { settings, needsSave } = hydrateSettings(
-      { userName: "rafa", detailWidth: 420, collapsedCards: { "Tasks/A.md": true } },
+      { userName: "rafa", detailWidth: 420, commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1" } },
       NOW,
     );
     expect(needsSave).toBe(true);
     expect(settings.commentsBaseline).toBe(NOW);
     expect(settings.userName).toBe("rafa");
     expect(settings.detailWidth).toBe(420);
-    expect(settings.collapsedCards).toEqual({ "Tasks/A.md": true });
-    expect(settings.commentsSeen).toEqual({});
+    expect(settings.commentsSeen).toEqual({ "Tasks/A.md": "2026-06-02 10:00#1" });
   });
 
   it("repairs a hand-edited data.json that carries null for a per-card map", () => {
-    const { settings, stored } = hydrateSettings({ commentsSeen: null, collapsedCards: null }, NOW);
+    const { settings, stored } = hydrateSettings({ commentsSeen: null }, NOW);
     expect(settings.commentsSeen).toEqual({});
-    expect(settings.collapsedCards).toEqual({});
     // Dropped rather than repaired in place, so the next write leaves the file clean.
     expect(stored).not.toHaveProperty("commentsSeen");
-    expect(stored).not.toHaveProperty("collapsedCards");
   });
 
   // It decides where a server listens, so a value the settings tab would never have produced must
@@ -100,14 +97,18 @@ describe("hydrateSettings on a file written before settings were sparse", () => 
 
   it("drops every value equal to its default and keeps every value that is not", () => {
     const { settings, stored, needsSave } = hydrateSettings(
-      legacy({ historyScope: "moves", detailWidth: 420, collapsedCards: { "Tasks/A.md": true } }),
+      legacy({
+        historyScope: "moves",
+        detailWidth: 420,
+        commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1" },
+      }),
       NOW,
     );
     expect(needsSave).toBe(true);
     expect(stored).toEqual({
       historyScope: "moves",
       detailWidth: 420,
-      collapsedCards: { "Tasks/A.md": true },
+      commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1" },
       commentsBaseline: "2026-06-01 09:00",
     });
     // Nothing changes for the user: the pruned settings still resolve to what the file said.
@@ -181,22 +182,20 @@ describe("seenMarkerFor", () => {
 describe("migratePathKeyedSettings", () => {
   const settings = {
     ...DEFAULT_SETTINGS,
-    collapsedCards: { "Tasks/A.md": true, "Notes/N.md": false },
-    commentsSeen: { "Tasks/A.md": "2026-08-25 10:00#1" },
+    commentsSeen: { "Tasks/A.md": "2026-08-25 10:00#1", "Notes/N.md": "2026-08-25 11:00#2" },
   };
 
-  it("follows every path-keyed map through a rename in one patch", () => {
+  it("follows the read markers through a rename", () => {
     expect(
       migratePathKeyedSettings(settings, { kind: "rename", from: "Tasks/A.md", to: "Done/A.md" }),
     ).toEqual({
-      collapsedCards: { "Done/A.md": true, "Notes/N.md": false },
-      commentsSeen: { "Done/A.md": "2026-08-25 10:00#1" },
+      commentsSeen: { "Done/A.md": "2026-08-25 10:00#1", "Notes/N.md": "2026-08-25 11:00#2" },
     });
   });
 
-  it("patches only the maps the operation actually touched", () => {
+  it("drops the read marker of a deleted card", () => {
     expect(migratePathKeyedSettings(settings, { kind: "delete", path: "Notes/N.md" })).toEqual({
-      collapsedCards: { "Tasks/A.md": true },
+      commentsSeen: { "Tasks/A.md": "2026-08-25 10:00#1" },
     });
   });
 
@@ -355,7 +354,7 @@ describe("a data.json changed by Sync or by hand", () => {
   const LOCAL: StoredSettings = {
     commentsBaseline: NOW,
     detailWidth: 420,
-    collapsedCards: { "Tasks/A.md": true },
+    commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1" },
   };
 
   it("is read, so what the other side wrote is no longer overwritten by this instance", () => {
@@ -378,15 +377,18 @@ describe("a data.json changed by Sync or by hand", () => {
     expect(needsSave).toBe(false);
   });
 
-  // Two JSON parses of the same content, and two devices that toggled the same cards in a different
+  // Two JSON parses of the same content, and two devices that opened the same cards in a different
   // order, both produce objects whose keys sit in different places.
   it("compares by value, not by the order keys happen to sit in", () => {
     const local: StoredSettings = {
       commentsBaseline: NOW,
-      collapsedCards: { "Tasks/A.md": true, "Tasks/B.md": false },
+      commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1", "Tasks/B.md": "2026-06-02 11:00#1" },
     };
     const { changedKeys } = adoptExternalSettings(
-      { collapsedCards: { "Tasks/B.md": false, "Tasks/A.md": true }, commentsBaseline: NOW },
+      {
+        commentsSeen: { "Tasks/B.md": "2026-06-02 11:00#1", "Tasks/A.md": "2026-06-02 10:00#1" },
+        commentsBaseline: NOW,
+      },
       local,
       NOW,
     );
@@ -395,7 +397,7 @@ describe("a data.json changed by Sync or by hand", () => {
 
   it("adopts a setting the other side put back to its default", () => {
     const { settings, stored, changedKeys } = adoptExternalSettings(
-      onDisk({ commentsBaseline: NOW, collapsedCards: { "Tasks/A.md": true } }),
+      onDisk({ commentsBaseline: NOW, commentsSeen: { "Tasks/A.md": "2026-06-02 10:00#1" } }),
       LOCAL,
       NOW,
     );
@@ -431,12 +433,12 @@ describe("a data.json changed by Sync or by hand", () => {
 
   it("repairs what a hand-edit left where a value belongs, and asks for the file to be healed", () => {
     const { settings, needsSave } = adoptExternalSettings(
-      onDisk({ ...LOCAL, collapsedCards: null as unknown as Record<string, boolean> }),
+      onDisk({ ...LOCAL, commentsSeen: null as unknown as Record<string, string> }),
       LOCAL,
       NOW,
     );
     expect(needsSave).toBe(true);
-    expect(settings.collapsedCards).toEqual({});
+    expect(settings.commentsSeen).toEqual({});
   });
 });
 

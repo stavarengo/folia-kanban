@@ -15,7 +15,7 @@ import {
 
 /**
  * The settings a user edits from the settings tab. The rest of `KanbanSettings` is bookkeeping the
- * plugin writes for itself (`collapsedCards`, `commentsSeen`, `commentsBaseline`) and never shows.
+ * plugin writes for itself (`commentsSeen`, `commentsBaseline`) and never shows.
  */
 export type EditableSettingKey =
   | "boardNoteDefaultView"

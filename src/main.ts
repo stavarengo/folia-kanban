@@ -25,6 +25,12 @@ import { remapPath } from "./model/pathOps";
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
 import { mcpTokenOutcome } from "./mcp/token";
 import {
+  DeviceStateStore,
+  remapDeviceState,
+  splitDevicePatch,
+  legacyCollapsedCards,
+} from "./deviceState";
+import {
   DEFAULT_SETTINGS,
   adoptExternalSettings,
   hydrateSettings,
@@ -34,6 +40,7 @@ import {
   peekStoredMcpToken,
   settingsForDisk,
   withoutStoredMcpToken,
+  type BoardSettings,
   type KanbanSettings,
   type SettingsPatch,
   type StoredSettings,
@@ -111,6 +118,13 @@ export default class FoliaKanbanPlugin extends Plugin {
    *  two cannot drift. */
   private stored: StoredSettings = {};
 
+  /** What this device keeps for itself, in local storage rather than `data.json`. Boards see it
+   *  merged into the settings, and {@link updateSettings} splits their writes between the two. */
+  private readonly device = new DeviceStateStore({
+    load: (key) => this.app.loadLocalStorage(key) as unknown,
+    save: (key, value) => this.app.saveLocalStorage(key, value),
+  });
+
   /** Tabs the user sent to the Markdown editor with the button, and the note they did it for.
    *  Nothing else ever writes to this: it records a decision a person made, never a guess about
    *  one. Keyed on the leaf so it dies with the tab, and scoped to the file so the decision does
@@ -148,8 +162,13 @@ export default class FoliaKanbanPlugin extends Plugin {
       (leaf) =>
         new KanbanView(
           leaf,
-          () => this.settings,
-          (p) => void this.updateSettings(p),
+          () => this.boardSettings(),
+          (p) =>
+            void this.updateSettings(p).catch((e: unknown) => {
+              // Nothing awaits a board's write, so a refused one would otherwise be an unhandled
+              // rejection. What the board shows is already applied; only keeping it failed.
+              new Notice(`Folia Kanban: could not save a board change. ${String(e)}`, 8000);
+            }),
           (view) => {
             const file = view.file;
             if (file) void this.showMarkdownIn(view.leaf, file.path);
@@ -322,7 +341,10 @@ export default class FoliaKanbanPlugin extends Plugin {
       else this.markdownTabs.set(leaf, next);
     });
     try {
-      await this.updateSettings((s) => migratePathKeyedSettings(s, op));
+      await this.updateSettings((s) => ({
+        ...migratePathKeyedSettings(s, op),
+        ...remapDeviceState(s, op),
+      }));
     } catch (e) {
       // Nothing awaits this (it runs off a vault event), so a failed write would otherwise be an
       // unhandled rejection: invisible to the user and to anything that could react. The in-memory
@@ -567,6 +589,7 @@ export default class FoliaKanbanPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const loaded: unknown = await this.loadData();
+    this.device.load(legacyCollapsedCards(loaded));
     const { settings, stored, needsSave } = hydrateSettings(loaded, stamp());
     this.stored = stored;
     this.settings = settings;
@@ -628,8 +651,8 @@ export default class FoliaKanbanPlugin extends Plugin {
    * what is taken and what still resolves last-write-wins.
    */
   override async onExternalSettingsChange(): Promise<void> {
-    // Both awaits below are moments where this instance can change its own settings — a collapse
-    // toggle, a width drag, a rename arriving in the same Sync burst. Adopting then would compare
+    // Both awaits below are moments where this instance can change its own settings — a width drag,
+    // a comment marked seen, a rename arriving in the same Sync burst. Adopting then would compare
     // the file against settings newer than it and drop them. The stored set is replaced rather than
     // mutated on every write, so its identity is the whole test; a few attempts, and if the user is
     // still typing we leave the file to the write that is already on its way.
@@ -663,8 +686,8 @@ export default class FoliaKanbanPlugin extends Plugin {
       // an install that had no token to give.
       if (this.settleMcpToken()) write = true;
       this.refreshViews();
-      // Only when a row it draws actually moved: `data.json` also carries per-card state written by
-      // ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
+      // Only when a row it draws actually moved: `data.json` also carries per-card read markers
+      // written by ordinary board use elsewhere, and letting that redraw the tab would throw away a name being
       // typed for a change the tab is not even showing.
       // An own key, not `in`: a hand-edited file can carry a key named after something every
       // object inherits, and `"constructor" in SETTING_CONTROLS` is true. Same call `getControlValue`
@@ -709,19 +732,37 @@ export default class FoliaKanbanPlugin extends Plugin {
     await write;
   }
 
+  /** What a board runs on: the settings, with this device's own state merged in. */
+  boardSettings(): BoardSettings {
+    return { ...this.settings, ...this.device.current };
+  }
+
   /** Apply a settings patch and push it live into every open board immediately, then persist in
    *  the background. Refreshing before the write resolves (not after) matters for any caller that
    *  reads a patch back off the live `settings` prop to build its next one — the subitems-collapse
    *  toggle does this on every click (§ collapse) — because waiting on the write first would let a
-   *  second update land before the first was visible anywhere, and silently lose it. */
+   *  second update land before the first was visible anywhere, and silently lose it. The part of
+   *  the patch that is device state goes to local storage, so a collapse toggle never writes
+   *  `data.json`. */
   async updateSettings(patch: SettingsPatch): Promise<void> {
-    if (!this.applyToStored(resolveSettingsPatch(this.settings, patch))) return;
+    const { device, synced } = splitDevicePatch(resolveSettingsPatch(this.boardSettings(), patch));
+    const deviceChanged = Object.keys(device).length > 0;
+    const syncedChanged = this.applyToStored(synced);
     // Switching agent access on for the first time is when its token comes into existence: it is
     // generated once and kept, so the client configured against it keeps working across restarts.
-    this.settleMcpToken();
-    this.refreshViews();
-    void this.mcp?.sync(this.settings);
-    await this.saveSettings();
+    if (syncedChanged) this.settleMcpToken();
+    try {
+      if (deviceChanged) this.device.update(device);
+    } finally {
+      // Local storage refusing a write must not keep the other half from landing: a rename carries
+      // the collapse state and the read marker in one patch, and a marker left on the old path
+      // would pass to whichever card is created there next.
+      if (deviceChanged || syncedChanged) this.refreshViews();
+      if (syncedChanged) {
+        void this.mcp?.sync(this.settings);
+        await this.saveSettings();
+      }
+    }
   }
 
   /**

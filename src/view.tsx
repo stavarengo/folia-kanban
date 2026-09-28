@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App as BoardApp, type BoardHost } from "./ui/App";
 import { VaultRepository } from "./obsidian/vaultRepo";
-import type { KanbanSettings, SettingsPatch } from "./settings";
+import type { BoardSettings, SettingsPatch } from "./settings";
 import { VIEW_TYPE_KANBAN } from "./viewType";
 
 /**
@@ -55,7 +55,7 @@ export class KanbanView extends FileView {
 
   constructor(
     leaf: WorkspaceLeaf,
-    private getSettings: () => KanbanSettings,
+    private getSettings: () => BoardSettings,
     private updateSettings: (patch: SettingsPatch) => void,
     private openAsMarkdown: (view: KanbanView) => void,
   ) {

@@ -25,7 +25,13 @@ import {
 import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
-import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
+import {
+  isCollapsedIn,
+  seenMarkerFor,
+  type BoardSettings,
+  type KanbanSettings,
+  type SettingsPatch,
+} from "../settings";
 import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
 import {
   BoardActionsContext,
@@ -155,7 +161,7 @@ export interface BoardHost {
 interface Props {
   repo: CardRepository;
   /** Live settings, sourced from the plugin via the view. */
-  settings: KanbanSettings;
+  settings: BoardSettings;
   /** Pushes a settings patch back to the plugin (persist + re-render open views). The function
    *  form reads the settings as they are at write time — for patches to the path-keyed maps. */
   onUpdateSettings: (patch: SettingsPatch) => void;
@@ -528,7 +534,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         const newPath = await rename();
         if (newPath !== path) {
           onUpdateSettings((s) => {
-            const migrated: Partial<KanbanSettings> = {};
+            const migrated: Partial<BoardSettings> = {};
             const collapsed = s.collapsedCards[path];
             if (collapsed !== undefined)
               migrated.collapsedCards = {
@@ -591,7 +597,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
             // view's write landing in between is not undone. Only once the file is actually gone:
             // a delete that failed leaves the card, and it must keep what it had.
             onUpdateSettings((s) => {
-              const prune: Partial<KanbanSettings> = {};
+              const prune: Partial<BoardSettings> = {};
               if (s.collapsedCards[path] !== undefined)
                 prune.collapsedCards = withoutKey(s.collapsedCards, path);
               if (s.commentsSeen[path] !== undefined)

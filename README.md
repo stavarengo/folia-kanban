@@ -126,7 +126,7 @@ Every card tile that has nested subitems — a next-todos preview, a group of su
 
 The toggle is per card, and it nests: collapsing a card also hides its subcards' own toggles (and their children), and a subcard keeps its own collapsed/expanded state when its parent is expanded again — so a big subtree can be folded down to just its top level. A column's **⋯** menu adds **Collapse all subitems** / **Expand all subitems**, which reaches every card currently shown in that column and its full nested subtree, not just the top level.
 
-Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again.
+Whether a card starts expanded or collapsed, before anyone has touched its toggle, is Settings → **Subitems default state**. Once you toggle a card (directly, or via collapse/expand-all), that card remembers its own state from then on — it survives closing and reopening the board — until you toggle it again. That memory belongs to the device: it is kept outside the vault, so a synced vault does not carry which cards you collapsed on one machine to another, and each device keeps its own. A device upgrading from a version that kept this in the vault starts from what that version left there.
 
 ## Unread comments
 

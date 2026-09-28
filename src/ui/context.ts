@@ -4,7 +4,13 @@ import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig, TodoLine } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
 import { unreadComments } from "../model/unread";
-import { isCollapsedIn, seenMarkerFor, type KanbanSettings, type SettingsPatch } from "../settings";
+import {
+  isCollapsedIn,
+  seenMarkerFor,
+  type BoardSettings,
+  type KanbanSettings,
+  type SettingsPatch,
+} from "../settings";
 import type { MatchContext } from "../model/filter";
 
 /**
@@ -46,13 +52,13 @@ export function useRepo(): CardRepository {
 
 /** Live settings plus an updater, provided by App and fed from the view/plugin. */
 export interface SettingsContextValue {
-  settings: KanbanSettings;
+  settings: BoardSettings;
   update: (patch: SettingsPatch) => void;
 }
 
 export const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-export function useSettings(): KanbanSettings {
+export function useSettings(): BoardSettings {
   const c = useContext(SettingsContext);
   if (!c) throw new Error("SettingsContext missing");
   return c.settings;

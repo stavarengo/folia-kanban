@@ -1,3 +1,4 @@
+import type { DeviceState } from "./deviceState";
 import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress } from "./mcp/bindAddress";
 import type { FileOp } from "./model/pathOps";
 import { remapPathKeys } from "./model/pathOps";
@@ -37,13 +38,9 @@ export interface KanbanSettings {
   /** Whether converting is offered in the right-click menu inside a note's editor. */
   boardSetupEditorMenu: boolean;
   /** Whether a card's nested subitems (inline todos preview + subcard files) start expanded or
-   *  collapsed when a card has never been toggled explicitly. `collapsedCards` overrides this
-   *  per card. */
+   *  collapsed when a card has never been toggled explicitly. `DeviceState.collapsedCards`
+   *  overrides this per card. */
   subitemsDefault: "expanded" | "collapsed";
-  /** Explicit per-card collapse override, keyed by card path — set the first time a card's
-   *  subitems toggle is used (directly, or via a column's collapse/expand-all). Absent from this
-   *  map means "follow `subitemsDefault`". Plugin data, never written to the note. */
-  collapsedCards: Record<string, boolean>;
   /**
    * The name comments added from the board are signed with (`- _<ts> @name:_ …`). Empty (the
    * default) writes them unsigned, exactly as before authorship existed. It is also who "me" is:
@@ -88,6 +85,11 @@ export interface KanbanSettings {
   mcpBindAddress: string;
 }
 
+/** What a board reads and writes: the settings, plus what this device keeps for itself. One object,
+ *  so the board never has to know which of the two stores a value lives in; the plugin splits
+ *  every write between them. */
+export type BoardSettings = KanbanSettings & DeviceState;
+
 /**
  * What a settings write accepts: a plain patch, or a function of the settings as they are at the
  * moment of writing. The function form is for patches that replace one of the path-keyed maps
@@ -95,21 +97,21 @@ export interface KanbanSettings {
  * to back would each replace the map with their own copy and the second would drop the first's entry.
  */
 export type SettingsPatch =
-  | Partial<KanbanSettings>
-  | ((current: KanbanSettings) => Partial<KanbanSettings>);
+  | Partial<BoardSettings>
+  | ((current: BoardSettings) => Partial<BoardSettings>);
 
 /** The plain patch a write means: the function form resolved against the settings as they are at
  *  the moment of writing. Empty when the write changes nothing. */
 export function resolveSettingsPatch(
-  current: KanbanSettings,
+  current: BoardSettings,
   patch: SettingsPatch,
-): Partial<KanbanSettings> {
+): Partial<BoardSettings> {
   return typeof patch === "function" ? patch(current) : patch;
 }
 
 /** Returns `current` itself (same reference) when the patch has nothing in it, so callers can skip
  *  the refresh and the disk write an empty patch would otherwise cost. */
-export function applySettingsPatch(current: KanbanSettings, patch: SettingsPatch): KanbanSettings {
+export function applySettingsPatch(current: BoardSettings, patch: SettingsPatch): BoardSettings {
   const p = resolveSettingsPatch(current, patch);
   return Object.keys(p).length === 0 ? current : { ...current, ...p };
 }
@@ -128,7 +130,6 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   boardSetupFileMenu: true,
   boardSetupEditorMenu: true,
   subitemsDefault: "expanded",
-  collapsedCards: {},
   userName: "",
   commentsSeen: {},
   commentsBaseline: "",
@@ -174,8 +175,7 @@ export function withoutStoredMcpToken(stored: StoredSettings): StoredSettings {
 
 /**
  * What `data.json` holds: only the settings someone actually set — the user in the settings tab, or
- * the plugin writing its own bookkeeping (`collapsedCards`, `commentsSeen`,
- * `commentsBaseline`). Everything absent is answered by `DEFAULT_SETTINGS` at read time, which is what lets
+ * the plugin writing its own bookkeeping (`commentsSeen`, `commentsBaseline`). Everything absent is answered by `DEFAULT_SETTINGS` at read time, which is what lets
  * a later release change a default and have it reach installs that never chose one, and what lets a
  * feature tell "never set" from a deliberate choice that happens to equal the default. Keys this
  * build does not know about are carried through untouched, so a file written by a newer one
@@ -270,9 +270,8 @@ function dropUnusable(stored: StoredSettings): boolean {
     delete stored[key];
     dropped = true;
   };
-  // Every tile reads these, so `null` for a map must not reach them.
-  for (const key of ["collapsedCards", "commentsSeen"] as const)
-    if (key in stored && !isRecord(stored[key])) drop(key);
+  // Every tile reads it, so `null` for a map must not reach it.
+  if ("commentsSeen" in stored && !isRecord(stored.commentsSeen)) drop("commentsSeen");
   // Same reason, and it decides where a server listens: `null` here would reach `listen` as a
   // non-string and come back as "could not start on address null" with a TypeError attached.
   if (
@@ -305,14 +304,14 @@ export function seenMarkerFor(settings: KanbanSettings, path: string): string | 
  * groups it unmounts) and the search tally (a match hidden inside a collapsed card is not on
  * screen) have to answer it the same way.
  */
-export function isCollapsedIn(settings: KanbanSettings, path: string): boolean {
+export function isCollapsedIn(settings: BoardSettings, path: string): boolean {
   return settings.collapsedCards[path] ?? settings.subitemsDefault === "collapsed";
 }
 
 /**
  * Every setting keyed by card path. One list, so a file operation that bypasses the plugin's own
  * actions keeps reaching all of them: adding the next path-keyed map means adding it here, not
- * finding this code again.
+ * finding this code again. Path-keyed device state has its own, `remapDeviceState`.
  */
 type PathKeyedMap = {
   [K in keyof KanbanSettings]: KanbanSettings[K] extends Record<string, unknown> ? K : never;
@@ -322,7 +321,6 @@ type PathKeyedMap = {
 // `KanbanSettings` and typecheck fails here until it is listed, so the migration below cannot
 // quietly fall behind the settings it is supposed to cover.
 const PATH_KEYED_MAPS = {
-  collapsedCards: true,
   commentsSeen: true,
 } satisfies Record<PathKeyedMap, true>;
 
@@ -402,8 +400,7 @@ export function adoptExternalSettings(
   // file saying every setting was unset. `hydrateSettings` reads it as the latter — right at load,
   // where an install has nothing to lose, and destructive here, where taking it at its word would
   // reset the running settings to their defaults and then write that back over everything the file
-  // is only failing to show: the read markers, the per-card collapse state, the bind address a
-  // server is answering on.
+  // is only failing to show: the read markers, the bind address a server is answering on.
   if (!isRecord(loaded))
     return {
       settings: resolveSettings(current),
