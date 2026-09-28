@@ -311,7 +311,7 @@
   font-size: var(--folia-font-size-xxs);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-key);
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 .folia-title-step-value {
   min-width: 0;
@@ -491,17 +491,20 @@
   margin-top: var(--folia-space-xxs);
 }
 /* The subitem's own column. Quiet until hovered/focused: most subitems live with their card, so
-   the control should not compete with the subtask text for attention. */
-.folia-subtask-column {
+   the control should not compete with the subtask text for attention. The fade dims the whole
+   control, frame and chevron included; at `--folia-opacity-subtle` its label fell under WCAG AA in
+   both schemes, and `--folia-opacity-muted` clears it. A disabled one (a link naming no card) has
+   nothing to reveal, so hovering its row leaves it quiet. */
+.folia-scope .folia-subtask-column {
   flex: 0 0 auto;
   margin-left: auto;
   max-width: 40%;
   font-size: var(--folia-font-size-xs);
   padding: var(--folia-space-hair) var(--folia-space-xs);
-  opacity: var(--folia-opacity-subtle);
+  opacity: var(--folia-opacity-muted);
 }
-.folia-subtask:hover .folia-subtask-column,
-.folia-subtask-column:focus {
+.folia-scope .folia-subtask:hover .folia-subtask-column:not(:disabled),
+.folia-scope .folia-subtask-column:focus {
   opacity: var(--folia-opacity-shown);
 }
 /* One relationship row: the linked card, then either its remove button or a note saying the link
@@ -520,7 +523,6 @@
 }
 .folia-link-missing {
   color: var(--folia-link-unresolved-color);
-  opacity: var(--folia-link-unresolved-opacity);
   filter: var(--folia-link-unresolved-filter);
   /* Still drawn as a border rather than as a text-decoration, and the reason survived the move onto
      the link variables: the community-directory CSS scan flags the text-decoration longhands and
@@ -674,6 +676,6 @@
 }
 .folia-ts {
   font-size: var(--folia-font-size-xxs);
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }

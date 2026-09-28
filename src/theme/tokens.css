@@ -223,13 +223,20 @@
 
   /* Links. Obsidian distinguishes three kinds and the board draws two of them: a resolved internal
      link, and a name that matches no card on the board, which is the unresolved case. */
-  --folia-link-color: var(--link-color);
-  --folia-link-color-hover: var(--link-color-hover);
+  /* The colour is owned: the default light accent Obsidian links with, #8a5cf5, is 4.26:1 even on
+     #ffffff, so no surface can make it pass WCAG AA. Mixed toward --text-normal it keeps the theme's
+     hue and, for the default accent, clears 4.5:1 on --background-primary, -secondary and
+     -primary-alt in both schemes. The hover colour is a lighter accent in light, so it takes more
+     --text-normal (see docs/decisions.md). */
+  --folia-link-color: color-mix(in srgb, var(--link-color) 75%, var(--text-normal));
+  --folia-link-color-hover: color-mix(in srgb, var(--link-color-hover) 55%, var(--text-normal));
   --folia-link-decoration: var(--link-decoration);
   --folia-link-decoration-hover: var(--link-decoration-hover);
   --folia-link-weight: var(--link-weight);
-  --folia-link-unresolved-color: var(--link-unresolved-color);
-  --folia-link-unresolved-opacity: var(--link-unresolved-opacity);
+  /* A missing link is dimmed by colour, not by Obsidian's `--link-unresolved-opacity`: its 0.7 over
+     the accent is 2.7:1 on the detail dialog in light. Half the accent in --text-muted still reads as
+     quieter than a resolved link. */
+  --folia-link-unresolved-color: color-mix(in srgb, var(--link-unresolved-color) 50%, var(--text-muted));
   --folia-link-unresolved-filter: var(--link-unresolved-filter);
   --folia-link-unresolved-decoration-color: var(--link-unresolved-decoration-color);
   /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone

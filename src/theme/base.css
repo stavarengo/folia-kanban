@@ -31,8 +31,10 @@
   color: var(--folia-link-color-hover);
   text-decoration: var(--folia-link-decoration-hover);
 }
+/* `--text-muted`, not `--text-faint`: faint is 2.3:1 on the detail dialog in light and 3.0:1 in dark, and
+   this is text someone has to read. The italic and the smaller size keep it secondary. */
 .folia-scope .folia-muted {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   font-style: italic;
 }

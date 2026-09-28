@@ -16,8 +16,11 @@
 }
 /* The strip occupies left 5–7px; `.folia-card-main`'s existing 12px left padding already clears it,
    so no extra body inset is needed (and a folder-only card with no color must stay visually inert). */
+/* The context colour is whatever `_context.md` says, so the text is mostly --text-normal: at 30%,
+   any sRGB colour, white and black included, stays above 5:1 on its own tint over every card and
+   panel background of the default themes. The tint, the border and the strip carry the hue. */
 .folia-scope .folia-chip-context {
-  color: var(--folia-ctx-color, var(--text-muted));
+  color: color-mix(in srgb, var(--folia-ctx-color, var(--text-muted)) 30%, var(--text-normal));
   background: color-mix(in oklch, var(--folia-ctx-color, var(--text-muted)) 16%, transparent);
   border-color: color-mix(in oklch, var(--folia-ctx-color, var(--text-muted)) 30%, transparent);
 }

@@ -48,13 +48,6 @@
       "reason": "Obsidian publishes opacity only for icons; the board's recessive states are its own."
     }
   },
-  "link-unresolved": {
-    "$value": "var(--link-unresolved-opacity)",
-    "cssVar": "--folia-link-unresolved-opacity",
-    "source": {
-      "alias": "--link-unresolved-opacity"
-    }
-  },
   "icon": {
     "$value": "var(--icon-opacity)",
     "cssVar": "--folia-icon-opacity",

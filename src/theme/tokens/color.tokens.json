@@ -221,24 +221,27 @@
     }
   },
   "link-color": {
-    "$value": "var(--link-color)",
+    "$value": "color-mix(in srgb, var(--link-color) 75%, var(--text-normal))",
     "cssVar": "--folia-link-color",
     "source": {
-      "alias": "--link-color"
+      "owned": true,
+      "reason": "Obsidian's default light link colour is 4.26:1 on white, under WCAG AA on every surface; mixed toward --text-normal it keeps the theme's hue and passes (measured live 2026-09-29, docs/decisions.md)."
     }
   },
   "link-color-hover": {
-    "$value": "var(--link-color-hover)",
+    "$value": "color-mix(in srgb, var(--link-color-hover) 55%, var(--text-normal))",
     "cssVar": "--folia-link-color-hover",
     "source": {
-      "alias": "--link-color-hover"
+      "owned": true,
+      "reason": "Obsidian's default light link hover is a lighter accent, 3.8:1 even at the rest colour's 75%; at 55% it measured 5.4:1 in light and 9.1:1 in dark (2026-09-29, docs/decisions.md)."
     }
   },
   "link-unresolved-color": {
-    "$value": "var(--link-unresolved-color)",
+    "$value": "color-mix(in srgb, var(--link-unresolved-color) 50%, var(--text-muted))",
     "cssVar": "--folia-link-unresolved-color",
     "source": {
-      "alias": "--link-unresolved-color"
+      "owned": true,
+      "reason": "Obsidian dims an unresolved link to 0.7 of its accent, 2.7:1 on the detail dialog in light; half the accent in --text-muted keeps it quieter than a resolved link and readable (measured 2026-09-29, docs/decisions.md)."
     }
   },
   "link-unresolved-decoration-color": {

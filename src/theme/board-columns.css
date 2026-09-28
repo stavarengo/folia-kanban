@@ -77,9 +77,11 @@
   min-width: var(--folia-count-w-min);
   justify-content: center;
 }
-.folia-column-count.is-over-limit {
-  color: var(--folia-on-accent);
-  background: var(--folia-danger);
+/* A danger tint behind the normal text colour, not white on the palette red, which is 3.5:1 in dark
+   and 4.2:1 in light: small text needs 4.5:1. The column's red edge and header tint say the rest. */
+.folia-scope .folia-column-count.is-over-limit {
+  color: var(--text-normal);
+  background: color-mix(in oklch, var(--folia-danger) 22%, transparent);
 }
 /* These two mix into opaque colours and stay in srgb — see src/theme/README.md. */
 .folia-column.is-over-limit {
@@ -113,22 +115,20 @@
   justify-content: center;
   gap: var(--folia-space-sm);
   padding: var(--folia-space-xl-plus) var(--folia-space-md);
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   border: var(--folia-border-width) dashed var(--folia-border);
   border-radius: var(--folia-r);
-  opacity: var(--folia-opacity-muted);
 }
 .folia-column-empty.is-filtered {
   border: none;
   padding: var(--folia-gap) var(--folia-space-md);
-  opacity: var(--folia-opacity-faint);
   font-style: italic;
 }
 
 .folia-column-rule {
   margin: 0 var(--folia-space-md) var(--folia-space-md);
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--folia-font-size-sm);
   text-align: center;
 }
