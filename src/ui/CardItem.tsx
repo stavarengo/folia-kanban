@@ -16,6 +16,7 @@ import {
   useUnreadComments,
 } from "./context";
 import { Icon } from "./icons";
+import { useReducedMotion } from "./useReducedMotion";
 
 interface Props {
   card: Card;
@@ -78,9 +79,12 @@ function CardItemInner({
   // cross-column relocation) so the sortable identity matches the column's SortableContext item
   // set — and so the same card in a lane + its status column registers two distinct sortables.
   const draggable = !nested && dragId != null;
+  const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: draggable ? dragId : card.path,
     disabled: !draggable,
+    // null switches off both the make-room slide and the settle.
+    ...(reducedMotion ? { transition: null } : {}),
   });
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),

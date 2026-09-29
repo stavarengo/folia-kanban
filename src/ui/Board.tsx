@@ -34,6 +34,7 @@ import { AddColumn } from "./AddColumn";
 import { useBoardActions, useSettings } from "./context";
 import type { Filter } from "../model/filter";
 import { cardChips, isCompletable, priorityTone } from "./cardView";
+import { useReducedMotion } from "./useReducedMotion";
 
 // The pan gesture and the card-drag sensor share the same pointer, so exactly one must claim a given
 // press. The live pan mode (settings.boardPan) decides which — but dnd-kit instantiates the sensor
@@ -88,6 +89,7 @@ export function Board({
   panModeRef.current = boardPan;
 
   const columnIds = board.config.columns.map((c) => c.id);
+  const reducedMotion = useReducedMotion();
   const sensors = useSensors(
     useSensor(PanAwarePointerSensor, {
       // A short distance threshold lets a click stay a click (never hijacked into a drag) while a
@@ -99,6 +101,8 @@ export function Board({
       coordinateGetter: sortableKeyboardCoordinates,
       // Space picks up / drops; Enter is left free for opening a focused card.
       keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
+      // Moving a card past the edge scrolls its container; dnd-kit smooths that scroll by default.
+      scrollBehavior: reducedMotion ? "auto" : "smooth",
     }),
   );
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -416,16 +420,23 @@ export function Board({
             className="folia-scope"
             // The live make-room gap (`dragReloc`) keeps the dragged card's placeholder at its
             // destination slot for BOTH same- and cross-column drops, so the overlay always tweens
-            // cleanly from the cursor into that slot — one unconditional settle animation.
-            dropAnimation={{
-              duration: 200,
-              easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-              // Briefly dim the overlay as it settles into the placeholder, so the lift visibly
-              // "lands" rather than blinking out.
-              sideEffects: defaultDropAnimationSideEffects({
-                styles: { active: { opacity: "var(--folia-opacity-faint)" } },
-              }),
-            }}
+            // cleanly from the cursor into that slot — one settle animation, skipped under reduced
+            // motion.
+            dropAnimation={
+              reducedMotion
+                ? null
+                : {
+                    duration: 200,
+                    easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+                    // Briefly dim the overlay as it settles into the placeholder, so the lift
+                    // visibly "lands" rather than blinking out.
+                    sideEffects: defaultDropAnimationSideEffects({
+                      styles: { active: { opacity: "var(--folia-opacity-faint)" } },
+                    }),
+                  }
+            }
+            // A keyboard drag also tweens the overlay between arrow steps (dnd-kit's default).
+            {...(reducedMotion ? { transition: "none" } : {})}
           >
             {activeColumn ? (
               // #1 (fix) — a dragged COLUMN gets a real lifted ghost too (col-header gave columns a

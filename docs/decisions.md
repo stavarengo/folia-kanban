@@ -196,7 +196,9 @@ Two icons did change size, both upward and both toward the scale: the "no colour
 
 **Decided 2026-09-21. Keep `scrollbar-width: thin` and `prefers-reduced-motion`.**
 
-Custom scrollbar colours would add platform-specific styling for a small difference with no reported mismatch. The standard reduced-motion query already suppresses entrance animations and drag transforms, and the audit's earlier host inspection found no replacement facility. Phase 2 confirms both mechanisms in source; the unavailable DevTools bridge means it supplies no new live evidence about Obsidian itself.
+Custom scrollbar colours would add platform-specific styling for a small difference with no reported mismatch. The standard reduced-motion query already suppresses entrance animations and the drag overlays' lift tween, and the audit's earlier host inspection found no replacement facility. Phase 2 confirms both mechanisms in source; the unavailable DevTools bridge means it supplies no new live evidence about Obsidian itself.
+
+The drag motion itself is out of that query's reach: dnd-kit writes the sortable slide as an inline `transition` and the drop as a Web Animation, neither of which a stylesheet overrides. `useReducedMotion` reads the same query through `matchMedia` and switches those off through dnd-kit's own options.
 
 **What would change this:** a reported scrollbar mismatch in a supported desktop theme, or a documented host motion preference that the standard media query cannot express.
 

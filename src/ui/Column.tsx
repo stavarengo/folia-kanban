@@ -13,6 +13,7 @@ import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
 import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
+import { useReducedMotion } from "./useReducedMotion";
 import { useBoardActions, useMatchContext, useSettings, useSubitemsCollapse } from "./context";
 import {
   isEmptyFilter,
@@ -158,6 +159,7 @@ export function Column({
   // which doubles as the body's droppable id — so a card dropped on this column still reports
   // over.id === column.id and resolveDrop keeps bucketing card drops unchanged. (No separate
   // useDroppable: that would register a second droppable under the same id and collide.)
+  const reducedMotion = useReducedMotion();
   const {
     setNodeRef,
     setActivatorNodeRef,
@@ -167,7 +169,7 @@ export function Column({
     transition,
     isOver,
     isDragging,
-  } = useSortable({ id: column.id });
+  } = useSortable({ id: column.id, ...(reducedMotion ? { transition: null } : {}) });
   const settings = useSettings();
   const actions = useBoardActions();
   const subitems = useSubitemsCollapse();

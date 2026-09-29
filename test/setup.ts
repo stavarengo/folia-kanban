@@ -37,6 +37,19 @@ if (hasDom) {
     } as unknown as typeof ResizeObserver;
   }
 
+  // jsdom has no matchMedia. Every query answers "no match", the host's state when no preference
+  // is set; a test that wants a preference replaces window.matchMedia itself.
+  if (!window.matchMedia) {
+    window.matchMedia = (media: string) =>
+      Object.assign(new EventTarget(), {
+        media,
+        matches: false,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+      });
+  }
+
   // jsdom doesn't implement the Pointer Capture API; stub it so pointer handlers that capture/release
   // (e.g. the board pan-scroll) don't throw under test.
   if (!Element.prototype.setPointerCapture) {

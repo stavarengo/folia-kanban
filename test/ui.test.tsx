@@ -1992,6 +1992,45 @@ describe("drag overlay portal", () => {
   });
 });
 
+describe("reduced-motion drag", () => {
+  // The theme's reduced-motion media query cannot reach dnd-kit: it writes its motion as inline
+  // styles and Web Animations. jsdom has no layout, so the drop tween (which needs real rects) is
+  // covered live; the keyboard drag's overlay tween between arrow steps is observable here.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const liftedOverlayTransition = async (reduce: boolean) => {
+    vi.spyOn(window, "matchMedia").mockImplementation((media: string) =>
+      Object.assign(new EventTarget(), {
+        media,
+        matches: reduce && media === "(prefers-reduced-motion: reduce)",
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+      }),
+    );
+    const user = userEvent.setup();
+    render_(makeRepo());
+    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    main.focus();
+    await user.keyboard("{ }");
+    // dnd-kit puts the overlay's transition on the positioned wrapper around our ghost.
+    const wrapper = document.querySelector(".folia-card-overlay")?.parentElement as HTMLElement;
+    const transition = wrapper.style.transition;
+    await user.keyboard("{Escape}");
+    return transition;
+  };
+
+  it("tweens a keyboard-lifted card between steps when no preference is set", async () => {
+    expect(await liftedOverlayTransition(false)).toContain("250ms");
+  });
+
+  it("moves a keyboard-lifted card without a tween under reduced motion", async () => {
+    expect(await liftedOverlayTransition(true)).toBe("none");
+  });
+});
+
 describe("pop-out window ownership", () => {
   // `activeDocument` is Obsidian's handle on "the document of whichever window has focus". A board
   // can sit in one window while another has focus, so every surface it portals out of the React
