@@ -236,6 +236,7 @@
   border-color: var(--folia-text-error);
 }
 .folia-prop-refusal {
+  padding-left: calc(var(--folia-prop-key-w) + var(--folia-space-md));
   color: var(--folia-text-error);
 }
 
