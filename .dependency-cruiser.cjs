@@ -1,4 +1,5 @@
-/** @type {import('dependency-cruiser').IConfiguration} */
+const { builtinModules } = require("node:module");
+
 // Architecture boundaries, adapted to this Obsidian plugin's layers:
 //   model    — pure domain + the CardRepository port; imports only itself
 //   obsidian — the Vault adapter that implements the port (the only data/transport layer)
@@ -22,6 +23,12 @@ const uiAndYamlPackages = "node_modules/(react|react-dom|@dnd-kit|yaml)/";
  *  as code, so each stays unresolved and its path is the bare specifier. */
 const appModules = "^(obsidian|electron)$|^(electron|@codemirror|@lezer)/";
 
+/** Node's builtin modules, with or without the `node:` prefix. A few (node:sqlite, node:test)
+ *  exist only prefixed; allowing their bare name too costs nothing, since the rule that uses this
+ *  also requires the dependency to be a core module. None is ever resolved to a file. */
+const nodeBuiltins = `^(node:)?(${builtinModules.map((m) => m.replace(/^node:/, "")).join("|")})$`;
+
+/** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     {
@@ -55,6 +62,14 @@ module.exports = {
         "Outside src/obsidian and the shell, no chain of imports may end at the obsidian package or at electron, @codemirror/* or @lezer/*, which the app supplies at runtime: type-only, inline import() types and dynamic imports included.",
       from: { path: "^src/", pathNot: "^src/obsidian/|^src/(main\\.ts|view\\.tsx)$" },
       to: { path: appModules, reachable: true },
+    },
+    {
+      name: "node-builtins-stay-in-adapter-and-shell",
+      severity: "error",
+      comment:
+        "Node's modules do not exist on mobile. The adapter loads the few it needs lazily behind a desktop check; nothing else in src may import them, dynamically or type-only included. The UI, model and MCP reach no module outside src but these, so a direct ban is a transitive one for them.",
+      from: { path: "^src/", pathNot: "^src/obsidian/|^src/(main\\.ts|view\\.tsx)$" },
+      to: { dependencyTypes: ["core"] },
     },
     {
       name: "mcp-is-a-port-consumer",
@@ -92,9 +107,9 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
-    // Outside src, only what a rule needs an end to find is let in: the app's modules for
-    // only-adapter-and-shell-reach-the-app, test/ for src-never-imports-test and the banned packages for
-    // model-and-mcp-stay-off-the-ui-stack. Narrowing this makes those rules pass vacuously.
-    includeOnly: ["^src/", "^test/", appModules, uiAndYamlPackages],
+    // Outside src, only what a rule needs an end to find is let in: the app's modules, Node's
+    // builtins, test/ and the packages the model and MCP may not use. Narrowing this makes the
+    // rules that point at them pass vacuously.
+    includeOnly: ["^src/", "^test/", appModules, uiAndYamlPackages, nodeBuiltins],
   },
 };

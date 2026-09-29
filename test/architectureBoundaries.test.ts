@@ -23,9 +23,13 @@ const tree: Record<string, string> = {
   "src/obsidian/adapter.ts": [
     'import { Plugin } from "obsidian";',
     'import { shell } from "electron";',
-    "export const adapter = [Plugin, shell];",
+    'export const adapter = async () => [Plugin, shell, await import("http")];',
     "",
   ].join("\n"),
+  "src/model/io.ts":
+    'import { readFileSync } from "node:fs";\nexport const io = async () => [readFileSync, await import("path")];\n',
+  "src/mcp/store.ts": 'export const store = () => import("node:sqlite");\n',
+  "src/ui/stats.ts": 'import type { Stats } from "fs";\nexport type S = Stats;\n',
   "src/model/typed.ts": 'export type App = import("obsidian").App;\n',
   "src/mcp/lazy.ts": 'export const load = () => import("@codemirror/view");\n',
   "src/model/b.ts": "export const b = 1;\n",
@@ -103,6 +107,12 @@ describe("architecture boundaries (dependency-cruiser)", () => {
       "model-and-mcp-stay-off-the-ui-stack: src/model/a.ts → npm:@dnd-kit/core/dist/index.js",
       "model-and-mcp-stay-off-the-ui-stack: src/model/a.ts → npm:react/index.js",
       "model-is-pure-domain: src/model/a.ts → src/settings.ts",
+      // Node's modules stay in the adapter and shell, `node:`-prefixed, dynamic and type-only too;
+      // the adapter's own lazy import("http") stays allowed.
+      "node-builtins-stay-in-adapter-and-shell: src/mcp/store.ts → node:sqlite",
+      "node-builtins-stay-in-adapter-and-shell: src/model/io.ts → fs",
+      "node-builtins-stay-in-adapter-and-shell: src/model/io.ts → path",
+      "node-builtins-stay-in-adapter-and-shell: src/ui/stats.ts → fs",
       // Obsidian and what it supplies stay behind the adapter and the shell, including an inline
       // import() type, a dynamic import and a path through the adapter.
       "only-adapter-and-shell-reach-the-app: src/mcp/lazy.ts → @codemirror/view",
