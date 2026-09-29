@@ -277,12 +277,14 @@ describe("the plugin follows external file operations", () => {
     expect(handler).toContain('kind: "rename", from: oldPath, to: file.path');
   });
 
-  it("runs the path-keyed settings migration, and re-points the markdown-tab record", () => {
+  it("runs the path-keyed settings migration, and re-points the per-tab records", () => {
     expect(followFileOp).toContain("migratePathKeyedSettings(s, op)");
-    // The record is keyed by leaf and holds a path; a WeakMap cannot be walked, so the leaves are.
+    // The records hold a path and are WeakMaps, which cannot be walked, so the leaves are.
     expect(followFileOp).toContain("iterateAllLeaves");
-    expect(followFileOp).toContain("this.markdownTabs");
-    expect(followFileOp).toContain("remapPath(");
+    expect(followFileOp).toContain("follow(this.markdownTabs, leaf, op)");
+    expect(followFileOp).toContain("follow(this.decided, leaf.view, op)");
+    const at = main.indexOf("function follow<");
+    expect(main.slice(at, main.indexOf("\n}", at))).toContain("remapPath(current, op)");
   });
 });
 

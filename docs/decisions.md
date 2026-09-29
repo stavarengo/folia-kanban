@@ -38,6 +38,38 @@ Only the dialog has a native form. Obsidian's `Modal` gives it the backdrop, the
 
 **What would change this:** a public API for a pane or a persistent overlay inside a view. Before trying again, check `node_modules/obsidian/obsidian.d.ts` for one, the same way the entry above says to.
 
+## Board notes open as the board by swapping after the open
+
+**Decided 2026-09-29. Documented API only, at the cost of a brief flash, heading links and a history entry.**
+
+Until 0.4.2 the plugin wrapped `WorkspaceLeaf.prototype.setViewState` for the whole app and rewrote every `markdown` open of a board note into a board open, before the editor was drawn. It read the undocumented `eState` keys `line`, `subpath` and `match` to leave heading, block and search-result opens in the editor, and passed the undocumented `popstate` flag so neither swap between board and editor entered the navigation history. That was one global mutation of a core prototype, in the path of every plugin's leaves, that any Obsidian release could break silently.
+
+Now `redirectToBoard` in `src/main.ts` listens to `file-open` (the active tab changed its note) and `active-leaf-change` (a background or deferred tab came forward), and swaps a Markdown tab showing a board note to the board with `leaf.setViewState`. Each editor is decided about once per note, so switching back to a tab is not an open, while the same note opened again after the tab showed something else is. A tab still finishing its own open silently ignores a second `setViewState`, and nothing documented says when it is done, so the swap checks what the tab shows and tries again every 16 ms for up to two seconds. It never saves the editor first: mid-load, the editor can hold the previous note's text under the new note's name, and a save then would write that text into the board note. A note the metadata cache has not read yet is asked about again on that note's first `changed` event. Taking over the `md` extension was rejected because it would give every note to the board view.
+
+What the documented route costs, measured on Obsidian 1.13.7 against the `examples` vault, as frames in which the editor was painted and the time from the first of them to the painted board:
+
+| Route | Frames | ms |
+| --- | --- | --- |
+| File explorer | 1–2 | 25–73 |
+| File explorer keyboard preview (Mod+Arrow) | 1–2 | 19–54 |
+| Link in a note | 1–2 | 31–76 |
+| Search result | 1–2 | 42–68 |
+| Quick switcher | 1–2 | 31–126 |
+| Heading link | 1 | 35–89 |
+| New split | 3–4 | 61–136 |
+| Background tab brought forward | 1–3 | 25–73 |
+| Deferred tab restored at startup | 2–3 | 40–53 |
+| Back and Forward | 0 | 0 |
+
+Back and Forward show no flash because history replays the tab's board state, not the editor. The tab in front at startup is swapped when the layout is ready; that one was not measured.
+
+- **Heading, block and search links open the board.** Nothing documented tells them apart from a plain link: `file-open` carries only the file, and what `getEphemeralState()` holds is not typed. The editor at the heading is one click away with the tab's button. Heading links and search results were checked live; block links take the same path and were not.
+- **History entries.** Only a swap into Obsidian's editor records one, and nothing documented on the plugin's side reaches that. So Back from the editor returns to the board first, and after board → editor → board the entry left behind is the board itself: the first Back press lands on the board already showing. `ViewStateResult.history` is not the lever; it is what a view reports about its own state changes.
+- **Background tabs.** A board note opened in a tab that is not brought forward stays Markdown, title included, until the tab is activated. Sidebars still always show the editor.
+- **Keyboard Back on a board.** The board is not navigable (`navigation = false`), so the Back and Forward hotkeys do nothing there, as before this change. The arrows in the tab header work.
+
+**What would change this:** a documented hook that runs before a leaf opens a file, a way to register a view as the default for notes matching a condition, or typed eState for link targets. Any of those gives back the flash or the heading links without touching a prototype.
+
 ## Unread-comment ordering assumes one clock
 
 **Decided 2026-08-26. Same-clock writers are the supported case.**
