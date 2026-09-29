@@ -120,8 +120,10 @@ const trimmed = (v: string) => v.trim();
 /**
  * One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. The
  * value keeps its YAML type through an edit (`editScalar`); text that cannot hold it stays in the
- * field, unwritten, with the reason under it. Closing the dialog blurs the field to save it, and
- * takes the field away with it, so a refusal then goes to the board's toast instead.
+ * field, unwritten, with the reason under it. A row that goes away still holding refused text — the
+ * dialog closing, another card opening — says so in the board's toast instead, since the reason
+ * under it goes too. Refused text is dropped when the value changes underneath: it was typed
+ * against a value, and a type, that are no longer there.
  */
 function PropRow({
   name,
@@ -136,8 +138,9 @@ function PropRow({
 }) {
   const hintId = useId();
   const actions = useBoardActions();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const unsaved = useRef<(() => void) | null>(null);
+  useEffect(() => () => unsaved.current?.(), []);
   const canonical = (text: string) => {
     const edit = editScalar(value, text);
     return edit.ok ? String(edit.value) : null;
@@ -150,15 +153,19 @@ function PropRow({
     },
     canonical,
   );
+  useEffect(() => {
+    if (unsaved.current) setDraft(String(value));
+    unsaved.current = null;
+    setRefusal(null);
+  }, [value, setDraft]);
   const attempt = () => {
     const edit = editScalar(value, draft);
     const reason = edit.ok || draft === String(value) ? null : edit.reason;
     setRefusal(reason);
-    if (reason !== null)
-      queueMicrotask(() => {
-        if (!inputRef.current?.isConnected)
-          actions.reportError(new Error(`“${name}” was not saved. ${reason}`));
-      });
+    unsaved.current =
+      reason === null
+        ? null
+        : () => actions.reportError(new Error(`“${name}” was not saved. ${reason}`));
     commit();
   };
   return (
@@ -166,7 +173,6 @@ function PropRow({
       <div className="folia-prop-row">
         <span className="folia-prop-key">{name}</span>
         <input
-          ref={inputRef}
           className="folia-prop-input"
           value={draft}
           aria-label={`Value of ${name}`}
@@ -185,7 +191,10 @@ function PropRow({
           className="folia-icon-btn folia-mini"
           aria-label={`Remove ${name}`}
           title="Remove property"
-          onClick={onRemove}
+          onClick={() => {
+            unsaved.current = null;
+            onRemove();
+          }}
         >
           <Icon name="close" />
         </button>

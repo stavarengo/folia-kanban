@@ -222,7 +222,7 @@ const DECIMAL = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
  * Read `text` as a new value for a property that holds `previous`, keeping its YAML type: a number
  * stays a number and a boolean stays a boolean, so an edit never turns `estimate: 3` into
  * `estimate: "5"`. Text that does not spell a value of that type is refused rather than written as
- * a string, and so is an empty field or an integer too long to keep exactly: the type would be
+ * a string, and so is an empty field or a whole part too long to keep exactly: the type would be
  * gone the moment the key held a string or nothing. Adding the property again under the same name
  * is the way to make it text, and the refusal says so, as Obsidian's own number field takes none.
  *
@@ -248,7 +248,7 @@ export function editScalar(previous: ScalarValue, text: string): ScalarEdit {
       reason:
         "This property holds a number. To store text, add it again below under the same name.",
     };
-  if (Number.isInteger(n) && !Number.isSafeInteger(n) && /^[-+]?\d+$/.test(typed))
+  if (!/[eE]/.test(typed) && !Number.isSafeInteger(Math.trunc(n)))
     return { ok: false, reason: "This number has more digits than the property can keep exactly." };
   return { ok: true, value: n };
 }

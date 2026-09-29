@@ -1059,6 +1059,60 @@ describe("card detail", () => {
     expect(estimate).not.toHaveAttribute("aria-invalid");
   });
 
+  it("says so when another card opens over a property value the row refused", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc");
+    await user.click(within(detail).getByText("Beta"));
+    await screen.findByRole("heading", { name: "Beta" });
+    expect(await screen.findByText(/“estimate” was not saved\./)).toBeInTheDocument();
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
+  });
+
+  it("drops refused text once the value changes, so it cannot overwrite the new one", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc{Enter}");
+    expect(estimate).toHaveAttribute("aria-invalid", "true");
+
+    // The way out the refusal names: the same name again, in the add row.
+    await user.type(within(detail).getByLabelText("New property name"), "estimate");
+    await user.type(within(detail).getByLabelText("New property value"), "about three");
+    await user.click(within(detail).getByLabelText("Add property"));
+    await waitFor(() => expect(estimate).toHaveValue("about three"));
+    expect(estimate).not.toHaveAttribute("aria-invalid");
+    await user.click(estimate);
+    estimate.blur();
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe("about three");
+  });
+
+  it("does not report refused text for a property the user removed", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc");
+    await user.click(within(detail).getByLabelText("Remove estimate"));
+    await waitFor(() => expect("estimate" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
+    expect(screen.queryByText(/was not saved/)).toBeNull();
+  });
+
   it("lets a title YAML read as a number become a name", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

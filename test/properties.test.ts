@@ -151,11 +151,22 @@ describe("editing a property value keeps its type", () => {
     },
   );
 
-  it("refuses an integer with more digits than a number can keep", () => {
-    expect(editScalar(3, "12345678901234567890")).toEqual({
-      ok: false,
-      reason: "This number has more digits than the property can keep exactly.",
+  it.each(["12345678901234567890", "9007199254740993.0", "12345678901234567890.5"])(
+    "refuses %j, whose whole part has more digits than a number can keep",
+    (text) => {
+      expect(editScalar(3, text)).toEqual({
+        ok: false,
+        reason: "This number has more digits than the property can keep exactly.",
+      });
+    },
+  );
+
+  it("still reads a long fraction or an exponent the way a number does", () => {
+    expect(editScalar(3, "0.12345678901234567890")).toEqual({
+      ok: true,
+      value: 0.12345678901234568,
     });
+    expect(editScalar(3, "1e21")).toEqual({ ok: true, value: 1e21 });
   });
 
   it.each([
