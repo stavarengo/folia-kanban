@@ -1098,6 +1098,41 @@ describe("card detail", () => {
     expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe("about three");
   });
 
+  it("keeps refused text when an edit from elsewhere keeps the value's type", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc{Enter}");
+    await act(async () => {
+      repo.files.get("Tasks/Alpha.md")!.fm["estimate"] = 4;
+      repo.notify();
+    });
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(4));
+    expect(estimate).toHaveValue("abc");
+    expect(estimate).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("does not report refused text on a card the user deleted", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc{Enter}");
+    await user.click(within(detail).getByLabelText("Delete card"));
+    await user.click(within(detail).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    expect(screen.queryByText(/was not saved/)).toBeNull();
+  });
+
   it("does not report refused text for a property the user removed", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

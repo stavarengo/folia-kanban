@@ -122,23 +122,26 @@ const trimmed = (v: string) => v.trim();
  * value keeps its YAML type through an edit (`editScalar`); text that cannot hold it stays in the
  * field, unwritten, with the reason under it. A row that goes away still holding refused text — the
  * dialog closing, another card opening — says so in the board's toast instead, since the reason
- * under it goes too. Refused text is dropped when the value changes underneath: it was typed
- * against a value, and a type, that are no longer there.
+ * under it goes too. Refused text is dropped when the value's type changes underneath (the way out
+ * the refusal names does that): it was typed against a type that is no longer there.
  */
 function PropRow({
   name,
   value,
   onCommit,
   onRemove,
+  onUnsaved,
 }: {
   name: string;
   value: ScalarValue;
   onCommit: (v: ScalarValue) => void;
   onRemove: () => void;
+  /** Tell the board that refused text went away unsaved with the row. */
+  onUnsaved: (reason: string) => void;
 }) {
   const hintId = useId();
-  const actions = useBoardActions();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const type = useRef(typeof value);
   const unsaved = useRef<(() => void) | null>(null);
   useEffect(() => () => unsaved.current?.(), []);
   const canonical = (text: string) => {
@@ -154,6 +157,8 @@ function PropRow({
     canonical,
   );
   useEffect(() => {
+    if (typeof value === type.current) return;
+    type.current = typeof value;
     if (unsaved.current) setDraft(String(value));
     unsaved.current = null;
     setRefusal(null);
@@ -162,10 +167,7 @@ function PropRow({
     const edit = editScalar(value, draft);
     const reason = edit.ok || draft === String(value) ? null : edit.reason;
     setRefusal(reason);
-    unsaved.current =
-      reason === null
-        ? null
-        : () => actions.reportError(new Error(`“${name}” was not saved. ${reason}`));
+    unsaved.current = reason === null ? null : () => onUnsaved(reason);
     commit();
   };
   return (
@@ -863,6 +865,7 @@ export function CardDetail({
 }: Props) {
   const repo = useRepo();
   const actions = useBoardActions();
+  const deleting = useRef(false);
   const matchCtx = useMatchContext();
   const boardRootRef = useBoardRootRef();
   const settings = useSettings();
@@ -1511,7 +1514,13 @@ export function CardDetail({
           <div className="folia-detail-confirm" role="alertdialog" aria-label="Confirm delete">
             <span>Delete this card? The note moves to trash.</span>
             <div className="folia-row-actions">
-              <button className="folia-btn folia-btn-danger" onClick={() => actions.remove(path)}>
+              <button
+                className="folia-btn folia-btn-danger"
+                onClick={() => {
+                  deleting.current = true;
+                  actions.remove(path);
+                }}
+              >
                 Delete
               </button>
               <button className="folia-btn" autoFocus onClick={() => setConfirmDelete(false)}>
@@ -1616,6 +1625,11 @@ export function CardDetail({
                 value={k === TITLE_KEY ? String(v) : v}
                 onCommit={(val) => void mutate(() => repo.setFrontmatter(path, { [k]: val }))}
                 onRemove={() => void mutate(() => repo.unsetFrontmatterKey(path, k))}
+                onUnsaved={(reason) => {
+                  // A card being deleted takes its unsaved text with it on purpose.
+                  if (!deleting.current)
+                    actions.reportError(new Error(`“${k}” was not saved. ${reason}`));
+                }}
               />
             ))}
             <div className="folia-prop-add">
