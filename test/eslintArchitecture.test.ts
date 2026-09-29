@@ -121,6 +121,32 @@ describe("Node and DOM globals fence", () => {
     expect(await restricted(domGlobals, file)).toBe(4);
   });
 
+  it.each(["src/model/card.ts", "src/mcp/tools.ts"])(
+    "rejects them reached through self and globalThis in %s",
+    async (file) => {
+      const qualified =
+        "export const all = [self.document.title, globalThis.navigator, self.process, globalThis.Buffer];\n";
+      const ids = await ruleIdsOf(qualified, file);
+      expect(ids.filter((id) => id === "no-restricted-properties")).toHaveLength(4);
+    },
+  );
+
+  it.each(["src/model/card.ts", "src/mcp/tools.ts"])(
+    "rejects an alias of self or globalThis in %s",
+    async (file) => {
+      const aliased =
+        "const scope = self;\nconst root = globalThis;\nexport const all = [scope.document, root.navigator];\n";
+      const ids = await ruleIdsOf(aliased, file);
+      expect(ids.filter((id) => id === "no-restricted-globals")).toHaveLength(2);
+    },
+  );
+
+  it("rejects Node globals reached through globalThis in the UI, not the DOM", async () => {
+    const qualified = "export const all = [globalThis.process, self.document.title];\n";
+    const ids = await ruleIdsOf(qualified, "src/ui/App.tsx");
+    expect(ids.filter((id) => id === "no-restricted-properties")).toHaveLength(1);
+  });
+
   it("leaves the UI free to use the DOM", async () => {
     expect(await restricted(pageGlobals, "src/ui/App.tsx")).toBe(0);
   });

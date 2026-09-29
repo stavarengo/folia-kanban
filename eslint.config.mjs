@@ -21,36 +21,36 @@ const focusedWindowMessage =
 
 /** Node's globals: the plugin runs on mobile too, where none of them exist. */
 const nodeGlobals = ["process", "Buffer", "global", "require", "__dirname"];
-/** The page's globals: the model and MCP have no DOM, and MCP runs with no board open. */
-const domGlobals = ["document", "window", "localStorage", "navigator"];
+/** The page's globals: the model and MCP have no DOM, and MCP runs with no board open. `self` and
+ *  `globalThis` are the page too, and banning them whole also stops an alias
+ *  (`const scope = self; scope.document`) from walking around the property ban. */
+const domGlobals = ["document", "window", "localStorage", "navigator", "self", "globalThis"];
+
+const nodeMessage = "Node globals are not available on mobile. Keep them to the adapter and shell.";
+const domMessage =
+  "src/model and src/mcp have no DOM. Pass what they need in from the UI or the adapter.";
 
 /**
- * The full `no-restricted-globals` option list for one layer. ESLint replaces a rule's options
- * per block, so each list re-states the preset's entries and the focused-window ban; a later
- * entry for the same name wins.
+ * The `no-restricted-globals` and `no-restricted-properties` option lists for one layer, so a
+ * banned global is also banned when reached as `window.x`, `globalThis.x` or `self.x`. ESLint
+ * replaces a rule's options per block, so each list re-states the preset's entries and the
+ * focused-window ban; a later entry for the same name wins.
  */
-function restrictedGlobals({ node = false, dom = false } = {}) {
+function restrictedGlobalRules({ node = false, dom = false } = {}) {
+  const banned = new Map(focusedWindowGlobals.map((name) => [name, focusedWindowMessage]));
+  if (node) for (const name of nodeGlobals) banned.set(name, nodeMessage);
+  if (dom) for (const name of domGlobals) banned.set(name, domMessage);
   const byName = new Map(obsidianRestrictedGlobals.map((entry) => [entry.name, entry]));
-  for (const name of focusedWindowGlobals)
-    byName.set(name, { name, message: focusedWindowMessage });
-  if (node) {
-    for (const name of nodeGlobals) {
-      byName.set(name, {
-        name,
-        message: "Node globals are not available on mobile. Keep them to the adapter and shell.",
-      });
-    }
-  }
-  if (dom) {
-    for (const name of domGlobals) {
-      byName.set(name, {
-        name,
-        message:
-          "src/model and src/mcp have no DOM. Pass what they need in from the UI or the adapter.",
-      });
-    }
-  }
-  return ["error", ...byName.values()];
+  for (const [name, message] of banned) byName.set(name, { name, message });
+  return {
+    "no-restricted-globals": ["error", ...byName.values()],
+    "no-restricted-properties": [
+      "error",
+      ...["window", "globalThis", "self"].flatMap((object) =>
+        [...banned].map(([property, message]) => ({ object, property, message })),
+      ),
+    ],
+  };
 }
 
 /**
@@ -278,29 +278,17 @@ export default [
     // own entries are carried over.
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/obsidian/**", "src/main.ts", "src/view.tsx"],
-    rules: {
-      "no-restricted-globals": restrictedGlobals(),
-      "no-restricted-properties": [
-        "error",
-        ...["window", "globalThis", "self"].flatMap((object) =>
-          focusedWindowGlobals.map((property) => ({
-            object,
-            property,
-            message: focusedWindowMessage,
-          })),
-        ),
-      ],
-    },
+    rules: restrictedGlobalRules(),
   },
   {
     // The UI, the model and MCP also run on mobile, so Node's globals stay out of them.
     files: ["src/{ui,model,mcp}/**/*.{ts,tsx}"],
-    rules: { "no-restricted-globals": restrictedGlobals({ node: true }) },
+    rules: restrictedGlobalRules({ node: true }),
   },
   {
     // The model and MCP have no DOM either.
     files: ["src/{model,mcp}/**/*.{ts,tsx}"],
-    rules: { "no-restricted-globals": restrictedGlobals({ node: true, dom: true }) },
+    rules: restrictedGlobalRules({ node: true, dom: true }),
   },
   {
     // no-undef is redundant with the TS type-checker, and the adapter and shell may use Obsidian's
