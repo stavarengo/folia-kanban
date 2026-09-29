@@ -145,7 +145,8 @@ describe("editing a property value keeps its type", () => {
     (text) => {
       expect(editScalar(3, text)).toEqual({
         ok: false,
-        reason: "This property holds a number. To store text, remove it and add it again.",
+        reason:
+          "This property holds a number. To store text, add it again below under the same name.",
       });
     },
   );
@@ -171,7 +172,8 @@ describe("editing a property value keeps its type", () => {
     (text) => {
       expect(editScalar(false, text)).toEqual({
         ok: false,
-        reason: "This property holds true or false. To store text, remove it and add it again.",
+        reason:
+          "This property holds true or false. To store text, add it again below under the same name.",
       });
     },
   );

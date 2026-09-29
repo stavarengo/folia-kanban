@@ -1047,7 +1047,7 @@ describe("card detail", () => {
     expect(estimate).toHaveValue("abc");
     expect(estimate).toHaveAttribute("aria-invalid", "true");
     expect(estimate).toHaveAccessibleDescription(
-      "This property holds a number. To store text, remove it and add it again.",
+      "This property holds a number. To store text, add it again below under the same name.",
     );
     expect(write).not.toHaveBeenCalled();
     expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
