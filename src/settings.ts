@@ -1,5 +1,5 @@
 import type { DeviceState } from "./deviceState";
-import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress } from "./mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS, isBindAddress } from "./bindAddress";
 import type { FileOp } from "./model/pathOps";
 import { remapPathKeys } from "./model/pathOps";
 import type { HistoryScope } from "./model/types";

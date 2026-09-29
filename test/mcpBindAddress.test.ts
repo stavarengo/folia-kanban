@@ -10,7 +10,7 @@ import {
   isWildcardBindAddress,
   normalizeBindAddress,
   originAllowed,
-} from "../src/mcp/bindAddress";
+} from "../src/bindAddress";
 
 describe("what counts as a bind address", () => {
   it("takes loopback, the wildcards and an ordinary interface address", () => {

@@ -22,7 +22,7 @@ import { KanbanView } from "./view";
 import { VIEW_TYPE_KANBAN } from "./viewType";
 import type { FileOp } from "./model/pathOps";
 import { remapPath } from "./model/pathOps";
-import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./bindAddress";
 import { mcpTokenOutcome } from "./mcp/token";
 import {
   DeviceStateStore,

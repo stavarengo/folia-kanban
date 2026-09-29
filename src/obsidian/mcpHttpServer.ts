@@ -12,7 +12,7 @@
 // itself; this one never starts any, so a GET is refused rather than left hanging.
 
 import { Platform } from "obsidian";
-import { isBindAddress, normalizeBindAddress, originAllowed } from "../mcp/bindAddress";
+import { isBindAddress, normalizeBindAddress, originAllowed } from "../bindAddress";
 import type { BoardHost } from "../mcp/host";
 import {
   PROTOCOL_VERSION,

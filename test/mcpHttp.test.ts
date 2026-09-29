@@ -4,7 +4,7 @@
 // the way an MCP client exercises them.
 
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 import { MCP_PATH, startMcpServer, type RunningMcpServer } from "../src/obsidian/mcpHttpServer";
 import type { BoardHost } from "../src/mcp/host";
 import type { JsonRpcResponse } from "../src/mcp/protocol";

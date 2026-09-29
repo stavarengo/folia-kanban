@@ -33,7 +33,7 @@ import {
   type EditableSettingKey,
 } from "../src/settingsLayout";
 import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "../src/settings";
-import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 
 const noop = (): void => {};
 

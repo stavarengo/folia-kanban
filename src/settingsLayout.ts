@@ -1,4 +1,4 @@
-import { MCP_DEFAULT_BIND_ADDRESS } from "./mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS } from "./bindAddress";
 import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "./settings";
 
 // The settings tab as data: what it offers, in what order, under which headings, worded how, and

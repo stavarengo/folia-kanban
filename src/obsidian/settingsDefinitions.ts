@@ -1,5 +1,5 @@
 import type { Setting, SettingDefinition, SettingDefinitionItem } from "obsidian";
-import { isBindAddress, normalizeBindAddress } from "../mcp/bindAddress";
+import { isBindAddress, normalizeBindAddress } from "../bindAddress";
 import {
   CARD_NEXT_TODOS_MAX,
   EXTRA_ALIASES,

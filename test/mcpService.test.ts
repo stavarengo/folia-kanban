@@ -8,7 +8,7 @@ import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
 import type { ServerInfo } from "../src/mcp/protocol";
 import { MCP_PATH } from "../src/obsidian/mcpHttpServer";
-import { MCP_DEFAULT_BIND_ADDRESS } from "../src/mcp/bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 import { FakeApp } from "./obsidianFake";
 
 const INFO: ServerInfo = { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" };
