@@ -14,10 +14,12 @@ const { builtinModules } = require("node:module");
 // imports and the whole transitive path.
 // test/ is unconstrained by design: tests may import any layer. Only the reverse is forbidden.
 
-/** The npm packages the model and MCP layers may not use: the UI's rendering stack, and yaml.
- *  pnpm resolves them to node_modules/.pnpm/<id>/node_modules/<name>/, so the pattern matches the
- *  last node_modules segment and is not anchored. */
-const uiAndYamlPackages = "node_modules/(react|react-dom|@dnd-kit|yaml)/";
+// pnpm resolves a package to node_modules/.pnpm/<id>/node_modules/<name>/, so these patterns match
+// the last node_modules segment and are not anchored.
+/** The UI's rendering stack, which the model and MCP may not use. */
+const uiPackages = "node_modules/(react|react-dom|@dnd-kit)/";
+/** A test-only devDependency: shipped code parses YAML with Obsidian's parseYaml. */
+const yamlPackage = "node_modules/yaml/";
 
 /** What Obsidian supplies at runtime (esbuild.config.mjs marks them external). None is installed
  *  as code, so each stays unresolved and its path is the bare specifier. */
@@ -83,9 +85,17 @@ module.exports = {
       name: "model-and-mcp-stay-off-the-ui-stack",
       severity: "error",
       comment:
-        "src/model and src/mcp run without a DOM and without a Markdown parser of their own: they may not import react, react-dom, @dnd-kit/* or yaml. zod stays allowed.",
+        "src/model and src/mcp run without a DOM: they may not import react, react-dom or @dnd-kit/*. zod stays allowed.",
       from: { path: "^src/(model|mcp)/" },
-      to: { path: uiAndYamlPackages },
+      to: { path: uiPackages },
+    },
+    {
+      name: "src-never-imports-yaml",
+      severity: "error",
+      comment:
+        "yaml is a devDependency the tests use to stand in for Obsidian's parser. Shipped code parses YAML with Obsidian's parseYaml, through the adapter.",
+      from: { path: "^src/" },
+      to: { path: yamlPackage },
     },
     {
       name: "src-never-imports-test",
@@ -108,8 +118,8 @@ module.exports = {
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
     // Outside src, only what a rule needs an end to find is let in: the app's modules, Node's
-    // builtins, test/ and the packages the model and MCP may not use. Narrowing this makes the
+    // builtins, test/, yaml and the packages the model and MCP may not use. Narrowing this makes the
     // rules that point at them pass vacuously.
-    includeOnly: ["^src/", "^test/", appModules, uiAndYamlPackages, nodeBuiltins],
+    includeOnly: ["^src/", "^test/", appModules, uiPackages, yamlPackage, nodeBuiltins],
   },
 };
