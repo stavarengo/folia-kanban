@@ -1,3 +1,4 @@
+import js from "@eslint/js";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import tseslint from "typescript-eslint";
 import vitest from "@vitest/eslint-plugin";
@@ -17,6 +18,40 @@ const obsidianRestrictedGlobals = (
 const focusedWindowGlobals = ["activeDocument", "activeWindow"];
 const focusedWindowMessage =
   "This is the focused window's, not necessarily the board's. Use useBoardDocument()/useBoardWindow() (src/ui/context.ts).";
+
+/** Node's globals: the plugin runs on mobile too, where none of them exist. */
+const nodeGlobals = ["process", "Buffer", "global", "require", "__dirname"];
+/** The page's globals: the model and MCP have no DOM, and MCP runs with no board open. */
+const domGlobals = ["document", "window", "localStorage", "navigator"];
+
+/**
+ * The full `no-restricted-globals` option list for one layer. ESLint replaces a rule's options
+ * per block, so each list re-states the preset's entries and the focused-window ban; a later
+ * entry for the same name wins.
+ */
+function restrictedGlobals({ node = false, dom = false } = {}) {
+  const byName = new Map(obsidianRestrictedGlobals.map((entry) => [entry.name, entry]));
+  for (const name of focusedWindowGlobals)
+    byName.set(name, { name, message: focusedWindowMessage });
+  if (node) {
+    for (const name of nodeGlobals) {
+      byName.set(name, {
+        name,
+        message: "Node globals are not available on mobile. Keep them to the adapter and shell.",
+      });
+    }
+  }
+  if (dom) {
+    for (const name of domGlobals) {
+      byName.set(name, {
+        name,
+        message:
+          "src/model and src/mcp have no DOM. Pass what they need in from the UI or the adapter.",
+      });
+    }
+  }
+  return ["error", ...byName.values()];
+}
 
 /**
  * Deliberate jsx-a11y exceptions, kept here rather than as `eslint-disable-next-line` comments:
@@ -53,7 +88,16 @@ export const a11yExceptions = [
 
 export default [
   {
-    ignores: ["dist/", "examples/", "node_modules/", "scripts/", "coverage/", ".pnpm-store/"],
+    ignores: ["dist/", "examples/", "node_modules/", "coverage/", ".pnpm-store/"],
+  },
+  {
+    // The guards and release helpers. Node globals, plus the browser's for the callbacks a script
+    // hands to a page (Playwright's `page.evaluate`), which run in the page.
+    files: ["scripts/**/*.mjs"],
+    ...js.configs.recommended,
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
   },
   {
     files: ["src/**/*.{ts,tsx}"],
@@ -195,8 +239,9 @@ export default [
   ),
   {
     // Architecture boundary, placed after the obsidianmd preset spread because that preset turns
-    // `no-restricted-imports` off for src. The Obsidian API may be imported only by
-    // the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). Everything else goes
+    // `no-restricted-imports` off for src. The Obsidian API, and the electron, CodeMirror and Lezer
+    // modules the app supplies with it (esbuild.config.mjs marks them external), may be imported
+    // only by the adapter (src/obsidian) and the plugin shell (main.ts/view.tsx). Everything else goes
     // through the CardRepository port (src/model/repo.ts).
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/obsidian/**", "src/main.ts", "src/view.tsx"],
@@ -210,6 +255,18 @@ export default [
               message:
                 "Only src/obsidian/** and the plugin shell (src/main.ts, src/view.tsx) may import the Obsidian API. Use the CardRepository port (src/model/repo.ts).",
             },
+            {
+              name: "electron",
+              message:
+                "Obsidian supplies electron at runtime. Only src/obsidian/** and the plugin shell may import it.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["electron/*", "@codemirror/*", "@lezer/*"],
+              message:
+                "Obsidian supplies electron, CodeMirror and Lezer at runtime. Only src/obsidian/** and the plugin shell may import them.",
+            },
           ],
         },
       ],
@@ -222,11 +279,7 @@ export default [
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/obsidian/**", "src/main.ts", "src/view.tsx"],
     rules: {
-      "no-restricted-globals": [
-        "error",
-        ...obsidianRestrictedGlobals,
-        ...focusedWindowGlobals.map((name) => ({ name, message: focusedWindowMessage })),
-      ],
+      "no-restricted-globals": restrictedGlobals(),
       "no-restricted-properties": [
         "error",
         ...["window", "globalThis", "self"].flatMap((object) =>
@@ -238,6 +291,16 @@ export default [
         ),
       ],
     },
+  },
+  {
+    // The UI, the model and MCP also run on mobile, so Node's globals stay out of them.
+    files: ["src/{ui,model,mcp}/**/*.{ts,tsx}"],
+    rules: { "no-restricted-globals": restrictedGlobals({ node: true }) },
+  },
+  {
+    // The model and MCP have no DOM either.
+    files: ["src/{model,mcp}/**/*.{ts,tsx}"],
+    rules: { "no-restricted-globals": restrictedGlobals({ node: true, dom: true }) },
   },
   {
     // no-undef is redundant with the TS type-checker, and the adapter and shell may use Obsidian's

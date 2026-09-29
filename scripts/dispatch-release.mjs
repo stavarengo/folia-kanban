@@ -117,10 +117,10 @@ const confirm = async (question) => {
   return answer.trim().toLowerCase() === "y";
 };
 
-// Text safe to print: every C0 control character and DEL replaced, tabs and
-// newlines kept. Used on anything a commit author wrote, since an escape
+// Text safe to print: every control character (C0, DEL and C1) replaced, tabs
+// and newlines kept. Used on anything a commit author wrote, since an escape
 // sequence in a commit subject can repaint the screen it is printed on.
-const printable = (text) => text.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "?");
+const printable = (text) => text.replace(/[^\P{Cc}\t\n]/gu, "?");
 
 // "host/owner/repo" for a remote, whatever spelling it arrives in: an https
 // URL, an scp-style `git@host:owner/repo`, or an ssh:// one. The host is half

@@ -45,7 +45,10 @@ describe("obsidian active-window globals fence", () => {
     "rejects activeDocument and activeWindow in %s",
     async (file) => {
       const [result] = await readActiveGlobals(file);
-      const banned = result?.messages.filter((m) => fenceRules.includes(m.ruleId ?? ""));
+      // The model and MCP also ban `window` itself (the DOM fence below); only this fence counts.
+      const banned = result?.messages.filter(
+        (m) => fenceRules.includes(m.ruleId ?? "") && m.message.includes("focused window"),
+      );
       expect(banned?.map((m) => [m.ruleId, m.severity])).toEqual([
         ["no-restricted-globals", 2],
         ["no-restricted-globals", 2],
@@ -64,4 +67,81 @@ describe("obsidian active-window globals fence", () => {
       expect(result?.messages.filter((m) => fenceRules.includes(m.ruleId ?? ""))).toEqual([]);
     },
   );
+});
+
+const ruleIdsOf = async (code: string, filePath: string) => {
+  const [result] = await eslint.lintText(code, { filePath });
+  expect(result?.fatalErrorCount).toBe(0);
+  return result?.messages.map((m) => m.ruleId) ?? [];
+};
+
+describe("app-supplied modules fence", () => {
+  const appModules =
+    'import { ipcRenderer } from "electron";\n' +
+    'import type { WebContents } from "electron/main";\n' +
+    'import { EditorView } from "@codemirror/view";\n' +
+    'import type { Tree } from "@lezer/common";\n' +
+    "export const all = (w: WebContents, t: Tree) => [ipcRenderer, EditorView, w, t];\n";
+
+  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts", "src/settings.ts"])(
+    "rejects electron, CodeMirror and Lezer in %s",
+    async (file) => {
+      const ids = await ruleIdsOf(appModules, file);
+      expect(ids.filter((id) => id === "no-restricted-imports")).toHaveLength(4);
+    },
+  );
+
+  it.each(["src/obsidian/vaultRepo.ts", "src/main.ts", "src/view.tsx"])(
+    "leaves %s free to import them",
+    async (file) => {
+      expect(await ruleIdsOf(appModules, file)).not.toContain("no-restricted-imports");
+    },
+  );
+});
+
+describe("Node and DOM globals fence", () => {
+  const nodeGlobals =
+    "export const all = [process.env, Buffer.from(''), global, require('x'), __dirname];\n";
+  const domGlobals =
+    "export const all = [document.body, window.innerWidth, localStorage.length, navigator.language];\n";
+  // Obsidian's preset already bans localStorage everywhere in src, so the allowed cases leave it out.
+  const pageGlobals =
+    "export const page = [document.body, window.innerWidth, navigator.language];\n";
+  const restricted = async (code: string, file: string) =>
+    (await ruleIdsOf(code, file)).filter((id) => id === "no-restricted-globals").length;
+
+  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts"])(
+    "rejects Node globals in %s",
+    async (file) => {
+      expect(await restricted(nodeGlobals, file)).toBe(5);
+    },
+  );
+
+  it.each(["src/model/card.ts", "src/mcp/tools.ts"])("rejects DOM globals in %s", async (file) => {
+    expect(await restricted(domGlobals, file)).toBe(4);
+  });
+
+  it("leaves the UI free to use the DOM", async () => {
+    expect(await restricted(pageGlobals, "src/ui/App.tsx")).toBe(0);
+  });
+
+  it.each(["src/obsidian/vaultRepo.ts", "src/main.ts"])(
+    "leaves %s free to use both",
+    async (file) => {
+      expect(await restricted(nodeGlobals + pageGlobals, file)).toBe(0);
+    },
+  );
+});
+
+describe("scripts/ is linted", () => {
+  it("runs the recommended rules on a script, with Node and browser globals", async () => {
+    const [result] = await eslint.lintText(
+      "export const run = () => [process.argv, window.innerWidth, undeclaredThing];\n",
+      { filePath: "scripts/some-guard.mjs" },
+    );
+    expect(result?.warningCount).toBe(0);
+    expect(result?.messages.map((m) => [m.ruleId, m.message])).toEqual([
+      ["no-undef", "'undeclaredThing' is not defined."],
+    ]);
+  });
 });
