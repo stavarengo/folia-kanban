@@ -207,3 +207,39 @@ export function propertySuggestions(
   take(lists.vault, "vault");
   return out;
 }
+
+/** A property value the detail panel shows as one line of text. */
+export type ScalarValue = string | number | boolean;
+
+/** What typed text becomes when it replaces a property value, or why it cannot. */
+export type ScalarEdit = { ok: true; value: ScalarValue } | { ok: false; reason: string };
+
+// YAML 1.2 decimal floats, the only numbers the text field accepts: `Number()` alone would read
+// `""` as 0 and `0x10` as 16, neither of which is what anyone typing into a number meant.
+const DECIMAL = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
+
+/**
+ * Read `text` as a new value for a property that holds `previous`, keeping its YAML type: a number
+ * stays a number and a boolean stays a boolean, so an edit never turns `estimate: 3` into
+ * `estimate: "5"`. Text that does not spell a value of that type is refused rather than written as
+ * a string, and so is text that would lose digits or clear the value — the type would be gone
+ * the moment the key held a string or nothing, and removing the property has its own button.
+ *
+ * Booleans are `true` and `false` in any case, and nothing else: Obsidian reads YAML 1.2, where
+ * `yes` and `on` are strings.
+ */
+export function editScalar(previous: ScalarValue, text: string): ScalarEdit {
+  if (typeof previous === "string") return { ok: true, value: text };
+  const typed = text.trim();
+  if (typeof previous === "boolean") {
+    const lower = typed.toLowerCase();
+    if (lower === "true" || lower === "false") return { ok: true, value: lower === "true" };
+    return { ok: false, reason: "This property holds true or false." };
+  }
+  const n = Number(typed);
+  if (!DECIMAL.test(typed) || !Number.isFinite(n))
+    return { ok: false, reason: "This property holds a number." };
+  if (Number.isInteger(n) && !Number.isSafeInteger(n) && /^[-+]?\d+$/.test(typed))
+    return { ok: false, reason: "This number has more digits than a property can keep." };
+  return { ok: true, value: n };
+}

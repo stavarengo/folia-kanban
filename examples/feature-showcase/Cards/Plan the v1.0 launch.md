@@ -8,6 +8,7 @@ tags: [planning, launch]
 area: work
 energy: high
 effort: 3
+signed-off: false
 ---
 
 # Plan the v1.0 launch

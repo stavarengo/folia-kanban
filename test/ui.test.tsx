@@ -1013,6 +1013,50 @@ describe("card detail", () => {
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.area).toBe("office"));
   });
 
+  it("keeps a number a number and a boolean a boolean through an edit", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3, done: true });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, " 5 {Enter}");
+    const done = within(detail).getByLabelText("Value of done");
+    await user.clear(done);
+    await user.type(done, "FALSE");
+    done.blur();
+    const fm = repo.files.get("Tasks/Alpha.md")!.fm;
+    await waitFor(() => expect(fm).toMatchObject({ estimate: 5, done: false }));
+    expect(estimate).toHaveValue("5");
+    expect(done).toHaveValue("false");
+  });
+
+  it("refuses text a typed property cannot hold, and keeps it in the field", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    const write = vi.spyOn(repo, "setFrontmatter");
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc{Enter}");
+    expect(estimate).toHaveValue("abc");
+    expect(estimate).toHaveAttribute("aria-invalid", "true");
+    expect(estimate).toHaveAccessibleDescription("This property holds a number.");
+    expect(write).not.toHaveBeenCalled();
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
+
+    await user.clear(estimate);
+    await user.type(estimate, "8");
+    estimate.blur();
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(8));
+    expect(estimate).not.toHaveAttribute("aria-invalid");
+  });
+
   it("deletes a custom property", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();

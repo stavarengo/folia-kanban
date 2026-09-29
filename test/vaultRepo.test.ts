@@ -707,6 +707,16 @@ describe("field edits and their history lines", () => {
     expect(app.vault.frontmatter("basic/Cards/One.md")["assignee"]).toEqual(["alex", "ana maria"]);
   });
 
+  it("writes a number and a boolean as YAML scalars, not as quoted strings", async () => {
+    const { app, repo } = repoWithCard("all");
+
+    await repo.setFrontmatter("basic/Cards/One.md", { estimate: 5, done: false });
+
+    const text = app.vault.text("basic/Cards/One.md") ?? "";
+    expect(text).toMatch(/^estimate: 5$/m);
+    expect(text).toMatch(/^done: false$/m);
+  });
+
   it("clears a key that currently holds a list, the same as it clears a scalar", async () => {
     const { app, repo } = repoWithCard("all");
     await repo.setFrontmatter("basic/Cards/One.md", { assignee: ["alex", "ana maria"] });

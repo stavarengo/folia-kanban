@@ -26,7 +26,13 @@ import { addCard, setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
 import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
 import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
-import { FOLIA_CARD_KEYS, PANEL_FIELD_KEYS, propertySuggestions } from "../model/properties";
+import {
+  FOLIA_CARD_KEYS,
+  PANEL_FIELD_KEYS,
+  editScalar,
+  propertySuggestions,
+  type ScalarValue,
+} from "../model/properties";
 import { laneFill, prospectiveCard } from "../model/lanes";
 import { relationKeys } from "../model/relationships";
 import { SELF, isMine, normalizeAuthor, seenMarker, unreadComments } from "../model/unread";
@@ -77,14 +83,19 @@ interface Props {
  * (a reload after an external edit), and the draft follows it too — but only a draft that still
  * reads what the field showed before: anything typed, committed or not, is never taken away. So a
  * write that fails keeps its text in the field, and an edit landing from elsewhere waits for the
- * field to be left. `trim` also strips the draft on commit.
+ * field to be left. `normalize` rewrites the draft on commit (stripping it, say) and can refuse it
+ * with `null`, which writes nothing and leaves the text as typed.
  *
  * Committing counts as showing what was committed. That matters where the write answers back with
  * something other than what was asked for — a file name made safe to use as one, or given a
  * suffix because that name was taken — since the field would otherwise keep the asked-for text,
  * read as still unsaved, and re-submit it on the next blur, renaming again and again.
  */
-function useFieldDraft(value: string, onCommit: (v: string) => void, trim = false) {
+function useFieldDraft(
+  value: string,
+  onCommit: (v: string) => void,
+  normalize: (v: string) => string | null = (v) => v,
+) {
   const [draft, setDraft] = useState(value);
   const shown = useRef(value);
   useEffect(() => {
@@ -93,17 +104,24 @@ function useFieldDraft(value: string, onCommit: (v: string) => void, trim = fals
     setDraft((d) => (d === before ? value : d));
   }, [value]);
   const commit = () => {
-    const next = trim ? draft.trim() : draft;
+    const next = normalize(draft);
+    if (next === null) return;
     if (next !== draft) setDraft(next);
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
-    if (next === (trim ? value.trim() : value)) return;
+    if (next === normalize(value)) return;
     shown.current = next;
     onCommit(next);
   };
   return { draft, setDraft, commit };
 }
 
-/** One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. */
+const trimmed = (v: string) => v.trim();
+
+/**
+ * One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. The
+ * value keeps its YAML type through an edit (`editScalar`); text that cannot hold it stays in the
+ * field, unwritten, with the reason under it.
+ */
 function PropRow({
   name,
   value,
@@ -111,36 +129,63 @@ function PropRow({
   onRemove,
 }: {
   name: string;
-  value: string;
-  onCommit: (v: string) => void;
+  value: ScalarValue;
+  onCommit: (v: ScalarValue) => void;
   onRemove: () => void;
 }) {
-  const { draft, setDraft, commit } = useFieldDraft(value, onCommit);
+  const hintId = useId();
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const canonical = (text: string) => {
+    const edit = editScalar(value, text);
+    return edit.ok ? String(edit.value) : null;
+  };
+  const { draft, setDraft, commit } = useFieldDraft(
+    String(value),
+    (text) => {
+      const edit = editScalar(value, text);
+      if (edit.ok) onCommit(edit.value);
+    },
+    canonical,
+  );
+  const attempt = () => {
+    const edit = editScalar(value, draft);
+    setRefusal(edit.ok || draft === String(value) ? null : edit.reason);
+    commit();
+  };
   return (
-    <div className="folia-prop-row">
-      <span className="folia-prop-key">{name}</span>
-      <input
-        className="folia-prop-input"
-        value={draft}
-        aria-label={`Value of ${name}`}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          }
-        }}
-      />
-      <button
-        className="folia-icon-btn folia-mini"
-        aria-label={`Remove ${name}`}
-        title="Remove property"
-        onClick={onRemove}
-      >
-        <Icon name="close" />
-      </button>
-    </div>
+    <>
+      <div className="folia-prop-row">
+        <span className="folia-prop-key">{name}</span>
+        <input
+          className="folia-prop-input"
+          value={draft}
+          aria-label={`Value of ${name}`}
+          aria-invalid={refusal !== null || undefined}
+          aria-describedby={refusal !== null ? hintId : undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={attempt}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              attempt();
+            }
+          }}
+        />
+        <button
+          className="folia-icon-btn folia-mini"
+          aria-label={`Remove ${name}`}
+          title="Remove property"
+          onClick={onRemove}
+        >
+          <Icon name="close" />
+        </button>
+      </div>
+      {refusal !== null && (
+        <p className="folia-prop-hint folia-prop-refusal" id={hintId}>
+          {refusal}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -163,7 +208,7 @@ function PriorityField({
   onCommit: (v: string) => void;
 }) {
   const listId = useId();
-  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
   return (
     <label>
       <span className="folia-prop-key">Priority</span>
@@ -224,7 +269,7 @@ function AssigneeField({
   const hintId = useId();
   const meButton = useRef<HTMLButtonElement>(null);
   const value = names.join(", ");
-  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, true);
+  const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
   const mine = me !== "" && names.some((name) => sameAssignee(name, me));
   return (
     // The button is a sibling of the label, not inside it: a label belongs to one control, and one
@@ -441,8 +486,8 @@ function TitleFields({
 }) {
   const [showWhy, setShowWhy] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const name = useFieldDraft(basename, onRename, true);
-  const over = useFieldDraft(override, onCommitOverride, true);
+  const name = useFieldDraft(basename, onRename, trimmed);
+  const over = useFieldDraft(override, onCommitOverride, trimmed);
   // A blank file name renames nothing (the repository refuses it), so the preview says so too, and
   // what is typed is read through the same rule that will name the file — `A/B` becomes `AB` here
   // exactly as it will on disk. A name already taken is the one thing the preview cannot know:
@@ -1382,12 +1427,14 @@ export function CardDetail({
       : refuseKey
         ? `This card already has “${alreadyHere}”, so “${typedKey}” would be a second property the board ignores.`
         : null;
-  const extraProps = Object.entries(fm).filter(
-    ([k, v]) =>
+  const extraProps = Object.entries(fm).filter((entry): entry is [string, ScalarValue] => {
+    const [k, v] = entry;
+    return (
       (!editedKeys.has(k) || (k === TITLE_KEY && titleRowIsGeneric)) &&
       (typeof v === "string" || typeof v === "number" || typeof v === "boolean") &&
-      (v !== "" || k === TITLE_KEY),
-  );
+      (v !== "" || k === TITLE_KEY)
+    );
+  });
 
   return (
     <div
@@ -1546,7 +1593,7 @@ export function CardDetail({
               <PropRow
                 key={k}
                 name={k}
-                value={String(v)}
+                value={v}
                 onCommit={(val) => void mutate(() => repo.setFrontmatter(path, { [k]: val }))}
                 onRemove={() => void mutate(() => repo.unsetFrontmatterKey(path, k))}
               />
