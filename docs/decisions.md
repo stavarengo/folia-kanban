@@ -104,6 +104,14 @@ The second half of this is `await import("http")` in `src/obsidian/mcpHttpServer
 
 **What would change this:** someone wanting the board on a phone badly enough to fund the styling pass — touch-sized targets, the hover-only affordances given a tap route, and `.is-phone`/`.is-tablet` layouts — with a device to check it on. That is its own entry when it comes, not a manifest edit. Nothing about the gated `http` import changes with it: the server is desktop-only whatever the manifest says, because `http` does not exist on mobile.
 
+## A property row keeps the type its value already has, not the type Obsidian registered for the name
+
+**Decided 2026-09-29 (#77). Editing a custom property in the detail panel keeps the YAML type of the value in the note: a number stays a number, `true`/`false` stays a boolean, and text that type cannot hold is refused with the reason under the field.**
+
+Obsidian's Properties view goes by the type registered for the property name across the vault, but that registry (`metadataTypeManager`) is not in the documented API, and moving off undocumented API is where the plugin is heading. The value in the note is the one type the panel can read without it. The cost: a number that should have been text cannot be turned into text in its own row. The refusal names the way out, adding the property again under the same name in the add row, which writes text; Obsidian's own Number field refuses text as well. A `title:` row always edits as text, whatever YAML read it as.
+
+**What would change this:** Obsidian documenting a way to read a property's registered type. Then both the row and the add row could follow it, and the refusal's way out would have to change with them.
+
 ## Folia does not decide for itself what colour goes on a pale accent
 
 **Decided 2026-09-10. The board reads `--text-on-accent` flat, exactly as Obsidian's own buttons do.**
