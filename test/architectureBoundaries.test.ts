@@ -20,7 +20,14 @@ const tree: Record<string, string> = {
   "src/view.tsx": "export const view = 1;\n",
   "src/bindAddress.ts": "export const bind = 1;\n",
   "src/settings.ts": 'export { bind } from "./bindAddress";\nexport type Settings = { a: 1 };\n',
-  "src/obsidian/adapter.ts": "export const adapter = 1;\n",
+  "src/obsidian/adapter.ts": [
+    'import { Plugin } from "obsidian";',
+    'import { shell } from "electron";',
+    "export const adapter = [Plugin, shell];",
+    "",
+  ].join("\n"),
+  "src/model/typed.ts": 'export type App = import("obsidian").App;\n',
+  "src/mcp/lazy.ts": 'export const load = () => import("@codemirror/view");\n',
   "src/model/b.ts": "export const b = 1;\n",
   "src/model/a.ts": [
     'import { b } from "./b";',
@@ -96,6 +103,12 @@ describe("architecture boundaries (dependency-cruiser)", () => {
       "model-and-mcp-stay-off-the-ui-stack: src/model/a.ts → npm:@dnd-kit/core/dist/index.js",
       "model-and-mcp-stay-off-the-ui-stack: src/model/a.ts → npm:react/index.js",
       "model-is-pure-domain: src/model/a.ts → src/settings.ts",
+      // Obsidian and what it supplies stay behind the adapter and the shell, including an inline
+      // import() type, a dynamic import and a path through the adapter.
+      "only-adapter-and-shell-reach-the-app: src/mcp/lazy.ts → @codemirror/view",
+      "only-adapter-and-shell-reach-the-app: src/model/typed.ts → obsidian",
+      "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → electron",
+      "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → obsidian",
       // G7: shipped code never imports test/.
       "src-never-imports-test: src/model/a.ts → test/fake.ts",
       // G2: the UI reaches none of the adapter, MCP or the shell, directly or through type-only

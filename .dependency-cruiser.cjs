@@ -6,15 +6,21 @@
 //   mcp      — the MCP tool surface; imports only itself and the model
 // The plugin shell (main.ts, view.tsx) wires the adapter into Obsidian. The root modules
 // (settings.ts and the like) sit between the shell and the UI.
-// The "only the adapter/shell may import the 'obsidian' package" rule is enforced
-// in eslint.config.mjs via no-restricted-imports (precise specifier match), which sees
-// direct imports only; ui-never-reaches-obsidian below covers the transitive ones for src/ui.
+// "Only the adapter and the shell may import the obsidian package, or electron, CodeMirror and
+// Lezer that the app supplies with it" is enforced twice: in eslint.config.mjs via
+// no-restricted-imports, which names the offending line but sees only static imports, and by
+// only-adapter-and-shell-reach-the-app below, which also sees `import("obsidian")` types, dynamic
+// imports and the whole transitive path.
 // test/ is unconstrained by design: tests may import any layer. Only the reverse is forbidden.
 
 /** The npm packages the model and MCP layers may not use: the UI's rendering stack, and yaml.
  *  pnpm resolves them to node_modules/.pnpm/<id>/node_modules/<name>/, so the pattern matches the
  *  last node_modules segment and is not anchored. */
 const uiAndYamlPackages = "node_modules/(react|react-dom|@dnd-kit|yaml)/";
+
+/** What Obsidian supplies at runtime (esbuild.config.mjs marks them external). None is installed
+ *  as code, so each stays unresolved and its path is the bare specifier. */
+const appModules = "^(obsidian|electron)$|^(electron|@codemirror|@lezer)/";
 
 module.exports = {
   forbidden: [
@@ -43,12 +49,12 @@ module.exports = {
       to: { path: "^src/(obsidian|mcp)/|^src/(main\\.ts|view\\.tsx)$", reachable: true },
     },
     {
-      name: "ui-never-reaches-obsidian",
+      name: "only-adapter-and-shell-reach-the-app",
       severity: "error",
       comment:
-        "No chain of imports from src/ui may end at the obsidian package, type-only ones included. ESLint's import ban sees only direct imports; this sees the whole path.",
-      from: { path: "^src/ui/" },
-      to: { path: "^obsidian$", reachable: true },
+        "Outside src/obsidian and the shell, no chain of imports may end at the obsidian package or at electron, @codemirror/* or @lezer/*, which the app supplies at runtime: type-only, inline import() types and dynamic imports included.",
+      from: { path: "^src/", pathNot: "^src/obsidian/|^src/(main\\.ts|view\\.tsx)$" },
+      to: { path: appModules, reachable: true },
     },
     {
       name: "mcp-is-a-port-consumer",
@@ -86,9 +92,9 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
-    // Outside src, only what a rule needs an end to find is let in: the obsidian package for
-    // ui-never-reaches-obsidian, test/ for src-never-imports-test and the banned packages for
+    // Outside src, only what a rule needs an end to find is let in: the app's modules for
+    // only-adapter-and-shell-reach-the-app, test/ for src-never-imports-test and the banned packages for
     // model-and-mcp-stay-off-the-ui-stack. Narrowing this makes those rules pass vacuously.
-    includeOnly: ["^src/", "^test/", "^obsidian$", uiAndYamlPackages],
+    includeOnly: ["^src/", "^test/", appModules, uiAndYamlPackages],
   },
 };
