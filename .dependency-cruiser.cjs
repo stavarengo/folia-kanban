@@ -1,14 +1,21 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
-// Architecture boundaries, adapted to this Obsidian plugin's
-// three layers:
-//   model    — pure domain + the CardRepository port; depends on nothing app-specific
+// Architecture boundaries, adapted to this Obsidian plugin's layers:
+//   model    — pure domain + the CardRepository port; imports only itself
 //   obsidian — the Vault adapter that implements the port (the only data/transport layer)
-//   ui       — React board; depends on model + the port, never the adapter
-//   mcp      — the MCP tool surface; same rule as ui (model + the port, never the adapter)
-// The plugin shell (main.ts, view.tsx) wires the adapter into Obsidian.
+//   ui       — React board; reaches neither the adapter, MCP nor the shell, by any path
+//   mcp      — the MCP tool surface; imports only itself and the model
+// The plugin shell (main.ts, view.tsx) wires the adapter into Obsidian. The root modules
+// (settings.ts and the like) sit between the shell and the UI.
 // The "only the adapter/shell may import the 'obsidian' package" rule is enforced
 // in eslint.config.mjs via no-restricted-imports (precise specifier match), which sees
 // direct imports only; ui-never-reaches-obsidian below covers the transitive ones for src/ui.
+// test/ is unconstrained by design: tests may import any layer. Only the reverse is forbidden.
+
+/** The npm packages the model and MCP layers may not use: the UI's rendering stack, and yaml.
+ *  pnpm resolves them to node_modules/.pnpm/<id>/node_modules/<name>/, so the pattern matches the
+ *  last node_modules segment and is not anchored. */
+const uiAndYamlPackages = "node_modules/(react|react-dom|@dnd-kit|yaml)/";
+
 module.exports = {
   forbidden: [
     {
@@ -23,17 +30,17 @@ module.exports = {
       name: "model-is-pure-domain",
       severity: "error",
       comment:
-        "src/model is the domain core + ports. It must not depend on the UI, the Obsidian adapter, or the plugin shell.",
+        "src/model is the domain core + ports. Within src it may import only src/model: not the UI, the adapter, MCP, the plugin shell or any root module.",
       from: { path: "^src/model/" },
-      to: { path: "^src/ui/|^src/obsidian/|^src/(main|view|settings)\\.(ts|tsx)$" },
+      to: { path: "^src/", pathNot: "^src/model/" },
     },
     {
-      name: "ui-through-port-not-adapter",
+      name: "ui-never-reaches-adapter-mcp-or-shell",
       severity: "error",
       comment:
-        "src/ui depends on the model and the CardRepository port (in src/model). It must never import the Obsidian adapter (src/obsidian) directly.",
+        "src/ui depends on the model and the CardRepository port (in src/model). No chain of imports from it may end in the Obsidian adapter (src/obsidian), the MCP layer (src/mcp) or the plugin shell (main.ts, view.tsx).",
       from: { path: "^src/ui/" },
-      to: { path: "^src/obsidian/" },
+      to: { path: "^src/(obsidian|mcp)/|^src/(main\\.ts|view\\.tsx)$", reachable: true },
     },
     {
       name: "ui-never-reaches-obsidian",
@@ -47,9 +54,24 @@ module.exports = {
       name: "mcp-is-a-port-consumer",
       severity: "error",
       comment:
-        "src/mcp is the agent-facing tool surface. Like src/ui it reaches the vault only through the CardRepository port in src/model, never the Obsidian adapter or the plugin shell. The adapter that implements its BoardHost lives in src/obsidian and imports it, not the other way round.",
+        "src/mcp is the agent-facing tool surface. Within src it may import only src/mcp and src/model, where the CardRepository port lives: never the UI, the Obsidian adapter, the plugin shell or a root module. The adapter that implements its BoardHost lives in src/obsidian and imports it, not the other way round.",
       from: { path: "^src/mcp/" },
-      to: { path: "^src/ui/|^src/obsidian/|^src/(main|view|settings)\\.(ts|tsx)$" },
+      to: { path: "^src/", pathNot: "^src/(mcp|model)/" },
+    },
+    {
+      name: "model-and-mcp-stay-off-the-ui-stack",
+      severity: "error",
+      comment:
+        "src/model and src/mcp run without a DOM and without a Markdown parser of their own: they may not import react, react-dom, @dnd-kit/* or yaml. zod stays allowed.",
+      from: { path: "^src/(model|mcp)/" },
+      to: { path: uiAndYamlPackages },
+    },
+    {
+      name: "src-never-imports-test",
+      severity: "error",
+      comment: "Shipped code must not depend on test helpers or fakes.",
+      from: { path: "^src/" },
+      to: { path: "^test/" },
     },
     {
       name: "no-orphans",
@@ -64,7 +86,9 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
-    // The obsidian package is let in so the reachability rule above has an end to find.
-    includeOnly: ["^src/", "^obsidian$"],
+    // Outside src, only what a rule needs an end to find is let in: the obsidian package for
+    // ui-never-reaches-obsidian, test/ for src-never-imports-test and the banned packages for
+    // model-and-mcp-stay-off-the-ui-stack. Narrowing this makes those rules pass vacuously.
+    includeOnly: ["^src/", "^test/", "^obsidian$", uiAndYamlPackages],
   },
 };
