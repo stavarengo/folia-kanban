@@ -275,20 +275,20 @@ export default [
   {
     // The same boundary for the ambient globals Obsidian injects: no import is involved, so the
     // import ban cannot see them. This replaces the preset's option list for these files, so its
-    // own entries are carried over.
+    // own entries are carried over. Everything here also runs on mobile, so Node's globals stay out.
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/obsidian/**", "src/main.ts", "src/view.tsx"],
-    rules: restrictedGlobalRules(),
-  },
-  {
-    // The UI, the model and MCP also run on mobile, so Node's globals stay out of them.
-    files: ["src/{ui,model,mcp}/**/*.{ts,tsx}"],
     rules: restrictedGlobalRules({ node: true }),
   },
   {
-    // The model and MCP have no DOM either.
+    // The model and MCP have no DOM either. The preset's advice to write `window.setTimeout` and
+    // `window` instead of `globalThis` would lead straight into that ban, so it is off here.
     files: ["src/{model,mcp}/**/*.{ts,tsx}"],
-    rules: restrictedGlobalRules({ node: true, dom: true }),
+    rules: {
+      ...restrictedGlobalRules({ node: true, dom: true }),
+      "obsidianmd/prefer-window-timers": "off",
+      "obsidianmd/no-global-this": "off",
+    },
   },
   {
     // no-undef is redundant with the TS type-checker, and the adapter and shell may use Obsidian's

@@ -21,9 +21,11 @@ const uiPackages = "node_modules/(react|react-dom|@dnd-kit)/";
 /** A test-only devDependency: shipped code parses YAML with Obsidian's parseYaml. */
 const yamlPackage = "node_modules/yaml/";
 
-/** What Obsidian supplies at runtime (esbuild.config.mjs marks them external). None is installed
- *  as code, so each stays unresolved and its path is the bare specifier. */
-const appModules = "^(obsidian|electron)$|^(electron|@codemirror|@lezer)/";
+/** What Obsidian supplies at runtime (esbuild.config.mjs marks them external). Uninstalled, each
+ *  stays a bare specifier; installed (as a devDependency for its types, say), it resolves into
+ *  node_modules. Both forms must match, or the rule goes blind the day one is installed. */
+const appModules =
+  "(^|node_modules/)(obsidian|electron)(/|$)|(^|node_modules/)(@codemirror|@lezer)/";
 
 /** Node's builtin modules, with or without the `node:` prefix. A few (node:sqlite, node:test)
  *  exist only prefixed; allowing their bare name too costs nothing, since the rule that uses this

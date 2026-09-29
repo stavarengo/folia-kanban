@@ -110,7 +110,7 @@ describe("Node and DOM globals fence", () => {
   const restricted = async (code: string, file: string) =>
     (await ruleIdsOf(code, file)).filter((id) => id === "no-restricted-globals").length;
 
-  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts"])(
+  it.each(["src/model/card.ts", "src/ui/App.tsx", "src/mcp/tools.ts", "src/settings.ts"])(
     "rejects Node globals in %s",
     async (file) => {
       expect(await restricted(nodeGlobals, file)).toBe(5);
@@ -146,6 +146,14 @@ describe("Node and DOM globals fence", () => {
     const ids = await ruleIdsOf(qualified, "src/ui/App.tsx");
     expect(ids.filter((id) => id === "no-restricted-properties")).toHaveLength(1);
   });
+
+  it.each(["src/model/card.ts", "src/mcp/tools.ts"])(
+    "does not steer %s toward window through the preset's own advice",
+    async (file) => {
+      const ids = await ruleIdsOf("export const t = setTimeout(() => {}, 1);\n", file);
+      expect(ids).not.toContain("obsidianmd/prefer-window-timers");
+    },
+  );
 
   it("leaves the UI free to use the DOM", async () => {
     expect(await restricted(pageGlobals, "src/ui/App.tsx")).toBe(0);

@@ -68,7 +68,11 @@ const tree: Record<string, string> = {
     "",
   ].join("\n"),
   "src/ui/Modal.tsx": 'import { view } from "../view";\nexport const Modal = view;\n',
-  "test/fake.ts": 'import { parse } from "yaml";\nexport const fake = parse;\n',
+  "test/fake.ts": "export const fake = 1;\n",
+  // An installed copy of an app-supplied module, which resolves into node_modules.
+  "node_modules/@codemirror/view/package.json":
+    '{ "name": "@codemirror/view", "main": "index.js" }\n',
+  "node_modules/@codemirror/view/index.js": "export const EditorView = 1;\n",
 };
 
 let fixtureDir = "";
@@ -116,15 +120,14 @@ describe("architecture boundaries (dependency-cruiser)", () => {
       "node-builtins-stay-in-adapter-and-shell: src/model/io.ts → path",
       "node-builtins-stay-in-adapter-and-shell: src/ui/stats.ts → fs",
       // Obsidian and what it supplies stay behind the adapter and the shell, including an inline
-      // import() type, a dynamic import and a path through the adapter.
-      "only-adapter-and-shell-reach-the-app: src/mcp/lazy.ts → @codemirror/view",
+      // import() type, a dynamic import and a path through the adapter, installed or not.
+      "only-adapter-and-shell-reach-the-app: src/mcp/lazy.ts → npm:@codemirror/view/index.js",
       "only-adapter-and-shell-reach-the-app: src/model/typed.ts → obsidian",
       "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → electron",
       "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → obsidian",
       // G7: shipped code never imports test/.
       "src-never-imports-test: src/model/a.ts → test/fake.ts",
-      // yaml is test-only: shipped code may not import it anywhere, type-only or dynamically. The
-      // test helper's own yaml import stays allowed.
+      // yaml is test-only: shipped code may not import it anywhere, type-only or dynamically.
       "src-never-imports-yaml: src/frontmatter.ts → npm:yaml/dist/index.js",
       "src-never-imports-yaml: src/model/yamlDoc.ts → npm:yaml/dist/index.js",
       // G2: the UI reaches none of the adapter, MCP or the shell, directly or through type-only
