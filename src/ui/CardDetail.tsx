@@ -120,7 +120,8 @@ const trimmed = (v: string) => v.trim();
 /**
  * One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. The
  * value keeps its YAML type through an edit (`editScalar`); text that cannot hold it stays in the
- * field, unwritten, with the reason under it.
+ * field, unwritten, with the reason under it. Closing the dialog blurs the field to save it, and
+ * takes the field away with it, so a refusal then goes to the board's toast instead.
  */
 function PropRow({
   name,
@@ -134,6 +135,8 @@ function PropRow({
   onRemove: () => void;
 }) {
   const hintId = useId();
+  const actions = useBoardActions();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const canonical = (text: string) => {
     const edit = editScalar(value, text);
@@ -149,7 +152,13 @@ function PropRow({
   );
   const attempt = () => {
     const edit = editScalar(value, draft);
-    setRefusal(edit.ok || draft === String(value) ? null : edit.reason);
+    const reason = edit.ok || draft === String(value) ? null : edit.reason;
+    setRefusal(reason);
+    if (reason !== null)
+      queueMicrotask(() => {
+        if (!inputRef.current?.isConnected)
+          actions.reportError(new Error(`“${name}” was not saved. ${reason}`));
+      });
     commit();
   };
   return (
@@ -157,6 +166,7 @@ function PropRow({
       <div className="folia-prop-row">
         <span className="folia-prop-key">{name}</span>
         <input
+          ref={inputRef}
           className="folia-prop-input"
           value={draft}
           aria-label={`Value of ${name}`}
@@ -1593,7 +1603,8 @@ export function CardDetail({
               <PropRow
                 key={k}
                 name={k}
-                value={v}
+                // A title is text whatever YAML read it as: `title: 2024` must be able to become a name.
+                value={k === TITLE_KEY ? String(v) : v}
                 onCommit={(val) => void mutate(() => repo.setFrontmatter(path, { [k]: val }))}
                 onRemove={() => void mutate(() => repo.unsetFrontmatterKey(path, k))}
               />

@@ -143,14 +143,17 @@ describe("editing a property value keeps its type", () => {
   it.each(["abc", "", "   ", "0x10", "5,5", "1 000", "Infinity", "NaN", "1e999", "5abc"])(
     "refuses %j for a number, rather than writing a string, a zero or NaN",
     (text) => {
-      expect(editScalar(3, text)).toEqual({ ok: false, reason: "This property holds a number." });
+      expect(editScalar(3, text)).toEqual({
+        ok: false,
+        reason: "This property holds a number. To store text, remove it and add it again.",
+      });
     },
   );
 
   it("refuses an integer with more digits than a number can keep", () => {
     expect(editScalar(3, "12345678901234567890")).toEqual({
       ok: false,
-      reason: "This number has more digits than a property can keep.",
+      reason: "This number has more digits than the property can keep exactly.",
     });
   });
 
@@ -168,7 +171,7 @@ describe("editing a property value keeps its type", () => {
     (text) => {
       expect(editScalar(false, text)).toEqual({
         ok: false,
-        reason: "This property holds true or false.",
+        reason: "This property holds true or false. To store text, remove it and add it again.",
       });
     },
   );

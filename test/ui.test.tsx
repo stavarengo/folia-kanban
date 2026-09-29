@@ -1046,7 +1046,9 @@ describe("card detail", () => {
     await user.type(estimate, "abc{Enter}");
     expect(estimate).toHaveValue("abc");
     expect(estimate).toHaveAttribute("aria-invalid", "true");
-    expect(estimate).toHaveAccessibleDescription("This property holds a number.");
+    expect(estimate).toHaveAccessibleDescription(
+      "This property holds a number. To store text, remove it and add it again.",
+    );
     expect(write).not.toHaveBeenCalled();
     expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
 
@@ -1055,6 +1057,20 @@ describe("card detail", () => {
     estimate.blur();
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(8));
     expect(estimate).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("lets a title YAML read as a number become a name", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { title: 2024 });
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const title = within(detail).getByLabelText("Value of title");
+    await user.clear(title);
+    await user.type(title, "Launch plan{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Launch plan"));
+    expect(title).not.toHaveAttribute("aria-invalid");
   });
 
   it("deletes a custom property", async () => {
@@ -1289,6 +1305,21 @@ describe("detail dialog", () => {
     await user.type(priority, "urgent");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.priority).toBe("urgent"));
+  });
+
+  it("says so when the dialog closes on a property value the row refuses", async () => {
+    const repo = makeRepo();
+    Object.assign(repo.files.get("Tasks/Alpha.md")!.fm, { estimate: 3 });
+    const { user, detail } = await open(repo);
+    const estimate = within(detail).getByLabelText("Value of estimate");
+    await user.clear(estimate);
+    await user.type(estimate, "abc");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    expect(
+      await screen.findByText(/“estimate” was not saved\. This property holds a number\./),
+    ).toBeInTheDocument();
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
   });
 
   it("gives Escape in the description to the editor: the draft goes, the dialog stays", async () => {

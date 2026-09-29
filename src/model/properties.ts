@@ -222,8 +222,9 @@ const DECIMAL = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
  * Read `text` as a new value for a property that holds `previous`, keeping its YAML type: a number
  * stays a number and a boolean stays a boolean, so an edit never turns `estimate: 3` into
  * `estimate: "5"`. Text that does not spell a value of that type is refused rather than written as
- * a string, and so is text that would lose digits or clear the value — the type would be gone
- * the moment the key held a string or nothing, and removing the property has its own button.
+ * a string, and so is an empty field or an integer too long to keep exactly: the type would be
+ * gone the moment the key held a string or nothing. Removing the property and adding it again is
+ * the way to make it text, and the refusal says so, as Obsidian's own number field takes no text.
  *
  * Booleans are `true` and `false` in any case, and nothing else: Obsidian reads YAML 1.2, where
  * `yes` and `on` are strings.
@@ -234,12 +235,18 @@ export function editScalar(previous: ScalarValue, text: string): ScalarEdit {
   if (typeof previous === "boolean") {
     const lower = typed.toLowerCase();
     if (lower === "true" || lower === "false") return { ok: true, value: lower === "true" };
-    return { ok: false, reason: "This property holds true or false." };
+    return {
+      ok: false,
+      reason: "This property holds true or false. To store text, remove it and add it again.",
+    };
   }
   const n = Number(typed);
   if (!DECIMAL.test(typed) || !Number.isFinite(n))
-    return { ok: false, reason: "This property holds a number." };
+    return {
+      ok: false,
+      reason: "This property holds a number. To store text, remove it and add it again.",
+    };
   if (Number.isInteger(n) && !Number.isSafeInteger(n) && /^[-+]?\d+$/.test(typed))
-    return { ok: false, reason: "This number has more digits than a property can keep." };
+    return { ok: false, reason: "This number has more digits than the property can keep exactly." };
   return { ok: true, value: n };
 }
