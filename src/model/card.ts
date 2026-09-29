@@ -14,7 +14,10 @@ import { fencedLines, unclosedFence } from "./fences";
 import { FrontmatterSchema, decode } from "./schemas";
 import { normalizeAuthor } from "./unread";
 
-const FRONTMATTER_RE = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/;
+// Where Obsidian's metadata reader, and so the properties Folia shows, says the frontmatter ends:
+// at the first line after the opening `---` that starts with `---`, the very next line included
+// (an empty block). See docs/decisions.md, "The model splits frontmatter itself".
+const FRONTMATTER_RE = /^---\r?\n((?:[\s\S]*?\r?\n)??)---\r?\n?/;
 // Obsidian's own rule for a checklist item's done-ness: a space means open, and literally any
 // other single character means done (`[/]`, `[-]`, `[>]`, and whatever else a theme defines) — not
 // only `x`/`X`. Reading view's checkbox styling and every theme that colours a checklist follow that
@@ -59,22 +62,18 @@ export const SECTION = {
 // ---------------------------------------------------------------------------
 
 export function splitFrontmatter(text: string): { fmText: string; body: string } {
-  const m = FRONTMATTER_RE.exec(text);
-  if (!m) return { fmText: "", body: text };
-  const fmText = m[1] ?? "";
+  const fmText = FRONTMATTER_RE.exec(text)?.[0] ?? "";
   return { fmText, body: text.slice(fmText.length) };
 }
 
 /** The YAML text between a note's `---` fences, or `null` when the note has no frontmatter. */
 export function frontmatterYaml(text: string): string | null {
-  const { fmText } = splitFrontmatter(text);
-  if (!fmText) return null;
-  return fmText.replace(/^---\r?\n/, "").replace(/\r?\n---\r?\n?$/, "");
+  return FRONTMATTER_RE.exec(text)?.[1] ?? null;
 }
 
 /** What a frontmatter block parsed to, checked: nothing is "no fields", and anything else must be a mapping. */
 export function frontmatterRecord(data: unknown): Record<string, unknown> {
-  // An empty frontmatter block (`--- \n ---`) is legitimately "no fields".
+  // An empty frontmatter block (`---` straight after `---`) is legitimately "no fields".
   if (data == null) return {};
   // Anything present must be a mapping; a list or scalar in the `---` block is corruption.
   return decode(FrontmatterSchema, data, "card frontmatter");
@@ -459,7 +458,17 @@ export function cardStats(text: string): CardStats {
 
 function withBody(text: string, fn: (body: string) => string): string {
   const { fmText, body } = splitFrontmatter(text);
-  return fmText + fn(body);
+  const next = fn(body);
+  // A closing fence at the very end of the file has no line ending of its own, so text added
+  // after it would run into the `---`. Only then: this function never splits a body that starts
+  // on the fence's own line (a trailing space after the dashes, say).
+  const gap =
+    fmText && body === "" && next && !/^\r?\n/.test(next) && !fmText.endsWith("\n")
+      ? fmText.includes("\r\n")
+        ? "\r\n"
+        : "\n"
+      : "";
+  return fmText + gap + next;
 }
 
 /**

@@ -29,7 +29,7 @@ export const FrontmatterSchema = z.record(z.string(), z.unknown());
  * defaultable display/config field: coerce any non-string to `undefined` (= absent) so a valid
  * board still loads, exactly as the adapter did before schemas existed. Structural corruption
  * (a non-object frontmatter block, malformed YAML) is still rejected upstream by FrontmatterSchema
- * and parseFrontmatter.
+ * and the adapter's parseFrontmatter.
  */
 const optionalConfigString = z.preprocess(
   (v) => (typeof v === "string" ? v : undefined),

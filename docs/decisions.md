@@ -114,6 +114,18 @@ Two ways to close it were weighed and left out. Comparing the neighbouring lines
 
 **What would change this:** a real report of a write landing on the wrong one of two identical lines, or a decision to let the plugin write a hidden identifier onto checklist lines. Either would reopen #36's reasoning first.
 
+## The model splits frontmatter itself, where Obsidian's reader does
+
+**Decided 2026-09-29 (#95). The model keeps one splitter, following Obsidian's metadata reader; the adapter does not call `getFrontMatterInfo`.**
+
+Every byte-stable body edit in `src/model/card.ts` runs inside `vault.process` as a pure text transform, and `src/model/cardTitle.ts` reads the same split. `src/model/` cannot import `obsidian`, so it cannot call `getFrontMatterInfo`, and having the adapter split with Obsidian while the model splits the body its own way would be two splitters that can disagree. So the adapter takes the YAML text from the model's `frontmatterYaml` too, and `FRONTMATTER_RE` is the only splitter in the code. This is why #27's ask to split with the offsets Obsidian already computed is not taken for frontmatter.
+
+It follows the reader behind `metadataCache`, because that is where Folia's card fields and board detection come from, and what Obsidian shows as the note's properties: the block ends at the first line after the opening `---` that starts with `---`, the very next line included, so a `---`/`---` block is an empty one rather than no block. It agrees with the reader in Obsidian 1.10.6, 1.12.7 and 1.13.7 on every note with LF or CRLF line endings; `test/frontmatter.test.ts` checks it against a copy of that reader. It still differs where a note uses a lone carriage return as a line ending, which the reader accepts and the rest of the model does not, since it splits every body on `\n`.
+
+Obsidian's writer is stricter: `getFrontMatterInfo`, and so `processFrontMatter`, needs a closing line that is exactly `---`. On a note whose closing line carries anything after the three dashes, a property write from Folia therefore stacks a second block on top of the one Obsidian shows. That is Obsidian's own disagreement and predates this split; it is tracked in the backlog entry "Obsidian's reader and writer frontmatter rules disagree, and a property write can corrupt a note".
+
+**What would change this:** Obsidian changing its reader's rule, which the tests cannot see. When in doubt, compare `obsidianReader` in `test/frontmatter.test.ts` with the tokenizer in the installed Obsidian's `worker.js`.
+
 ## Folia's components do not wear Obsidian's undocumented class names
 
 **Decided 2026-09-21. The contract with the host is its documented CSS variables, and nothing else.**

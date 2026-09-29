@@ -267,6 +267,36 @@ describe("what the adapter reads: file text vs metadataCache", () => {
     expect(byPath["basic/Cards/Uncached.md"]).toBe("done");
   });
 
+  // Obsidian's reader ends the block on a line that only starts with `---`, and shows these notes'
+  // properties; so does Folia, and the body after that line is the note's body.
+  it("loads a board, a context and a card whose closing fence has a trailing space", async () => {
+    const app = new FakeApp();
+    app.vault.addFile(
+      "basic/Board.md",
+      "---\nfolia-board: true\ncard-folder: ./Cards\ncolumns:\n  - todo\n  - done\n--- \n# Board\n",
+    );
+    app.vault.addFile(
+      "basic/Cards/Home/_context.md",
+      "---\ncontext-name: Home life\n--- \nAt home.\n",
+    );
+    app.vault.addFile(
+      "basic/Cards/Home/X.md",
+      "---\ntype: task\nstatus: todo\n--- \n# Card X\nBody\n## Subtasks\n- [ ] one\nMiddle text\n---\nFooter\n",
+    );
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md");
+
+    const board = await repo.loadBoard();
+    expect(board.config.cardFolder).toBe("basic/Cards");
+    expect(board.config.columns.map((c) => c.id)).toEqual(["todo", "done"]);
+    const x = Object.values(board.cards).find((c) => c.path === "basic/Cards/Home/X.md");
+    expect(x?.frontmatter["status"]).toBe("todo");
+    expect(x?.stats?.checklist).toBe(1);
+    const body = await repo.readBody("basic/Cards/Home/X.md");
+    expect(body.title).toBe("Card X");
+    expect(body.subtasks.map((s) => s.text)).toEqual(["one"]);
+    expect((await repo.loadContexts("basic/Cards"))["Home"]?.name).toBe("Home life");
+  });
+
   it("names the card whose frontmatter cannot be parsed instead of dropping it", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/Broken.md", "---\nstatus: [unclosed\n---\n\n# Broken\n");

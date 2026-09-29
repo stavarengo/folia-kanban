@@ -208,14 +208,35 @@ class Events {
   }
 }
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+/**
+ * Obsidian's metadata reader's frontmatter rule, copied from the Markdown tokenizer in its worker
+ * (the same in 1.10.6, 1.12.7 and 1.13.7). It first turns every line ending into `\n`, so `end`,
+ * just past the closing `---`, is an offset in that text.
+ */
+export function obsidianReader(raw: string): { yaml: string; end: number } | null {
+  const n = raw.replace(/\r\n|\r/g, "\n");
+  if (n.slice(0, 3) !== "---" || n.charAt(3) !== "\n") return null;
+  let i = n.indexOf("---", 3);
+  while (i !== -1 && n.charAt(i - 1) !== "\n") i = n.indexOf("---", i + 3);
+  return i === -1 ? null : { yaml: n.slice(4, Math.max(4, i - 1)), end: i + 3 };
+}
+
+function asFields(yaml: string): Record<string, unknown> {
+  const parsed: unknown = parse(yaml);
+  return parsed !== null && typeof parsed === "object"
+    ? { ...(parsed as Record<string, unknown>) }
+    : {};
+}
+
+// `processFrontMatter` splits by `getFrontMatterInfo`, which is stricter than the metadata reader
+// the model follows: its closing line must be exactly `---`, and a note it sees no block in gets a
+// new block on top. Kept separate so the suite sees that disagreement as Obsidian has it.
+const WRITER_FRONTMATTER = /^---\r?\n((?:[\s\S]*?\n)??)---(?:\r?\n|$)/;
 
 function splitNote(text: string): { fm: Record<string, unknown>; body: string } {
-  const match = FRONTMATTER.exec(text);
+  const match = WRITER_FRONTMATTER.exec(text);
   if (!match) return { fm: {}, body: text };
-  const parsed: unknown = parse(match[1] ?? "");
-  const fm = parsed !== null && typeof parsed === "object" ? { ...parsed } : {};
-  return { fm: fm as Record<string, unknown>, body: text.slice(match[0].length) };
+  return { fm: asFields(match[1] ?? ""), body: text.slice(match[0].length) };
 }
 
 function joinNote(fm: Record<string, unknown>, body: string): string {
@@ -391,8 +412,9 @@ export class FakeVault extends Events {
     this.emitEvent("delete", file);
   }
 
+  /** What the metadata cache holds: the block by Obsidian's reader, not by the model under test. */
   frontmatter(path: string): Record<string, unknown> {
-    return splitNote(this.texts.get(path) ?? "").fm;
+    return asFields(obsidianReader(this.texts.get(path) ?? "")?.yaml ?? "");
   }
 
   writeFrontmatter(path: string, fn: (fm: Record<string, unknown>) => void): void {
