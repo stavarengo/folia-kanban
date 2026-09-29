@@ -23,6 +23,7 @@
 // The vault's theme setting is restored afterwards; `git checkout -- examples` undoes anything
 // else.
 
+/* global app, axe -- page globals: Obsidian's app, and the axe-core this script injects before page.evaluate runs. */
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { chromium } from "playwright-core";
