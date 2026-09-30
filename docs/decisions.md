@@ -500,3 +500,9 @@ The board used to find the bar by its `.status-bar` class, measure it and pad th
 The preview fired the workspace `hover-link` event for links it found by the undocumented `internal-link` class and their `data-href`. The developer docs do show a plugin view firing that event, in the sample code of the "Build a Bases view" guide, but `obsidian.d.ts` types neither the event nor its payload. Since #88 the panel is an Obsidian dialog: a page preview sits on `--layer-popover` (30), under the dialog's `--layer-modal` (50), and it was reported opening behind the dialog's backdrop (#101). Lifting it would mean styling the undocumented `.hover-popover`. A popped-out board never showed it either (#81).
 
 **What would change this:** a documented way to open a page preview above a modal, together with a typed `hover-link` event or another documented way for a view to ask for a preview of a link it rendered.
+
+## Card links use the vault's link path setting
+
+**Decided 2026-09-30 (#106).** Folia writes wikilinks for card relationships and subtasks, using `MetadataCache.fileToLinktext` to choose the path inside the brackets. Shortest, relative and absolute paths omit `.md`. When Obsidian is configured to generate Markdown links, the old `generateMarkdownLink` plus bracket-stripping code discarded its Markdown-link result and fell back to the target's full vault path. The new call follows the vault's path setting in that case too. Folia still writes wikilinks because its card reader expects them; reading and writing Markdown links belongs to #40.
+
+**What would change this:** #40 adding Markdown-link reading for card relationships and subtasks. Folia could then write Markdown links when the vault setting asks for them.

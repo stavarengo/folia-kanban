@@ -200,9 +200,7 @@ export class VaultRepository implements CardRepository {
   private linkTextTo(targetPath: string, sourcePath: string): string {
     const file = this.app.vault.getFileByPath(targetPath);
     const bare = targetPath.replace(/\.md$/i, "");
-    if (file === null) return bare;
-    const generated = this.app.fileManager.generateMarkdownLink(file, sourcePath).trim();
-    return /^\[\[[^\]]+\]\]$/.test(generated) ? generated.slice(2, -2) : bare;
+    return file === null ? bare : this.app.metadataCache.fileToLinktext(file, sourcePath, true);
   }
 
   /**

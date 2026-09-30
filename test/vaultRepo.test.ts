@@ -554,6 +554,20 @@ describe("links, read and written the way the vault reads and writes them", () =
     expect(app.vault.frontmatter("basic/Cards/x/Parent.md")["blocks"]).toEqual([`[[${expected}]]`]);
   });
 
+  it("does not derive link text from generateMarkdownLink", async () => {
+    const { app, repo } = setup();
+    app.fileManager.useMarkdownLinks = true;
+    app.metadataCache.newLinkFormat = "relative";
+    const generate = vi.spyOn(app.fileManager, "generateMarkdownLink");
+    app.vault.addFile("basic/Cards/x/Parent.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/y/Child.md", card("status: todo"));
+
+    await repo.addRelation("basic/Cards/x/Parent.md", "blocks", "Child");
+
+    expect(app.vault.frontmatter("basic/Cards/x/Parent.md")["blocks"]).toEqual(["[[../y/Child]]"]);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("stores a relationship as a link to the card the name reaches from this note", async () => {
     const { app, repo } = twoChildren();
 
