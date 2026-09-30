@@ -1,4 +1,4 @@
-import type { TFile, WorkspaceLeaf } from "obsidian";
+import type { TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { FileView, Scope, type KeymapEventListener } from "obsidian";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -88,7 +88,7 @@ export class KanbanView extends FileView {
    * carry `boardPath` instead, so read that too — otherwise every board tab a user already had
    * open would come back empty after an upgrade.
    */
-  override async setState(state: unknown, result: { history: boolean }): Promise<void> {
+  override async setState(state: unknown, result: ViewStateResult): Promise<void> {
     const s = state as { file?: unknown; boardPath?: unknown } | null;
     const legacy = typeof s?.file !== "string" && typeof s?.boardPath === "string";
     await super.setState(legacy ? { ...s, file: s.boardPath } : state, result);
