@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } fro
 // The settings tab as data: what it offers, in what order, under which headings, worded how, and
 // what makes a row go inert. Both renderings read it — the declarative definitions Obsidian 1.13
 // and later index for the settings search (`./obsidian/settingsDefinitions`) and the imperative tab
-// `src/main.ts` draws below that — so the tab is one tab whichever API is there.
+// `./obsidian/settingTab` draws below that — so the tab is one tab whichever API is there.
 
 /**
  * The settings a user edits from the settings tab. The rest of `KanbanSettings` is bookkeeping the

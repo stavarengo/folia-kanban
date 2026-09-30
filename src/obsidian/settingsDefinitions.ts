@@ -256,7 +256,7 @@ function tokenRows(ctx: RowContext): SettingDefinition[] {
  * setting catches up without the tab being redrawn.
  *
  * The shape is {@link SETTING_GROUPS} turned into Obsidian's own groups, so the tab reads as a few
- * headed sections rather than one flat list, and `src/main.ts` walks the same groups to build the
+ * headed sections rather than one flat list, and `settingTab.ts` walks the same groups to build the
  * imperative tab Obsidian below 1.13 gets.
  */
 export function settingDefinitions(

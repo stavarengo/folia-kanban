@@ -44,11 +44,13 @@ const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
 });
 
 /**
- * Every string, and every template literal, spelled out in `src/main.ts` — comments stripped first,
- * so prose about a setting is not mistaken for the setting's own wording.
+ * Every string, and every template literal, spelled out in the imperative tab and the plugin that
+ * owns it — comments stripped first, so prose about a setting is not mistaken for its own wording.
  */
-const mainStringLiterals = (): string[] => {
-  const source = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8")
+const tabStringLiterals = (): string[] => {
+  const source = ["src/obsidian/settingTab.ts", "src/main.ts"]
+    .map((path) => readFileSync(resolve(process.cwd(), path), "utf8"))
+    .join("\n")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
   const literal = /"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
@@ -106,14 +108,15 @@ describe("settingDefinitions", () => {
     }
   });
 
-  // The other rendering of the tab lives in src/main.ts, which cannot be imported here (it pulls in
-  // the obsidian runtime, which only exists inside the app). Reading it as text is what is left: a
-  // name, description or heading spelled out there again is a second source of truth, and the two
-  // would drift the first time one of them is reworded. What is read is every string literal that
-  // file holds, with its comments taken out first — wording duplicated for real is always a
-  // literal, while a whole-file search would trip over any word that also lives in an identifier.
+  // The other rendering of the tab lives in src/obsidian/settingTab.ts, which is not imported here
+  // (it extends `PluginSettingTab`, which the test fake of the obsidian runtime does not provide).
+  // Reading it as text is what is left: a name, description or heading spelled out there again is a second source of truth,
+  // and the two would drift the first time one of them is reworded. What is read is every string
+  // literal that file and the plugin hold, with their comments taken out first — wording duplicated
+  // for real is always a literal, while a whole-file search would trip over any word that also
+  // lives in an identifier.
   it("is the only place the imperative tab can get the tab's wording from", () => {
-    const literals = mainStringLiterals();
+    const literals = tabStringLiterals();
     const wording = [
       ABOUT_HEADING,
       ...SETTING_GROUPS.map((g) => g.heading),
@@ -159,7 +162,7 @@ describe("settingDefinitions", () => {
     }
   });
 
-  // `renderRow` in src/main.ts casts a "held" row's key to `HeldFieldKey`. A third held row added
+  // `renderRow` in src/obsidian/settingTab.ts casts a "held" row's key to `HeldFieldKey`. A third held row added
   // to the controls without being added to that type would make the cast lie, silently.
   it("holds exactly the two fields the held-field type names", () => {
     const held = Object.entries(SETTING_CONTROLS)

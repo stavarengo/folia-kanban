@@ -254,11 +254,15 @@ describe("migratePathKeyedSettings", () => {
 // the board view: the maps are remembered whether or not a board is open.
 describe("the plugin follows external file operations", () => {
   const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
-  /** `src/main.ts` from the start of `followFileOp` to the end of its body. */
-  const followFileOp = (() => {
-    const from = main.slice(main.indexOf("private async followFileOp"));
+  const tabs = readFileSync(resolve(process.cwd(), "src/obsidian/boardTabs.ts"), "utf8");
+  /** `source` from the start of `signature` to the end of that method's body. */
+  const body = (source: string, signature: string): string => {
+    const at = source.indexOf(signature);
+    expect(at, `no ${signature}`).toBeGreaterThan(-1);
+    const from = source.slice(at);
     return from.slice(0, from.indexOf("\n  }"));
-  })();
+  };
+  const followFileOp = body(main, "private async followFileOp");
 
   it("listens to the vault's rename and delete events and routes both into the follow-up", () => {
     for (const event of ["rename", "delete"]) {
@@ -279,12 +283,15 @@ describe("the plugin follows external file operations", () => {
 
   it("runs the path-keyed settings migration, and re-points the per-tab records", () => {
     expect(followFileOp).toContain("migratePathKeyedSettings(s, op)");
+    expect(followFileOp).toContain("this.tabs.followFileOp(op)");
     // The records hold a path and are WeakMaps, which cannot be walked, so the leaves are.
-    expect(followFileOp).toContain("iterateAllLeaves");
-    expect(followFileOp).toContain("follow(this.markdownTabs, leaf, op)");
-    expect(followFileOp).toContain("follow(this.decided, leaf.view, op)");
-    const at = main.indexOf("function follow<");
-    expect(main.slice(at, main.indexOf("\n}", at))).toContain("remapPath(current, op)");
+    const tabsFollow = body(tabs, "followFileOp(op: FileOp): void {");
+    expect(tabsFollow).toContain("iterateAllLeaves");
+    expect(tabsFollow).toContain("follow(this.markdownTabs, leaf, op)");
+    expect(tabsFollow).toContain("follow(this.decided, leaf.view, op)");
+    const at = tabs.indexOf("function follow<");
+    expect(at).toBeGreaterThan(-1);
+    expect(tabs.slice(at, tabs.indexOf("\n}", at))).toContain("remapPath(current, op)");
   });
 });
 
@@ -293,10 +300,19 @@ describe("the plugin follows external file operations", () => {
 // minted at load is recorded as set or only held in memory.
 describe("the plugin writes only what was set", () => {
   const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+  /** The plugin class and the modules split out of it, for what none of them may say. */
+  const plugin = [
+    "src/main.ts",
+    "src/obsidian/settingTab.ts",
+    "src/obsidian/boardTabs.ts",
+    "src/obsidian/boardSetup.ts",
+  ]
+    .map((path) => readFileSync(resolve(process.cwd(), path), "utf8"))
+    .join("\n");
 
   it("saves the stored set, not the settings the defaults were merged into", () => {
     expect(main).toContain("this.saveData(settingsForDisk(this.stored))");
-    expect(main).not.toContain("this.saveData(this.settings)");
+    expect(plugin).not.toContain("this.saveData(this.settings)");
   });
 
   it("keeps the token where the vault cannot carry it, and writes the file that gave one up", () => {
@@ -316,7 +332,7 @@ describe("the plugin writes only what was set", () => {
   // way. The only place a value joins the stored set is `applyToStored`, so a token can only get
   // back in through a settings patch carrying one.
   it("never puts the token into the set it writes to disk", () => {
-    expect(main).not.toContain("mcpToken:");
+    expect(plugin).not.toContain("mcpToken:");
     expect(main).toContain('private mcpToken = "";');
   });
 
@@ -492,8 +508,11 @@ describe("a data.json changed by Sync or by hand", () => {
 // the same way the block above reads it: what the plugin does with an adopted file is half the fix.
 describe("the plugin reacts to an external settings change", () => {
   const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
-  const method = (name: string): string => {
-    const from = main.slice(main.indexOf(name));
+  const settingTab = readFileSync(resolve(process.cwd(), "src/obsidian/settingTab.ts"), "utf8");
+  const method = (name: string, source = main): string => {
+    const at = source.indexOf(name);
+    expect(at, `no ${name}`).toBeGreaterThan(-1);
+    const from = source.slice(at);
     return from.slice(0, from.indexOf("\n  }"));
   };
   const handler = method("override async onExternalSettingsChange");
@@ -534,7 +553,7 @@ describe("the plugin reacts to an external settings change", () => {
   // showing the values from before the change writes them straight back over it.
   it("tells the settings tab, whose rows would otherwise commit what they still show", () => {
     expect(adopt).toContain("this.settingTab?.settingsChangedExternally()");
-    const tab = method("settingsChangedExternally(): void {");
+    const tab = method("settingsChangedExternally(): void {", settingTab);
     expect(tab).toContain("this.pendingUserName = null;");
     expect(tab).toContain("this.pendingMcpFields = {};");
     // From 1.13 the tab is Obsidian's to draw; emptying its container would replace what it
