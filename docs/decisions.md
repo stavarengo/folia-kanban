@@ -521,6 +521,8 @@ Every reading of a `[[wikilink]]` in the model needs the note it names: the subc
 
 The board credits a card with its `area`, its frontmatter tags and its body tags, and the `tag:` filter, the chips and free-text search all read that one list (`src/model/tags.ts`). For `tags` the answer is Obsidian's: the adapter fills `Card.frontmatterTags` from `parseFrontMatterTags`, so a card shows exactly the frontmatter tags Obsidian's tag pane counts. That helper reads only a key matching `tags` (in any case), so `area` has no Obsidian reading to follow. It is Folia's own key, with a single string value. The `area:` filter reads it directly, but it stays in the tag list because a card has always shown its area as a chip and answered `tag:` and free-text search with it.
 
+A card that never passes through the adapter, such as the prospective card a lane judges a new card by, has no `frontmatterTags` and reads `tags` as written; the values Folia writes there are plain names, so the two readings agree.
+
 The tag pane also hides names that Obsidian's private tag-name check rejects, such as `a,b` or `123`, and nothing documented exposes that check. So a frontmatter value like `tags: [a,b]` still shows as a chip on the card while Obsidian does not list it as a tag.
 
 **What would change this:** Obsidian documenting its tag-name check, or `area` taking list values.
