@@ -288,7 +288,7 @@ export class VaultRepository implements CardRepository {
     const resolved = resolveCardFolder(
       this.boardPath,
       normalizePath(raw),
-      (p) => this.isFolder(p),
+      (p) => this.entryAt(p),
       // Obsidian's own case-insensitive lookup is undocumented and returns the first hit, which
       // cannot tell one match from several; see `pathTaken` for the same rule applied to new names.
       () =>
@@ -308,8 +308,9 @@ export class VaultRepository implements CardRepository {
     return resolved;
   }
 
-  private isFolder(path: string): boolean {
-    return this.app.vault.getFolderByPath(path) !== null;
+  private entryAt(path: string): "folder" | "file" | null {
+    const entry = this.app.vault.getAbstractFileByPath(path);
+    return entry === null ? null : entry instanceof TFolder ? "folder" : "file";
   }
 
   private async readConfig(): Promise<ResolvedBoardConfig> {

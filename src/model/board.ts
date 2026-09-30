@@ -105,13 +105,13 @@ function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
  * Pick the vault path a configured `card-folder` value names, out of the readings
  * {@link cardFolderCandidates} allows, and report which of them exist right now.
  *
- * `isFolder` is the caller's live view of the vault — the only impure part, injected so the choice
+ * `entryAt` is the caller's live view of the vault — the only impure part, injected so the choice
  * itself stays testable. An existing folder always beats one that isn't there, which is what makes
  * the board-note reading a fallback rather than a second guess. When none of the readings exists,
  * the first one wins and keeps its create-on-first-card story: for a value without an explicit
  * `./`, that is the vault-root reading, exactly where the folder has always been created.
  *
- * Only when no reading exists exactly are the vault's `folders` asked for (walking them is the
+ * Only when nothing at all sits at any reading are the vault's `folders` asked for (walking them is the
  * expensive part), to find the ones a reading names in another letter case. The leading segments a
  * reading shares with the board note's own folder stay exact, since that folder is a real path:
  * a `./Cards` beside `basic/Board.md` never reaches into a `Basic/` next to it. The rest, and
@@ -125,14 +125,17 @@ function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
 export function resolveCardFolder(
   boardPath: string,
   cardFolder: string,
-  isFolder: (path: string) => boolean,
+  entryAt: (path: string) => "folder" | "file" | null,
   folders: () => readonly string[],
 ): { path: string; existing: string[]; caseMatches: string[] } | null {
   const candidates = cardFolderCandidates(boardPath, cardFolder);
   const [preferred] = candidates;
   if (preferred === undefined) return null;
-  const existing = candidates.filter(isFolder);
+  const existing = candidates.filter((c) => entryAt(c) === "folder");
   if (existing[0] !== undefined) return { path: existing[0], existing, caseMatches: [] };
+  // A file spelled exactly as written is still what the value names, and the caller refuses it.
+  if (candidates.some((c) => entryAt(c) !== null))
+    return { path: preferred, existing, caseMatches: [] };
   const home = parentFolder(boardPath).split("/");
   const matchers = candidates.map((c) => {
     const segments = c.split("/");

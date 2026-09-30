@@ -723,12 +723,12 @@ describe("deriveContext (#14)", () => {
 
 describe("resolveCardFolder (#20260821.08)", () => {
   const board = "basic/Example Board.md";
-  /** Resolve `value` against a vault where exactly `folders` exist. */
-  const pick = (boardPath: string, value: string, folders: string[] = []) =>
+  /** Resolve `value` against a vault where exactly `folders` and `files` exist. */
+  const pick = (boardPath: string, value: string, folders: string[] = [], files: string[] = []) =>
     resolveCardFolder(
       boardPath,
       value,
-      (p) => folders.includes(p),
+      (p) => (folders.includes(p) ? "folder" : files.includes(p) ? "file" : null),
       () => folders,
     );
 
@@ -866,9 +866,16 @@ describe("resolveCardFolder (#20260821.08)", () => {
         caseMatches: ["cards", "basic/cards"],
       });
     });
+    it("loses to a file spelled exactly as written, which the caller then refuses", () => {
+      expect(pick(board, "./Cards", ["basic/cards"], ["basic/Cards"])).toEqual({
+        path: "basic/Cards",
+        existing: [],
+        caseMatches: [],
+      });
+    });
     it("never walks the vault when a reading exists exactly", () => {
       const folders = vi.fn(() => ["cards"]);
-      resolveCardFolder(board, "Cards", (p) => p === "Cards", folders);
+      resolveCardFolder(board, "Cards", (p) => (p === "Cards" ? "folder" : null), folders);
       expect(folders).not.toHaveBeenCalled();
     });
   });

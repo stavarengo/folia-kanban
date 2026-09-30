@@ -51,7 +51,7 @@ describe("applyBoardFrontmatter — the properties a guided setup writes", () =>
     const resolved = resolveCardFolder(
       "Projects/Acme/Board.md",
       String(config["card-folder"]),
-      () => false,
+      () => null,
       () => [],
     );
     expect(resolved?.path).toBe(path);

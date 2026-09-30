@@ -296,6 +296,18 @@ describe("card-folder resolution against a live vault", () => {
       expect(app.vault.getFolderByPath("basic/Cards")).toBeNull();
     });
 
+    it("is not used when a file sits at the path as written", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards", "not a folder");
+      app.vault.addFile("basic/cards/One.md", card("status: todo"));
+
+      await expect(repo.loadBoard()).rejects.toThrow(
+        'Card folder "./Cards" (resolved to "basic/Cards") is not a folder.',
+      );
+      await expect(repo.createCard("Two", "todo")).rejects.toThrow();
+      expect(app.vault.getFileByPath("basic/cards/Two.md")).toBeNull();
+    });
+
     it("refuses to guess between two spellings, and to create a third", async () => {
       const { app, repo } = setup();
       app.vault.addFile("basic/cards/One.md", card("status: todo"));
