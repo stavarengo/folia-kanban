@@ -662,7 +662,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 **Decided 2026-09-30 (#109). These pieces look like re-implementations of something Obsidian has, and are not, or look hand-built and are already Obsidian's.**
 
 - **Drag and drop** (`@dnd-kit` in `src/ui/Board.tsx`, `Column.tsx` and `CardItem.tsx`): Obsidian's drag manager is not in `obsidian.d.ts`.
-- **The due-date field** (`<input type="date">` in `src/ui/CardDetail.tsx`): the API has no date component.
+- **The due-date field** (`<input type="date">` in `src/ui/CardFields.tsx`): the API has no date component.
 - **Board panning** (`src/ui/boardPan.ts`, the `boardPan` setting): the host has no panning facility.
 - **The `/` shortcut's check for a field being typed in** (`bindSearchShortcut` in `src/view.tsx`, its handler in `src/ui/App.tsx`): a `Scope` knows nothing of editable targets and stops at the first match whatever the handler returns, so the handler declines the key itself, and the key is registered only while there is a search box to focus.
 - **The day-change check** (`RECHECK_MS` in `src/ui/useToday.ts`, once a minute): Obsidian has no "day changed" event.
@@ -670,7 +670,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **The `## History` lines** (`src/model/history.ts`): a log of what happened to the card, kept in its note, not an undo stack.
 - **`sanitizeFilename`** (`src/model/cardTitle.ts`): Obsidian exports no filename sanitiser.
 - **`.` and `..` in `card-folder`** (`cardFolderCandidates` and `resolveSegments` in `src/model/cardFolder.ts`, `relativeToFolder` in `src/model/pathOps.ts`): `normalizePath` tidies separators and leaves those segments alone.
-- **The property names in use** (`propertyNamesInUse` in `src/obsidian/vaultRepo.ts`, a walk over the frontmatter cache): `getAllPropertyInfos` is not in `obsidian.d.ts`.
+- **The property names in use** (`collectPropertyNames` in `src/obsidian/propertyNames.ts`, a walk over the frontmatter cache): `getAllPropertyInfos` is not in `obsidian.d.ts`.
 - **The settings write chain** (`pendingWrite` in `src/main.ts`): `saveData` does not serialise calls, and two in flight can land on disk in either order.
 - **The agent-access queues** (the `turn` chain in `createServer`, `src/obsidian/mcpHttpServer.ts`, and `enqueue` in `src/obsidian/mcpService.ts` for starting and stopping the server): Node's server takes requests concurrently, two board writes must never compute against the same snapshot, and the API has no async queue.
 - **`onChange` and `onFileOp` on the repository port** (`src/model/repo.ts`): a thin layer over `vault.on`, because an `EventRef` cannot cross into the model.
@@ -682,6 +682,6 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **Inline `style=` values** (`src/ui/BoardDragOverlay.tsx`, `Column.tsx`, `CardItem.tsx` and `CardDetail.tsx`): runtime data such as dnd-kit's transforms, a column's or context's colour and a measured height, not design.
 - **`var(--color-${name})` for column colours** (`src/ui/columnColors.ts`): these are Obsidian's documented palette variables, picked by name.
 - **The inline status lines**: see "The board's inline status lines stay its own".
-- **Already native, only hand-built looking**: `renderMarkdown` in `src/obsidian/vaultRepo.ts` renders through `MarkdownRenderer` with a `Component` it loads and unloads, React mounts on the view's `contentEl`, the `/` shortcut is registered on the view's own `Scope`, and `refreshViews` in `src/main.ts` walks `getLeavesOfType`.
+- **Already native, only hand-built looking**: `renderMarkdown` in `src/obsidian/markdownRender.ts` renders through `MarkdownRenderer` with a `Component` it loads and unloads, React mounts on the view's `contentEl`, the `/` shortcut is registered on the view's own `Scope`, and `refreshViews` in `src/main.ts` walks `getLeavesOfType`.
 
 **What would change this:** the API gaining the piece a line says is missing, such as a typed drag manager, a date component, a day-changed event, a filename sanitiser, a `normalizePath` that resolves segments, a property registry or a translation API. That line then moves to the host, or earns its own entry if it stays.

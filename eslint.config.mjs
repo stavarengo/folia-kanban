@@ -173,9 +173,7 @@ export default [
     },
   },
   {
-    // Giant files and god functions are forbidden. New code must stay within
-    // these limits; the pre-existing offenders are tracked under tracking/waivers/0004 and
-    // relaxed in the override block below until they are split.
+    // Giant files and god functions are forbidden.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
       "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
@@ -183,31 +181,6 @@ export default [
       complexity: ["error", 10],
       "max-depth": ["error", 4],
       "max-params": ["error", 4],
-    },
-  },
-  {
-    // Pre-existing oversized / over-complex files.
-    // Tracked debt: see tracking/waivers/0004-legacy-file-size-complexity.md (expiry + plan).
-    // Only the three rules these files violate are relaxed; max-params/max-depth stay enforced,
-    // and every NEW file remains fully gated by the block above.
-    files: [
-      "src/main.ts",
-      "src/model/board.ts",
-      "src/model/card.ts",
-      "src/model/columns.ts",
-      "src/obsidian/vaultRepo.ts",
-      "src/ui/App.tsx",
-      "src/ui/Board.tsx",
-      "src/ui/CardDetail.tsx",
-      "src/ui/CardItem.tsx",
-      "src/ui/Column.tsx",
-      "src/ui/Toolbar.tsx",
-      "src/ui/cardView.ts",
-    ],
-    rules: {
-      "max-lines": "off",
-      "max-lines-per-function": "off",
-      complexity: "off",
     },
   },
   ...a11yExceptions,
