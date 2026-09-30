@@ -13,6 +13,12 @@ import type {
 } from "../src/model/repo";
 import type { ColumnPatch } from "../src/model/columns";
 import { staleLine } from "../src/model/repo";
+import {
+  mountButton,
+  mountDropdown,
+  mountIconButton,
+  mountProgressBar,
+} from "../src/obsidian/hostControls";
 import { vaultLinktext } from "../src/model/links";
 import type { FileOp } from "../src/model/pathOps";
 import type {
@@ -499,6 +505,13 @@ export class FakeRepo implements CardRepository {
       remove: () => input.remove(),
     };
   }
+
+  // The real adapters, drawing on the fakes in obsidianFake.ts, so the board's tests press the
+  // same listeners the app does.
+  readonly mountButton = mountButton;
+  readonly mountIconButton = mountIconButton;
+  readonly mountDropdown = mountDropdown;
+  readonly mountProgressBar = mountProgressBar;
 
   /** Every link `followLink` followed, with the note it was resolved against, in order. */
   readonly followed: { linktext: string; sourcePath: string }[] = [];

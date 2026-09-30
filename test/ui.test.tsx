@@ -114,7 +114,12 @@ function renderInSecondWindow(repo: FakeRepo, innerHeight: number) {
   const frame = document.createElement("iframe");
   document.body.appendChild(frame);
   const doc = frame.contentDocument!;
-  const view = doc.defaultView!;
+  const view = doc.defaultView! as Window & typeof globalThis;
+  // Obsidian gives a pop-out window the same DOM helpers as the main one, which setup.ts stands in
+  // for on the main window only; the host controls draw with them.
+  const { createEl, createDiv } = HTMLElement.prototype;
+  Object.assign(view.HTMLElement.prototype, { createEl, createDiv });
+  Object.assign(view.Node.prototype, { empty: Node.prototype.empty });
   Object.defineProperty(view, "innerHeight", { configurable: true, value: innerHeight });
   const container = doc.createElement("div");
   doc.body.appendChild(container);

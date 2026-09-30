@@ -815,3 +815,146 @@ export class FakeApp {
     },
   };
 }
+
+// The host controls behind `mountButton`, `mountIconButton`, `mountDropdown` and `mountProgressBar`,
+// drawn the way Obsidian 1.13.7 draws them. What the adapter adds on top (a role, `aria-disabled`,
+// the click it hands over) is deliberately missing here, so a test sees the adapter supply it.
+
+/** A `button`; its click callback gets the event, and one that returns a promise shows loading. */
+export class ButtonComponent {
+  readonly buttonEl: HTMLButtonElement;
+
+  constructor(containerEl: HTMLElement) {
+    this.buttonEl = containerEl.createEl("button");
+  }
+
+  onClick(callback: (evt: MouseEvent) => unknown): this {
+    this.buttonEl.addEventListener("click", (evt) => {
+      const result = callback(evt);
+      if (!(result instanceof Promise)) return;
+      this.buttonEl.classList.add("mod-loading");
+      void result.finally(() => this.buttonEl.classList.remove("mod-loading"));
+    });
+    return this;
+  }
+
+  setButtonText(text: string): this {
+    this.buttonEl.textContent = text;
+    return this;
+  }
+
+  setCta(): this {
+    this.buttonEl.classList.add("mod-cta");
+    return this;
+  }
+
+  removeCta(): this {
+    this.buttonEl.classList.remove("mod-cta");
+    return this;
+  }
+
+  setDisabled(disabled: boolean): this {
+    this.buttonEl.disabled = disabled;
+    return this;
+  }
+}
+
+/**
+ * A focusable `div` with no role. Enter and Space press it without a click, and its callback gets no
+ * event. Disabled, it ignores presses and leaves the tab order.
+ */
+export class ExtraButtonComponent {
+  readonly extraSettingsEl: HTMLElement;
+  disabled = false;
+  private callback: () => unknown = () => {};
+
+  constructor(containerEl: HTMLElement) {
+    this.extraSettingsEl = containerEl.createDiv("clickable-icon");
+    this.extraSettingsEl.tabIndex = 0;
+    this.extraSettingsEl.addEventListener("click", () => {
+      if (!this.disabled) this.callback();
+    });
+    this.extraSettingsEl.addEventListener("keydown", (evt) => {
+      if (evt.key !== "Enter" && evt.key !== " ") return;
+      evt.preventDefault();
+      if (!this.disabled) this.callback();
+    });
+  }
+
+  onClick(callback: () => unknown): this {
+    this.callback = callback;
+    return this;
+  }
+
+  setIcon(icon: string): this {
+    const svg = this.extraSettingsEl.ownerDocument.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    );
+    svg.setAttribute("class", `svg-icon lucide-${icon}`);
+    this.extraSettingsEl.replaceChildren(svg);
+    return this;
+  }
+
+  setTooltip(tooltip: string): this {
+    this.extraSettingsEl.setAttribute("aria-label", tooltip);
+    return this;
+  }
+
+  setDisabled(disabled: boolean): this {
+    this.disabled = disabled;
+    this.extraSettingsEl.classList.toggle("is-disabled", disabled);
+    if (disabled) this.extraSettingsEl.removeAttribute("tabindex");
+    else this.extraSettingsEl.tabIndex = 0;
+    return this;
+  }
+}
+
+/** The real select, then a hidden one the host measures the width with. `setValue` is silent. */
+export class DropdownComponent {
+  readonly selectEl: HTMLSelectElement;
+
+  constructor(containerEl: HTMLElement) {
+    this.selectEl = containerEl.createEl("select", "dropdown");
+    containerEl.createEl("select", {
+      cls: "dropdown is-measuring",
+      attr: { "aria-hidden": "true" },
+    });
+  }
+
+  addOption(value: string, display: string): this {
+    this.selectEl.createEl("option", { text: display, attr: { value } });
+    return this;
+  }
+
+  onChange(callback: (value: string) => unknown): this {
+    this.selectEl.addEventListener("change", () => callback(this.selectEl.value));
+    return this;
+  }
+
+  setValue(value: string): this {
+    this.selectEl.value = value;
+    return this;
+  }
+
+  setDisabled(disabled: boolean): this {
+    this.selectEl.disabled = disabled;
+    return this;
+  }
+}
+
+/** A track holding a fill as wide as the value, 0 to 100, with no role or value of its own. */
+export class ProgressBarComponent {
+  private readonly fill: HTMLElement;
+
+  constructor(containerEl: HTMLElement) {
+    this.fill = containerEl
+      .createDiv("setting-progress-bar")
+      .createDiv("setting-progress-bar-inner");
+  }
+
+  setValue(value: number): this {
+    this.fill.style.width = `${value}%`;
+    return this;
+  }
+}

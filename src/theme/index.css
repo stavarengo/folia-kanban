@@ -1,6 +1,7 @@
 /* Base rules precede their refinements; esbuild preserves this import order. */
 @import "./tokens.css";
 @import "./base.css";
+@import "./host-controls.css";
 @import "./toolbar.css";
 @import "./board-columns.css";
 @import "./swatches.css";

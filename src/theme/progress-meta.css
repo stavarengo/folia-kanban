@@ -4,21 +4,9 @@
   align-items: center;
   gap: var(--folia-space-sm-plus);
 }
+/* The host's bar, whose face is the host's; it takes the room the label leaves. */
 .folia-progress-track {
   flex: 1 1 auto;
-  height: var(--folia-progress-h);
-  border-radius: var(--folia-r-pill);
-  background: var(--background-modifier-border);
-  overflow: hidden;
-}
-.folia-progress-fill {
-  height: 100%;
-  border-radius: var(--folia-r-pill);
-  background: var(--folia-accent);
-  transition: width var(--folia-dur) var(--folia-ease);
-}
-.folia-progress.folia-is-complete .folia-progress-fill {
-  background: var(--folia-success);
 }
 .folia-progress-label {
   --folia-icon-size: var(--icon-xs);

@@ -21,6 +21,14 @@
   transform: none;
   pointer-events: auto;
 }
+/* The host's icon button, held to the step the card title's clearance is counted in. */
+.folia-scope .folia-card-action {
+  display: grid;
+  place-items: center;
+  width: var(--folia-hit-md);
+  height: var(--folia-hit-md);
+  padding: 0;
+}
 .folia-scope .folia-action-done:hover:where(:not(:disabled)) { color: var(--folia-text-success); }
 .folia-scope .folia-action-delete:hover:where(:not(:disabled)) { color: var(--folia-text-error); }
 

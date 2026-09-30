@@ -1,0 +1,5 @@
+/* ------------------------------------------------------------------ host controls */
+/* The slot a host control is mounted into lays it out as its parent's own child. */
+.folia-host-slot {
+  display: contents;
+}

@@ -29,9 +29,15 @@ import type {
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import type {
+  ButtonControl,
   ConfirmRequest,
+  DropdownControl,
+  HostControlOptions,
+  IconButtonControl,
+  IconButtonOptions,
   MenuAnchor,
   MenuRow,
+  ProgressBarControl,
   PropertyNamesInUse,
   SearchField,
   SuggestSource,
@@ -44,6 +50,7 @@ import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
 import { parseFrontmatter } from "./frontmatter";
 import { attachSuggest, mountSearch } from "./inputSuggest";
+import { mountButton, mountDropdown, mountIconButton, mountProgressBar } from "./hostControls";
 import { pathTaken } from "./pathTaken";
 import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
@@ -1098,6 +1105,30 @@ export class VaultRepository implements CardRepository {
 
   mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField {
     return mountSearch(container, onChange);
+  }
+
+  mountButton(
+    container: HTMLElement,
+    onClick: (evt: MouseEvent) => void,
+    options?: HostControlOptions,
+  ): ButtonControl {
+    return mountButton(container, onClick, options);
+  }
+
+  mountIconButton(
+    container: HTMLElement,
+    onClick: (evt?: MouseEvent) => void,
+    options?: IconButtonOptions,
+  ): IconButtonControl {
+    return mountIconButton(container, onClick, options);
+  }
+
+  mountDropdown(container: HTMLElement, onChange: (value: string) => void): DropdownControl {
+    return mountDropdown(container, onChange);
+  }
+
+  mountProgressBar(container: HTMLElement): ProgressBarControl {
+    return mountProgressBar(container);
   }
 
   absolutePath(path: string): string | null {

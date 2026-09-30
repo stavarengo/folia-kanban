@@ -139,6 +139,66 @@ export interface SearchField {
 }
 
 /**
+ * One of the host's own controls, mounted into an element the caller renders. `el` is the element
+ * the person sees and operates: the caller gives it its own classes, never the host's.
+ */
+export interface HostControl {
+  readonly el: HTMLElement;
+  /** Take the control back out of its container. */
+  remove(): void;
+}
+
+/** How a mounted control treats the events around it. Read once, when it is mounted. */
+export interface HostControlOptions {
+  /** Events that stop at the control instead of reaching the elements around it. */
+  stopPropagation?: readonly ("click" | "auxclick" | "pointerdown")[];
+  /** A press leaves focus where it was, so pressing the control does not blur the field it serves. */
+  keepFocus?: boolean;
+}
+
+/** The host's text button (Obsidian's `ButtonComponent`). */
+export interface ButtonControl extends HostControl {
+  setText(text: string): void;
+  /** The call-to-action face, for the one button a form is about. */
+  setCta(cta: boolean): void;
+  setDisabled(disabled: boolean): void;
+}
+
+/** The host's icon button (Obsidian's `ExtraButtonComponent`), announced as a button. */
+export interface IconButtonControl extends HostControl {
+  /** A Lucide icon id, as the host names its icons. */
+  setIcon(icon: string): void;
+  /** The accessible name, which is also the tooltip. */
+  setLabel(label: string): void;
+  setDisabled(disabled: boolean): void;
+}
+
+export interface IconButtonOptions extends HostControlOptions {
+  /** A middle click presses the button too, and stops there. */
+  middleClick?: boolean;
+}
+
+export interface DropdownOption {
+  value: string;
+  label: string;
+}
+
+/** The host's dropdown (Obsidian's `DropdownComponent`). */
+export interface DropdownControl extends HostControl {
+  readonly el: HTMLSelectElement;
+  /** Replace every option. The selection is the caller's to set again afterwards. */
+  setOptions(options: readonly DropdownOption[]): void;
+  /** Show `value` without reporting it back as a change. */
+  setValue(value: string): void;
+  setDisabled(disabled: boolean): void;
+}
+
+/** The host's progress bar (Obsidian's `ProgressBarComponent`), a picture with no role of its own. */
+export interface ProgressBarControl extends HostControl {
+  setValue(percent: number): void;
+}
+
+/**
  * Every write below leaves a note byte for byte as it was, history included, when what it would
  * store is what the note already holds. A history line records a change, so no change, no line.
  */
@@ -309,6 +369,26 @@ export interface CardRepository {
 
   /** Mount the host's search field (Obsidian's `SearchComponent`, clear button included). */
   mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField;
+
+  mountButton(
+    container: HTMLElement,
+    onClick: (evt: MouseEvent) => void,
+    options?: HostControlOptions,
+  ): ButtonControl;
+
+  /**
+   * `onClick` gets the pointer's click, modifiers and all, and nothing for a key press: the host
+   * presses its icon buttons from the keyboard without a click.
+   */
+  mountIconButton(
+    container: HTMLElement,
+    onClick: (evt?: MouseEvent) => void,
+    options?: IconButtonOptions,
+  ): IconButtonControl;
+
+  mountDropdown(container: HTMLElement, onChange: (value: string) => void): DropdownControl;
+
+  mountProgressBar(container: HTMLElement): ProgressBarControl;
 
   /** Tell the person something in the host's own notice, an error staying up longer. */
   showNotice(message: string, tone: "success" | "error"): void;
