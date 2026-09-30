@@ -79,6 +79,8 @@ interface ButtonProps extends HostControlOptions, SlotProps {
   /** A name other than the text, for a button whose text leans on what sits beside it. */
   "aria-label"?: string;
   title?: string;
+  /** Pointed at the button while it is mounted. */
+  elRef?: MutableRefObject<HTMLElement | null>;
 }
 
 export function HostButton({
@@ -90,6 +92,7 @@ export function HostButton({
   slotClassName,
   "aria-label": ariaLabel,
   title,
+  elRef,
   ...options
 }: ButtonProps) {
   const click = useLatest(onClick);
@@ -97,6 +100,13 @@ export function HostButton({
     (repo, el) => repo.mountButton(el, (evt) => click.current(evt), options),
     className,
   );
+  useLayoutEffect(() => {
+    if (!elRef || !button) return;
+    elRef.current = button.el;
+    return () => {
+      elRef.current = null;
+    };
+  }, [elRef, button]);
   useLayoutEffect(() => {
     if (!button) return;
     button.setText(text);

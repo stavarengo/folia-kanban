@@ -262,6 +262,16 @@ describe("the React wrappers", () => {
     expect(button).not.toHaveAttribute("title");
   });
 
+  it("point a text button's ref at the button while it is mounted", () => {
+    const ref: { current: HTMLElement | null } = { current: null };
+    const { getByRole, unmount } = render(
+      inRepo(<HostButton text="Go" elRef={ref} onClick={() => {}} />),
+    );
+    expect(ref.current).toBe(getByRole("button", { name: "Go" }));
+    unmount();
+    expect(ref.current).toBeNull();
+  });
+
   it("rebuild a dropdown's options only when the list changes, and keep its value", () => {
     const options = [
       { value: "a", label: "A" },

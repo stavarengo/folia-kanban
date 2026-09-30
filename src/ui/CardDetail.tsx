@@ -358,7 +358,7 @@ function AssigneeField({
   onToggleMine: () => void;
 }) {
   const hintId = useId();
-  const field = useRef<HTMLDivElement>(null);
+  const meButton = useRef<HTMLElement | null>(null);
   const value = names.join(", ");
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
   const suggestRef = useFreeTextSuggest(options, setDraft, commit);
@@ -366,7 +366,7 @@ function AssigneeField({
   return (
     // The button is a sibling of the label, not inside it: a label belongs to one control, and one
     // wrapping both would name the button "Assignee" too.
-    <div className="folia-assignee-field" ref={field}>
+    <div className="folia-assignee-field">
       <label>
         <span className="folia-prop-key">Assignee</span>
         <input
@@ -382,8 +382,7 @@ function AssigneeField({
           // would decide the answer. Reading `relatedTarget` catches both ways of getting there,
           // the pointer and the Tab key, which is why it is here rather than on the press.
           onBlur={(e) => {
-            const meButton = field.current?.querySelector(".folia-assignee-me");
-            if (meButton && e.relatedTarget === meButton) {
+            if (meButton.current && e.relatedTarget === meButton.current) {
               setDraft(value);
               return;
             }
@@ -401,6 +400,7 @@ function AssigneeField({
         <HostButton
           className="folia-btn folia-assignee-me"
           slotClassName="folia-assignee-me-slot"
+          elRef={meButton}
           text={mine ? "Unassign me" : "Assign to me"}
           title={
             mine
