@@ -427,17 +427,44 @@ describe("theme button contract", () => {
     reject("not a bare button that reaches rendered Markdown");
   });
 
-  it.each(["folia-card-action", "folia-detail-action"])(
-    "rejects a later %s hover colour that would repaint Mark done and Delete",
-    (name) => {
-      edit("src/theme/index.css", (s) => s + `\n@import "./late.css";\n`);
-      writeFileSync(
-        join(fixture, "src/theme/late.css"),
-        `.folia-scope .${name}:hover { color: var(--text-normal); }\n`,
-      );
-      reject("would repaint its hover");
-    },
-  );
+  it.each([
+    ".folia-card-action:hover",
+    ".folia-detail-action:hover",
+    ".folia-action-done:hover",
+    ".folia-action-delete:hover",
+    ".folia-card-action:is(:hover, :focus)",
+  ])("rejects a later %s colour that would repaint Mark done or Delete", (selector) => {
+    edit("src/theme/index.css", (s) => s + `\n@import "./late.css";\n`);
+    writeFileSync(
+      join(fixture, "src/theme/late.css"),
+      `.folia-scope ${selector} { color: var(--text-normal); }\n`,
+    );
+    reject("would repaint its hover");
+  });
+
+  it("rejects a spread that can replace a button's class", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <button className="folia-link" {...props} />;\n',
+    );
+    reject("A spread after a button's className");
+  });
+
+  it("rejects a host button whose class cannot be read", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <HostButton className={face} text="x" onClick={go} />;\n',
+    );
+    reject("A host button's className must be written out");
+  });
+
+  it("checks buttons outside src/ui too", () => {
+    writeFileSync(
+      join(fixture, "src/elsewhere.tsx"),
+      'export const probe = <button className="folia-btn">x</button>;\n',
+    );
+    reject("Every button branch needs");
+  });
 
   it("requires the Mark done hover colour", () => {
     edit("src/theme/card-quick-actions.css", (s) =>

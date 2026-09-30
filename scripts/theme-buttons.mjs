@@ -89,10 +89,10 @@ export async function checkButtons(roots, fail) {
   // wrappers add `folia-host-control` to every control themselves, outside any JSX.
   const hostClasses = new Set(["folia-host-control"]);
   const families = new Set();
-  for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
+  for (const file of (await readdir("src", { recursive: true })).filter((f) =>
     f.endsWith(".tsx"),
   )) {
-    const path = join("src/ui", file);
+    const path = join("src", file);
     const source = ts.createSourceFile(
       path,
       await readFile(path, "utf8"),
@@ -100,6 +100,8 @@ export async function checkButtons(roots, fail) {
       true,
       ts.ScriptKind.TSX,
     );
+    const lineOf = (node) =>
+      `${path}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
     function visit(node) {
       if (
         (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
@@ -108,22 +110,34 @@ export async function checkButtons(roots, fail) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
         );
-        for (const value of classValues(attr?.initializer))
+        for (const value of classValues(attr?.initializer)) {
+          if (value.includes("?"))
+            fail(
+              lineOf(node),
+              "A host button's className must be written out, so its rules are checked.",
+            );
           for (const c of value.split(/\s+/)) if (/^folia-[\w-]+$/.test(c)) hostClasses.add(c);
+        }
       }
       if (
         (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
         node.tagName.getText(source) === "button"
       ) {
-        const attr = node.attributes.properties.find(
+        const props = node.attributes.properties;
+        const attr = props.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
         );
+        if (props.slice(props.indexOf(attr) + 1).some((p) => ts.isJsxSpreadAttribute(p)))
+          fail(
+            lineOf(node),
+            "A spread after a button's className can replace the class it is checked by.",
+          );
         for (const value of classValues(attr?.initializer))
           for (const part of value.split(/\s+/))
             if (/^folia-[\w-]+\?$/.test(part)) families.add(part.slice(0, -1));
         for (const value of classValues(attr?.initializer)) {
           const classes = value.split(/\s+/).filter((c) => /^folia-[\w-]+$/.test(c));
-          const where = `${path}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
+          const where = lineOf(node);
           if (!classes.some((c) => HAND_DRAWN.has(c)))
             fail(
               where,
@@ -195,8 +209,14 @@ export async function checkButtons(roots, fail) {
     });
   // Mark done and Delete answer the pointer in their own colour, on the host's icon button. That
   // colour beats the host by weight, so no later rule of the board's may repaint the same button.
-  const actionClasses = ["folia-card-action", "folia-detail-icon", "folia-detail-action"];
+  const sharedClasses = [
+    "folia-card-action",
+    "folia-detail-icon",
+    "folia-detail-action",
+    "folia-host-control",
+  ];
   for (const action of ["done", "delete"]) {
+    const actionClasses = [...sharedClasses, `folia-action-${action}`];
     const refinement = `.folia-scope .folia-action-${action}:hover:where(:not([aria-disabled="true"]))`;
     if (!unconditionalRules.get(refinement)?.has("color"))
       fail("src/theme", `${refinement} needs color, in a top-level rule.`);
