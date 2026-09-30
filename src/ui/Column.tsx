@@ -660,7 +660,7 @@ export function Column({
             )}
             <div className="folia-row-actions">
               <HostButton
-                className="folia-btn"
+                className="folia-btn folia-btn-primary"
                 cta
                 text="Add card"
                 keepFocus

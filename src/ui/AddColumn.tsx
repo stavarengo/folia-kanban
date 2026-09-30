@@ -41,7 +41,13 @@ export function AddColumn() {
         }}
       />
       <div className="folia-row-actions">
-        <HostButton className="folia-btn" cta text="Add" keepFocus onClick={submit} />
+        <HostButton
+          className="folia-btn folia-btn-primary"
+          cta
+          text="Add"
+          keepFocus
+          onClick={submit}
+        />
         <HostButton
           className="folia-btn"
           text="Cancel"
