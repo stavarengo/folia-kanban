@@ -153,13 +153,6 @@
       "alias": "--color-purple"
     }
   },
-  "success": {
-    "$value": "var(--color-green)",
-    "cssVar": "--folia-success",
-    "source": {
-      "alias": "--color-green"
-    }
-  },
   "icon-color": {
     "$value": "var(--icon-color)",
     "cssVar": "--folia-icon-color",

@@ -225,7 +225,6 @@
      shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
   --folia-unread: var(--color-blue);
   --folia-unread-reply: var(--color-purple);
-  --folia-success: var(--color-green);
 
   /* Controls follow the host arrow convention; links use the host link cursor. */
   --folia-cursor-link: var(--cursor-link);
