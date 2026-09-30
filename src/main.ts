@@ -3,7 +3,6 @@ import {
   FuzzySuggestModal,
   MarkdownView,
   Notice,
-  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -670,7 +669,6 @@ export default class FoliaKanbanPlugin extends Plugin {
     const outcome = mcpTokenOutcome(
       {
         enabled: this.settings.mcpEnabled,
-        desktop: Platform.isDesktop,
         secret: this.mcpToken,
         legacy: peekStoredMcpToken(this.stored),
       },
@@ -814,14 +812,9 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
   }
 
-  /**
-   * Host the MCP server, on desktop only. The manifest already says `isDesktopOnly`, so this is
-   * defence in depth rather than the only thing standing between a phone and a Node socket: the
-   * server needs Node's `http`, and every path to it is gated on this flag as well as on the
-   * manifest (see `docs/decisions.md`, "Mobile is not supported").
-   */
+  /** Host the MCP server. Desktop-only is the manifest's `isDesktopOnly`, not a check here (see
+   *  `docs/decisions.md`, "Mobile is not supported"). */
   private buildMcp(): void {
-    if (!Platform.isDesktop) return;
     this.mcp = new McpService({
       app: this.app,
       getSettings: () => this.settings,
@@ -982,18 +975,13 @@ class KanbanSettingTab extends PluginSettingTab {
    * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
    */
   override getSettingDefinitions(): SettingDefinitionItem[] {
-    return settingDefinitions(
-      () => this.plugin.settings,
-      this.plugin.manifest.version,
-      {
-        copy: () => void this.plugin.copyMcpToken(),
-        regenerate: () => void this.replaceToken(),
-        renderHeldField: (key, setting) => {
-          this.renderHeldField(key, setting);
-        },
+    return settingDefinitions(() => this.plugin.settings, this.plugin.manifest.version, {
+      copy: () => void this.plugin.copyMcpToken(),
+      regenerate: () => void this.replaceToken(),
+      renderHeldField: (key, setting) => {
+        this.renderHeldField(key, setting);
       },
-      Platform.isDesktop,
-    );
+    });
   }
 
   /** Where the declarative rendering reads a control's current value from: our own settings, not
@@ -1170,9 +1158,6 @@ class KanbanSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     for (const group of SETTING_GROUPS) {
-      // A phone cannot listen for connections, so the whole agent-access section stays away —
-      // heading included, rather than a heading standing over nothing.
-      if (group.id === "agentAccess" && !Platform.isDesktop) continue;
       new Setting(containerEl).setName(group.heading).setHeading();
       for (const key of group.keys) this.renderRow(key, containerEl);
       if (group.id === "agentAccess") this.renderTokenRows(containerEl);

@@ -10,7 +10,7 @@ const MINTED = "minted here";
 const mint = (): string => MINTED;
 
 /** Agent access on, on a machine that can host it, with nothing anywhere yet. */
-const FRESH: McpTokenState = { enabled: true, desktop: true, secret: "", legacy: null };
+const FRESH: McpTokenState = { enabled: true, secret: "", legacy: null };
 
 describe("the token an install should hold", () => {
   it("comes into existence the first time agent access is switched on", () => {
@@ -34,17 +34,6 @@ describe("the token an install should hold", () => {
 
   it("is not minted while agent access is off", () => {
     expect(mcpTokenOutcome({ ...FRESH, enabled: false }, mint)).toEqual({
-      token: "",
-      write: false,
-      dropLegacy: false,
-    });
-  });
-
-  // The plugin is desktop-only in the manifest, so this should be unreachable — it is asserted
-  // because the flag is what every path to the Node `http` import is gated on, and a platform that
-  // cannot host the server has no business holding its secret.
-  it("is not minted on a platform that cannot host the server", () => {
-    expect(mcpTokenOutcome({ ...FRESH, desktop: false }, mint)).toEqual({
       token: "",
       write: false,
       dropLegacy: false,

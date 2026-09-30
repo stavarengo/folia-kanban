@@ -176,19 +176,12 @@ function dropdownPatchFor(key: string, value: unknown): Partial<KanbanSettings> 
 
 /**
  * What every row of one group needs to know about itself: the heading it sits under (which is also
- * a search term), where to read the settings, what the tab can do, and whether the group's rows
- * exist on this platform at all.
- *
- * `visible` is carried down to each row even though the group carries it too, and deliberately:
- * Obsidian documents a group's `visible` as hiding the heading and its contents, but only a row's
- * own `visible` as also taking that row out of the settings search for that render. A phone must
- * not be able to reach the agent-access toggle through a search result for a server it cannot host.
+ * a search term), where to read the settings, and what the tab can do.
  */
 interface RowContext {
   heading: string;
   read: () => KanbanSettings;
   actions: SettingTabActions;
-  visible?: boolean;
 }
 
 /** One declarative row: the shared copy, the search words the short name gave up, and the control
@@ -199,7 +192,6 @@ function rowDefinition(key: EditableSettingKey, ctx: RowContext): SettingDefinit
   const base = {
     ...SETTING_COPY[key],
     aliases: [heading, ...(EXTRA_ALIASES[key] ?? [])],
-    ...(ctx.visible === undefined ? {} : { visible: ctx.visible }),
   };
   // A held field is not a control at all: it draws itself and writes on blur, and its disabled
   // state is applied there, from `isRowDisabled`, on both rendering paths.
@@ -239,7 +231,6 @@ function rowDefinition(key: EditableSettingKey, ctx: RowContext): SettingDefinit
 function tokenRows(ctx: RowContext): SettingDefinition[] {
   const { heading, read, actions } = ctx;
   const off = (): boolean => !read().mcpEnabled;
-  const shown = ctx.visible === undefined ? {} : { visible: ctx.visible };
   return [
     {
       name: MCP_TOKEN_COPY.name,
@@ -247,7 +238,6 @@ function tokenRows(ctx: RowContext): SettingDefinition[] {
       aliases: [heading, "mcp", "token", "bearer"],
       action: actions.copy,
       disabled: off,
-      ...shown,
     },
     {
       name: MCP_TOKEN_REGENERATE.name,
@@ -255,7 +245,6 @@ function tokenRows(ctx: RowContext): SettingDefinition[] {
       aliases: [heading, "mcp", "token", "regenerate", "revoke"],
       action: actions.regenerate,
       disabled: off,
-      ...shown,
     },
   ];
 }
@@ -274,29 +263,17 @@ export function settingDefinitions(
   read: () => KanbanSettings,
   version: string,
   actions: SettingTabActions,
-  desktop: boolean,
 ): SettingDefinitionItem[] {
   return [
     ...SETTING_GROUPS.map((group) => {
-      // A phone cannot listen for connections, so the group that promises it can does not appear —
-      // rather than switching on, minting a token and quietly doing nothing. The group hides the
-      // heading and everything under it; each row carries the same flag so the settings search
-      // cannot offer one either. See {@link RowContext}.
-      const desktopOnly = group.id === "agentAccess";
-      const ctx: RowContext = {
-        heading: group.heading,
-        read,
-        actions,
-        ...(desktopOnly ? { visible: desktop } : {}),
-      };
+      const ctx: RowContext = { heading: group.heading, read, actions };
       return {
         type: "group" as const,
         heading: group.heading,
         items: [
           ...group.keys.map((key) => rowDefinition(key, ctx)),
-          ...(desktopOnly ? tokenRows(ctx) : []),
+          ...(group.id === "agentAccess" ? tokenRows(ctx) : []),
         ],
-        ...(desktopOnly ? { visible: desktop } : {}),
       };
     }),
     {

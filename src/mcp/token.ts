@@ -11,10 +11,6 @@
 export interface McpTokenState {
   /** Whether agent access is switched on. Nothing is minted for a switch that is off. */
   enabled: boolean;
-  /** Whether this platform can host the server at all. A phone has no business holding a secret
-   *  for something it can never run — and the plugin is desktop-only, so this should always be
-   *  true, which is why it is an input rather than an assumption. */
-  desktop: boolean;
   /** The token already in secret storage, or "" for none. A store that cannot be read says "" too:
    *  both mean there is nothing here to use. */
   secret: string;
@@ -55,6 +51,6 @@ export function mcpTokenOutcome(state: McpTokenState, mint: () => string): McpTo
   const dropLegacy = state.legacy !== null;
   if (state.secret) return { token: state.secret, write: false, dropLegacy };
   if (state.legacy) return { token: state.legacy, write: true, dropLegacy };
-  if (!state.enabled || !state.desktop) return { token: "", write: false, dropLegacy };
+  if (!state.enabled) return { token: "", write: false, dropLegacy };
   return { token: mint(), write: true, dropLegacy };
 }

@@ -37,12 +37,11 @@ import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 
 const noop = (): void => {};
 
-const definitions = settingDefinitions(
-  () => DEFAULT_SETTINGS,
-  "1.2.3",
-  { copy: noop, regenerate: noop, renderHeldField: noop },
-  true,
-);
+const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+  copy: noop,
+  regenerate: noop,
+  renderHeldField: noop,
+});
 
 /**
  * Every string, and every template literal, spelled out in `src/main.ts` — comments stripped first,
@@ -56,9 +55,6 @@ const mainStringLiterals = (): string[] => {
   return [...source.matchAll(literal)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
 };
 
-const truth = (v: boolean | (() => boolean) | undefined): boolean =>
-  typeof v === "function" ? v() : (v ?? true);
-
 /** A headed section of the tab. */
 const isGroup = (item: SettingDefinitionItem): item is SettingDefinitionGroup =>
   "type" in item && item.type === "group";
@@ -68,18 +64,17 @@ const isRow = (item: SettingDefinitionItem | SettingGroupItem): item is SettingD
   !("type" in item);
 
 /**
- * Every row of the tab, in the order it renders them, each carrying the heading it sits under and
- * whether that whole group is shown. The tab is a list of groups now, so anything asking "is this
- * row there, and is it live" has to walk into them.
+ * Every row of the tab, in the order it renders them, each carrying the heading it sits under. The
+ * tab is a list of groups now, so anything asking "is this row there, and is it live" has to walk
+ * into them.
  */
 const rowsOf = (
   items: SettingDefinitionItem[],
-): { row: SettingDefinition; heading: string | null; groupShown: boolean }[] =>
+): { row: SettingDefinition; heading: string | null }[] =>
   items.flatMap((item) => {
-    if (!isGroup(item)) return isRow(item) ? [{ row: item, heading: null, groupShown: true }] : [];
-    const groupShown = truth(item.visible);
+    if (!isGroup(item)) return isRow(item) ? [{ row: item, heading: null }] : [];
     const heading = item.heading ?? null;
-    return (item.items ?? []).filter(isRow).map((row) => ({ row, heading, groupShown }));
+    return (item.items ?? []).filter(isRow).map((row) => ({ row, heading }));
   });
 
 const rows = rowsOf(definitions).map((r) => r.row);
@@ -307,16 +302,11 @@ describe("settingsPatchFor", () => {
 
   it("hands the row it is asked to draw to the tab, with the key it belongs to", () => {
     const drawn: HeldFieldKey[] = [];
-    const defs = settingDefinitions(
-      () => DEFAULT_SETTINGS,
-      "1.2.3",
-      {
-        copy: noop,
-        regenerate: noop,
-        renderHeldField: (key) => drawn.push(key),
-      },
-      true,
-    );
+    const defs = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+      copy: noop,
+      regenerate: noop,
+      renderHeldField: (key) => drawn.push(key),
+    });
     for (const key of HELD_KEYS) {
       const row = rowsOf(defs)
         .map((r) => r.row)
@@ -411,87 +401,20 @@ describe("settingsPatchFor", () => {
   });
 });
 
-describe("agent access on a platform that cannot host it", () => {
-  const tabRows = (desktop: boolean) =>
-    rowsOf(
-      settingDefinitions(
-        () => DEFAULT_SETTINGS,
-        "1.2.3",
-        { copy: noop, regenerate: noop, renderHeldField: noop },
-        desktop,
-      ),
-    );
-
-  const named = (desktop: boolean, name: string) =>
-    tabRows(desktop).find((r) => r.row.name === name);
-
-  /** A row is shown only if its group is: hiding the group is what takes the agent-access rows off
-   *  a platform that cannot host a server, heading and all. */
-  const visibleOf = (found: ReturnType<typeof named>): boolean => {
-    if (!found) return false;
-    return found.groupShown && truth("visible" in found.row ? found.row.visible : undefined);
-  };
-
-  /** A row's own flag, ignoring its group's. Obsidian documents only this one as also taking the
-   *  row out of the settings search, which is the difference between a row a phone cannot see and
-   *  one a phone can still find, tap, and use to mint a token for a server it cannot host. */
-  const rowsOwnVisible = (found: ReturnType<typeof named>): boolean | undefined => {
-    if (!found || !("visible" in found.row)) return undefined;
-    const { visible } = found.row;
-    return typeof visible === "function" ? visible() : visible;
-  };
-
-  // Toggling it on used to persist the setting and mint a token for a server the phone can never
-  // run, and say nothing about it. Now the three rows simply are not there.
-  it("hides every agent-access row on mobile and shows them on desktop", () => {
-    for (const name of [
-      SETTING_COPY.mcpEnabled.name,
-      SETTING_COPY.mcpPort.name,
-      SETTING_COPY.mcpBindAddress.name,
-      MCP_TOKEN_COPY.name,
-      MCP_TOKEN_REGENERATE.name,
-    ]) {
-      expect(visibleOf(named(false, name)), `${name} on mobile`).toBe(false);
-      expect(visibleOf(named(true, name)), `${name} on desktop`).toBe(true);
-    }
-  });
-
-  // The group's own `visible` hides the heading and its rows, but Obsidian documents only a row's
-  // own `visible` as excluding it from the settings search too. Both are set, and this is the half
-  // a refactor to group-level visibility would quietly drop.
-  it("marks each agent-access row invisible in its own right, not only its group", () => {
-    for (const name of [
-      SETTING_COPY.mcpEnabled.name,
-      SETTING_COPY.mcpPort.name,
-      SETTING_COPY.mcpBindAddress.name,
-      MCP_TOKEN_COPY.name,
-      MCP_TOKEN_REGENERATE.name,
-    ]) {
-      expect(rowsOwnVisible(named(false, name)), `${name} on mobile`).toBe(false);
-      expect(rowsOwnVisible(named(true, name)), `${name} on desktop`).toBe(true);
-    }
-    // And nothing else carries a flag it does not need.
-    expect(rowsOwnVisible(named(false, SETTING_COPY.historyScope.name))).toBeUndefined();
-  });
-
-  it("leaves every other row alone on mobile", () => {
-    expect(visibleOf(named(false, SETTING_COPY.historyScope.name))).toBe(true);
-  });
-
+describe("the agent-access token rows", () => {
   // A token that cannot be replaced is a password only until it leaks. The row is there, and it is
   // dead until there is a token to replace.
   it("offers replacing the token, disabled until agent access is on", () => {
-    const found = named(true, MCP_TOKEN_REGENERATE.name);
+    const found = rows.find((r) => r.name === MCP_TOKEN_REGENERATE.name);
     expect(found).toBeDefined();
-    const disabled = found && "disabled" in found.row ? found.row.disabled : undefined;
+    const disabled = found && "disabled" in found ? found.disabled : undefined;
     expect(typeof disabled === "function" ? disabled() : false).toBe(true);
     const on = rowsOf(
-      settingDefinitions(
-        () => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }),
-        "1.2.3",
-        { copy: noop, regenerate: noop, renderHeldField: noop },
-        true,
-      ),
+      settingDefinitions(() => ({ ...DEFAULT_SETTINGS, mcpEnabled: true }), "1.2.3", {
+        copy: noop,
+        regenerate: noop,
+        renderHeldField: noop,
+      }),
     ).find((r) => r.row.name === MCP_TOKEN_REGENERATE.name)?.row;
     const onDisabled = on && "disabled" in on ? on.disabled : undefined;
     expect(typeof onDisabled === "function" ? onDisabled() : false).toBe(false);
@@ -500,18 +423,13 @@ describe("agent access on a platform that cannot host it", () => {
   it("runs the action it was given", () => {
     let called = 0;
     const row = rowsOf(
-      settingDefinitions(
-        () => DEFAULT_SETTINGS,
-        "1.2.3",
-        {
-          copy: noop,
-          regenerate: () => {
-            called += 1;
-          },
-          renderHeldField: noop,
+      settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+        copy: noop,
+        regenerate: () => {
+          called += 1;
         },
-        true,
-      ),
+        renderHeldField: noop,
+      }),
     ).find((r) => r.row.name === MCP_TOKEN_REGENERATE.name)?.row;
     const action = row && "action" in row ? row.action : undefined;
     // Obsidian hands the row element and its index; neither is read here.

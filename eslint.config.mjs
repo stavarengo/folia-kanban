@@ -331,16 +331,6 @@ export default [
     },
   },
   {
-    // Two rules meet head-on in the MCP transport. `obsidianmd/no-nodejs-modules` forbids an
-    // `import ... from "http"` statement outright — including a type-only one — because a plugin
-    // that reaches for Node at load time is broken on mobile. `consistent-type-imports` forbids the
-    // one remaining way of naming those types, the inline `import("http")` annotation. The Obsidian
-    // rule is the one that protects users, so it stays; the style rule steps aside for this single
-    // file, where an inline type annotation is erased at build time and reaches nobody's mobile.
-    files: ["src/obsidian/mcpHttpServer.ts"],
-    rules: { "@typescript-eslint/consistent-type-imports": "off" },
-  },
-  {
     // One version gate. The preset's `obsidianmd/no-unsupported-api` already fails a use of an API
     // newer than manifest.json's `minAppVersion` unless a literal `requireApiVersion(...)` guards
     // it. It sees dotted member access, calls, `new` and `extends`, not a destructured property

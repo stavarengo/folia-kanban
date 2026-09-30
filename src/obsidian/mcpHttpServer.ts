@@ -2,16 +2,13 @@
 // (loopback unless they said otherwise) and gated by a bearer token.
 //
 // It lives in the adapter layer rather than beside the tools because Node is a platform detail. The
-// bundle marks Node builtins external, so a top-level import would become a `require` that runs
-// when the plugin loads, and there is no `http` on mobile — that would throw before the board ever
-// rendered. So the module is loaded with a dynamic import inside `startMcpServer`, behind the same
-// `Platform.isDesktop` check the plugin makes before it ever builds one, and the types it needs are
-// written inline: a type is erased at build time, an import statement is not.
+// `http` import becomes a `require` that runs when the plugin loads, which is safe only because the
+// manifest says `isDesktopOnly` and Obsidian never loads the plugin where there is no Node.
 //
 // Only POST is answered. The protocol allows a server to open an SSE stream for messages it starts
 // itself; this one never starts any, so a GET is refused rather than left hanging.
 
-import { Platform } from "obsidian";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
 import { isBindAddress, normalizeBindAddress, originAllowed } from "../bindAddress";
 import type { BoardHost } from "../mcp/host";
 import {
@@ -21,10 +18,6 @@ import {
   jsonRpcError,
   type ServerInfo,
 } from "../mcp/protocol";
-
-type IncomingMessage = import("http").IncomingMessage;
-type ServerResponse = import("http").ServerResponse;
-type Server = import("http").Server;
 
 /** The path clients post to, appended to `http://<bind address>:<port>`. */
 export const MCP_PATH = "/mcp";
@@ -255,19 +248,17 @@ function answerLate(
 }
 
 /**
- * Start the server. Rejects when the platform has no server to give, the token is empty, the bind
- * address is not one this machine has, or the port is taken — so a caller can say what went wrong
+ * Start the server. Rejects when the token is empty, the bind address is not one this machine
+ * has, or the port is taken — so a caller can say what went wrong
  * instead of leaving a dead toggle switched on.
  */
 export async function startMcpServer(options: McpServerOptions): Promise<RunningMcpServer> {
-  if (!Platform.isDesktop) throw new Error("Agent access needs a desktop; mobile has no server.");
   if (!options.token) throw new Error("The MCP server needs a token before it can be started.");
   // The settings tab refuses a value that is not an address, but a hand-edited `data.json` does
   // not go through it, and `listen` would take a name and try to resolve it.
   if (!isBindAddress(options.bindAddress)) {
     throw new Error(`"${options.bindAddress}" is not an address this computer can listen on.`);
   }
-  const { createServer } = await import("http");
   // One request at a time. Every write tool reads the board, computes against what it read, and
   // writes it back; two moves into the same column in flight together would each compute an order
   // from the same snapshot and hand the two cards the same slot. The board view never had this
