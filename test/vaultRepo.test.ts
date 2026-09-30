@@ -500,6 +500,18 @@ describe("contexts", () => {
     });
   });
 
+  it("falls back to the folder's name, and leaves colour and label out, when they are blank", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile(
+      "basic/Cards/Work/_context.md",
+      note('context-name: "  "\ncolor: ""\nlabel: " "', "\nThe body.\n"),
+    );
+
+    const contexts = await repo.loadContexts("basic/Cards");
+
+    expect(contexts["Work"]).toEqual({ name: "Work", body: "\nThe body.\n", folder: "Work" });
+  });
+
   it("returns nothing when the card folder is not there", async () => {
     const { repo } = setup();
     expect(await repo.loadContexts()).toEqual({});
@@ -2267,6 +2279,31 @@ describe("an edit that leaves the note as it was", () => {
     const text = app.vault.text(PATH) ?? "";
     expect(text).toContain("Due → 2026-10-01");
     expect(text).not.toContain("Priority →");
+  });
+
+  it("writes nothing when a mapping is set to what it holds in another key order", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile(PATH, card("status: todo\nmeta:\n  a: 1\n  b: [x, y]"));
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md");
+    const before = app.vault.text(PATH);
+
+    await repo.setFrontmatter(PATH, { meta: { b: ["x", "y"], a: 1 } });
+
+    expect(app.vault.text(PATH)).toBe(before);
+  });
+
+  it("still writes a list that gained or lost an item, or a mapping that gained a key", async () => {
+    const { app, repo } = untouched();
+
+    await repo.setFrontmatter(PATH, { tags: ["a", "b", "c"] });
+    expect(app.vault.frontmatter(PATH)["tags"]).toEqual(["a", "b", "c"]);
+    await repo.setFrontmatter(PATH, { tags: ["a"] });
+    expect(app.vault.frontmatter(PATH)["tags"]).toEqual(["a"]);
+
+    await repo.setFrontmatter(PATH, { meta: { a: 1 } });
+    await repo.setFrontmatter(PATH, { meta: { a: 1, b: 2 } });
+    expect(app.vault.frontmatter(PATH)["meta"]).toEqual({ a: 1, b: 2 });
   });
 
   it("still moves, and records, a card sent somewhere new", async () => {
