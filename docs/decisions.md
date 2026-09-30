@@ -459,6 +459,14 @@ The toolbar search used to be a hand-built combobox with `role="combobox"`, `ari
 
 **What would change this:** Obsidian giving its suggestion popup accessible roles, or documenting a hook for row ids and selection changes that would let the plugin supply them.
 
+## Tooltips are aria-labels, with no setTooltip port
+
+**Decided 2026-09-30 (#105). Every tooltip on the board is Obsidian's, drawn from the element's `aria-label`; `src/ui` has no port to `setTooltip`.**
+
+`setTooltip(el, text)` without options only sets `aria-label` (checked in the 1.11.4 and 1.13.7 bundles), and Obsidian's hover handler shows the nearest `aria-label` as the tooltip. So in this app the tooltip is the accessible name, and a port would add an adapter and a fake for an attribute React can set. The one thing `setTooltip` adds is redrawing a tooltip already open when its text changes; a label React changes under the pointer shows the old text until the pointer comes back, as a `title` did. Where an element is announced and shows text, its label starts with that text and then adds the hint, so the name still begins with what is on screen. The hinted labels in the detail panel (property keys, a link naming no card, a relation's "via" note) stay plain spans: axe lists an `aria-label` on a span as needing review rather than as a violation, and `role="img"` would have a screen reader call a word a graphic. Inside a card tile nothing is announced but the tile's own name, so the chips' labels there are tooltip only.
+
+**What would change this:** Obsidian documenting a tooltip that is not the accessible name, or the board needing a `TooltipOptions` setting such as placement or delay. Either one calls for the port.
+
 ## The board's inline status lines stay its own
 
 **Decided 2026-09-30 (#87). Every dialog, confirm and passing message is Obsidian's now; the lines that describe the board where it stands are not, because Obsidian has no component for them.**

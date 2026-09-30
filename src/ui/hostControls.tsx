@@ -93,7 +93,6 @@ interface ButtonProps extends HostControlOptions, SlotProps {
   className?: string;
   /** A name other than the text, for a button whose text leans on what sits beside it. */
   "aria-label"?: string;
-  title?: string;
   /** Pointed at the button while it is mounted. */
   elRef?: MutableRefObject<HTMLElement | null>;
 }
@@ -106,7 +105,6 @@ export function HostButton({
   className,
   slotClassName,
   "aria-label": ariaLabel,
-  title,
   elRef,
   ...options
 }: ButtonProps) {
@@ -122,7 +120,6 @@ export function HostButton({
     button.setCta(cta);
     button.setDisabled(disabled);
     setAttr(button.el, "aria-label", ariaLabel);
-    setAttr(button.el, "title", title);
   });
   return <Slot slot={slot} slotClassName={slotClassName} />;
 }
@@ -172,7 +169,6 @@ interface DropdownProps extends SlotProps {
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
-  title?: string;
 }
 
 export function HostDropdown({
@@ -183,7 +179,6 @@ export function HostDropdown({
   className,
   slotClassName,
   "aria-label": ariaLabel,
-  title,
 }: DropdownProps) {
   const change = useLatest(onChange);
   const [slot, dropdown] = useHostControl(
@@ -201,7 +196,6 @@ export function HostDropdown({
     if (dropdown.el.value !== value) dropdown.setValue(value);
     dropdown.setDisabled(disabled);
     setAttr(dropdown.el, "aria-label", ariaLabel);
-    setAttr(dropdown.el, "title", title);
   });
   return <Slot slot={slot} slotClassName={slotClassName} />;
 }

@@ -426,13 +426,13 @@ describe("assignment (20260827.03)", () => {
       ["Rafa", "user", "muted"],
       ["Alex", "user", "muted"],
     ]);
-    expect(chips[0]?.title).toBe("Assigned to Rafa");
+    expect(chips[0]?.tooltip).toBe("Assigned to Rafa");
     expect(cardChips(card({}), "2026-06-16", "done")).toEqual([]);
   });
 
   it("shows a body tag as a tag chip, after the frontmatter ones and named as one", () => {
     const c = { ...card({ area: "ops", tags: ["red"] }), bodyTags: ["home"] };
-    expect(cardChips(c, "2026-06-16", "done").map((chip) => [chip.label, chip.title])).toEqual([
+    expect(cardChips(c, "2026-06-16", "done").map((chip) => [chip.label, chip.tooltip])).toEqual([
       ["ops", "Tag"],
       ["red", "Tag"],
       ["home", "Tag (written in the note's body)"],

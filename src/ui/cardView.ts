@@ -26,7 +26,8 @@ export interface CardChip {
   label: string;
   tone: ChipTone;
   icon?: IconName;
-  title?: string;
+  /** What the chip is, shown on hover. */
+  tooltip?: string;
 }
 
 const PRIORITY_TONE: Record<string, ChipTone> = {
@@ -386,7 +387,7 @@ export function relationChips(counts: readonly RelationCount[] | undefined): Car
           label: "Blocked",
           tone: "danger",
           icon: "ban",
-          title: `Blocked by ${incoming} unfinished ${cards(incoming)}`,
+          tooltip: `Blocked by ${incoming} unfinished ${cards(incoming)}`,
         });
       }
       if (out > 0) {
@@ -395,7 +396,7 @@ export function relationChips(counts: readonly RelationCount[] | undefined): Car
           label: `Blocks ${out}`,
           tone: "accent",
           icon: "octagon-alert",
-          title: `Blocking ${out} unfinished ${cards(out)}`,
+          tooltip: `Blocking ${out} unfinished ${cards(out)}`,
         });
       }
       continue;
@@ -406,7 +407,7 @@ export function relationChips(counts: readonly RelationCount[] | undefined): Car
         label: `${type.label} ${out}`,
         tone: "muted",
         icon: "link",
-        title: `${type.label}: ${out} ${cards(out)}`,
+        tooltip: `${type.label}: ${out} ${cards(out)}`,
       });
     }
     if (incoming > 0) {
@@ -415,7 +416,7 @@ export function relationChips(counts: readonly RelationCount[] | undefined): Car
         label: `${type.inverseLabel} ${incoming}`,
         tone: "muted",
         icon: "link",
-        title: `${type.inverseLabel}: ${incoming} ${cards(incoming)}`,
+        tooltip: `${type.inverseLabel}: ${incoming} ${cards(incoming)}`,
       });
     }
   }
@@ -436,7 +437,7 @@ export function cardChips(
       key: "prio",
       label: fm.priority,
       tone: priorityTone(fm.priority, scale),
-      title: "Priority",
+      tooltip: "Priority",
     });
   }
   // The body tags come last, and say so: they are the ones the detail panel's `tags` property
@@ -447,7 +448,7 @@ export function cardChips(
       key: "tag-" + i,
       label: tag,
       tone: "muted",
-      title: i < fmTagCount ? "Tag" : "Tag (written in the note's body)",
+      tooltip: i < fmTagCount ? "Tag" : "Tag (written in the note's body)",
     });
   }
   for (const [i, name] of assigneeValues(card).entries()) {
@@ -459,7 +460,7 @@ export function cardChips(
       // Deliberately the same chip whoever it names: telling "mine" apart at a glance is what the
       // `assignee:me` filter and its "Mine" quick filter are for, and a tile that colours one name
       // differently would need to know who is reading it to draw a single card.
-      title: "Assigned to " + name,
+      tooltip: "Assigned to " + name,
     });
   }
   if (typeof fm.due === "string" && fm.due) {
@@ -476,7 +477,7 @@ export function cardChips(
       label: info.label,
       tone,
       icon: info.urgency === "overdue" ? "triangle-alert" : "calendar",
-      title: "Due " + fm.due,
+      tooltip: "Due " + fm.due,
     });
   }
 

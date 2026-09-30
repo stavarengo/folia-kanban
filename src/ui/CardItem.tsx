@@ -309,18 +309,24 @@ function CardItemInner({
         ) : (
           <div className="folia-card-title">{card.title}</div>
         )}
+        {/* The labels from here down are never announced (see the name above): Obsidian shows an
+            element's aria-label as its tooltip, and that is all they are for. */}
         {(ctxLabel || chips.length > 0) && (
           <div className="folia-chips">
             {ctxLabel && (
               <span
                 className="folia-chip folia-chip-context"
-                title={`Context: ${ctx?.name ?? card.context}`}
+                aria-label={`Context: ${ctx?.name ?? card.context}`}
               >
                 {ctxLabel}
               </span>
             )}
             {chips.map((c) => (
-              <span key={c.key} className={`folia-chip folia-chip-${c.tone}`} title={c.title}>
+              <span
+                key={c.key}
+                className={`folia-chip folia-chip-${c.tone}`}
+                aria-label={c.tooltip}
+              >
                 {c.icon && <Icon name={c.icon} />}
                 {c.label}
               </span>
@@ -330,7 +336,7 @@ function CardItemInner({
         {stats && stats.checklist > 0 && (
           <div
             className={"folia-progress" + (allDone ? " folia-is-complete" : "")}
-            title={progressWords(stats)}
+            aria-label={progressWords(stats)}
           >
             <HostProgressBar
               slotClassName="folia-progress-slot"
@@ -356,17 +362,13 @@ function CardItemInner({
         {stats && (stats.subcards > 0 || stats.comments > 0) && (
           <div className="folia-card-meta">
             {stats.subcards > 0 && (
-              <span
-                title="Subcards"
-                aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}
-              >
+              <span aria-label={`${stats.subcards} subcard${stats.subcards === 1 ? "" : "s"}`}>
                 <Icon name="git-branch" /> {stats.subcards}
               </span>
             )}
             {stats.comments > 0 && (
               <span
                 className={unread.kind === "none" ? undefined : `folia-comments-${unread.kind}`}
-                title={commentsTitle(stats.comments, unread)}
                 aria-label={commentsTitle(stats.comments, unread)}
               >
                 <Icon name="message-square" /> {stats.comments}
@@ -424,7 +426,6 @@ function CardItemInner({
       {parentPath && (
         <button
           className="folia-card-parent-ref"
-          title={`Part of ${parentTitle ?? parentPath}`}
           aria-label={`Part of ${parentTitle ?? parentPath}`}
           onClick={(e) => {
             e.stopPropagation();

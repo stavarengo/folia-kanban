@@ -402,10 +402,10 @@ function AssigneeField({
           slotClassName="folia-assignee-me-slot"
           elRef={meButton}
           text={mine ? "Unassign me" : "Assign to me"}
-          title={
+          aria-label={
             mine
-              ? "Take your name off this card, leaving anyone else on it"
-              : `Add ${me} to this card`
+              ? "Unassign me: take your name off this card, leaving anyone else on it"
+              : `Assign to me: add ${me} to this card`
           }
           onClick={onToggleMine}
         />
@@ -600,7 +600,7 @@ function TitleFields({
       <div className="folia-prop-row">
         <span
           className="folia-prop-key"
-          title="The note's own file name, which [[wikilinks]] bind to. Editing it renames the note and rewrites the links pointing at it."
+          aria-label="File name: the note's own file name, which [[wikilinks]] bind to. Editing it renames the note and rewrites the links pointing at it."
         >
           File name
         </span>
@@ -617,7 +617,7 @@ function TitleFields({
         <div className="folia-prop-row">
           <span
             className="folia-prop-key"
-            title="Overrides the file name and the heading; clear it to fall back"
+            aria-label="Override card title: overrides the file name and the heading; clear it to fall back"
           >
             Override card title
           </span>
@@ -643,7 +643,6 @@ function TitleFields({
               one. */}
           <button
             className={"folia-link folia-title-value" + (expanded ? " folia-is-expanded" : "")}
-            title={shown}
             aria-expanded={expanded}
             aria-label={expanded ? "Show less of the title" : "Show the whole title"}
             onClick={() => setExpanded((v) => !v)}
@@ -708,7 +707,7 @@ function RelationRow({
   board: Board;
   onNavigate: ((path: string) => void) | undefined;
   onRemove?: (() => void) | undefined;
-  note?: { text: string; title: string } | undefined;
+  note?: { text: string; hint: string } | undefined;
 }) {
   const target = link.path;
   // What the row reads as, so the button that removes it announces the same card the row shows.
@@ -720,7 +719,10 @@ function RelationRow({
           {label}
         </button>
       ) : (
-        <span className="folia-link-missing" title="No card with this name on the board">
+        <span
+          className="folia-link-missing"
+          aria-label={`${label}: no card with this name on the board`}
+        >
           {label}
         </span>
       )}
@@ -733,7 +735,7 @@ function RelationRow({
           onClick={onRemove}
         />
       ) : note ? (
-        <span className="folia-relation-note folia-muted" title={note.title}>
+        <span className="folia-relation-note folia-muted" aria-label={`${note.text}: ${note.hint}`}>
           {note.text}
         </span>
       ) : null}
@@ -745,16 +747,16 @@ function RelationRow({
 function outgoingNote(
   type: RelationTypeDef,
   source: "inverse" | "both",
-): { text: string; title: string } {
+): { text: string; hint: string } {
   const inverse = type.inverse ?? "";
   return source === "inverse"
     ? {
         text: `via ${inverse}`,
-        title: `Declared by that card's ${inverse} property — remove it there`,
+        hint: `declared by that card's ${inverse} property — remove it there`,
       }
     : {
         text: `also via ${inverse}`,
-        title: `Both notes state this link, so clearing it here would leave the other to bring it back — remove that card's ${inverse} property too`,
+        hint: `both notes state this link, so clearing it here would leave the other to bring it back — remove that card's ${inverse} property too`,
       };
 }
 
@@ -762,15 +764,15 @@ function outgoingNote(
 function incomingNote(
   type: RelationTypeDef,
   source: "own" | "inverse" | "both",
-): { text: string; title: string } | undefined {
+): { text: string; hint: string } | undefined {
   if (source === "inverse") return undefined;
   const inverse = type.inverse ?? "";
   return {
     text: "from this note",
-    title:
+    hint:
       source === "own"
-        ? `Written in this note's own ${inverse} property — edit the note to change it`
-        : `Written in this note's own ${inverse} property, and stated by that card as well`,
+        ? `written in this note's own ${inverse} property — edit the note to change it`
+        : `written in this note's own ${inverse} property, and stated by that card as well`,
   };
 }
 
@@ -1527,7 +1529,7 @@ export function CardDetail({
           {/* A label, not the place to read a long title: clamped to two lines (see
             `.folia-detail-title`) with the whole of it on hover, and the full, wrapping copy
             sitting in the "Resulting display title" row a few pixels below. */}
-          <h2 className="folia-detail-title" title={card.title} ref={titleRef} tabIndex={-1}>
+          <h2 className="folia-detail-title" aria-label={card.title} ref={titleRef} tabIndex={-1}>
             {card.title}
           </h2>
           <div className="folia-row-actions">
@@ -1862,7 +1864,7 @@ export function CardDetail({
                       ) : (
                         <span
                           className="folia-link-missing"
-                          title="No card with this name on the board"
+                          aria-label={`${s.link}: no card with this name on the board`}
                         >
                           {s.link}
                         </span>
@@ -1884,8 +1886,11 @@ export function CardDetail({
                       <HostDropdown
                         className="folia-subtask-column"
                         slotClassName="folia-subtask-column-slot"
-                        aria-label={`Column for ${s.text}`}
-                        title={orphanLink ? "No card on the board to place" : "Column"}
+                        aria-label={
+                          orphanLink
+                            ? `Column for ${s.text}: no card on the board to place`
+                            : `Column for ${s.text}`
+                        }
                         disabled={orphanLink}
                         options={[
                           { value: "", label: "With this card" },

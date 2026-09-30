@@ -95,7 +95,7 @@ describe("a11y axe gate (no violations)", () => {
     render_(assignedRepo(), NAMED);
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
-    await within(detail).findByRole("button", { name: "Unassign me" });
+    await within(detail).findByRole("button", { name: /^Unassign me:/ });
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);
   }, 30000);
@@ -116,4 +116,16 @@ describe("a11y axe gate (no violations)", () => {
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);
   }, 30000);
+});
+
+// Obsidian draws its tooltip from an element's aria-label; a `title` would put the browser's own
+// tooltip next to it.
+describe("tooltips are Obsidian's", () => {
+  it("nothing on the board or in the open panel carries a title attribute", async () => {
+    const user = userEvent.setup();
+    render_(makeRepo(), { ...DEFAULT_SETTINGS, userName: "Rafa" });
+    await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+    await screen.findByTestId("card-detail");
+    expect([...document.body.querySelectorAll("[title]")].map((el) => el.outerHTML)).toEqual([]);
+  });
 });

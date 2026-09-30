@@ -497,7 +497,7 @@ export function Column({
           <span
             ref={setActivatorNodeRef}
             className="folia-column-title"
-            title="Drag to reorder, click to rename"
+            aria-label={`${column.title}, drag to reorder, click to rename`}
             {...attributes}
             {...listeners}
             // Clear any stale post-drag guard at the very start of a fresh gesture, THEN hand the
@@ -525,18 +525,11 @@ export function Column({
         <span
           className={"folia-column-count" + (overLimit ? " folia-is-over-limit" : "")}
           role="img"
-          title={
-            overLimit
-              ? `${count} of ${wipLimit} — over the WIP limit`
-              : wipLimit != null
-                ? `${count} of ${wipLimit} (WIP limit)`
-                : `${count} cards`
-          }
           aria-label={
             overLimit
               ? `${count} of ${wipLimit}, over the WIP limit`
               : wipLimit != null
-                ? `${count} of ${wipLimit} cards`
+                ? `${count} of ${wipLimit} cards (WIP limit)`
                 : `${count} cards`
           }
         >

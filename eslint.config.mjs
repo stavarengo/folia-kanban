@@ -91,6 +91,15 @@ export const a11yExceptions = [
   },
 ];
 
+const API_GATE = {
+  // Any mention, identifier or string key, so a namespace import
+  // (`Obsidian.requireApiVersion`, `Obsidian["requireApiVersion"]`) or a destructured alias
+  // cannot bring the gate back elsewhere.
+  selector: "Identifier[name='requireApiVersion'], Literal[value='requireApiVersion']",
+  message:
+    "Gate newer Obsidian APIs in src/obsidian/compat.ts, with a fallback for older apps; requireApiVersion belongs there only.",
+};
+
 export default [
   {
     ignores: ["dist/", "examples/", "node_modules/", "coverage/", ".pnpm-store/"],
@@ -339,16 +348,20 @@ export default [
     // place such a call can live, each with its fallback beside it.
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/obsidian/compat.ts"],
+    rules: { "no-restricted-syntax": ["error", API_GATE] },
+  },
+  {
+    // Obsidian draws its tooltip from an element's aria-label, so a `title` would put the browser's
+    // own tooltip next to it. The gate above is repeated: a later block replaces the rule's options.
+    files: ["src/ui/**/*.tsx"],
     rules: {
       "no-restricted-syntax": [
         "error",
+        API_GATE,
         {
-          // Any mention, identifier or string key, so a namespace import
-          // (`Obsidian.requireApiVersion`, `Obsidian["requireApiVersion"]`) or a destructured alias
-          // cannot bring the gate back elsewhere.
-          selector: "Identifier[name='requireApiVersion'], Literal[value='requireApiVersion']",
+          selector: "JSXOpeningElement[name.name=/^[a-z]/] > JSXAttribute[name.name='title']",
           message:
-            "Gate newer Obsidian APIs in src/obsidian/compat.ts, with a fallback for older apps; requireApiVersion belongs there only.",
+            "Obsidian shows an element's aria-label as its tooltip; use aria-label (keeping any visible text in it) instead of title.",
         },
       ],
     },

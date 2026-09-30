@@ -295,15 +295,11 @@ describe("the React wrappers", () => {
 
   it("name a text button apart from its text, and drop the name when it goes", () => {
     const { getByRole, rerender } = render(
-      inRepo(
-        <HostButton text="Add" aria-label="Add property" title="Add property" onClick={() => {}} />,
-      ),
+      inRepo(<HostButton text="Add" aria-label="Add property" onClick={() => {}} />),
     );
     const button = getByRole("button", { name: "Add property" });
-    expect(button).toHaveAttribute("title", "Add property");
     rerender(inRepo(<HostButton text="Add" onClick={() => {}} />));
     expect(getByRole("button", { name: "Add" })).toBe(button);
-    expect(button).not.toHaveAttribute("title");
   });
 
   it("point a text button's ref at the button while it is mounted", () => {
@@ -322,19 +318,10 @@ describe("the React wrappers", () => {
       { value: "b", label: "B" },
     ];
     const ui = (list: typeof options, value: string) =>
-      inRepo(
-        <HostDropdown
-          options={list}
-          value={value}
-          onChange={() => {}}
-          aria-label="Column"
-          title="Where it goes"
-        />,
-      );
+      inRepo(<HostDropdown options={list} value={value} onChange={() => {}} aria-label="Column" />);
     const { getByRole, rerender } = render(ui(options, "b"));
     const select = getByRole("combobox", { name: "Column" }) as HTMLSelectElement;
     expect(select).toHaveValue("b");
-    expect(select).toHaveAttribute("title", "Where it goes");
     const optionA = select.options[0];
 
     rerender(ui([...options], "a"));

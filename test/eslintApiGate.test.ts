@@ -46,3 +46,28 @@ describe("newer Obsidian APIs go through the one version gate", { timeout: 30_00
     expect(ids).not.toContain("obsidianmd/no-unsupported-api");
   });
 });
+
+describe("tooltips in src/ui are Obsidian's", { timeout: 30_000 }, () => {
+  const UI = "src/ui/Toolbar.tsx";
+
+  it("rejects a title attribute", async () => {
+    const code = 'export const Toolbar = () => <span title="Priority">A</span>;\n';
+    expect(await ruleIds(code, UI)).toContain("no-restricted-syntax");
+  });
+
+  it("accepts the same hint as an aria-label", async () => {
+    const code = 'export const Toolbar = () => <span aria-label="Priority">A</span>;\n';
+    expect(await ruleIds(code, UI)).not.toContain("no-restricted-syntax");
+  });
+
+  it("leaves a component's own title prop alone", async () => {
+    const code =
+      "const Section = (p: { title: string }) => <h3>{p.title}</h3>;\n" +
+      'export const Toolbar = () => <Section title="Due" />;\n';
+    expect(await ruleIds(code, UI)).not.toContain("no-restricted-syntax");
+  });
+
+  it("still rejects a version guard written there", async () => {
+    expect(await ruleIds(guarded, UI)).toContain("no-restricted-syntax");
+  });
+});

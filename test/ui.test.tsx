@@ -214,7 +214,7 @@ describe("board rendering", () => {
     expect(within(todoCol).getByText("Beta").closest(".folia-card")).toHaveClass(
       "folia-card--nested",
     );
-    expect(within(todoCol).getByTitle("1 cards")).toHaveTextContent("1"); // count = top-level only
+    expect(within(todoCol).getByLabelText("1 cards")).toHaveTextContent("1"); // count = top-level only
 
     const doingCol = screen.getByText("Doing").closest("section") as HTMLElement;
     expect(within(doingCol).getByText("Gamma")).toBeInTheDocument();
@@ -302,13 +302,13 @@ describe("board rendering", () => {
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     expect(within(alpha).getByText("A")).toBeInTheDocument(); // priority chip
     expect(within(alpha).getByText("1/3")).toBeInTheDocument(); // 1 of 3 checklist lines done (2 todos + 1 subcard)
-    expect(within(alpha).getByTitle("Subcards")).toHaveTextContent("1"); // 1 subcard
+    expect(within(alpha).getByLabelText("1 subcard")).toHaveTextContent("1"); // 1 subcard
     // The badge names what it counts AND what is new: no card has been opened, so its one comment
     // (unsigned, so not "mine") is unread.
-    expect(within(alpha).getByTitle("1 comment, 1 unread comment")).toHaveTextContent("1");
+    expect(within(alpha).getByLabelText("1 comment, 1 unread comment")).toHaveTextContent("1");
 
     const gamma = screen.getByText("Gamma").closest(".folia-card") as HTMLElement;
-    expect(within(gamma).getByTitle("Due 2026-06-01")).toHaveTextContent("12d ago"); // overdue, relative
+    expect(within(gamma).getByLabelText("Due 2026-06-01")).toHaveTextContent("12d ago"); // overdue, relative
   });
 });
 
@@ -816,7 +816,9 @@ describe("card detail", () => {
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
     // There is no note to write a status to, so the control says so rather than dropping a choice.
-    expect(within(detail).getByLabelText("Column for [[Nowhere]]")).toBeDisabled();
+    expect(
+      within(detail).getByLabelText("Column for [[Nowhere]]: no card on the board to place"),
+    ).toBeDisabled();
   });
 
   it("lets a claim naming no column of this board be selected away from", async () => {
@@ -2582,7 +2584,7 @@ describe("card context menu", () => {
       const card = (await screen.findByText(name)).closest(".folia-card") as HTMLElement;
       return {
         strip: card.getAttribute("data-prio"),
-        chip: within(card).getByTitle("Priority").className,
+        chip: within(card).getByLabelText("Priority").className,
       };
     };
     expect(await tone("First")).toEqual({
@@ -4093,7 +4095,7 @@ describe("context grouping marker (#14)", () => {
     // The label chip shows the short label and names the context in its tooltip.
     const chip = within(a).getByText("client");
     expect(chip).toHaveClass("folia-chip-context");
-    expect(chip).toHaveAttribute("title", "Context: Acme Corp");
+    expect(chip).toHaveAttribute("aria-label", "Context: Acme Corp");
   });
 
   it("leaves a card without a context unmarked", async () => {
@@ -4891,9 +4893,9 @@ describe("unread comments", () => {
     render_(conversation(), asRafa);
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     // Two comments, one of them yours — so only the agent's counts, and it came after yours.
-    expect(within(alpha).getByTitle("2 comments, 1 unread comment, a reply to yours")).toHaveClass(
-      "folia-comments-reply",
-    );
+    expect(
+      within(alpha).getByLabelText("2 comments, 1 unread comment, a reply to yours"),
+    ).toHaveClass("folia-comments-reply");
     // The tile's own name carries it too: everything in the tile is inside a role="button", so a
     // label on the badge alone would never be announced.
     expect(
@@ -4920,7 +4922,7 @@ describe("unread comments", () => {
   it("with no name set nothing is yours, so both comments read as plain unread", async () => {
     render_(conversation());
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
-    expect(within(alpha).getByTitle("2 comments, 2 unread comments")).toHaveClass(
+    expect(within(alpha).getByLabelText("2 comments, 2 unread comments")).toHaveClass(
       "folia-comments-unread",
     );
   });
@@ -4944,7 +4946,7 @@ describe("unread comments", () => {
     expect(within(detail).getByText("New")).toBeInTheDocument();
     // The tile is quiet again.
     const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
-    await waitFor(() => expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument());
+    await waitFor(() => expect(within(alpha).getByLabelText("2 comments")).toBeInTheDocument());
   });
 
   it("never records one card's comments as seen on another when the panel switches cards", async () => {
@@ -5014,7 +5016,7 @@ describe("unread comments", () => {
     // reader's own words light the badge.
     const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
     await waitFor(() => expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe(`${repo.ts}#1`));
-    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    expect(within(alpha).getByLabelText("2 comments")).toBeInTheDocument();
     // Reopening the card must not tag the reader's own line as new either.
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
@@ -5185,7 +5187,7 @@ describe("unread comments", () => {
       expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 09:00#1"),
     );
     const alpha = document.querySelector('.folia-card[data-path="Tasks/Alpha.md"]') as HTMLElement;
-    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    expect(within(alpha).getByLabelText("2 comments")).toBeInTheDocument();
   });
 
   it("does not mistake someone else's comment for yours because you typed the same words", async () => {
@@ -5221,7 +5223,7 @@ describe("unread comments", () => {
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     // Timestamps carry no seconds, so an agent answering straight away shares your minute.
     expect(
-      within(alpha).getByTitle("2 comments, 1 unread comment, a reply to yours"),
+      within(alpha).getByLabelText("2 comments, 1 unread comment, a reply to yours"),
     ).toBeInTheDocument();
   });
 
@@ -5260,9 +5262,9 @@ describe("unread comments", () => {
     const box = { current: asRafa };
     renderStateful(repo, { ...asRafa, commentsBaseline: "2026-06-14 09:00" }, box);
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
-    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    expect(within(alpha).getByLabelText("2 comments")).toBeInTheDocument();
     const beta = screen.getByText("Beta").closest(".folia-card") as HTMLElement;
-    expect(within(beta).getByTitle("3 comments, 1 unread comment")).toBeInTheDocument();
+    expect(within(beta).getByLabelText("3 comments, 1 unread comment")).toBeInTheDocument();
 
     // The panel draws the New rule at the same place the tile counted from...
     await user.click(screen.getByText("Beta"));
@@ -5283,7 +5285,7 @@ describe("unread comments", () => {
       commentsSeen: { "Tasks/Alpha.md": "2026-06-13 10:00#1" },
     });
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
-    expect(within(alpha).getByTitle("2 comments")).toBeInTheDocument();
+    expect(within(alpha).getByLabelText("2 comments")).toBeInTheDocument();
     await user.click(screen.getByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     expect(within(detail).queryByText("New")).toBeNull();
@@ -6988,8 +6990,8 @@ describe("a title far wider than the panel (20260827.02)", () => {
     await user.click(await screen.findByText(HUGE));
     const detail = await screen.findByTestId("card-detail");
     const heading = within(detail).getByRole("heading", { name: HUGE });
-    // The whole title is recoverable from the header without it growing to hold it...
-    expect(heading).toHaveAttribute("title", HUGE);
+    // The whole title is recoverable from the header, as its tooltip, without it growing to hold it...
+    expect(heading).toHaveAttribute("aria-label", HUGE);
     expect(rule(".folia-detail-title")).toContain("-webkit-line-clamp: 2");
     expect(rule(".folia-detail-title")).toContain("overflow-wrap: anywhere");
     // ...and the action buttons are the title's siblings, never inside it, and never shrink.
@@ -7015,7 +7017,6 @@ describe("a title far wider than the panel (20260827.02)", () => {
       expect(el).toHaveTextContent(HUGE);
       return el;
     });
-    expect(value).toHaveAttribute("title", HUGE);
     expect(value).toHaveAttribute("aria-expanded", "false");
     // Both of the things Obsidian's app.css does to every button have to be undone, and neither is
     // visible from jsdom: `white-space: nowrap` would hold the whole title on one line whatever the
@@ -7229,11 +7230,11 @@ describe("assigning a card (20260827.03)", () => {
     const repo = makeRepo();
     const { user, detail } = await openPanel(repo, named("Rafa"));
 
-    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+    await user.click(within(detail).getByRole("button", { name: /^Assign to me:/ }));
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa"));
 
     const back = await within(await screen.findByTestId("card-detail")).findByRole("button", {
-      name: "Unassign me",
+      name: /^Unassign me:/,
     });
     await user.click(back);
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
@@ -7241,7 +7242,7 @@ describe("assigning a card (20260827.03)", () => {
 
   it("offers the one-click case only once the reader has a name, and says where it comes from", async () => {
     const { detail } = await openPanel(makeRepo());
-    expect(within(detail).queryByRole("button", { name: "Assign to me" })).toBeNull();
+    expect(within(detail).queryByRole("button", { name: /^Assign to me:/ })).toBeNull();
     expect(within(detail).getByText(/Set “Your name” in the plugin settings/)).toBeInTheDocument();
     // The field itself still takes a name typed by hand — nothing about assignment is gated.
     expect(within(detail).getByLabelText("Assignee")).toBeEnabled();
@@ -7328,7 +7329,7 @@ describe("assigning a card (20260827.03)", () => {
     // The field shows the list the note holds, and the button is still an offer to join it.
     expect(within(detail).getByLabelText("Assignee")).toHaveValue("alex, ana maria");
 
-    await user.click(within(detail).getByRole("button", { name: "Assign to me" }));
+    await user.click(within(detail).getByRole("button", { name: /^Assign to me:/ }));
     await waitFor(() =>
       expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual([
         "alex",
@@ -7340,7 +7341,7 @@ describe("assigning a card (20260827.03)", () => {
     // And leaving takes only your own name off — the other two were somebody's decision, not yours.
     await user.click(
       await within(await screen.findByTestId("card-detail")).findByRole("button", {
-        name: "Unassign me",
+        name: /^Unassign me:/,
       }),
     );
     await waitFor(() =>
@@ -7355,13 +7356,13 @@ describe("assigning a card (20260827.03)", () => {
     const { user, detail } = await openPanel(repo, named("Rafa"));
 
     // A shape somebody else authored stays the shape they authored, even down to one name.
-    await user.click(within(detail).getByRole("button", { name: "Unassign me" }));
+    await user.click(within(detail).getByRole("button", { name: /^Unassign me:/ }));
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual(["alex"]));
 
     // And a list that empties leaves no key behind, rather than an empty one.
     await user.click(await screen.findByText("Gamma"));
     const gamma = await screen.findByTestId("card-detail");
-    await user.click(await within(gamma).findByRole("button", { name: "Unassign me" }));
+    await user.click(await within(gamma).findByRole("button", { name: /^Unassign me:/ }));
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Gamma.md")!.fm).toBe(false));
   });
 
@@ -7391,7 +7392,7 @@ describe("assigning a card (20260827.03)", () => {
     const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
 
     await user.type(field, "Alex");
-    await press(user, within(detail).getByRole("button", { name: "Assign to me" }));
+    await press(user, within(detail).getByRole("button", { name: /^Assign to me:/ }));
 
     // One write, and it is the one the pressed button names. Two would mean the blur committed
     // "Alex" first and the toggle then computed its answer from a card it had already changed.
@@ -7411,7 +7412,7 @@ describe("assigning a card (20260827.03)", () => {
     repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "Rafa";
     render_(repo, named("Rafa"));
     await screen.findByText("Alpha");
-    expect(screen.getByTitle("Assigned to Rafa")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assigned to Rafa")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Mine" }));
     expect(screen.getByLabelText("Search cards")).toHaveValue("assignee:me");
