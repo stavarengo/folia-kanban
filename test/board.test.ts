@@ -834,9 +834,15 @@ describe("resolveCardFolder (#20260821.08)", () => {
       expect(pick(board, "./Cards", ["basic/cards"])?.path).toBe("basic/cards");
       expect(pick(board, "Cards", ["basic/cards"])?.path).toBe("basic/cards");
     });
-    it("matches the whole path, so a parent folder in another case counts too", () => {
-      expect(pick(board, "./Cards", ["Basic/cards"])?.path).toBe("Basic/cards");
+    it("ignores case in every segment the value wrote", () => {
       expect(pick(board, "Area/Cards", ["area/CARDS"])?.path).toBe("area/CARDS");
+      expect(pick("a/b/Board.md", "../Shared", ["a/shared"])?.path).toBe("a/shared");
+    });
+    it("keeps the board note's own folder exact, so a sibling spelled differently is not reached", () => {
+      // On Linux `Basic/` is another folder than the `basic/` this board note sits in.
+      expect(pick(board, "./Cards", ["Basic/cards"])?.caseMatches).toEqual([]);
+      expect(pick(board, "Cards", ["Basic/cards"])?.caseMatches).toEqual([]);
+      expect(pick("a/b/Board.md", "../Shared", ["A/shared"])?.caseMatches).toEqual([]);
     });
     it("is not searched for under a reading the value does not allow", () => {
       // `./` means beside the board note only, whatever the case of a folder at the vault root.

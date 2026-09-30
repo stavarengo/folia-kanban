@@ -112,7 +112,10 @@ function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
  * `./`, that is the vault-root reading, exactly where the folder has always been created.
  *
  * Only when no reading exists exactly are the vault's `folders` asked for (walking them is the
- * expensive part), to find the ones a reading names in another letter case. Exactly one such
+ * expensive part), to find the ones a reading names in another letter case. The leading segments a
+ * reading shares with the board note's own folder stay exact, since that folder is a real path:
+ * a `./Cards` beside `basic/Board.md` never reaches into a `Basic/` next to it. The rest, and
+ * always the last segment, is compared ignoring case. Exactly one such
  * folder is taken, under its real path, since every consumer compares that path exactly; with two
  * or more, which one was meant is unknowable, so `path` stays the preferred reading and
  * `caseMatches` lists them for the caller to refuse on. Linux lets `Cards/` and `cards/` coexist.
@@ -130,8 +133,22 @@ export function resolveCardFolder(
   if (preferred === undefined) return null;
   const existing = candidates.filter(isFolder);
   if (existing[0] !== undefined) return { path: existing[0], existing, caseMatches: [] };
-  const wanted = new Set(candidates.map((c) => c.toLowerCase()));
-  const caseMatches = folders().filter((f) => wanted.has(f.toLowerCase()));
+  const home = parentFolder(boardPath).split("/");
+  const matchers = candidates.map((c) => {
+    const segments = c.split("/");
+    let kept = 0;
+    while (kept < segments.length - 1 && segments[kept] === home[kept]) kept++;
+    const anchor = segments.slice(0, kept).join("/");
+    return {
+      anchor: kept === 0 ? "" : anchor + "/",
+      rest: segments.slice(kept).join("/").toLowerCase(),
+    };
+  });
+  const caseMatches = folders().filter((f) =>
+    matchers.some(
+      (m) => f.startsWith(m.anchor) && f.slice(m.anchor.length).toLowerCase() === m.rest,
+    ),
+  );
   const [only] = caseMatches;
   return {
     path: only !== undefined && caseMatches.length === 1 ? only : preferred,
