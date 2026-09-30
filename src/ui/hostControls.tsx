@@ -21,6 +21,20 @@ function useLatest<T>(value: T): MutableRefObject<T> {
   return ref;
 }
 
+/** Points `elRef` at the mounted control's element for as long as it is mounted. */
+function useElRef(
+  elRef: MutableRefObject<HTMLElement | null> | undefined,
+  control: HostControl | null,
+): void {
+  useLayoutEffect(() => {
+    if (!elRef || !control) return;
+    elRef.current = control.el;
+    return () => {
+      elRef.current = null;
+    };
+  }, [elRef, control]);
+}
+
 /**
  * Mount a control into the returned slot and give it `className`. `mount` is read on the first
  * render only, and so are the options it passes on.
@@ -100,13 +114,7 @@ export function HostButton({
     (repo, el) => repo.mountButton(el, (evt) => click.current(evt), options),
     className,
   );
-  useLayoutEffect(() => {
-    if (!elRef || !button) return;
-    elRef.current = button.el;
-    return () => {
-      elRef.current = null;
-    };
-  }, [elRef, button]);
+  useElRef(elRef, button);
   useLayoutEffect(() => {
     if (!button) return;
     button.setText(text);
@@ -147,11 +155,11 @@ export function HostIconButton({
     (repo, el) => repo.mountIconButton(el, (evt) => click.current(evt), options),
     className,
   );
+  useElRef(elRef, button);
   useLayoutEffect(() => {
     button?.setIcon(icon);
     button?.setLabel(label);
     button?.setDisabled(disabled);
-    if (elRef) elRef.current = button?.el ?? null;
   });
   return <Slot slot={slot} slotClassName={slotClassName} />;
 }
