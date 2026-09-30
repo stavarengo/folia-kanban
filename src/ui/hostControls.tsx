@@ -50,6 +50,7 @@ function useHostControl<T extends HostControl>(
   useLayoutEffect(() => {
     if (!slot.current) return;
     const mounted = first.current(repo, slot.current);
+    mounted.el.classList.add("folia-host-control");
     setControl(mounted);
     return () => mounted.remove();
   }, [repo]);

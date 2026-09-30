@@ -4,3 +4,9 @@
 .folia-host-slot {
   display: inline-flex;
 }
+/* The host rings a focused control with 3px of `--background-modifier-border-focus`, which is
+   `#555555` on `#333333` in the dark theme, around 1.7:1. The board's accent outline
+   (focus-visibility.css) is the indicator, so the host's ring would only double it. */
+.folia-scope .folia-host-control:focus-visible {
+  box-shadow: none;
+}

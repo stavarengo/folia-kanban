@@ -211,6 +211,8 @@ describe("the React wrappers", () => {
     expect(getByRole("button", { name: "Two" })).toBe(el);
     expect(el).toHaveClass("folia-b");
     expect(el).not.toHaveClass("folia-a");
+    // The one class the focus-ring reset reaches every control through, whatever else it wears.
+    expect(el).toHaveClass("folia-host-control");
     click(el);
     expect(first).not.toHaveBeenCalled();
     expect(latest).toHaveBeenCalledOnce();
