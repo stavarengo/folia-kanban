@@ -369,7 +369,7 @@ function CardItemInner({
                 title={commentsTitle(stats.comments, unread)}
                 aria-label={commentsTitle(stats.comments, unread)}
               >
-                <Icon name="message" /> {stats.comments}
+                <Icon name="message-square" /> {stats.comments}
                 {/* Shape, not just colour: a plain dot for unread, an arrow for a reply — so the
                     two states stay apart for anyone who cannot tell blue from purple. */}
                 {unread.kind === "unread" && (

@@ -169,10 +169,10 @@ export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function To
             otherwise empty the board and take away the only button that could switch it off. */}
         {(canFilterMine || hasToken(query, "assignee", "me")) &&
           chip("assignee", "me", "user", "Mine")}
-        {chip("due", "overdue", "alert", "Overdue")}
+        {chip("due", "overdue", "triangle-alert", "Overdue")}
         {chip("due", "soon", "calendar", "Due soon")}
         {chip("is", "blocked", "ban", "Blocked")}
-        {chip("unread", "comments", "message", "Unread")}
+        {chip("unread", "comments", "message-square", "Unread")}
       </div>
 
       {active && (

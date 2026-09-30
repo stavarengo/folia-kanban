@@ -475,7 +475,7 @@ export function cardChips(
       key: "due",
       label: info.label,
       tone,
-      icon: info.urgency === "overdue" ? "alert" : "calendar",
+      icon: info.urgency === "overdue" ? "triangle-alert" : "calendar",
       title: "Due " + fm.due,
     });
   }

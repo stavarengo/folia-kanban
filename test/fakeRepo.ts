@@ -19,6 +19,7 @@ import {
   mountIconButton,
   mountProgressBar,
 } from "../src/obsidian/hostControls";
+import { drawIcon } from "../src/obsidian/icons";
 import { vaultLinktext } from "../src/model/links";
 import type { FileOp } from "../src/model/pathOps";
 import type {
@@ -507,11 +508,12 @@ export class FakeRepo implements CardRepository {
   }
 
   // The real adapters, drawing on the fakes in obsidianFake.ts, so the board's tests press the
-  // same listeners the app does.
+  // same listeners the app does and see the icons the app would draw.
   readonly mountButton = mountButton;
   readonly mountIconButton = mountIconButton;
   readonly mountDropdown = mountDropdown;
   readonly mountProgressBar = mountProgressBar;
+  readonly drawIcon = drawIcon;
 
   /** Every link `followLink` followed, with the note it was resolved against, in order. */
   readonly followed: { linktext: string; sourcePath: string }[] = [];

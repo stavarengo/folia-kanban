@@ -38,7 +38,7 @@ The guard asks an owned token to become an alias whenever Obsidian already docum
 
 Plain pixel lengths in spacing, size and runtime tokens must use the host grid, including arithmetic for dimensions larger than its published rungs. An off-grid exception must name the nearest rung with `despite` and explain why it cannot follow that rung.
 
-Icon containers set `--folia-icon-size` and `--folia-icon-stroke` from the host icon scale. Only `.folia-icon` maps those tokens onto the documented `--icon-size` and `--icon-stroke` shorthands, so host-rendered Markdown does not inherit Folia's defaults. The two host properties may be assigned on the SVG rule; their values still pass the raw-value and variable checks. `Icon` reads them through CSS and has no numeric size prop.
+Icon containers set `--folia-icon-size` and `--folia-icon-stroke` from the host icon scale. Only `.folia-icon` maps those tokens onto the documented `--icon-size` and `--icon-stroke` shorthands, so host-rendered Markdown does not inherit Folia's defaults. `Icon` is a slot the host draws its own Lucide icon into (`setIcon`), and the host's `svg-icon` rule sizes and strokes that icon from those two shorthands, so the slot sets no size of its own; their values still pass the raw-value and variable checks. `Icon` has no numeric size prop.
 
 ## Scheme overrides
 

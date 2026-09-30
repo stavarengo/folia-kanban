@@ -51,6 +51,7 @@ import { isBoardFrontmatter } from "./viewMode";
 import { parseFrontmatter } from "./frontmatter";
 import { attachSuggest, mountSearch } from "./inputSuggest";
 import { mountButton, mountDropdown, mountIconButton, mountProgressBar } from "./hostControls";
+import { drawIcon } from "./icons";
 import { pathTaken } from "./pathTaken";
 import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
@@ -1129,6 +1130,10 @@ export class VaultRepository implements CardRepository {
 
   mountProgressBar(container: HTMLElement): ProgressBarControl {
     return mountProgressBar(container);
+  }
+
+  drawIcon(container: HTMLElement, icon: string): void {
+    drawIcon(container, icon);
   }
 
   absolutePath(path: string): string | null {

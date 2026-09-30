@@ -392,6 +392,9 @@ export interface CardRepository {
 
   mountProgressBar(container: HTMLElement): ProgressBarControl;
 
+  /** Draw the host's icon `icon` (a Lucide id) into `container`, replacing the one there. */
+  drawIcon(container: HTMLElement, icon: string): void;
+
   /** Tell the person something in the host's own notice, an error staying up longer. */
   showNotice(message: string, tone: "success" | "error"): void;
 

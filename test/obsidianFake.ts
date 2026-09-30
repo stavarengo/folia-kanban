@@ -816,6 +816,17 @@ export class FakeApp {
   };
 }
 
+/**
+ * Draws an empty `svg` carrying the id where Obsidian 1.13.7 draws the icon: it takes out the first
+ * child, whatever it is, and appends the new icon after any others.
+ */
+export function setIcon(parent: HTMLElement, iconId: string): void {
+  parent.firstChild?.remove();
+  const svg = parent.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", `svg-icon lucide-${iconId}`);
+  parent.appendChild(svg);
+}
+
 // The host controls behind `mountButton`, `mountIconButton`, `mountDropdown` and `mountProgressBar`,
 // drawn the way Obsidian 1.13.7 draws them. What the adapter adds on top (a role, `aria-disabled`,
 // the click it hands over) is deliberately missing here, so a test sees the adapter supply it.
@@ -892,12 +903,7 @@ export class ExtraButtonComponent {
   }
 
   setIcon(icon: string): this {
-    const svg = this.extraSettingsEl.ownerDocument.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "svg",
-    );
-    svg.setAttribute("class", `svg-icon lucide-${icon}`);
-    this.extraSettingsEl.replaceChildren(svg);
+    setIcon(this.extraSettingsEl, icon);
     return this;
   }
 

@@ -540,7 +540,7 @@ export function Column({
                 : `${count} cards`
           }
         >
-          {overLimit && <Icon name="alert" />}
+          {overLimit && <Icon name="triangle-alert" />}
           {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
         <HostIconButton

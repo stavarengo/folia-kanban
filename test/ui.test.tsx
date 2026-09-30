@@ -1872,7 +1872,7 @@ describe("collapse/expand subitems", () => {
     // Icon() must merge a caller className onto its own base class, not replace it — this toggle
     // is the first caller to pass one, and losing `folia-icon` would silently drop the icon's
     // sizing/alignment rules along with the chevron-rotation state class.
-    expect(toggle.querySelector("svg")).toHaveClass("folia-icon");
+    expect(toggle.querySelector(".lucide-chevron-down")?.parentElement).toHaveClass("folia-icon");
 
     await user.click(toggle);
 
@@ -1881,7 +1881,10 @@ describe("collapse/expand subitems", () => {
       name: 'Show 3 subitems, 1 done, for "Alpha"',
     });
     expect(collapsedToggle).toBeInTheDocument();
-    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "folia-is-collapsed");
+    expect(collapsedToggle.querySelector(".lucide-chevron-down")?.parentElement).toHaveClass(
+      "folia-icon",
+      "folia-is-collapsed",
+    );
     expect(within(alpha).queryByText("first todo")).toBeNull();
     expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
 

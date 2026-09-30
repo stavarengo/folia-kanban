@@ -41,7 +41,7 @@ describe("icon geometry contract", () => {
     });
   });
 
-  it("assigns host icon shorthands only on Folia SVGs, never on Markdown ancestors", () => {
+  it("assigns host icon shorthands only on Folia icon slots, never on Markdown ancestors", () => {
     const owners: string[] = [];
     stylesheet.walkRules((rule) => {
       rule.walkDecls(/^--icon-(size|stroke)$/, () => {
@@ -49,13 +49,16 @@ describe("icon geometry contract", () => {
       });
     });
     expect(owners).toEqual([".folia-icon", ".folia-icon"]);
-    expect(declarations(".folia-icon")).toMatchObject({
+    const slot = declarations(".folia-icon");
+    expect(slot).toMatchObject({
       "--icon-size": "var(--folia-icon-size)",
       "--icon-stroke": "var(--folia-icon-stroke)",
-      width: "var(--icon-size)",
-      height: "var(--icon-size)",
-      "stroke-width": "var(--icon-stroke)",
     });
+    // The host's `svg-icon` rule sizes and strokes the icon from those two shorthands; a size of
+    // the slot's own would only fight it.
+    expect(slot).not.toHaveProperty("width");
+    expect(slot).not.toHaveProperty("height");
+    expect(slot).not.toHaveProperty("stroke-width");
   });
 });
 

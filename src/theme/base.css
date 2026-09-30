@@ -89,12 +89,12 @@
   flex: 0 0 auto;
 }
 
+/* The slot the host draws its icon into. The host's `svg-icon` rule sizes the icon from the two
+   shorthands set here; inline-flex keeps the slot hugging it and lets a state class transform it. */
 .folia-icon {
   --icon-size: var(--folia-icon-size);
   --icon-stroke: var(--folia-icon-stroke);
-  width: var(--icon-size);
-  height: var(--icon-size);
-  stroke-width: var(--icon-stroke);
+  display: inline-flex;
   flex: 0 0 auto;
   vertical-align: var(--folia-icon-baseline);
 }
