@@ -21,6 +21,7 @@ beforeEach(() => {
   cpSync("src/theme", join(fixture, "src/theme"), { recursive: true });
   cpSync("src/ui", join(fixture, "src/ui"), { recursive: true });
   cpSync("manifest.json", join(fixture, "manifest.json"));
+  cpSync("docs/decisions.md", join(fixture, "docs/decisions.md"));
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
@@ -302,10 +303,10 @@ describe("theme guard fallbacks", () => {
 
   it("refuses a literal fallback on a variable Obsidian publishes no default for", () => {
     // The hole a reviewer found: only six of the variables this layer reads document a per-scheme
-    // default, so a rule that only caught those let the worst of the nine literals straight back in
-    // — `var(--text-on-accent, #fff)`, whose whole danger is freezing white for a pale accent.
-    giveFallback("--folia-on-accent", "--text-on-accent", "on-accent", "#fff");
-    reject("publishes no default for --text-on-accent to agree with");
+    // default, so a rule that only caught those let the other literals straight back in, each one
+    // freezing a colour the theme is meant to choose.
+    giveFallback("--folia-text-error", "--text-error", "text-error", "#e93147");
+    reject("publishes no default for --text-error to agree with");
   });
 
   it("keeps accepting a fallback that is another var(), which is not a second opinion", () => {
@@ -335,7 +336,7 @@ describe("theme guard column palette", () => {
 
 describe("theme button contract", () => {
   it("rejects a face rule that loses its scope", () => {
-    edit("src/theme/buttons.css", (s) => s.replace(".folia-scope .folia-btn {", ".folia-btn {"));
+    edit("src/theme/base.css", (s) => s.replace(".folia-scope .folia-link {", ".folia-link {"));
     reject("needs .folia-scope");
   });
 
@@ -344,24 +345,35 @@ describe("theme button contract", () => {
     reject("Every button branch needs");
   });
 
+  it("rejects a button that is not one of the recorded hand-drawn groups", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <button className="folia-btn">Add</button>;\n',
+    );
+    reject("Use HostButton or HostIconButton, or record the group");
+  });
+
+  it("rejects a hand-drawn group whose decision entry is gone", () => {
+    edit("docs/decisions.md", (s) =>
+      s.replace("## In-text links and disclosures stay hand-drawn", "## Links"),
+    );
+    reject('The hand-drawn button group "In-text links and disclosures stay hand-drawn"');
+  });
+
   it("checks both branches of a conditional class", () => {
     edit(
       "src/ui/AddColumn.tsx",
-      (s) => s + '\nconst probe = <button className={flag ? "folia-btn" : ""} />;\n',
+      (s) => s + '\nconst probe = <button className={flag ? "folia-link" : ""} />;\n',
     );
     reject("Every button branch needs");
   });
 
-  it("requires an explicit resting shadow for a new flat control", () => {
-    edit(
-      "src/ui/AddColumn.tsx",
-      (s) => s + '\nconst probe = <button className="folia-probe" />;\n',
-    );
-    edit(
-      "src/theme/buttons.css",
-      (s) =>
-        s +
-        "\n.folia-scope .folia-probe { background: transparent; color: var(--text-normal); }\n.folia-scope .folia-probe:hover { box-shadow: none; }\n",
+  it("requires an explicit resting shadow for a flat control", () => {
+    edit("src/theme/base.css", (s) =>
+      s.replace(
+        ".folia-scope .folia-link {\n  box-shadow: none;\n",
+        ".folia-scope .folia-link {\n",
+      ),
     );
     reject("needs a scoped resting rule for box-shadow");
   });
@@ -371,7 +383,7 @@ describe("theme button contract", () => {
       "src/ui/Toolbar.tsx",
       (s) =>
         s +
-        '\nexport const Toned = (t: string) => <button className={"folia-btn folia-tone-" + t} />;\n',
+        '\nexport const Toned = (t: string) => <button className={"folia-link folia-tone-" + t} />;\n',
     );
     edit("src/theme/chips.css", (s) => s + "\n.folia-tone-new { background: transparent; }\n");
     reject("needs .folia-scope");
@@ -380,7 +392,7 @@ describe("theme button contract", () => {
   it("rejects rules that reach host-rendered buttons", () => {
     edit(
       "src/theme/buttons.css",
-      (s) => s + "\n.folia-scope button:disabled { opacity: var(--folia-opacity-disabled); }\n",
+      (s) => s + "\n.folia-scope button:disabled { opacity: var(--folia-opacity-faint); }\n",
     );
     reject("not a bare button that reaches rendered Markdown");
   });
@@ -407,15 +419,23 @@ describe("theme button contract", () => {
     reject("not a bare button that reaches rendered Markdown");
   });
 
-  it("rejects card-action hover refinements imported before the icon base", () => {
-    edit("src/theme/index.css", (s) =>
-      s.replace(
-        /@import "\.\/(buttons|card-quick-actions)\.css";/g,
-        (_, name: string) =>
-          `@import "./${name === "buttons" ? "card-quick-actions" : "buttons"}.css";`,
-      ),
+  it.each(["folia-card-action", "folia-detail-action"])(
+    "rejects a later %s hover colour that would repaint Mark done and Delete",
+    (name) => {
+      edit("src/theme/index.css", (s) => s + `\n@import "./late.css";\n`);
+      writeFileSync(
+        join(fixture, "src/theme/late.css"),
+        `.folia-scope .${name}:hover { color: var(--text-normal); }\n`,
+      );
+      reject("would repaint its hover");
+    },
+  );
+
+  it("requires the Mark done hover colour", () => {
+    edit("src/theme/card-quick-actions.css", (s) =>
+      s.replace(/\.folia-scope \.folia-action-done:hover[^\n]*\n/, ""),
     );
-    reject("must follow the base icon hover rule");
+    reject("folia-action-done:hover");
   });
 
   it.each([
@@ -427,14 +447,13 @@ describe("theme button contract", () => {
   ])("rejects a wrapped host-button subject: %s", (selector) => {
     edit(
       "src/theme/buttons.css",
-      (s) =>
-        s + `\n.folia-scope ${selector}:disabled { opacity: var(--folia-opacity-disabled); }\n`,
+      (s) => s + `\n.folia-scope ${selector}:disabled { opacity: var(--folia-opacity-faint); }\n`,
     );
     reject("not a bare button that reaches rendered Markdown");
   });
 
   it("still checks a Folia face hidden inside a selector wrapper", () => {
-    edit("src/theme/buttons.css", (s) => s + "\n:is(.folia-btn) { background: transparent; }\n");
+    edit("src/theme/buttons.css", (s) => s + "\n:is(.folia-link) { background: transparent; }\n");
     reject("needs .folia-scope and a direct Folia subject class");
   });
 
@@ -444,15 +463,16 @@ describe("theme button contract", () => {
     "@container (width: 0px)",
     "@layer conditional",
   ])("does not credit a resting face nested in %s", (condition) => {
+    const face = [
+      "  box-shadow: none;\n",
+      "  background: transparent;\n",
+      "  color: var(--folia-link-color);\n",
+    ];
     edit(
-      "src/ui/AddColumn.tsx",
-      (s) => s + '\nconst probe = <button className="folia-guard-probe" />;\n',
-    );
-    edit(
-      "src/theme/buttons.css",
+      "src/theme/base.css",
       (s) =>
-        s +
-        `\n${condition} { .folia-scope .folia-guard-probe { background: transparent; color: var(--text-normal); box-shadow: none; } }\n`,
+        face.reduce((css, line) => css.replace(line, ""), s) +
+        `\n${condition} { .folia-scope .folia-link { ${face.join("")} } }\n`,
     );
     reject("needs a scoped resting rule for background, color, box-shadow");
   });

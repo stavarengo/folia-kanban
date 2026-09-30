@@ -67,7 +67,23 @@ function hasButtonSubject(nodes) {
   });
 }
 
+/** Every JSX <button> left in the board is one of the groups docs/decisions.md names as staying
+ *  hand-drawn, found by a base class it wears; anything else is meant to be a host control. */
+const HAND_DRAWN = new Map([
+  ["folia-add-column", "Icon-and-label controls stay hand-drawn"],
+  ["folia-column-add", "Icon-and-label controls stay hand-drawn"],
+  ["folia-filter-chip", "Icon-and-label controls stay hand-drawn"],
+  ["folia-card-subitems-toggle", "Icon-and-label controls stay hand-drawn"],
+  ["folia-card-parent-ref", "In-text links and disclosures stay hand-drawn"],
+  ["folia-link", "In-text links and disclosures stay hand-drawn"],
+  ["folia-desc-empty", "In-text links and disclosures stay hand-drawn"],
+]);
+
 export async function checkButtons(roots, fail) {
+  const decisions = await readFile("docs/decisions.md", "utf8");
+  for (const heading of new Set(HAND_DRAWN.values()))
+    if (!decisions.includes(`\n## ${heading}\n`))
+      fail("docs/decisions.md", `The hand-drawn button group "${heading}" needs its entry.`);
   const buttons = [];
   const families = new Set();
   for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
@@ -95,10 +111,10 @@ export async function checkButtons(roots, fail) {
         for (const value of classValues(attr?.initializer)) {
           const classes = value.split(/\s+/).filter((c) => /^folia-[\w-]+$/.test(c));
           const where = `${path}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
-          if (!classes.length)
+          if (!classes.some((c) => HAND_DRAWN.has(c)))
             fail(
               where,
-              "Every button branch needs a static folia-* base class with a scoped face rule.",
+              "Every button branch needs the base class of a hand-drawn group docs/decisions.md names. Use HostButton or HostIconButton, or record the group there and in HAND_DRAWN.",
             );
           buttons.push({ classes, where });
         }
@@ -111,7 +127,7 @@ export async function checkButtons(roots, fail) {
     fail("src/ui", "Button guard found no JSX buttons; check the source location.");
   const names = new Set(buttons.flatMap((b) => b.classes));
   const bases = [];
-  const orderedSelectors = [];
+  const colouredHovers = [];
   const unconditionalRules = new Map();
   for (const root of roots)
     root.walkRules((rule) => {
@@ -122,7 +138,7 @@ export async function checkButtons(roots, fail) {
           .filter((p) => ["background", "color", "box-shadow"].includes(p)),
       );
       for (const selector of postcss.list.comma(rule.selector)) {
-        orderedSelectors.push(selector);
+        if (face.has("color") && selector.includes(":hover")) colouredHovers.push(selector);
         if (rule.parent.type === "root") {
           const declarations = unconditionalRules.get(selector) ?? new Map();
           for (const node of rule.nodes)
@@ -164,15 +180,16 @@ export async function checkButtons(roots, fail) {
           bases.push({ classes: match[1].slice(1).split("."), face });
       }
     });
-  // These equal-specificity hover colours must follow the shared icon hover face.
-  const iconHover = ".folia-scope .folia-icon-btn:hover:where(:not(:disabled))";
+  // Mark done and Delete answer the pointer in their own colour, on the host's icon button. That
+  // colour beats the host by weight, so no later rule of the board's may repaint the same button.
+  const actionClasses = ["folia-card-action", "folia-detail-icon", "folia-detail-action"];
   for (const action of ["done", "delete"]) {
-    const refinement = `.folia-scope .folia-action-${action}:hover:where(:not(:disabled))`;
-    if (
-      orderedSelectors.lastIndexOf(iconHover) < 0 ||
-      orderedSelectors.lastIndexOf(refinement) <= orderedSelectors.lastIndexOf(iconHover)
-    )
-      fail("src/theme/index.css", `${refinement} must follow the base icon hover rule.`);
+    const refinement = `.folia-scope .folia-action-${action}:hover:where(:not([aria-disabled="true"]))`;
+    if (!unconditionalRules.get(refinement)?.has("color"))
+      fail("src/theme", `${refinement} needs color, in a top-level rule.`);
+    for (const later of colouredHovers.slice(colouredHovers.lastIndexOf(refinement) + 1))
+      if (actionClasses.some((c) => new RegExp(`\\.${c}(?![\\w-])[^\\s]*:hover`).test(later)))
+        fail("src/theme", `${later} comes after ${refinement} and would repaint its hover.`);
   }
   // Pin the owned pointer outline and its consumers, not arbitrary state interactions.
   const requireSignal = (selector, property, value) => {
@@ -216,7 +233,7 @@ export async function checkButtons(roots, fail) {
   });
   // These raised controls deliberately inherit the host shadow. Every flat control must say so
   // in its own resting rule; a state-only reset does not cover the resting face.
-  const hostShadow = new Set(["folia-btn", "folia-filter-chip", "folia-column-add"]);
+  const hostShadow = new Set(["folia-filter-chip", "folia-column-add"]);
   for (const button of buttons) {
     const covered = new Set();
     for (const base of bases)

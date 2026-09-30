@@ -29,6 +29,6 @@
   height: var(--folia-hit-md);
   padding: 0;
 }
-.folia-scope .folia-action-done:hover:where(:not(:disabled)) { color: var(--folia-text-success); }
-.folia-scope .folia-action-delete:hover:where(:not(:disabled)) { color: var(--folia-text-error); }
+.folia-scope .folia-action-done:hover:where(:not([aria-disabled="true"])) { color: var(--folia-text-success); }
+.folia-scope .folia-action-delete:hover:where(:not([aria-disabled="true"])) { color: var(--folia-text-error); }
 

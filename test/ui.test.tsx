@@ -7105,17 +7105,6 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
         ".folia-scope .folia-muted",
         [".folia-scope .folia-title-reason", ".folia-scope .folia-title-step-reason"],
       ],
-      [
-        ".folia-scope .folia-icon-btn",
-        [".folia-scope .folia-mini", ".folia-scope .folia-column-menu-btn"],
-      ],
-      [
-        ".folia-scope .folia-icon-btn:hover:where(:not(:disabled))",
-        [
-          ".folia-scope .folia-action-done:hover:where(:not(:disabled))",
-          ".folia-scope .folia-action-delete:hover:where(:not(:disabled))",
-        ],
-      ],
     ] as const) {
       expect(ruleAt(base)).toBeGreaterThan(-1);
       for (const refinement of refinements) {
@@ -7124,19 +7113,14 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     }
   });
 
-  it("keeps the column menu button's fade and leaves its size to the icon-button tier", () => {
-    // Written above `.folia-icon-btn` it declared nothing the base rule did not already declare,
-    // so the button drew at the base size and its opacity was switched without the fade. Scoped
-    // and moved below the base, the opacity and transition declarations land; the state rules
-    // follow it, so the button still shows on hover, on focus and while its menu is open. Its size
-    // is the base rule's, like the card quick actions beside it.
+  it("keeps the column menu button hidden until its column is hovered or it has focus", () => {
+    // The hiding rule and the revealing ones weigh the same, so the reveal has to come later.
     const own = rule(".folia-scope .folia-column-menu-btn");
-    expect(own).not.toContain("width:");
-    expect(own).not.toContain("height:");
+    expect(own).toContain("width: var(--folia-hit-md)");
     expect(own).toContain("opacity: var(--folia-opacity-hidden)");
     expect(own).toContain("transition: opacity");
-    // The three state selectors share one rule, so `at` (which anchors on a rule's own line) does
-    // not reach them; their position in the file is what matters here.
+    // The state selectors share one rule, so `ruleAt` (which anchors on a rule's own line) does not
+    // reach them; their position in the file is what matters here.
     expect(styles.indexOf(".folia-column:hover .folia-column-menu-btn")).toBeGreaterThan(
       ruleAt(".folia-scope .folia-column-menu-btn"),
     );

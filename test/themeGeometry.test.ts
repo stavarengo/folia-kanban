@@ -19,7 +19,6 @@ describe("icon geometry contract", () => {
   it.each([
     ".folia-scope .folia-chip",
     ".folia-scope .folia-filter-chip",
-    ".folia-scope .folia-mini",
     ".folia-column-count",
     ".folia-card-meta",
     ".folia-progress-label",
@@ -97,10 +96,20 @@ describe("composite dimensions", () => {
     expect(tokens["--folia-font-size-xxs"]).toBe("calc(var(--font-ui-smaller) * 5 / 6)");
     expect(tokens["--folia-font-size-xs"]).toBe("calc(var(--font-ui-smaller) * 11 / 12)");
     expect(tokens["--folia-hit-min"]).toBe("24px");
-    for (const selector of [".folia-scope .folia-icon-btn", ".folia-scope .folia-swatch"]) {
+    expect(declarations(".folia-scope .folia-swatch")).toMatchObject({
+      "min-width": "var(--folia-hit-min)",
+      "min-height": "var(--folia-hit-min)",
+    });
+    // The host's icon buttons take their size from the two tiers, which hold the floor themselves.
+    for (const [selector, tier] of [
+      [".folia-scope .folia-card-action", "md"],
+      [".folia-scope .folia-detail-action", "md"],
+      [".folia-scope .folia-column-menu-btn", "md"],
+      [".folia-scope .folia-mini", "sm"],
+    ] as const) {
       expect(declarations(selector)).toMatchObject({
-        "min-width": "var(--folia-hit-min)",
-        "min-height": "var(--folia-hit-min)",
+        width: `var(--folia-hit-${tier})`,
+        height: `var(--folia-hit-${tier})`,
       });
     }
     // The swatch follows the host colour input upward as well, and Obsidian ships one under the

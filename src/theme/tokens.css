@@ -152,49 +152,14 @@
      never meant to sit on. `--folia-accent` above is the fill; these two are the foreground. */
   --folia-text-accent: var(--text-accent);
   --folia-text-accent-hover: var(--text-accent-hover);
-  /* Read flat, on purpose. Obsidian publishes two variables for text on an accent fill —
-     `--text-on-accent` for a dark accent, `--text-on-accent-inverted` for a light one — and app.css
-     defines them once, on `body`, as `white` and `black`. No button rule branches between them —
-     `button.mod-cta` sets `--text-color: var(--text-on-accent)` and stops there, and in 1.13.7 the
-     only rule in the whole stylesheet naming the inverted one is a Canvas group label. The choice
-     happens at runtime instead. When the user picks a light accent, Obsidian writes
-     `--text-on-accent: var(--text-on-accent-inverted)` into the INLINE style of `<body>`, next to
-     the `--accent-h/s/l` triple it derives from the setting (verified in 1.13.7: a pale yellow
-     accent turned both `button.mod-cta` and Folia's own primary button black-on-yellow, and a
-     popout opened after it carried the same override). So reading `--text-on-accent` alone is not
-     a missing case: it is how a plugin stays in step with the app, and with a theme that overrides
-     either variable.
-     What this depends on is the DECLARATION SITE, not the value: the override lives on `<body>`, so
-     it only reaches rules that inherit from it. This block does, because `.folia-scope` is always a
-     descendant of a body (see the header note, and scripts/check-portal-scope.mjs, which keeps it
-     that way through every portal). Moved to `:root`/`html` — body's parent — the same declaration
-     would miss the override and freeze on the un-inverted white for good, visible only to users
-     with a pale accent. That move fails `pnpm theme:check`, which requires
-     every token to be declared in this block and nowhere else — the guard is real, but it guards
-     the site, so it only means anything if the reason is written down. Here it is. */
-  --folia-on-accent: var(--text-on-accent);
-  /* `danger` and `success` are FILLS — the over-limit badge, the urgency tint, the progress bar —
-     and Obsidian publishes no variable for either, so they stay on the palette. The three below
-     are the foregrounds, and they are separate for the same reason the accent is: a theme tunes
-     error text for legibility without touching what an error fill looks like. */
+  /* `danger` is a FILL — the over-limit badge, the urgency tint — and Obsidian publishes no
+     variable for it, so it stays on the palette. The three below are the foregrounds, and they are
+     separate for the same reason the accent is: a theme tunes error text for legibility without
+     touching what an error fill looks like. */
   --folia-danger: var(--color-red);
   --folia-text-error: var(--text-error);
   --folia-text-warning: var(--text-warning);
   --folia-text-success: var(--text-success);
-
-  /* Icons. Obsidian expresses icon state as icon colours rather than text colours, so a theme that
-     restyles icons alone reaches these. The collapse pair is the only place in its whole variable
-     set where "collapsed" is a colour of its own, which is exactly what the subitems chevron is. */
-  --folia-icon-color: var(--icon-color);
-  --folia-icon-color-hover: var(--icon-color-hover);
-  --folia-icon-color-focused: var(--icon-color-focused);
-  /* The opacities are not optional extras: measured in 1.13.7's default theme, --icon-color and
-     --icon-color-hover are the SAME colour (#b3b3b3), so an icon button that expressed hover
-     through colour alone would stop responding to hover at all. Obsidian carries that response in
-     the opacity pair, 0.85 to 1. Reading the colours without them is a regression, not a subset. */
-  --folia-icon-opacity: var(--icon-opacity);
-  --folia-icon-opacity-hover: var(--icon-opacity-hover);
-  --folia-icon-opacity-active: var(--icon-opacity-active);
 
   /* A finished subtask or card is the same object as a ticked checklist line, so it is drawn with
      the same two variables the app draws those with. They also route around the community scan,
@@ -274,7 +239,6 @@
   --folia-opacity-muted: 0.7;
   --folia-opacity-subtle: 0.6;
   --folia-opacity-faint: 0.5;
-  --folia-opacity-disabled: 0.4;
 
   /* Set live from the board's own JavaScript, and declared here so the fallback is a token like any
      other rather than a literal repeated at every call site. Each is written onto an element BELOW

@@ -104,13 +104,6 @@
       "alias": "--text-accent-hover"
     }
   },
-  "on-accent": {
-    "$value": "var(--text-on-accent)",
-    "cssVar": "--folia-on-accent",
-    "source": {
-      "alias": "--text-on-accent"
-    }
-  },
   "danger": {
     "$value": "var(--color-red)",
     "cssVar": "--folia-danger",
@@ -151,27 +144,6 @@
     "cssVar": "--folia-unread-reply",
     "source": {
       "alias": "--color-purple"
-    }
-  },
-  "icon-color": {
-    "$value": "var(--icon-color)",
-    "cssVar": "--folia-icon-color",
-    "source": {
-      "alias": "--icon-color"
-    }
-  },
-  "icon-color-hover": {
-    "$value": "var(--icon-color-hover)",
-    "cssVar": "--folia-icon-color-hover",
-    "source": {
-      "alias": "--icon-color-hover"
-    }
-  },
-  "icon-color-focused": {
-    "$value": "var(--icon-color-focused)",
-    "cssVar": "--folia-icon-color-focused",
-    "source": {
-      "alias": "--icon-color-focused"
     }
   },
   "done-color": {

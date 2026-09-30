@@ -43,12 +43,18 @@
   outline: var(--folia-focus-ring-w) solid transparent;
   box-shadow: var(--folia-ring);
 }
-/* The host's icon button, held to the same size tier as the card quick actions. Its fade (hidden
-   until hover/focus) and its state colours are buttons.css's own — this is only its size. */
+/* The host's icon button, held to the same size tier as the card quick actions, and hidden until
+   the column is hovered or the button has keyboard focus. */
 .folia-scope .folia-column-menu-btn {
   display: grid;
   place-items: center;
   width: var(--folia-hit-md);
   height: var(--folia-hit-md);
   padding: 0;
+  opacity: var(--folia-opacity-hidden);
+  transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
+}
+.folia-column:hover .folia-column-menu-btn,
+.folia-scope .folia-column-menu-btn:focus-visible {
+  opacity: var(--folia-opacity-shown);
 }

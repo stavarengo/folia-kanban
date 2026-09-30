@@ -77,7 +77,7 @@
   flex: 0 0 auto;
 }
 /* The host's icon buttons, drawn on the panel's own sizes: the header's at the card actions' step,
-   the rest by `.folia-mini`. */
+   the small row actions a step below. */
 .folia-scope .folia-detail-icon {
   display: grid;
   place-items: center;
@@ -86,6 +86,10 @@
 .folia-scope .folia-detail-action {
   width: var(--folia-hit-md);
   height: var(--folia-hit-md);
+}
+.folia-scope .folia-mini {
+  width: var(--folia-hit-sm);
+  height: var(--folia-hit-sm);
 }
 /* A row's small action sits at its end, whatever the row holds before it. */
 .folia-detail-mini-slot {
