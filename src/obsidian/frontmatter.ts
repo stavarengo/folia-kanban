@@ -16,3 +16,28 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
   }
   return frontmatterRecord(data);
 }
+
+/** Whether two parsed YAML values say the same thing. Key order in a mapping is not a difference. */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) || Array.isArray(b)) return sameList(a, b);
+  return isMapping(a) && isMapping(b) && sameMapping(a, b);
+}
+
+function sameList(a: unknown, b: unknown): boolean {
+  return (
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((x, i) => sameValue(x, b[i]))
+  );
+}
+
+function isMapping(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function sameMapping(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => k in b && sameValue(a[k], b[k]));
+}

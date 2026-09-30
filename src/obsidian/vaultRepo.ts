@@ -1,31 +1,16 @@
-import type { App } from "obsidian";
-import {
-  Component,
-  FileSystemAdapter,
-  Keymap,
-  MarkdownRenderer,
-  TFile,
-  TFolder,
-  Vault,
-  debounce,
-  normalizePath,
-  parseFrontMatterEntry,
-  parseFrontMatterTags,
-} from "obsidian";
+import type { App, TFile } from "obsidian";
+import { FileSystemAdapter, Keymap } from "obsidian";
 import type {
   Board,
-  BoardConfig,
   Card,
   CardBody,
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
   HistoryScope,
-  LineDrift,
   LineRef,
   SubtaskRef,
   RelationType,
-  SubItem,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
 import type {
@@ -46,51 +31,36 @@ import type { ColumnPatch } from "../model/columns";
 import { boardNotice, confirmAction, promptTrash } from "./dialogs";
 import { openColumnEditor } from "./columnEditModal";
 import { showMenu } from "./menu";
-import { staleLine } from "../model/repo";
-import { isBoardFrontmatter } from "./viewMode";
-import { parseFrontmatter } from "./frontmatter";
 import { attachSuggest, mountSearch } from "./inputSuggest";
 import { mountButton, mountDropdown, mountIconButton, mountProgressBar } from "./hostControls";
 import { drawIcon } from "./icons";
 import { pathTaken } from "./pathTaken";
-import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
+import { uniqueNotePath } from "./boardNote";
+import { buildBoard } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
 import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
 import { dateOnly, stamp } from "../model/dates";
-import { vaultLinktext } from "../model/links";
 import {
   SECTION,
   addSubcard as addSubcardText,
   addTodo as addTodoText,
   appendComment,
   appendHistory,
-  cardStats,
-  commentDrift,
   parseBody,
-  parseSubtasks,
-  pendingSubcardLinks,
   removeSubtask as removeSubtaskText,
   removeTimestampedLine,
   setDescription as setDescriptionText,
-  setSubcardDone,
   setSubtaskDone,
-  setSubtaskStatus as setSubtaskStatusText,
-  splitFrontmatter,
-  subtaskDrift,
   updateTimestampedLine,
 } from "../model/card";
-import {
-  isSelfRelation,
-  normalizeRelationTypes,
-  withRelation,
-  withoutRelation,
-} from "../model/relationships";
+import { isSelfRelation, withRelation, withoutRelation } from "../model/relationships";
 import {
   commentAddedLine,
   commentEditedLine,
   commentRemovedLine,
   dueLine,
   historyAllows,
+  type HistoryEventKind,
   priorityLine,
   relationAddedLine,
   relationRemovedLine,
@@ -100,59 +70,27 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../model/history";
-import {
-  TITLE_KEY,
-  asTitleMode,
-  resolveTitle,
-  sanitizeFilename,
-  setHeadingTitle,
-} from "../model/cardTitle";
+import { TITLE_KEY, resolveTitle, sanitizeFilename, setHeadingTitle } from "../model/cardTitle";
 import type { CardRepository } from "../model/repo";
 import type { FileOp } from "../model/pathOps";
+import { parseFrontmatter, sameValue } from "./frontmatter";
 import {
-  BoardFrontmatterSchema,
-  ContextFrontmatterSchema,
-  DataCorruptionError,
-  decode,
-} from "../model/schemas";
-
-/** The per-context config note (#14). Lives inside a context subfolder; read-only for the plugin. */
-const CONTEXT_NOTE = "_context.md";
-
-/** Whether two parsed YAML values say the same thing. Key order in a mapping is not a difference. */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((x, i) => sameValue(x, b[i]))
-    );
-  }
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-  const ka = Object.keys(a);
-  const rb = b as Record<string, unknown>;
-  const ra = a as Record<string, unknown>;
-  return ka.length === Object.keys(b).length && ka.every((k) => k in rb && sameValue(ra[k], rb[k]));
-}
-
-/**
- * `BoardConfig` plus what resolving `card-folder` learned on the way, so `loadBoard` can report a
- * missing or ambiguous folder without repeating the vault lookups. Repo-internal: `BoardConfig`
- * stays the adapter-agnostic shape every consumer shares.
- */
-interface ResolvedBoardConfig extends BoardConfig {
-  /** The property text as written, for messages that must name what the person actually typed. */
-  cardFolderRaw: string;
-  /** Every candidate path that exists as a folder right now, in the order they were preferred. */
-  cardFolderExisting: string[];
-  /** The real paths of the folders a candidate names in another letter case, when none is exact. */
-  cardFolderCaseMatches: string[];
-}
+  ambiguousCaseMessage,
+  inspectCardFolder,
+  readBoardConfig,
+  readBoardFrontmatter,
+  type ResolvedBoardConfig,
+} from "./boardConfig";
+import { cardFilesIn, readCard, readContexts } from "./cardNotes";
+import { NoteWriter } from "./noteWriter";
+import { followLink, linkTextTo, relationTargetPath, resolveLink } from "./vaultLinks";
+import { renderMarkdown } from "./markdownRender";
+import { collectPropertyNames } from "./propertyNames";
+import { watchFileOps, watchVault } from "./vaultEvents";
+import { applyMove } from "./applyMove";
 
 export class VaultRepository implements CardRepository {
-  private recentWrites = new Map<string, number>();
+  private writer: NoteWriter;
   /**
    * Where the last load found this board's cards (`<cardFolder>/`), so `onChange` can tell a
    * metadata-cache catch-up that concerns this board from one anywhere else in the vault.
@@ -166,197 +104,32 @@ export class VaultRepository implements CardRepository {
     public getHistoryScope: () => HistoryScope = () => "moves",
     /** Live source of the name new comments are signed with. Empty = write them unsigned. */
     public getUserName: () => string = () => "",
-  ) {}
+  ) {
+    this.writer = new NoteWriter(app);
+  }
 
   /**
    * Append a history line for `kind` only when the current scope allows it. Called only after a
    * write that changed the note: a history line records a change, so an edit that left the note as
    * it was has nothing to record.
    */
-  private async maybeHistory(
-    path: string,
-    kind: Parameters<typeof historyAllows>[1],
-    line: string,
-  ): Promise<void> {
+  private async maybeHistory(path: string, kind: HistoryEventKind, line: string): Promise<void> {
     if (!historyAllows(this.getHistoryScope(), kind)) return;
-    await this.editBody(path, (t) => appendHistory(t, line, stamp()));
+    await this.writer.editBody(path, (t) => appendHistory(t, line, stamp()));
   }
 
   private file(path: string): TFile {
-    const f = this.app.vault.getFileByPath(path);
-    if (f === null) throw new Error(`Not a file: ${path}`);
-    return f;
+    return this.writer.file(path);
   }
 
-  /**
-   * Which note a link written in `sourcePath` names, answered by the vault itself — the same
-   * answer the editor gives when that link is clicked, shortest-path and same-folder rules
-   * included. `link` is a bare linkpath (no `#anchor`, no `|alias`); a `.md` suffix is fine.
-   * Null for a link naming no note.
-   */
-  private resolveLink(link: string, sourcePath: string): string | null {
-    return this.app.metadataCache.getFirstLinkpathDest(link, sourcePath)?.path ?? null;
-  }
-
-  /**
-   * How a link to the note at `targetPath` should be written inside a note at `sourcePath`, per
-   * this vault's own link settings — the shortest name that still names one note, a relative or
-   * absolute path where the vault is set up that way.
-   *
-   * Only the text INSIDE the brackets: every link Folia writes is a wikilink, whatever the vault's
-   * "use [[Wikilinks]]" setting says, because Folia's own reading of a note (the `## Subtasks`
-   * checklist, the relationship keys) only recognizes that form. A vault set to Markdown links
-   * therefore gets a wikilink here — the honest shape until reading Markdown links is built too.
-   */
-  private linkTextTo(targetPath: string, sourcePath: string): string {
-    const file = this.app.vault.getFileByPath(targetPath);
-    const bare = targetPath.replace(/\.md$/i, "");
-    return file === null ? bare : this.app.metadataCache.fileToLinktext(file, sourcePath, true);
-  }
-
-  /**
-   * The note a relationship `target` names, read from the card that declares it — or null when it
-   * names no note, or carries an `#anchor` / `|alias`. A decorated target said more than "which
-   * note", so it is left alone rather than rewritten into a plainer link that loses the rest.
-   */
-  private relationTargetPath(target: string, sourcePath: string): string | null {
-    const raw = target.trim();
-    if (raw === "" || raw.includes("#") || raw.includes("|")) return null;
-    return this.resolveLink(raw, sourcePath);
-  }
-
-  private frontmatterOf(file: TFile): CardFrontmatter {
-    const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    return cached ?? {};
-  }
-
-  /**
-   * The tags Obsidian read out of a note's body, `#` stripped, in the order they appear.
-   *
-   * Read from the metadata cache and nowhere else, deliberately: which `#word` in a body is a tag
-   * is Obsidian's own lexer's answer (code fences, inline code, the character set, escapes), and a
-   * regex here would be a second, quietly different answer — which is the very drift this fix
-   * exists to close. So a note with no cache entry yet contributes no body tags, unlike its
-   * frontmatter (which `loadBoard` re-parses from the text when the cache has nothing).
-   */
-  private bodyTagsOf(file: TFile): string[] {
-    const tags = this.app.metadataCache.getFileCache(file)?.tags ?? [];
-    const out: string[] = [];
-    for (const t of tags) {
-      const tag = t.tag.replace(/^#/, "");
-      if (tag !== "") out.push(tag);
-    }
-    return out;
-  }
-
-  private markWrite(path: string) {
-    this.recentWrites.set(path, Date.now());
-  }
-
-  /**
-   * How to name the card folder in a message: what was written, plus what it resolved to whenever
-   * the two differ — a `./Cards` that came out as `basic/Cards` is only actionable with both.
-   */
-  private describeCardFolder(config: ResolvedBoardConfig): string {
-    return config.cardFolderRaw === config.cardFolder
-      ? `"${config.cardFolderRaw}"`
-      : `"${config.cardFolderRaw}" (resolved to "${config.cardFolder}")`;
-  }
-
-  /** Pick the vault path a `card-folder` property names, against the vault as it is right now. */
   /**
    * What {@link propertyNamesInUse} last answered, kept for as long as the board it belongs to is
    * unchanged (see `loadBoard`). Without it, every card opened would walk the whole vault again.
    */
   private propertyNames: PropertyNamesInUse | null = null;
 
-  /** The folders an ambiguous-by-case `card-folder` could mean, for the notice and for refusals. */
-  private ambiguousCaseMessage(config: ResolvedBoardConfig): string {
-    const names = config.cardFolderCaseMatches.map((p) => `"${p}"`).join(", ");
-    return `Card folder "${config.cardFolderRaw}" matches ${names} only when letter case is ignored, so it is not clear which one holds the cards. Rename all but one of them, or write the one you mean exactly.`;
-  }
-
-  /**
-   * How to write `card-folder` so it names the folder it matched only by case, exactly. A `./` or
-   * `../` value stays relative to the board note, and with it keeps the portability it was written
-   * for; anything else gets the real path, which the vault-root reading always takes first.
-   */
-  private exactSpelling(config: ResolvedBoardConfig): string {
-    if (!/^\.\.?(\/|$)/.test(config.cardFolderRaw)) return config.cardFolder;
-    const home = this.boardPath.split("/").slice(0, -1);
-    const target = config.cardFolder.split("/");
-    let shared = 0;
-    while (shared < home.length && home[shared] === target[shared]) shared++;
-    const up = home.slice(shared).map(() => "..");
-    return [...(up.length === 0 ? ["."] : up), ...target.slice(shared)].join("/");
-  }
-
-  private cardFolderFor(raw: string): { path: string; existing: string[]; caseMatches: string[] } {
-    // `normalizePath` only tidies separators (it leaves `.` and `..` alone and turns an empty
-    // value into "/"), so the `.`/`..` resolution and the two readings live in the pure helper.
-    const resolved = resolveCardFolder(
-      this.boardPath,
-      normalizePath(raw),
-      (p) => this.entryAt(p),
-      // Obsidian's own case-insensitive lookup is undocumented and returns the first hit, which
-      // cannot tell one match from several; see `pathTaken` for the same rule applied to new names.
-      () =>
-        this.app.vault
-          .getAllLoadedFiles()
-          .filter((f) => f instanceof TFolder)
-          .map((f) => f.path),
-    );
-    if (resolved === null) {
-      // Nothing left after dropping the readings that climb out of the vault or land on its root.
-      // Unlike a folder that simply isn't there yet, adding a card cannot fix this, so it fails
-      // hard rather than rendering a board whose "Add card" would write somewhere nonsensical.
-      throw new Error(
-        `Card folder "${raw}" names the vault root or a path outside it, neither of which can hold cards. Fix the board's card-folder property.`,
-      );
-    }
-    return resolved;
-  }
-
-  private entryAt(path: string): "folder" | "file" | null {
-    const entry = this.app.vault.getAbstractFileByPath(path);
-    return entry === null ? null : entry instanceof TFolder ? "folder" : "file";
-  }
-
   private async readConfig(): Promise<ResolvedBoardConfig> {
-    const boardFile = this.file(this.boardPath);
-    // Parse the board config from the (write-fresh) file text rather than metadataCache:
-    // the cache lags a processFrontMatter write by a tick, so reading it right after an
-    // in-app column edit would return stale columns and the edit wouldn't reflect.
-    const fm = decode(
-      BoardFrontmatterSchema,
-      parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
-      `board config (${this.boardPath})`,
-    );
-    // Resolved once, here, so every consumer of `config.cardFolder` — card selection, context
-    // derivation (`deriveContext`, called deep inside `buildBoard`), `loadContexts`, and
-    // `ensureFolder`/`createCard` — agrees on the exact same vault path. A leading slash, doubled
-    // slashes, a `..` segment or a board-note-relative reading must not make one of those
-    // consumers see the folder (or a card's context) and another not.
-    const named: unknown =
-      parseFrontMatterEntry(fm, /^card-folder$/) ?? parseFrontMatterEntry(fm, /^card_folder$/);
-    const cardFolderRaw = typeof named === "string" ? named : "Tasks";
-    const {
-      path: cardFolder,
-      existing: cardFolderExisting,
-      caseMatches: cardFolderCaseMatches,
-    } = this.cardFolderFor(cardFolderRaw);
-    const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
-    return {
-      path: this.boardPath,
-      columns: normalizeColumns(fm["columns"]),
-      priorities: normalizePriorities(fm["priorities"]),
-      relations: normalizeRelationTypes(fm["relations"]),
-      cardFolder,
-      cardFolderRaw,
-      titleMode,
-      cardFolderExisting,
-      cardFolderCaseMatches,
-    };
+    return readBoardConfig(this.app, this.file(this.boardPath), this.boardPath);
   }
 
   async loadBoard(): Promise<Board> {
@@ -365,96 +138,21 @@ export class VaultRepository implements CardRepository {
     // without re-walking the vault each time a card is opened.
     this.propertyNames = null;
     const config = await this.readConfig();
-    const folderPath = config.cardFolder;
-    // A card folder that isn't there matches zero files, which looks exactly like an empty
-    // board. Say so via `cardFolderWarning` rather than rendering a healthy-looking board with
-    // nothing on it — but keep loading: a board whose folder was never created yet (the `Tasks`
-    // default, or a fresh `card-folder`) must still be usable, since adding the first card creates
-    // that folder (see `ensureFolder`). The prefix below simply matches nothing when the folder
-    // isn't there, so `cards` comes out empty either way.
-    //
-    // A path that resolves to something OTHER than a folder (a file already sits there) has no
-    // such self-heal story — `ensureFolder`/`createCard` can't create a folder where a file already
-    // is, and would fail with no useful feedback surfaced anywhere in the UI. That case stays a
-    // hard failure instead of a soft notice, so the board (and its "Add card" controls) are simply
-    // not reachable rather than reachable-but-broken.
-    const folder = this.app.vault.getFolderByPath(folderPath);
-    if (folder === null && this.app.vault.getFileByPath(folderPath) !== null) {
-      throw new Error(
-        `Card folder ${this.describeCardFolder(config)} is not a folder. Fix the board's card-folder property.`,
-      );
-    }
-    // Both readings existing is the one way the fallback can flip silently: a board using the
-    // board-note-relative reading keeps working until someone creates a same-named folder at the
-    // vault root, and then loads empty with the folder it wanted still sitting right there. Name
-    // the winner rather than let that look like an ordinary empty board.
-    //
-    // A folder found only by ignoring letter case is used, under its real path, and named too: on
-    // Linux a folder spelled exactly as written can still appear beside it and take over.
-    const caseMatches = config.cardFolderCaseMatches;
-    const cardFolderWarning =
-      caseMatches.length > 1
-        ? this.ambiguousCaseMessage(config)
-        : folder === null
-          ? `Card folder ${this.describeCardFolder(config)} was not found. It will be created when you add your first card.`
-          : config.cardFolderExisting.length > 1
-            ? `Card folder "${config.cardFolderRaw}" matches both "${config.cardFolderExisting[0]}" and "${config.cardFolderExisting[1]}". Using "${config.cardFolder}" — write the path as "./…" to always mean the one beside this board note.`
-            : caseMatches.length === 1
-              ? `Card folder "${config.cardFolderRaw}" matches "${config.cardFolder}" only when letter case is ignored. Using it — write the path as "${this.exactSpelling(config)}" to match it exactly.`
-              : undefined;
-    const prefix = folderPath + "/";
-    this.cardFolderPrefix = prefix;
-    const files: TFile[] = [];
-    if (folder !== null)
-      Vault.recurseChildren(folder, (child) => {
-        if (
-          child instanceof TFile &&
-          child.extension === "md" &&
-          child.path !== this.boardPath &&
-          child.name !== CONTEXT_NOTE
-        )
-          files.push(child);
-      });
-
+    const { folder, warning: cardFolderWarning } = inspectCardFolder(
+      this.app,
+      config,
+      this.boardPath,
+    );
+    this.cardFolderPrefix = config.cardFolder + "/";
     const cards: Card[] = [];
-    for (const f of files) {
-      let fm = this.frontmatterOf(f);
-      const text = await this.app.vault.cachedRead(f);
-      if (Object.keys(fm).length === 0) {
-        try {
-          fm = parseFrontmatter(text);
-        } catch (e) {
-          // §17: surface which card is corrupt instead of silently dropping its fields.
-          throw new DataCorruptionError(`Card "${f.path}" has invalid frontmatter`, { cause: e });
-        }
-      }
-      const subItems = parseSubtasks(text);
-      const childLinks = subItems
-        .filter((s) => s.kind === "card" && s.link)
-        .map((s) => s.link ?? "")
-        .filter((l) => l !== "");
-      const { title, source } = resolveTitle(f.basename, fm, text, config.titleMode);
-      const bodyTags = this.bodyTagsOf(f);
-      cards.push({
-        path: f.path,
-        basename: f.basename,
-        title,
-        titleSource: source,
-        frontmatter: fm,
-        childLinks,
-        subItems,
-        stats: cardStats(text),
-        ...(bodyTags.length > 0 ? { bodyTags } : {}),
-        // Always set, even empty: an absent field makes the model read `tags` as written.
-        frontmatterTags: (parseFrontMatterTags(fm) ?? []).map((t) => t.replace(/^#/, "")),
-      });
-    }
+    for (const f of folder === null ? [] : cardFilesIn(folder, this.boardPath))
+      cards.push(await readCard(this.app, f, config.titleMode));
     // buildBoard derives each card's `context` from its path; carry the configs alongside.
     const board = buildBoard(
       config,
       cards,
       await this.loadContexts(config.cardFolder),
-      (link, source) => this.resolveLink(link, source),
+      (link, source) => resolveLink(this.app, link, source),
     );
     return cardFolderWarning ? { ...board, cardFolderWarning } : board;
   }
@@ -463,88 +161,15 @@ export class VaultRepository implements CardRepository {
     // Already the resolved path when it comes from a caller — `readConfig` is the only place that
     // turns the raw property into one, so re-normalizing here could only make the two disagree.
     const folderPath = cardFolder ?? (await this.readConfig()).cardFolder;
-    const root = this.app.vault.getFolderByPath(folderPath);
-    const out: Record<string, ContextConfig> = {};
-    if (root === null) return out;
-    // Each immediate subfolder is a context. An optional `_context.md` inside it supplies the
-    // display name / color / label / body; a subfolder without the note still counts as a context
-    // (name = folder), so its cards can be filtered by `context:` even before it's configured.
-    for (const child of root.children) {
-      if (!(child instanceof TFolder)) continue;
-      const folder = child.name;
-      const note = child.children.find((f) => f instanceof TFile && f.name === CONTEXT_NOTE);
-      let config: ContextConfig = { name: folder, body: "", folder };
-      if (note instanceof TFile) {
-        const text = await this.app.vault.cachedRead(note);
-        const fm = decode(
-          ContextFrontmatterSchema,
-          parseFrontmatter(text),
-          `context config (${note.path})`,
-        );
-        const cn = fm["context-name"];
-        const name = cn !== undefined && cn.trim() ? cn : folder;
-        const color = fm["color"] !== undefined && fm["color"].trim() ? fm["color"] : undefined;
-        const label = fm["label"] !== undefined && fm["label"].trim() ? fm["label"] : undefined;
-        config = {
-          name,
-          ...(color !== undefined ? { color } : {}),
-          ...(label !== undefined ? { label } : {}),
-          body: splitFrontmatter(text).body,
-          folder,
-        };
-      }
-      out[folder] = config;
-    }
-    return out;
+    return readContexts(this.app, folderPath);
   }
 
   async readBody(path: string): Promise<CardBody> {
     return parseBody(await this.app.vault.cachedRead(this.file(path)));
   }
 
-  /**
-   * The note's frontmatter as the file holds it right now, or null when it cannot be read as YAML.
-   *
-   * Every frontmatter write asks this first, because `processFrontMatter` re-serializes the whole
-   * block whether or not anything in it changes: a flow list like `tags: [a, b]` comes back as a
-   * block list, quotes come and go. So a write that would store what is already there must not be
-   * made at all. `read`, not `cachedRead`, since this decides whether a write happens. The look and
-   * the write are two steps, so a change landing between them is written over by the value the
-   * caller asked for — which is the value it would have written anyway.
-   */
-  private async currentFrontmatter(path: string): Promise<Record<string, unknown> | null> {
-    try {
-      return parseFrontmatter(await this.app.vault.read(this.file(path)));
-    } catch (e) {
-      // Unparseable YAML is the frontmatter write's to report, exactly as it was before this look.
-      if (e instanceof DataCorruptionError) return null;
-      throw e;
-    }
-  }
-
-  /**
-   * Raw frontmatter write — NO history. The move path (applyMove) uses this so it never
-   * double-emits a structural line on top of its own "Moved …" entry. Returns the keys whose stored
-   * value actually changed; when none would, the note is not touched.
-   */
-  private async writeFrontmatter(path: string, patch: Record<string, unknown>): Promise<string[]> {
-    const fm = await this.currentFrontmatter(path);
-    const changed = Object.keys(patch).filter(
-      (k) => fm === null || !(k in fm) || !sameValue(fm[k], patch[k]),
-    );
-    if (changed.length === 0) return [];
-    this.markWrite(path);
-    await this.app.fileManager.processFrontMatter(
-      this.file(path),
-      (fm: Record<string, unknown>) => {
-        for (const [k, v] of Object.entries(patch)) fm[k] = v;
-      },
-    );
-    return changed;
-  }
-
   async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
-    const changed = await this.writeFrontmatter(path, patch);
+    const changed = await this.writer.writeFrontmatter(path, patch);
     // One concise line per changed key the policy recognizes. `order` is move-managed and has no
     // field-edit history string, so it's skipped here.
     for (const k of changed) {
@@ -556,204 +181,47 @@ export class VaultRepository implements CardRepository {
   }
 
   async unsetFrontmatterKey(path: string, key: string): Promise<void> {
-    await this.unsetKey(path, key);
-  }
-
-  /** Remove one key; false, with the note untouched, when it does not carry that key. */
-  private async unsetKey(path: string, key: string): Promise<boolean> {
-    const fm = await this.currentFrontmatter(path);
-    if (fm !== null && !(key in fm)) return false;
-    this.markWrite(path);
-    await this.app.fileManager.processFrontMatter(
-      this.file(path),
-      (fm: Record<string, unknown>) => {
-        delete fm[key];
-      },
-    );
-    return true;
-  }
-
-  /**
-   * Rewrite a note's text through `fn`. Returns whether it changed; when `fn` would hand the text
-   * back as it is, nothing is written. `fn` is run once on a fresh read to decide that, and again
-   * inside `process`, on the text the write is actually made on — so it must be a pure function of
-   * the text it is given.
-   */
-  private async editBody(path: string, fn: (text: string) => string): Promise<boolean> {
-    const file = this.file(path);
-    const now = await this.app.vault.read(file);
-    if (fn(now) === now) return false;
-    let changed = false;
-    this.markWrite(path);
-    await this.app.vault.process(file, (t) => {
-      const next = fn(t);
-      changed = next !== t;
-      return next;
-    });
-    return changed;
-  }
-
-  /**
-   * Edit one line of a note, but only while the note still reads the way the caller described it.
-   * `vault.process` is what makes a read-modify-write see the current bytes, so the check belongs
-   * INSIDE its callback — against the very text the edit is about to be made on, not against a
-   * snapshot read before it. A note that has moved on since is handed straight back, byte for byte,
-   * and the refusal is raised after the write returns rather than thrown out of the callback: what
-   * `process` does with a throw from inside is not ours to promise.
-   */
-  private async editLine(
-    path: string,
-    line: { kind: "subtask"; at: SubtaskRef } | { kind: "comment"; at: LineRef },
-    write: (text: string) => string,
-  ): Promise<boolean> {
-    let drift: LineDrift | null = null;
-    const changed = await this.editBody(path, (t) => {
-      drift = line.kind === "subtask" ? subtaskDrift(t, line.at) : commentDrift(t, line.at);
-      return drift ? t : write(t);
-    });
-    if (drift === null) return changed;
-    // Nothing was written, so the echo guard this call set on the way in is guarding nothing:
-    // dropping it keeps the next change from elsewhere — the very change that made this one
-    // refuse — from being swallowed as ours. At worst it costs one extra reload, when an earlier
-    // write of ours really did land on this note moments ago.
-    this.recentWrites.delete(path);
-    throw staleLine(line.kind, path, line.at, drift);
+    await this.writer.unsetKey(path, key);
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
-    // Whether the moved note itself changed, which is what its history line describes: a move that
-    // leaves it as it was (dropped back on its own slot, sent to the column it already stands in)
-    // records nothing. The parent notes below keep their own count.
-    let changed = false;
-    if (mutation.setFrontmatter)
-      changed = (await this.writeFrontmatter(mutation.path, mutation.setFrontmatter)).length > 0;
-    for (const key of mutation.unsetFrontmatter ?? []) {
-      if (await this.unsetKey(mutation.path, key)) changed = true;
-    }
-    if (mutation.setSubtaskStatus) {
-      // One edit for the whole line: the checkbox and the `[status:: …]` field are two halves of
-      // where a subitem sits, so writing them separately would leave a moment where the board
-      // reloads on a line that says two different things.
-      const { status, done, ...at } = mutation.setSubtaskStatus;
-      const { index } = at;
-      const edited = await this.editLine(mutation.path, { kind: "subtask", at }, (t) =>
-        setSubtaskStatusText(
-          done === undefined ? t : setSubtaskDone(t, index, done),
-          index,
-          status,
-        ),
-      );
-      if (edited) changed = true;
-    }
-    if (mutation.syncClaim) {
-      // Where the claim belongs is worked out HERE, from the claim AND the box the note carries as
-      // the write is made, rather than carried in from a reading taken when the box was clicked:
-      // those can be minutes apart, and either half moving changes the answer. Read once first so a
-      // line the rule moves nowhere is not rewritten at all (the same two looks `parentLines` takes
-      // below), then decided again inside the write, which is the text that actually changes.
-      const { doneColumn, ...at } = mutation.syncClaim;
-      const { index, text } = at;
-      const nextFor = (item: SubItem | undefined): string | null | undefined =>
-        item && claimInStep(item.status ?? null, item.done, doneColumn);
-      // `read`, not `cachedRead`: this look decides whether a write happens, and the display cache
-      // is allowed to lag the file — not least behind the checkbox this very call just wrote.
-      const seen = parseSubtasks(await this.app.vault.read(this.file(mutation.path)))[index];
-      // Skipped only when this IS the caller's line and the rule leaves its claim where it is. A
-      // position that has become somebody else's line goes on into the write, which refuses it —
-      // the tick that was already written is on a line whose claim nobody has kept in step, and
-      // that is the caller's to hear rather than ours to pass over as "nothing to do".
-      //
-      // This look is the same read-then-write `parentLines` takes below, and carries the same
-      // window: a claim that changes between it and the write is answered by the write, but one
-      // that changes after a "nothing to do" read is not seen at all, and the line keeps a claim
-      // the tick would have moved. The alternative is a `process` pass on every tick of every
-      // claimless todo — a write of identical bytes, and the mtime and sync churn that goes with
-      // it — for a window of one await.
-      const settled =
-        seen !== undefined &&
-        seen.text === text &&
-        seen.occurrence === at.occurrence &&
-        nextFor(seen) === (seen.status ?? null);
-      if (!settled) {
-        const edited = await this.editLine(mutation.path, { kind: "subtask", at }, (t) => {
-          const item = parseSubtasks(t)[index];
-          const was = item?.status ?? null;
-          const next = nextFor(item);
-          return next === undefined || next === was ? t : setSubtaskStatusText(t, index, next);
-        });
-        if (edited) changed = true;
-      }
-    }
-    if (changed && mutation.history) {
-      const historyLine = mutation.history;
-      await this.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));
-    }
-    // Last, and after the moved note's own record, so a parent that has gone missing since the
-    // board loaded cannot stop the move itself from being recorded — nor the other parents from
-    // being written; the first failure is raised once every note has had its turn. Each parent is
-    // read first and left alone when it no longer needs the write. The box is the same edit a
-    // click on it would make, so it leaves the same (scope-gated) trace, naming only the links
-    // that actually changed.
-    let failure: Error | undefined;
-    for (const { path, links, done } of mutation.parentLines ?? []) {
-      try {
-        // `editBody` skips a note that needs nothing, deciding on a fresh read; the lines named
-        // below are the ones found inside the atomic write, which is the text the history describes.
-        let pending: { link: string; text: string }[] = [];
-        const edited = await this.editBody(path, (t) => {
-          pending = pendingSubcardLinks(t, links, done);
-          return setSubcardDone(
-            t,
-            pending.map((p) => p.link),
-            done,
-          );
-        });
-        for (const { text } of edited ? pending : []) {
-          await this.maybeHistory(
-            path,
-            "subtask",
-            done ? subtaskDoneLine(text) : subtaskReopenedLine(text),
-          );
-        }
-      } catch (e) {
-        failure ??= e instanceof Error ? e : new Error(String(e));
-      }
-    }
-    if (failure !== undefined) throw failure;
+    await applyMove(this.app, this.writer, mutation, (path, kind, line) =>
+      this.maybeHistory(path, kind, line),
+    );
   }
 
   async setDescription(path: string, description: string): Promise<void> {
     // No history kind maps to a description edit, so this stays ungated.
-    await this.editBody(path, (t) => setDescriptionText(t, description));
+    await this.writer.editBody(path, (t) => setDescriptionText(t, description));
   }
   async addComment(path: string, text: string, author?: string): Promise<void> {
     const signature = author || this.getUserName();
     // One stamp for both runs of the edit, so they agree on the line they add.
     const at = stamp();
-    if (await this.editBody(path, (t) => appendComment(t, text, at, signature)))
+    if (await this.writer.editBody(path, (t) => appendComment(t, text, at, signature)))
       await this.maybeHistory(path, "comment", commentAddedLine());
   }
   async updateComment(path: string, at: LineRef, text: string): Promise<void> {
-    const changed = await this.editLine(path, { kind: "comment", at }, (t) =>
+    const changed = await this.writer.editLine(path, { kind: "comment", at }, (t) =>
       updateTimestampedLine(t, SECTION.comments, at.index, text),
     );
     if (changed) await this.maybeHistory(path, "comment", commentEditedLine());
   }
   async removeComment(path: string, at: LineRef): Promise<void> {
-    const changed = await this.editLine(path, { kind: "comment", at }, (t) =>
+    const changed = await this.writer.editLine(path, { kind: "comment", at }, (t) =>
       removeTimestampedLine(t, SECTION.comments, at.index),
     );
     if (changed) await this.maybeHistory(path, "comment", commentRemovedLine());
   }
   async addTodo(path: string, text: string): Promise<void> {
-    if (await this.editBody(path, (t) => addTodoText(t, text)))
+    if (await this.writer.editBody(path, (t) => addTodoText(t, text)))
       await this.maybeHistory(path, "subtask", subtaskAddedLine(text));
   }
   async toggleSubtask(path: string, at: SubtaskRef, done: boolean): Promise<void> {
     // The history line names `at.text`, and the write only lands while the note still reads that
     // way — so the record and the tick are the same line, with nothing read separately to disagree.
     // A box already standing where it was sent is left alone, and so is its record.
-    const changed = await this.editLine(path, { kind: "subtask", at }, (t) =>
+    const changed = await this.writer.editLine(path, { kind: "subtask", at }, (t) =>
       setSubtaskDone(t, at.index, done),
     );
     if (!changed) return;
@@ -764,44 +232,10 @@ export class VaultRepository implements CardRepository {
     );
   }
   async removeSubtask(path: string, at: SubtaskRef): Promise<void> {
-    const changed = await this.editLine(path, { kind: "subtask", at }, (t) =>
+    const changed = await this.writer.editLine(path, { kind: "subtask", at }, (t) =>
       removeSubtaskText(t, at.index),
     );
     if (changed) await this.maybeHistory(path, "subtask", subtaskRemovedLine(at.text));
-  }
-
-  /**
-   * Rewrite a card's stored list for one relationship type, INSIDE the frontmatter write.
-   *
-   * The read-modify-write happens in the `processFrontMatter` callback rather than against a
-   * `cachedRead` snapshot taken before it, so two edits landing back to back add up instead of
-   * clobbering each other (the same reason `rememberPriorities` merges inside its write). Returns
-   * whether anything actually changed, so an already-declared link writes no history line.
-   */
-  private async editRelations(
-    path: string,
-    type: RelationType,
-    rewrite: (fm: Record<string, unknown>) => string[] | null,
-  ): Promise<boolean> {
-    // Asked of the note as it is first: a callback that bails out still has the whole block
-    // re-serialized (see `currentFrontmatter`), so a list that stays as it is must not be written.
-    const fm = await this.currentFrontmatter(path);
-    if (fm !== null && rewrite(fm) === null) return false;
-    let changed = false;
-    this.markWrite(path);
-    await this.app.fileManager.processFrontMatter(
-      this.file(path),
-      (fm: Record<string, unknown>) => {
-        const next = rewrite(fm);
-        if (next === null) return;
-        // An empty list means the card declares no such relationship any more, so the key goes
-        // with it — the note is left as if it had never had one, not carrying a `blocks: []`.
-        if (next.length === 0) delete fm[type];
-        else fm[type] = next;
-        changed = true;
-      },
-    );
-    return changed;
   }
 
   /**
@@ -818,7 +252,7 @@ export class VaultRepository implements CardRepository {
     // Where the vault names the note, that answer settles it: a target is a self-link when it
     // reaches this very note, whatever it was spelled as. Only a target the vault cannot place —
     // a card that is not there yet, or one carrying an anchor — falls back to comparing names.
-    const targetPath = this.relationTargetPath(target, path);
+    const targetPath = relationTargetPath(this.app, target, path);
     const self =
       targetPath !== null
         ? targetPath === path
@@ -828,8 +262,10 @@ export class VaultRepository implements CardRepository {
     // Same reason as `addSubcard`: whatever the caller named the card, the note gets the link this
     // vault would write to it, so the board reads back the card the caller meant. A target naming
     // no note (a link to a card that is not there yet) is stored exactly as it was typed.
-    const written = targetPath === null ? target : this.linkTextTo(targetPath, path);
-    const changed = await this.editRelations(path, type, (fm) => withRelation(fm, type, written));
+    const written = targetPath === null ? target : linkTextTo(this.app, targetPath, path);
+    const changed = await this.writer.editRelations(path, type, (fm) =>
+      withRelation(fm, type, written),
+    );
     if (changed) await this.maybeHistory(path, "relation", relationAddedLine(type, written));
   }
 
@@ -839,7 +275,7 @@ export class VaultRepository implements CardRepository {
     targets: readonly string[],
   ): Promise<void> {
     if (!(await this.knownRelation(type))) return;
-    const changed = await this.editRelations(path, type, (fm) =>
+    const changed = await this.writer.editRelations(path, type, (fm) =>
       withoutRelation(fm, type, targets),
     );
     // One line for the relationship, named by the form the panel showed — not one per spelling.
@@ -848,15 +284,8 @@ export class VaultRepository implements CardRepository {
       await this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
-  private async uniquePath(folder: string, title: string, except?: string): Promise<string> {
-    const base = sanitizeFilename(title);
-    const taken = pathTaken(this.app.vault, except);
-    let candidate = normalizePath(`${folder}/${base}.md`);
-    let n = 1;
-    while (taken(candidate)) {
-      candidate = normalizePath(`${folder}/${base} ${n++}.md`);
-    }
-    return candidate;
+  private uniquePath(folder: string, title: string, except?: string): string {
+    return uniqueNotePath(folder, sanitizeFilename(title), pathTaken(this.app.vault, except));
   }
 
   private async ensureFolder(folder: string): Promise<void> {
@@ -868,10 +297,10 @@ export class VaultRepository implements CardRepository {
   async createCard(title: string, status: string): Promise<string> {
     const config = await this.readConfig();
     // Creating the folder as written would only add one more spelling beside the ones already there.
-    if (config.cardFolderCaseMatches.length > 1) throw new Error(this.ambiguousCaseMessage(config));
+    if (config.cardFolderCaseMatches.length > 1) throw new Error(ambiguousCaseMessage(config));
     await this.ensureFolder(config.cardFolder);
-    const path = await this.uniquePath(config.cardFolder, title);
-    this.markWrite(path);
+    const path = this.uniquePath(config.cardFolder, title);
+    this.writer.markWrite(path);
     // Create the body first, then let Obsidian serialize the frontmatter — never hand-build
     // YAML (an odd column id / title could otherwise produce malformed frontmatter).
     const file = await this.app.vault.create(path, `# ${title}\n`);
@@ -893,8 +322,8 @@ export class VaultRepository implements CardRepository {
     const childPath = await this.createCard(title, parentStatus || "todo");
     // Written the way THIS vault writes links, from this parent: a bare file name is ambiguous the
     // moment a second note takes it, and Folia would then write a link Folia cannot read back.
-    await this.editBody(parentPath, (t) =>
-      addSubcardText(t, this.linkTextTo(childPath, parentPath)),
+    await this.writer.editBody(parentPath, (t) =>
+      addSubcardText(t, linkTextTo(this.app, childPath, parentPath)),
     );
     return childPath;
   }
@@ -903,9 +332,9 @@ export class VaultRepository implements CardRepository {
     const value = serializeColumns(columns);
     // Compared as the board reads them, so a hand-written `columns: [todo, done]` saved unchanged
     // is not expanded into the long form behind the person's back.
-    const fm = await this.currentFrontmatter(this.boardPath);
+    const fm = await this.writer.currentFrontmatter(this.boardPath);
     if (fm !== null && sameValue(serializeColumns(normalizeColumns(fm["columns"])), value)) return;
-    await this.writeFrontmatter(this.boardPath, { columns: value });
+    await this.writer.writeFrontmatter(this.boardPath, { columns: value });
   }
 
   async rememberPriorities(values: string[]): Promise<void> {
@@ -916,15 +345,11 @@ export class VaultRepository implements CardRepository {
     // `filter: "priority:a"`, for one). Setting a priority the board already knows is the common
     // case, so that would churn the board note on nearly every priority edit.
     const current = normalizePriorities(
-      decode(
-        BoardFrontmatterSchema,
-        parseFrontmatter(await this.app.vault.cachedRead(boardFile)),
-        `board config (${this.boardPath})`,
-      )["priorities"],
+      (await readBoardFrontmatter(this.app, boardFile, this.boardPath))["priorities"],
     );
     if (mergePriorities(current, values) === null) return;
 
-    this.markWrite(this.boardPath);
+    this.writer.markWrite(this.boardPath);
     await this.app.fileManager.processFrontMatter(boardFile, (fm: Record<string, unknown>) => {
       // Merge again, now against the note as it is INSIDE the write rather than the snapshot read
       // above: that is what makes a second edit landing mid-reload additive rather than a clobber.
@@ -938,15 +363,15 @@ export class VaultRepository implements CardRepository {
   }
 
   async deleteCard(path: string): Promise<void> {
-    this.markWrite(path);
+    this.writer.markWrite(path);
     await this.app.fileManager.trashFile(this.file(path));
   }
 
   async promptDeleteCard(path: string): Promise<boolean> {
-    this.markWrite(path);
+    this.writer.markWrite(path);
     const gone = await promptTrash(this.app, this.file(path));
     // Nothing was written, so a change arriving now is somebody else's and must reload the board.
-    if (!gone) this.recentWrites.delete(path);
+    if (!gone) this.writer.forgetWrite(path);
     return gone;
   }
 
@@ -982,11 +407,11 @@ export class VaultRepository implements CardRepository {
     );
     if (title === current) return path; // unchanged — no write
     if (source === "frontmatter") {
-      await this.writeFrontmatter(path, { [TITLE_KEY]: title });
+      await this.writer.writeFrontmatter(path, { [TITLE_KEY]: title });
       return path;
     }
     if (source === "heading") {
-      await this.editBody(path, (t) => setHeadingTitle(t, file.basename, titleMode, title));
+      await this.writer.editBody(path, (t) => setHeadingTitle(t, file.basename, titleMode, title));
       return path;
     }
     return this.renameFile(path, title);
@@ -999,10 +424,10 @@ export class VaultRepository implements CardRepository {
     const base = sanitizeFilename(wanted);
     if (base === file.basename) return path; // unchanged once made safe to use as a file name
     const folder = file.parent?.path ?? "";
-    const dest = await this.uniquePath(folder === "/" ? "" : folder, base, file.path);
+    const dest = this.uniquePath(folder === "/" ? "" : folder, base, file.path);
     if (dest === path) return path;
-    this.markWrite(path);
-    this.markWrite(dest);
+    this.writer.markWrite(path);
+    this.writer.markWrite(dest);
     // fileManager.renameFile rewrites inbound [[links]] (the parent's ## Subtasks link survives).
     await this.app.fileManager.renameFile(file, dest);
     return dest;
@@ -1019,84 +444,19 @@ export class VaultRepository implements CardRepository {
   }
 
   followLink(evt: MouseEvent, sourcePath: string, beforeOpen?: () => void): boolean {
-    // `instanceOf`, because a board in a pop-out window renders into that window's DOM, whose
-    // elements are not instances of this window's `Element`.
-    const target = evt.targetNode;
-    if (!target?.instanceOf(Element)) return false;
-    const linktext = vaultLinktext(target.closest("a")?.getAttribute("href") ?? null);
-    if (linktext === null) return false;
-    // A link inside an embedded note is followed by the embed, which claims the click before it
-    // gets here. Opening it again would open it twice.
-    if (evt.defaultPrevented) {
-      beforeOpen?.();
-      return true;
-    }
-    evt.preventDefault();
-    // Read before `beforeOpen`, which may take the link out of the document.
-    const newLeaf = Keymap.isModEvent(evt);
-    beforeOpen?.();
-    void this.app.workspace.openLinkText(linktext, sourcePath, newLeaf);
-    return true;
+    return followLink(this.app, evt, sourcePath, beforeOpen);
   }
 
   renderMarkdown(el: HTMLElement, markdown: string, sourcePath: string): () => void {
-    el.empty();
-    // A managed Component owns the render's child lifecycle (embeds, post-processors). render is
-    // async and APPENDS into its target while running, so render into a detached clone and only
-    // commit the result if this run wasn't cancelled. Without the detached target, a stale in-flight
-    // render would keep appending into `el` after cleanup and stack onto the next render's output.
-    let cancelled = false;
-    const c = new Component();
-    c.load();
-    const tmp = el.cloneNode(false) as HTMLElement;
-    void MarkdownRenderer.render(this.app, markdown, tmp, sourcePath, c)
-      .then(() => {
-        if (cancelled) return;
-        el.replaceChildren(...tmp.childNodes);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      c.unload();
-      el.empty();
-    };
+    return renderMarkdown(this.app, el, markdown, sourcePath);
   }
 
-  /**
-   * Every frontmatter key the vault's notes already carry, from the metadata index — Obsidian has
-   * parsed every note once already, so parsing them again here would be both slower and a second
-   * reading of the same bytes. Split at this board's card folder, since only this class knows
-   * where that folder resolved to.
-   *
-   * Only notes that could be cards are read. EVERY board note is skipped, not only this board's,
-   * and so is every `_context.md`: their keys (`folia-board`, `columns`, `context-name`, …)
-   * configure a board or a folder and mean nothing on a card, so offering them on a card is
-   * offering a mistake — and a vault holding several boards would otherwise hand each one's
-   * configuration to the others as vault-wide vocabulary. It is the same "this is not a card"
-   * rule `loadBoard` applies when it picks the notes to draw.
-   */
   async propertyNamesInUse(): Promise<PropertyNamesInUse> {
-    if (this.propertyNames) return this.propertyNames;
-    const config = await this.readConfig();
-    const prefix = config.cardFolder + "/";
-    const inCardFolder = new Set<string>();
-    const elsewhere = new Set<string>();
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      if (file.path === this.boardPath || file.name === CONTEXT_NOTE) continue;
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (!fm || isBoardFrontmatter(fm)) continue;
-      const into = file.path.startsWith(prefix) ? inCardFolder : elsewhere;
-      for (const key of Object.keys(fm)) into.add(key);
-    }
-    const sorted = (keys: Set<string>): string[] => [...keys].sort((a, b) => a.localeCompare(b));
-    // A key used both inside and outside the folder belongs to the board: it is the nearer answer,
-    // and a name must never be offered twice. Matched without regard to case, since `Energy` and
-    // `energy` are the same answer to "what do notes here call this".
-    const near = new Set([...inCardFolder].map((k) => k.toLowerCase()));
-    this.propertyNames = {
-      inCardFolder: sorted(inCardFolder),
-      elsewhere: sorted(elsewhere).filter((k) => !near.has(k.toLowerCase())),
-    };
+    this.propertyNames ??= collectPropertyNames(
+      this.app,
+      this.boardPath,
+      (await this.readConfig()).cardFolder,
+    );
     return this.propertyNames;
   }
 
@@ -1144,54 +504,10 @@ export class VaultRepository implements CardRepository {
   }
 
   onFileOp(cb: (op: FileOp) => void): () => void {
-    // Deliberately NOT filtered by the `recentWrites` echo guard `onChange` uses. Following a path
-    // is idempotent — whichever of the two paths runs first (the in-app action or this listener),
-    // the other finds nothing left to move — so suppressing our own writes would only risk
-    // swallowing a real external operation that landed inside the guard's window.
-    const refs = [
-      this.app.vault.on("rename", (f, oldPath) =>
-        cb({ kind: "rename", from: oldPath, to: f.path }),
-      ),
-      this.app.vault.on("delete", (f) => cb({ kind: "delete", path: f.path })),
-    ];
-    return () => {
-      for (const ref of refs) this.app.vault.offref(ref);
-    };
+    return watchFileOps(this.app, cb);
   }
 
   onChange(cb: () => void): () => void {
-    const schedule = debounce(cb, 150, true);
-    const fireVault = (path: string) => {
-      const last = this.recentWrites.get(path);
-      if (last !== undefined) {
-        if (Date.now() - last < 2500) return; // our own write — we reload explicitly
-        this.recentWrites.delete(path); // prune the stale echo-guard entry
-      }
-      schedule();
-    };
-    const vaultRefs = [
-      this.app.vault.on("modify", (f) => fireVault(f.path)),
-      this.app.vault.on("create", (f) => fireVault(f.path)),
-      this.app.vault.on("delete", (f) => fireVault(f.path)),
-      this.app.vault.on("rename", (f) => fireVault(f.path)),
-    ];
-    // The metadataCache catches up a tick after our own processFrontMatter write; reconcile then
-    // so an in-app move/edit can't visually snap back to its old slot while the cache is stale.
-    // Any card in this board's folder counts, not only the files we wrote, because a card's body
-    // tags exist nowhere but this cache: a board opened while Obsidian was still filling it
-    // would otherwise draw every card right except its tags, and stay that way until some
-    // unrelated vault change happened along. The 150ms debounce collapses the opening burst into
-    // one reload. Files outside the folder are left to the vault events.
-    const metaRef = this.app.metadataCache.on("changed", (f) => {
-      const prefix = this.cardFolderPrefix;
-      if (this.recentWrites.has(f.path) || (prefix !== null && f.path.startsWith(prefix))) {
-        schedule();
-      }
-    });
-    return () => {
-      schedule.cancel();
-      for (const ref of vaultRefs) this.app.vault.offref(ref);
-      this.app.metadataCache.offref(metaRef);
-    };
+    return watchVault(this.app, this.writer, () => this.cardFolderPrefix, cb);
   }
 }

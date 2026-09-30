@@ -635,7 +635,7 @@ Three things went with the hand-drawn bar. It no longer turns green when every s
 
 **Decided 2026-09-30 (#109). A vault event on a path the plugin wrote less than 2.5 seconds ago does not reload the board.**
 
-`markWrite` in `src/obsidian/vaultRepo.ts` stamps each path the repository writes into `recentWrites`, and `onChange` drops a `modify`, `create`, `delete` or `rename` on that path inside the window, because the write reloads the board itself. Obsidian's vault events carry the file and nothing about who changed it, so time is the only signal there is. The metadata cache's `changed` event on such a path still reloads the board, so an outside edit that lands inside the window arrives through the cache instead of being lost. `onFileOp` is left unfiltered on purpose: following a rename or delete is idempotent, and filtering it could only swallow a real one that lands inside the window.
+`markWrite` in `src/obsidian/noteWriter.ts` stamps each path the repository writes into `recentWrites`, and `onChange` (`watchVault` in `src/obsidian/vaultEvents.ts`) drops a `modify`, `create`, `delete` or `rename` on that path inside the window, because the write reloads the board itself. Obsidian's vault events carry the file and nothing about who changed it, so time is the only signal there is. The metadata cache's `changed` event on such a path still reloads the board, so an outside edit that lands inside the window arrives through the cache instead of being lost. `onFileOp` is left unfiltered on purpose: following a rename or delete is idempotent, and filtering it could only swallow a real one that lands inside the window.
 
 One outside change is still missed: a delete. Deleting a note raises no `changed`, and `onFileOp` only moves or clears the selected card, so a card someone else deletes within 2.5 seconds of a board write stays on the board until the next reload. It takes another actor deleting the very card the board just wrote, within that window, so it is recorded rather than chased.
 
@@ -651,7 +651,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 
 ## New names are judged the way Obsidian judges them
 
-**Decided 2026-09-30 (#109, after #78). Every new note or folder name goes through `pathTaken` in `src/obsidian/pathTaken.ts`: `uniqueNotePath` and the exported `cardFolderFor` in `src/obsidian/boardNote.ts`, and `uniquePath` in `src/obsidian/vaultRepo.ts`.**
+**Decided 2026-09-30 (#109, after #78). Every new note or folder name goes through `pathTaken` in `src/obsidian/pathTaken.ts`: `uniqueNotePath` and the exported `cardFolderFor` in `src/obsidian/boardNote.ts`; the card repository's `uniquePath` in `src/obsidian/vaultRepo.ts` names cards through `uniqueNotePath` too.**
 
 `pathTaken` follows `Vault.getAvailablePath`: a name is taken if any vault path matches it ignoring case, on every platform, Linux included, so a vault synced to macOS or Windows never holds two names for one file. A rename leaves its own file out, so a change of case alone is not a collision. Measured on Obsidian 1.13.7 on Linux: `adapter.insensitive` is `false`, yet `getAvailablePath('basic/Cards/plan the launch', 'md')` returns `plan the launch 1.md` while `Plan the launch.md` exists. The rule is copied because `getAvailablePath` is not in `obsidian.d.ts`, nor is its case-insensitive lookup (see "A card folder that matches only by letter case is used when it is the only one"), and the one documented allocator, `getAvailablePathForAttachment`, resolves against the attachment folder.
 
