@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { dateOnly, dueInfo, stamp } from "../src/model/dates";
 
-// Day boundaries are local time, so pin a zone with a DST change: Amsterdam goes to summer time on
+// Day boundaries are local time, so pin a zone with a DST change: central Europe goes to summer time on
 // 2026-03-29 and back on 2026-10-25, which is where a diff over milliseconds could round wrong.
 const originalTz = process.env["TZ"];
-process.env["TZ"] = "Europe/Amsterdam";
+process.env["TZ"] = "Europe/Berlin";
 afterAll(() => {
   if (originalTz === undefined) delete process.env["TZ"];
   else process.env["TZ"] = originalTz;
