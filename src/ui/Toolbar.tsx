@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  type RefObject,
+} from "react";
 import { Icon, type IconName } from "./icons";
 import { useRepo } from "./context";
 import { HostButton } from "./hostControls";
@@ -82,23 +89,21 @@ function applySuggestion(
   return { query: next + trailing + after, caret: next.length + trailing.length };
 }
 
-export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function Toolbar(
-  { query, onChange, matchCount, totalCount, canFilterMine },
-  ref,
-) {
+/**
+ * Mount the host's search field into `box` and keep `onChange` told of what is typed into it. The
+ * field is the host's, so it is mounted rather than rendered, and it holds its own value.
+ */
+function useSearchField(
+  box: RefObject<HTMLDivElement | null>,
+  onChange: (query: string) => void,
+): RefObject<SearchField | null> {
   const repo = useRepo();
-  const box = useRef<HTMLDivElement>(null);
   const field = useRef<SearchField | null>(null);
   const report = useRef(onChange);
   useEffect(() => {
     report.current = onChange;
   }, [onChange]);
-  useImperativeHandle(ref, () => ({ focus: () => field.current?.input.focus() }), []);
 
-  const active = query.trim() !== "";
-
-  // The field is the host's, so it is mounted rather than rendered, and it holds its own value:
-  // the effect below writes `query` into it whenever the query changes from somewhere else.
   useLayoutEffect(() => {
     if (!box.current) return;
     const search = repo.mountSearch(box.current, (value) => report.current(value));
@@ -140,10 +145,25 @@ export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function To
       search.remove();
       field.current = null;
     };
-  }, [repo]);
+  }, [repo, box]);
+  return field;
+}
+
+export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function Toolbar(
+  { query, onChange, matchCount, totalCount, canFilterMine },
+  ref,
+) {
+  const box = useRef<HTMLDivElement>(null);
+  const field = useSearchField(box, onChange);
+  useImperativeHandle(ref, () => ({ focus: () => field.current?.input.focus() }), [field]);
+
+  const active = query.trim() !== "";
+
+  // The field holds its own value; this writes `query` into it whenever the query changes from
+  // somewhere else.
   useLayoutEffect(() => {
     if (field.current && field.current.input.value !== query) field.current.setValue(query);
-  }, [query]);
+  }, [field, query]);
 
   const toggle = (key: FilterKey, value: string) => {
     onChange(toggleToken(query, key, value));
