@@ -514,3 +514,26 @@ The preview fired the workspace `hover-link` event for links it found by the und
 Every reading of a `[[wikilink]]` in the model needs the note it names: the subcard line in the checklist, the fallback resolver in `buildBoard`, and the identity that folds `[[A]]`, `[[A|see this]]` and `[[A#Notes]]` into one relationship. `parseLinktext` answers only half of that. In Obsidian 1.13.7 it is `indexOf("#")` and nothing else: no `|` handling and no trimming, since Obsidian's own callers split the alias off first. So a port would carry a one-line split into the model, which would still have to split the alias and trim around it, and the checklist reading runs inside `vault.process` with no host at all (see "The model splits frontmatter itself"). `linkpath` does the same `#` split after dropping the alias, and all three readings now go through it instead of three hand-written splits that ran in different orders. A relationship value written without brackets (`blocks: Other card`) is still read as a target, as #27 decided.
 
 **What would change this:** `parseLinktext` taking on the alias or trimming, or the model gaining a host-supplied parser for other reasons. Compare `linkpath`'s tests in `test/links.test.ts` with the `parseLinktext` in the installed Obsidian's `app.js`.
+
+## A card's `area` counts as a tag
+
+**Decided 2026-09-30 (#106). `area` is read as written; the frontmatter `tags` key is read the way Obsidian reads it.**
+
+The board credits a card with its `area`, its frontmatter tags and its body tags, and the `tag:` filter, the chips and free-text search all read that one list (`src/model/tags.ts`). For `tags` the answer is Obsidian's: the adapter fills `Card.frontmatterTags` from `parseFrontMatterTags`, so a card shows exactly the frontmatter tags Obsidian's tag pane counts. That helper reads only a key matching `tags` (in any case), so `area` has no Obsidian reading to follow. It is Folia's own key, with a single string value, and it stays a tag because lanes and filters written as `area:research` have always found those cards through it.
+
+The tag pane also hides names that Obsidian's private tag-name check rejects, such as `a,b` or `123`, and nothing documented exposes that check. So a frontmatter value like `tags: [a,b]` still shows as a chip on the card while Obsidian does not list it as a tag.
+
+**What would change this:** Obsidian documenting its tag-name check, or `area` taking list values.
+
+## Dates are formatted and compared without Moment
+
+**Decided 2026-09-30 (#106, answers #35). `dateOnly`, `stamp` and `dueInfo` in `src/model/dates.ts` keep their own arithmetic.**
+
+Obsidian bundles Moment and hands it to plugins as `moment` (it is `window.moment`), and #35 waited for a reason to use it. #106, moving the plugin onto documented API, was that reason, and checking it against Obsidian 1.13.7 turned up two reasons not to:
+
+- **Locale.** Obsidian sets Moment's global locale to the app's language. Under Arabic, Hindi or Persian, among others, `format("YYYY-MM-DD HH:mm")` writes native numerals (`٢٠٢٦-٠٩-٣٠ ٠٩:٠٥`). Those strings go into `due`, `created` and every comment and history line, where `TS_LINE_RE` in `src/model/card.ts` accepts only `[0-9: -]` and `sortKey` in `src/model/unread.ts` compares digits. Every call would have to pin `.locale("en")`, and one call that forgets corrupts the notes of exactly the people who never see it happen on an English setup.
+- **Parsing.** `dueInfo` reads a due date with `Date.parse` at local midnight, which rolls an impossible day over (`2026-02-30` counts as 2 March), and shows anything that is not `YYYY-MM-DD` as written. Moment's strict parsing rejects the rollover and its loose parsing accepts forms the board never has. Neither is the reading that ships.
+
+`src/model/` cannot import `obsidian` either, so using Moment would mean a formatter port threaded to `lanes.ts`, `board.ts`, the adapter, the plugin entry and `useToday.ts`, carrying four lines of padding and one subtraction. `test/dates.test.ts` pins the formats and the day boundaries, around midnight and across both daylight-saving changes.
+
+**What would change this:** what #35 already names: due dates accepting another form, a configurable date format, or configurable calendar behaviour. Moment then earns its place, called with an explicit `en` locale and a strict format.
