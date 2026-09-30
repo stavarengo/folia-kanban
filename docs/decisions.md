@@ -571,8 +571,8 @@ They sit in running text and must wrap with it. A `ButtonComponent` is a box one
 
 ## The card progress bar is Obsidian's
 
-**Decided 2026-09-30 (#103). A card's subtask bar is a `ProgressBarComponent`, and the board keeps only the count beside it and the ARIA on its own wrapper.**
+**Decided 2026-09-30 (#103). A card's subtask bar is a `ProgressBarComponent`, and the board keeps only the count beside it.**
 
-Three things went with the hand-drawn bar. It no longer turns green when every subtask is done: the count beside it still turns success-coloured and shows a tick, so the state keeps a cue that is not colour on a bar. It is no longer a pill: the host's bar is 8px high with a 4px corner, where the board's was 4px and fully rounded. And its fill no longer slides to the new width: the component sets the width directly. The component sets no role, so the board's `.folia-progress` wrapper carries `role="progressbar"` and the values. In the light theme the empty track is faint on a white card, which is the host's choice of colour.
+Three things went with the hand-drawn bar. It no longer turns green when every subtask is done: the count beside it still turns success-coloured and shows a tick, so the state keeps a cue that is not colour on a bar. It is no longer a pill: the host's bar is 8px high with a 4px corner, where the board's was 4px and fully rounded. And its fill no longer slides to the new width: the component sets the width directly. The component sets no role, and a role inside the card would not be announced anyway, since the card is itself a `role="button"`: the card's own accessible name says how many subtasks are done. In the light theme the empty track is faint on a white card, which is the host's choice of colour.
 
 **What would change this:** the component gaining a state for a complete bar, or live evidence that the empty track cannot be seen in a supported theme.

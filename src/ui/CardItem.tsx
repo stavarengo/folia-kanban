@@ -280,11 +280,17 @@ function CardItemInner({
         onClick={open}
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
-        // Unread comments are folded into the tile's OWN accessible name: everything inside this
-        // element is a descendant of a `role="button"`, so a label on the badge itself is never
-        // announced. The name is the only place a screen reader can hear that a card has something
-        // waiting on it.
-        aria-label={unread.kind === "none" ? card.title : `${card.title}, ${unreadWords(unread)}`}
+        // Subtask progress and unread comments are folded into the tile's OWN accessible name:
+        // everything inside this element is a descendant of a `role="button"`, so a label or role
+        // on the bar or the badge is never announced. The name is the only place a screen reader
+        // can hear them.
+        aria-label={[
+          card.title,
+          stats && stats.checklist > 0 ? progressWords(stats) : null,
+          unread.kind === "none" ? null : unreadWords(unread),
+        ]
+          .filter(Boolean)
+          .join(", ")}
         aria-current={selected ? "true" : undefined}
       >
         {editing != null ? (
@@ -324,12 +330,7 @@ function CardItemInner({
         {stats && stats.checklist > 0 && (
           <div
             className={"folia-progress" + (allDone ? " folia-is-complete" : "")}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={stats.checklist}
-            aria-valuenow={stats.checklistDone}
-            title={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
-            aria-label={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
+            title={progressWords(stats)}
           >
             <HostProgressBar
               slotClassName="folia-progress-slot"
@@ -485,6 +486,11 @@ function cardMain(el: Element): HTMLElement {
 function commentsTitle(total: number, unread: UnreadState): string {
   const base = `${total} comment${total === 1 ? "" : "s"}`;
   return unread.kind === "none" ? base : `${base}, ${unreadWords(unread)}`;
+}
+
+/** "1 of 2 subtasks done". */
+function progressWords(stats: CardStats): string {
+  return `${stats.checklistDone} of ${stats.checklist} subtasks done`;
 }
 
 /** "2 unread comments" / "2 unread comments, one a reply to yours" / "1 unread comment, a reply to yours". */

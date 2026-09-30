@@ -4898,6 +4898,22 @@ describe("unread comments", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the tile with its subtask progress before its unread comments", async () => {
+    // The bar sits inside the tile's role="button" as well, so the name is the only place a screen
+    // reader hears how far the card has got.
+    render_(
+      new FakeRepo(config, {
+        "Tasks/Alpha.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Alpha\n\n## Subtasks\n- [x] one\n- [ ] two\n\n## Comments\n- _2026-06-13 10:00 @agent:_ hi\n",
+        },
+      }),
+    );
+    expect(
+      await screen.findByLabelText("Alpha, 1 of 2 subtasks done, 1 unread comment"),
+    ).toBeInTheDocument();
+  });
+
   it("with no name set nothing is yours, so both comments read as plain unread", async () => {
     render_(conversation());
     const alpha = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
