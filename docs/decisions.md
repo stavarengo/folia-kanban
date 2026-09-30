@@ -366,7 +366,7 @@ So `pnpm contrast:live` prints those nodes as this documented exception, and onl
 
 Since #103 the board draws no neutral or primary button face of its own. A primary action is a `ButtonComponent` set as the call to action, so it takes the host's accent. The hand-drawn controls that remain are the groups named in "Icon-and-label controls stay hand-drawn" and "In-text links and disclosures stay hand-drawn". The filter chip keeps Phase 3's pill radius and coloured on-state. Card chips keep their tag geometry and tuned tints, and colour swatches keep the host swatch radius and shadow. Applying the button radius or neutral fill to those would erase distinctions established in earlier phases. Links and disclosure controls remain transparent. The column-add button keeps the host raised shadow, and the dashed add-column tile stays transparent and flat so its border remains visible.
 
-Every control's focus indicator is the board's accent outline from Phase 3. The host's own focus ring is removed from its controls, because its default border-focus colour has the contrast limitation recorded above.
+Every control's focus indicator is the board's accent outline from Phase 3. The host's own focus ring is removed from its controls, because its default border-focus colour has the contrast limitation recorded above. The same reset also takes away the hover shadow Obsidian gives a dropdown that has focus from a click. Keeping it would mean excluding the class the host adds to mark that focus, which is a selector on a host class, so the shadow goes.
 
 **What would change this:** a change to what these controls represent, or a shipped host focus indicator that meets the earlier decision's conditions.
 
