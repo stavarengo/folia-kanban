@@ -182,13 +182,6 @@
       "alias": "--size-4-2"
     }
   },
-  "progress-height": {
-    "$value": "var(--size-4-1)",
-    "cssVar": "--folia-progress-h",
-    "source": {
-      "alias": "--size-4-1"
-    }
-  },
   "divider-height": {
     "$value": "var(--border-width)",
     "cssVar": "--folia-divider-h",

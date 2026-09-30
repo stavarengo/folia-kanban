@@ -91,7 +91,6 @@
   --folia-dot: var(--size-4-2);
   --folia-unread-dot: var(--size-2-3);
   --folia-todo-mark: var(--size-4-2);
-  --folia-progress-h: var(--size-4-1);
   --folia-divider-h: var(--border-width);
   --folia-ctx-strip-inset: var(--size-2-3); /* the context strip is inset past the priority bar beside it */
   --folia-icon-size: var(--icon-s);
