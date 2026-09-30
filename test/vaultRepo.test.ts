@@ -309,6 +309,16 @@ describe("card-folder resolution against a live vault", () => {
       expect(app.vault.getFileByPath("basic/cards/Two.md")).toBeNull();
     });
 
+    it("is found at the vault root even when a file beside the board takes the fallback name", async () => {
+      const { app, repo } = setup("card-folder: Cards");
+      app.vault.addFile("basic/Cards", "not a folder");
+      app.vault.addFile("cards/One.md", card("status: todo"));
+
+      expect(Object.keys((await repo.loadBoard()).cards)).toEqual(["cards/One.md"]);
+      expect(await repo.createCard("Two", "todo")).toBe("cards/Two.md");
+      expect(app.vault.getFolderByPath("Cards")).toBeNull();
+    });
+
     it("refuses to guess between two spellings, and to create a third", async () => {
       const { app, repo } = setup();
       app.vault.addFile("basic/cards/One.md", card("status: todo"));

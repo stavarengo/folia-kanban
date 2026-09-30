@@ -873,6 +873,12 @@ describe("resolveCardFolder (#20260821.08)", () => {
         caseMatches: [],
       });
     });
+    it("is still found by the other reading when a file takes one", () => {
+      // A bare value beside a file named like it: the vault-root reading may still match by case,
+      // just as an exact folder there would win over the file.
+      expect(pick(board, "Cards", ["cards"], ["basic/Cards"])?.path).toBe("cards");
+      expect(pick(board, "Cards", ["basic/cards"], ["Cards"])?.path).toBe("basic/cards");
+    });
     it("never walks the vault when a reading exists exactly", () => {
       const folders = vi.fn(() => ["cards"]);
       resolveCardFolder(board, "Cards", (p) => (p === "Cards" ? "folder" : null), folders);

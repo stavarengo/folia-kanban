@@ -111,14 +111,16 @@ function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
  * the first one wins and keeps its create-on-first-card story: for a value without an explicit
  * `./`, that is the vault-root reading, exactly where the folder has always been created.
  *
- * Only when nothing at all sits at any reading are the vault's `folders` asked for (walking them is the
- * expensive part), to find the ones a reading names in another letter case. The leading segments a
- * reading shares with the board note's own folder stay exact, since that folder is a real path:
- * a `./Cards` beside `basic/Board.md` never reaches into a `Basic/` next to it. The rest, and
- * always the last segment, is compared ignoring case. Exactly one such
- * folder is taken, under its real path, since every consumer compares that path exactly; with two
- * or more, which one was meant is unknowable, so `path` stays the preferred reading and
- * `caseMatches` lists them for the caller to refuse on. Linux lets `Cards/` and `cards/` coexist.
+ * Only when no reading is an existing folder are the vault's `folders` asked for (walking them is
+ * the expensive part), to find the ones a reading names in another letter case. A reading taken by
+ * a file spelled exactly that way is left out of the search, just as that file never stopped the
+ * other reading from being picked; when it is the preferred reading, the caller refuses the file.
+ * The leading segments a reading shares with the board note's own folder stay exact, since that
+ * folder is a real path: a `./Cards` beside `basic/Board.md` never reaches into a `Basic/` next to
+ * it. The rest, and always the last segment, is compared ignoring case. Exactly one such folder is
+ * taken, under its real path, since every consumer compares that path exactly; with two or more,
+ * which one was meant is unknowable, so `path` stays the preferred reading and `caseMatches` lists
+ * them for the caller to refuse on. Linux lets `Cards/` and `cards/` coexist.
  *
  * `null` when no reading survives at all — see {@link cardFolderCandidates}.
  */
@@ -133,11 +135,10 @@ export function resolveCardFolder(
   if (preferred === undefined) return null;
   const existing = candidates.filter((c) => entryAt(c) === "folder");
   if (existing[0] !== undefined) return { path: existing[0], existing, caseMatches: [] };
-  // A file spelled exactly as written is still what the value names, and the caller refuses it.
-  if (candidates.some((c) => entryAt(c) !== null))
-    return { path: preferred, existing, caseMatches: [] };
+  const open = candidates.filter((c) => entryAt(c) === null);
+  if (open.length === 0) return { path: preferred, existing, caseMatches: [] };
   const home = parentFolder(boardPath).split("/");
-  const matchers = candidates.map((c) => {
+  const matchers = open.map((c) => {
     const segments = c.split("/");
     let kept = 0;
     while (kept < segments.length - 1 && segments[kept] === home[kept]) kept++;
