@@ -5545,6 +5545,8 @@ describe("the detail panel reports a failed write", () => {
 
     await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
+    // The field goes back to what the note says rather than keeping the refused pick.
+    await waitFor(() => expect(within(detail).getByLabelText("Status")).toHaveValue("todo"));
   });
 
   it("refuses giving a subcard a lane's column from the panel", async () => {
@@ -5576,6 +5578,9 @@ describe("the detail panel reports a failed write", () => {
 
     await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Kid.md")?.fm["status"]).toBeUndefined();
+    await waitFor(() =>
+      expect(within(detail).getByLabelText("Column for [[Kid]]")).toHaveValue(""),
+    );
   });
 
   it("does not claim a card is done when the done column refused it", async () => {
@@ -5660,6 +5665,9 @@ describe("the detail panel reports a failed write", () => {
 
     await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")?.body).toBe(before);
+    await waitFor(() =>
+      expect(within(detail).getByLabelText("Column for Buy soil")).toHaveValue(""),
+    );
   });
 
   // The lane judges the line actually being moved. A line added above since the board was drawn

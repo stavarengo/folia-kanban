@@ -111,6 +111,8 @@ export default [
       ...jsxA11yTyped.flatConfigs.recommended.rules,
       // autofocus is deliberate focus management for modals/inline-edit (good a11y here).
       "jsx-a11y/no-autofocus": "off",
+      // Renders the host's <select>, which the rule cannot see through the component.
+      "jsx-a11y/label-has-associated-control": ["error", { controlComponents: ["HostDropdown"] }],
     },
     languageOptions: {
       parser: tseslint.parser,

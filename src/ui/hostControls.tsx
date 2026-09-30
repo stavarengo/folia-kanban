@@ -76,6 +76,9 @@ interface ButtonProps extends HostControlOptions, SlotProps {
   cta?: boolean;
   disabled?: boolean;
   className?: string;
+  /** A name other than the text, for a button whose text leans on what sits beside it. */
+  "aria-label"?: string;
+  title?: string;
 }
 
 export function HostButton({
@@ -85,6 +88,8 @@ export function HostButton({
   disabled = false,
   className,
   slotClassName,
+  "aria-label": ariaLabel,
+  title,
   ...options
 }: ButtonProps) {
   const click = useLatest(onClick);
@@ -93,9 +98,12 @@ export function HostButton({
     className,
   );
   useLayoutEffect(() => {
-    button?.setText(text);
-    button?.setCta(cta);
-    button?.setDisabled(disabled);
+    if (!button) return;
+    button.setText(text);
+    button.setCta(cta);
+    button.setDisabled(disabled);
+    setAttr(button.el, "aria-label", ariaLabel);
+    setAttr(button.el, "title", title);
   });
   return <Slot slot={slot} slotClassName={slotClassName} />;
 }

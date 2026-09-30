@@ -39,27 +39,6 @@
   font-style: italic;
 }
 
-/* Obsidian's own `select, .combobox-button, .dropdown` rule already dresses every bare <select> as
-   a dropdown — `--dropdown-background`, `--input-height`, `--input-radius`, `--input-shadow`, and
-   `@media (hover: hover)` hover on `--dropdown-background-hover` with a disabled guard the board
-   would drop if it wrote its own. All of that is left alone. Two things are kept back.
-
-   Type: the app's rule sets `--font-ui-small`, and in the detail panel a select is a property value
-   beside text inputs that all take the metadata input size, where 13px against the panel's own
-   reads as a mistake rather than as citizenship. The panel is the only place the board draws a
-   select of its own. Padding: `--dropdown-padding` holds 2.4em at
-   the end for the chevron `.dropdown` paints, and the board does not wear that class (see
-   docs/decisions.md), so adopting it would open a gutter with nothing in it.
-
-   Focus stays the board's. Obsidian rings a focused select with 3px of
-   `--background-modifier-border-focus`, which is `#555555` on `#333333` — around 1.7:1, under what
-   an indicator needs — so `.folia-scope :focus-visible` keeps drawing the board's accent outline
-   over it rather than deferring. */
-.folia-fields select {
-  font: inherit;
-  padding: 0 var(--folia-space-md);
-}
-
 /* The host pads every view's content box; the board needs the whole pane. The host rule weighs two
    classes and a theme's stylesheet loads after the plugin's, so a theme restating that rule would
    win a tie. The repeated class outweighs it, as the attribute selector this replaced did. */

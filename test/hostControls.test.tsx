@@ -249,6 +249,19 @@ describe("the React wrappers", () => {
     expect(button).toBeDisabled();
   });
 
+  it("name a text button apart from its text, and drop the name when it goes", () => {
+    const { getByRole, rerender } = render(
+      inRepo(
+        <HostButton text="Add" aria-label="Add property" title="Add property" onClick={() => {}} />,
+      ),
+    );
+    const button = getByRole("button", { name: "Add property" });
+    expect(button).toHaveAttribute("title", "Add property");
+    rerender(inRepo(<HostButton text="Add" onClick={() => {}} />));
+    expect(getByRole("button", { name: "Add" })).toBe(button);
+    expect(button).not.toHaveAttribute("title");
+  });
+
   it("rebuild a dropdown's options only when the list changes, and keep its value", () => {
     const options = [
       { value: "a", label: "A" },

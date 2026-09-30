@@ -41,7 +41,7 @@ import { seenMarkerFor } from "../settings";
 import { assigneeValues, boardAssignees, sameAssignee, toggleAssignee } from "../model/assignees";
 import { describeFill, priorityOptions } from "./cardView";
 import { useBoardActions, useMatchContext, useBoardRootRef, useRepo, useSettings } from "./context";
-import { Icon } from "./icons";
+import { HostButton, HostDropdown, HostIconButton } from "./hostControls";
 import { Markdown } from "./Markdown";
 
 /** What the panel may ask of the dialog it is drawn in; see `DetailModalHandle` in App. */
@@ -266,17 +266,16 @@ function PropRow({
             }
           }}
         />
-        <button
-          className="folia-icon-btn folia-mini"
-          aria-label={`Remove ${name}`}
-          title="Remove property"
+        <HostIconButton
+          className="folia-detail-icon folia-mini"
+          slotClassName="folia-detail-mini-slot"
+          icon="x"
+          label={`Remove ${name}`}
           onClick={() => {
             unsaved.current = null;
             onRemove();
           }}
-        >
-          <Icon name="close" />
-        </button>
+        />
       </div>
       {refusal !== null && (
         <p className="folia-prop-hint folia-prop-refusal" id={hintId}>
@@ -359,7 +358,7 @@ function AssigneeField({
   onToggleMine: () => void;
 }) {
   const hintId = useId();
-  const meButton = useRef<HTMLButtonElement>(null);
+  const field = useRef<HTMLDivElement>(null);
   const value = names.join(", ");
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
   const suggestRef = useFreeTextSuggest(options, setDraft, commit);
@@ -367,7 +366,7 @@ function AssigneeField({
   return (
     // The button is a sibling of the label, not inside it: a label belongs to one control, and one
     // wrapping both would name the button "Assignee" too.
-    <div className="folia-assignee-field">
+    <div className="folia-assignee-field" ref={field}>
       <label>
         <span className="folia-prop-key">Assignee</span>
         <input
@@ -383,7 +382,8 @@ function AssigneeField({
           // would decide the answer. Reading `relatedTarget` catches both ways of getting there,
           // the pointer and the Tab key, which is why it is here rather than on the press.
           onBlur={(e) => {
-            if (meButton.current && e.relatedTarget === meButton.current) {
+            const meButton = field.current?.querySelector(".folia-assignee-me");
+            if (meButton && e.relatedTarget === meButton) {
               setDraft(value);
               return;
             }
@@ -398,19 +398,17 @@ function AssigneeField({
         />
       </label>
       {me !== "" && (
-        <button
-          ref={meButton}
+        <HostButton
           className="folia-btn folia-assignee-me"
-          type="button"
+          slotClassName="folia-assignee-me-slot"
+          text={mine ? "Unassign me" : "Assign to me"}
           title={
             mine
               ? "Take your name off this card, leaving anyone else on it"
               : `Add ${me} to this card`
           }
           onClick={onToggleMine}
-        >
-          {mine ? "Unassign me" : "Assign to me"}
-        </button>
+        />
       )}
       {me === "" && (
         <span className="folia-assignee-hint" id={hintId}>
@@ -480,25 +478,23 @@ function CommentItem({
             className="folia-comment-text"
             onFollowLink={() => dialog?.close()}
           />
-          <button
-            className="folia-icon-btn folia-mini"
-            aria-label="Edit comment"
-            title="Edit"
+          <HostIconButton
+            className="folia-detail-icon folia-mini"
+            slotClassName="folia-detail-mini-slot"
+            icon="pencil"
+            label="Edit comment"
             onClick={() => {
               setDraft(text);
               setEditing(true);
             }}
-          >
-            <Icon name="pencil" />
-          </button>
-          <button
-            className="folia-icon-btn folia-mini"
-            aria-label="Delete comment"
-            title="Delete"
+          />
+          <HostIconButton
+            className="folia-detail-icon folia-mini"
+            slotClassName="folia-detail-mini-slot"
+            icon="trash-2"
+            label="Delete comment"
             onClick={onDelete}
-          >
-            <Icon name="trash" />
-          </button>
+          />
         </div>
       )}
     </li>
@@ -729,14 +725,13 @@ function RelationRow({
         </span>
       )}
       {onRemove ? (
-        <button
-          className="folia-icon-btn folia-mini"
-          aria-label={`Remove ${heading} link to ${label}`}
-          title="Remove"
+        <HostIconButton
+          className="folia-detail-icon folia-mini"
+          slotClassName="folia-detail-mini-slot"
+          icon="x"
+          label={`Remove ${heading} link to ${label}`}
           onClick={onRemove}
-        >
-          <Icon name="close" />
-        </button>
+        />
       ) : note ? (
         <span className="folia-relation-note folia-muted" title={note.title}>
           {note.text}
@@ -1432,16 +1427,14 @@ export function CardDetail({
                 </p>
               )}
               <div className="folia-row-actions">
-                <button
-                  className="folia-btn folia-btn-primary"
+                <HostButton
+                  className="folia-btn"
+                  text="Create"
+                  cta
                   disabled={!createTitle.trim()}
                   onClick={submitCreate}
-                >
-                  Create
-                </button>
-                <button className="folia-btn" onClick={onClose}>
-                  Cancel
-                </button>
+                />
+                <HostButton className="folia-btn" text="Cancel" onClick={onClose} />
               </div>
             </section>
           </div>
@@ -1539,31 +1532,24 @@ export function CardDetail({
           </h2>
           <div className="folia-row-actions">
             {actions.doneColumnId && fm.status !== actions.doneColumnId && (
-              <button
-                className="folia-icon-btn folia-action-done"
-                aria-label="Mark done"
-                title="Mark done"
+              <HostIconButton
+                className="folia-detail-icon folia-detail-action folia-action-done"
+                icon="circle-check"
+                label="Mark done"
                 onClick={() => actions.complete(card)}
-              >
-                <Icon name="check-circle" />
-              </button>
+              />
             )}
-            <button
-              className="folia-icon-btn"
-              aria-label="Open note"
-              title="Open note in Obsidian"
-              onClick={(e) => openElsewhere(() => repo.openCard(path, e.nativeEvent))}
-              onAuxClick={(e) => {
-                if (e.button !== 1) return;
-                openElsewhere(() => repo.openCard(path, e.nativeEvent));
-              }}
-            >
-              <Icon name="external-link" />
-            </button>
-            <button
-              className="folia-icon-btn folia-action-delete"
-              aria-label="Delete card"
-              title="Delete card"
+            <HostIconButton
+              className="folia-detail-icon folia-detail-action"
+              icon="external-link"
+              label="Open note"
+              middleClick
+              onClick={(evt) => openElsewhere(() => repo.openCard(path, evt))}
+            />
+            <HostIconButton
+              className="folia-detail-icon folia-detail-action folia-action-delete"
+              icon="trash-2"
+              label="Delete card"
               onClick={() => {
                 // Set before asking: the panel unmounts as the note goes, before the answer is in.
                 deleting.current = true;
@@ -1571,9 +1557,7 @@ export function CardDetail({
                   if (!gone) deleting.current = false;
                 });
               }}
-            >
-              <Icon name="trash" />
-            </button>
+            />
           </div>
         </div>
 
@@ -1599,11 +1583,13 @@ export function CardDetail({
           <div className="folia-fields">
             <label>
               <span className="folia-prop-key">Status</span>
-              <select
+              <HostDropdown
+                className="folia-status-select"
+                slotClassName="folia-status-slot"
+                options={board.config.columns.map((c) => ({ value: c.id, label: c.title }))}
                 value={String(fm.status ?? "")}
-                onChange={(e) =>
+                onChange={(status) =>
                   void mutate(async () => {
-                    const status = e.target.value;
                     // The panel's Status field is a column change like any other, so a lane that
                     // would not draw the card refuses it here too.
                     if (card && actions.refusedByLane(status, card)) return;
@@ -1614,13 +1600,7 @@ export function CardDetail({
                     if (sync) await repo.applyMove(sync);
                   })
                 }
-              >
-                {board.config.columns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             {/* The one field that does not go through `mutate`: setting a priority also teaches the
               board note its vocabulary, which lives in the shared action, and that action already
@@ -1696,8 +1676,10 @@ export function CardDetail({
                 aria-label="New property value"
                 onChange={(e) => setNewProp({ ...newProp, val: e.target.value })}
               />
-              <button
+              <HostButton
                 className="folia-btn"
+                slotClassName="folia-prop-add-slot"
+                text="Add"
                 aria-label="Add property"
                 disabled={!typedKey || refuseKey}
                 onClick={() => {
@@ -1711,9 +1693,7 @@ export function CardDetail({
                       setNewProp((cur) => (cur.key || cur.val ? cur : { key, val }));
                   });
                 }}
-              >
-                Add
-              </button>
+              />
             </div>
             {ownFieldHint && (
               <p className="folia-prop-hint" id={ownFieldHintId}>
@@ -1765,8 +1745,10 @@ export function CardDetail({
                   </p>
                 )}
                 <div className="folia-row-actions">
-                  <button
-                    className="folia-btn folia-btn-primary"
+                  <HostButton
+                    className="folia-btn"
+                    text="Save"
+                    cta
                     onClick={() => {
                       const refusal = descriptionRefusal(descDraft);
                       if (refusal !== null) {
@@ -1787,19 +1769,16 @@ export function CardDetail({
                         setEditingDesc(false);
                       });
                     }}
-                  >
-                    Save
-                  </button>
-                  <button
+                  />
+                  <HostButton
                     className="folia-btn"
+                    text="Revert"
                     onClick={() => {
                       revertDesc();
                       setDescRefusal(null);
                       setEditingDesc(false);
                     }}
-                  >
-                    Revert
-                  </button>
+                  />
                 </div>
               </>
             ) : body && body.description.trim() ? (
@@ -1823,17 +1802,14 @@ export function CardDetail({
                   className="folia-desc-rendered"
                   onFollowLink={() => dialog?.close()}
                 />
-                <button
-                  className="folia-icon-btn folia-mini folia-desc-edit"
-                  aria-label="Edit description"
-                  title="Edit"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    beginEditDesc();
-                  }}
-                >
-                  <Icon name="pencil" />
-                </button>
+                <HostIconButton
+                  className="folia-detail-icon folia-mini folia-desc-edit"
+                  slotClassName="folia-desc-edit-slot"
+                  icon="pencil"
+                  label="Edit description"
+                  stopPropagation={["click"]}
+                  onClick={beginEditDesc}
+                />
               </div>
             ) : (
               <button
@@ -1905,14 +1881,23 @@ export function CardDetail({
                     const orphanLink = s.kind === "card" && child === null;
                     const claim = subtaskColumn(board, s, resolve);
                     return (
-                      <select
+                      <HostDropdown
                         className="folia-subtask-column"
+                        slotClassName="folia-subtask-column-slot"
                         aria-label={`Column for ${s.text}`}
                         title={orphanLink ? "No card on the board to place" : "Column"}
                         disabled={orphanLink}
+                        options={[
+                          { value: "", label: "With this card" },
+                          ...board.config.columns.map((c) => ({ value: c.id, label: c.title })),
+                          // The board has no such column, so nothing above can be showing — offer
+                          // the written value itself, or there would be no way to select away from it.
+                          ...(claim.known
+                            ? []
+                            : [{ value: claim.value, label: `${claim.value} (no such column)` }]),
+                        ]}
                         value={claim.value}
-                        onChange={(e) => {
-                          const value = e.target.value;
+                        onChange={(value) => {
                           if (!isTodoLine(s)) {
                             if (!child) return;
                             void mutate(async () => {
@@ -1934,25 +1919,14 @@ export function CardDetail({
                           // replaces is the claim shown on this row, and the two readings can differ.
                           actions.moveTodo(path, s, value === "" ? null : value);
                         }}
-                      >
-                        <option value="">With this card</option>
-                        {board.config.columns.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.title}
-                          </option>
-                        ))}
-                        {/* The board has no such column, so nothing above can be showing — offer the
-                          written value itself, or there would be no way to select away from it. */}
-                        {!claim.known && (
-                          <option value={claim.value}>{claim.value} (no such column)</option>
-                        )}
-                      </select>
+                      />
                     );
                   })()}
-                  <button
-                    className="folia-icon-btn folia-mini"
-                    aria-label="Remove"
-                    title="Remove"
+                  <HostIconButton
+                    className="folia-detail-icon folia-mini"
+                    slotClassName="folia-detail-mini-slot"
+                    icon="x"
+                    label="Remove"
                     // A todo asks first, as it does from the tile and the menu; a subcard's line
                     // only unlinks the note, which stays where it is.
                     // The todo action reports its own failure and reloads the board, so only the
@@ -1962,9 +1936,7 @@ export function CardDetail({
                         ? void actions.removeTodo(path, s).then(reload)
                         : void mutate(() => repo.removeSubtask(path, s))
                     }
-                  >
-                    <Icon name="close" />
-                  </button>
+                  />
                 </li>
               ))}
               {body && body.subtasks.length === 0 && (

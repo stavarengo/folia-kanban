@@ -76,6 +76,21 @@
 .folia-detail-header .folia-row-actions {
   flex: 0 0 auto;
 }
+/* The host's icon buttons, drawn on the panel's own sizes: the header's at the card actions' step,
+   the rest by `.folia-mini`. */
+.folia-scope .folia-detail-icon {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.folia-scope .folia-detail-action {
+  width: var(--folia-hit-md);
+  height: var(--folia-hit-md);
+}
+/* A row's small action sits at its end, whatever the row holds before it. */
+.folia-detail-mini-slot {
+  margin-left: auto;
+}
 .folia-detail-body {
   /* The property gutter is a share of this box (see `--folia-prop-key-w`). */
   container-type: inline-size;
@@ -98,11 +113,13 @@
   gap: var(--folia-space-md);
 }
 /* The text and date values are `.folia-prop-input`s like every other value in the panel. The status
-   select keeps the host's dropdown dress (see base.css) and takes only the value's size and height,
-   so the four rows read as the same kind of row as the ones above and below them. */
-.folia-fields select {
+   dropdown is the host's, chevron included, and takes only the value's type and height, so the four
+   rows read as the same kind of row as the ones above and below them. */
+.folia-status-slot,
+.folia-scope .folia-status-select {
   flex: 1 1 auto;
   min-width: 0;
+  font: inherit;
   font-size: var(--metadata-input-font-size);
 }
 
@@ -120,8 +137,10 @@
   flex: 1 1 calc(var(--folia-prop-key-w) + var(--folia-space-md) + var(--folia-assignee-input-w-min));
   min-width: 0;
 }
-.folia-assignee-me {
+.folia-assignee-me-slot {
   flex: none;
+}
+.folia-assignee-me {
   white-space: nowrap;
 }
 .folia-assignee-hint {
@@ -190,7 +209,7 @@
 }
 /* One height for every value box, text, date or select: the host's own for a property value. */
 .folia-scope .folia-prop-input,
-.folia-fields select {
+.folia-scope .folia-status-select {
   height: var(--metadata-input-height);
 }
 /* The host also gives a typed input a hover fill and border (`input[type='date']:not(:disabled):hover`)
@@ -205,7 +224,7 @@
   border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);
 }
-.folia-prop-add .folia-btn {
+.folia-prop-add-slot {
   flex: 0 0 auto;
 }
 /* Why the Add button is refusing a property name that the panel already edits somewhere else. */
@@ -366,10 +385,12 @@
   border-color: var(--folia-border);
 }
 
-.folia-scope .folia-desc-edit {
+.folia-desc-edit-slot {
   position: absolute;
   top: var(--folia-space-xs);
   right: var(--folia-space-xs);
+}
+.folia-scope .folia-desc-edit {
   opacity: var(--folia-opacity-hidden);
   transition: opacity var(--folia-dur-fast) ease;
 }
@@ -624,12 +645,17 @@
    control, frame and chevron included; at `--folia-opacity-subtle` its label fell under WCAG AA in
    both schemes, and `--folia-opacity-muted` clears it. A disabled one (a link naming no card) has
    nothing to reveal, so hovering its row leaves it quiet. */
-.folia-scope .folia-subtask-column {
+.folia-subtask-column-slot {
   flex: 0 0 auto;
   margin-left: auto;
   max-width: 40%;
+}
+.folia-scope .folia-subtask-column {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--folia-font-size-xs);
-  padding: var(--folia-space-hair) var(--folia-space-xs);
+  /* Only the height: the host's own side padding holds the room its chevron is drawn in. */
+  padding-block: var(--folia-space-hair);
   opacity: var(--folia-opacity-muted);
 }
 .folia-scope .folia-subtask:hover .folia-subtask-column:not(:disabled),
