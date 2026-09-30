@@ -1,41 +1,17 @@
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import type { Board as BoardModel, Card, ColumnDef } from "../model/types";
-import {
-  columnOf,
-  filterVisiblePaths,
-  findDoneColumn,
-  isTodoLine,
-  moveColumn,
-  moveSubtask,
-  parseTodoPath,
-  resolveDrop,
-  reassignColumn,
-  relationCounts,
-  subtaskRef,
-  todoTile,
-} from "../model/board";
-import {
-  addCard,
-  moveCardOver,
-  moveCardTo,
-  setCardPriority,
-  setSubtaskDone,
-} from "../model/boardOps";
-import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
-import { DEFAULT_PRIORITIES } from "../model/priorities";
+import type { ContextConfig, RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
-import type { ColumnPatch } from "../model/columns";
-import { isCollapsedIn, seenMarkerFor, type BoardSettings, type SettingsPatch } from "../settings";
-import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
+import type { MatchContext } from "../model/filter";
+import type { BoardSettings, SettingsPatch } from "../settings";
 import {
   BoardActionsContext,
   ContextsContext,
@@ -44,74 +20,17 @@ import {
   MatchContextContext,
   SettingsContext,
   BoardRootContext,
-  unreadStateOf,
   type BoardActions,
-  type PinnedSeen,
-  type CopyPathForm,
+  type SettingsContextValue,
 } from "./context";
-
 import { Board } from "./Board";
-import { CardDetail, DetailDialogContext } from "./CardDetail";
+import { DetailDialogContext } from "./detailDialog";
 import { Toolbar } from "./Toolbar";
 import { useToday } from "./useToday";
-import { matchCard, parseFilter, type MatchContext } from "../model/filter";
-import { boardPriorities } from "./cardView";
-
-/** Stable empty contexts map (#14) so the provider value identity doesn't churn pre-load. */
-const EMPTY_CONTEXTS = {} as const;
-
-/** Stable empty relation-count map, same reason. */
-const EMPTY_RELATION_COUNTS = {} as const;
-
-/** Stable empty column list, so the actions object keeps its identity before the board loads. */
-const EMPTY_COLUMNS: readonly ColumnDef[] = [];
-const EMPTY_PRIORITIES: readonly string[] = [];
-
-/**
- * Merge a column edit patch onto the current def. A key set to `undefined` in the patch CLEARS
- * that field, so it is dropped from the result (serializeColumns prunes defaults/blanks after).
- */
-function applyColumnPatch(c: ColumnDef, patch: ColumnPatch): ColumnDef {
-  const merged = { ...c, ...patch };
-  const next: ColumnDef = { id: c.id, title: merged.title ?? c.title };
-  if (merged.color !== undefined) next.color = merged.color;
-  if (merged.limit !== undefined) next.limit = merged.limit;
-  if (merged.filter !== undefined) next.filter = merged.filter;
-  if (merged.group !== undefined) next.group = merged.group;
-  if (merged.sort !== undefined) next.sort = merged.sort;
-  if (merged.opacity !== undefined) next.opacity = merged.opacity;
-  if (merged.hoverOpacity !== undefined) next.hoverOpacity = merged.hoverOpacity;
-  if (merged.parked !== undefined) next.parked = merged.parked;
-  return next;
-}
-
-/**
- * The card a lane's rule is asked about. A checklist line is judged by the tile the person acted on,
- * since that tile is the reading the move is held to; a note by what the board holds now, since a
- * note's fields are read afresh by the move itself.
- */
-function laneSubject(board: BoardModel, card: Card): Card {
-  return card.todoRef ? card : (board.cards[card.path] ?? card);
-}
-
-/** The text one copy form puts on the clipboard; `null` only when the vault has no disk path. */
-function pathForm(
-  path: string,
-  form: CopyPathForm,
-  boardPath: string,
-  repo: CardRepository,
-): string | null {
-  switch (form) {
-    case "absolute":
-      return repo.absolutePath(path);
-    case "board":
-      return relativeToFolder(parentFolder(boardPath), path);
-    case "name":
-      return baseName(path);
-    case "vault":
-      return path;
-  }
-}
+import { useBoardLoad } from "./useBoardLoad";
+import { useDetailPanel } from "./useDetailPanel";
+import { useBoardView } from "./useBoardView";
+import { useBoardWrites } from "./useBoardWrites";
 
 /** The open dialog the card detail panel is drawn in. See {@link BoardHost.openDetailModal}. */
 export interface DetailModalHandle {
@@ -206,32 +125,8 @@ interface Props {
 }
 
 export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
-  const [board, setBoard] = useState<BoardModel | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  // Add-card flows: which column is in CREATE mode, plus a flag to focus the description of a
-  // freshly-created card. Both cleared when the panel closes.
-  const [createColumn, setCreateColumn] = useState<string | null>(null);
-  const [focusNew, setFocusNew] = useState(false);
-  // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
-  const [focusAddSubcard, setFocusAddSubcard] = useState(false);
-  // One-shot: focus the open card's "Override card title" field (the context-menu action).
-  const [focusTitleOverride, setFocusTitleOverride] = useState(false);
-  // The detail panel's identity, and the ONLY thing that remounts it. It is bumped when the panel
-  // is pointed at something else (another card, the create form), and deliberately NOT when the
-  // open card's own file is renamed or moved: the panel is then still about the same card, and a
-  // remount would throw away everything half-typed in it. Every per-card draft in `CardDetail`
-  // rides on this — the panel's state is scoped to one mount, so nothing typed on one card can
-  // still be sitting in a field when the panel moves to the next.
-  const [openId, setOpenId] = useState(0);
-  const openIdRef = useRef(openId);
-  openIdRef.current = openId;
-  // Advances on every open, including a re-open of the card already showing. The panel's one-shot
-  // focus actions ride on this instead of on a remount; see `openCard`.
-  const [focusSeq, setFocusSeq] = useState(0);
-  // The rename a file op has just made under the open card, from its old path to its new one; see
-  // the `onFileOp` effect below.
-  const [renamedTo, setRenamedTo] = useState<{ from: string; to: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { board, error, load } = useBoardLoad(repo);
+  const panel = useDetailPanel(repo, board, load);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
   const [query, setQuery] = useState("");
@@ -243,857 +138,108 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     [settings, onUpdateSettings],
   );
 
-  const notify = useCallback(
-    (text: string, tone: "success" | "error" = "success") => repo.showNotice(text, tone),
-    [repo],
-  );
-  const reportError = useCallback(
-    (e: unknown) => notify(e instanceof Error ? e.message : String(e), "error"),
-    [notify],
-  );
-  // Latest board for stable callbacks — lets the actions object stay referentially stable
-  // across single-card edits so memoized cards don't all re-render.
-  const boardRef = useRef<BoardModel | null>(null);
-  boardRef.current = board;
-  // Filled below, once the board and the settings it reads are in hand. The write paths run long
-  // after that, so they read it here rather than closing over a value declared after them.
-  const matchCtxRef = useRef<MatchContext | null>(null);
-  // Reads can overlap — every vault change fires another `load`, and the read it starts can take
-  // longer than one already in flight. Only the newest requested load may land, the same sequence
-  // guard `CardDetail` uses for its own per-card body reads: a result whose number has been
-  // superseded by the time it resolves is dropped rather than handed to `setBoard`/`setError`.
-  const loadSeq = useRef(0);
-  /** Resolves true when this read is the one that landed, false when a newer one superseded it. */
-  const load = useCallback(async (): Promise<boolean> => {
-    const seq = ++loadSeq.current;
-    try {
-      const b = await repo.loadBoard();
-      if (seq !== loadSeq.current) return false;
-      setBoard(b);
-      setError(null);
-    } catch (e) {
-      if (seq !== loadSeq.current) return false;
-      setError(e instanceof Error ? e.message : String(e));
-    }
-    return true;
-  }, [repo]);
-
-  useEffect(() => {
-    void load();
-    const off = repo.onChange(() => void load());
-    return off;
-  }, [load, repo]);
-
-  // The open card follows its file when that file is renamed, moved, or deleted from OUTSIDE the
-  // board (the file explorer, another plugin, an edit on disk), and the panel closes when the file
-  // is gone. In-app renames/deletes do this in `renameCard`/`remove`; this covers everything else.
-  // Only the selection: it belongs to this view. The per-card maps in plugin data are followed by
-  // the plugin itself (`followFileOp` in main.ts), which is also awake when no board is open.
-  //
-  // A file op is reported the moment the vault makes it, while the board reload it triggers is
-  // debounced — so for a short window the board still knows this card only under its old path.
-  // `renamedTo` names the path the selection was just moved to, and keeps the panel open across
-  // that window; without it the panel would unmount and take every uncommitted draft with it.
-  // Holding the PATH rather than a flag is what makes it self-checking: a board that arrives
-  // knowing some other card cannot keep a panel open for this one.
-  const selectedRef = useRef<string | null>(null);
-  selectedRef.current = selected;
-  useEffect(
-    () =>
-      repo.onFileOp((op) => {
-        const cur = selectedRef.current;
-        if (cur === null) return;
-        const next = remapPath(cur, op);
-        if (next === cur) return;
-        // A delete leaves nothing to follow: the selection clears and the panel closes at once.
-        setRenamedTo(next === null ? null : { from: cur, to: next });
-        setSelected(next);
-      }),
-    [repo],
-  );
-  // The window closes on the first board that can actually answer for the new path: one that has
-  // the card there, or one that no longer has it under the old path either (moved out of the card
-  // folder, say) and so really does close the panel. A board still showing the old path was read
-  // before the rename and finished after it — it knows nothing about this, and letting it clear
-  // the window would unmount the panel and take every draft with it.
-  useEffect(() => {
-    setRenamedTo((r) =>
-      r === null || board === null || board.cards[r.to] != null || board.cards[r.from] == null
-        ? null
-        : r,
-    );
-  }, [board]);
-
+  const view = useBoardView({
+    board,
+    settings,
+    query,
+    today: todayValue,
+    selected: panel.selected,
+  });
+  const writes = useBoardWrites({
+    repo,
+    board,
+    load,
+    panel,
+    matchCtx: view.matchCtx,
+    doneColumnId: view.doneColumnId,
+    priorities: view.priorities,
+    onUpdateSettings,
+    inlineEdit: settings.addCardFlow === "inline-edit",
+  });
   // Whether the board's own chrome is on screen at all — the two renders below stand in for it,
   // one while the first load is in flight and one when a load has failed, and neither has a root
   // or a search box. A boolean rather than the board object so a reload, which builds a new board
   // every time, does not churn everything keyed on this.
-  const boardShown = board !== null && error === null;
-
-  /**
-   * A lane is a view of its rule and never an owner of a card, so filing one into a lane it does
-   * not match would leave the card claiming a column that will not draw it. The write is refused
-   * with the reason instead: nothing is written, and the card returns to where it was.
-   */
-  const refusedByLane = useCallback(
-    (columnId: string, card: Card): boolean => {
-      const b = boardRef.current;
-      const ctx = matchCtxRef.current;
-      if (!b || !ctx) return false;
-      const why = laneRefusal(b, columnId, card, ctx);
-      if (why === null) return false;
-      notify(`${why} Nothing was changed.`, "error");
-      return true;
-    },
-    [notify],
-  );
-
-  const onMove = useCallback(
-    async (dragged: Card, overId: string) => {
-      const b = boardRef.current;
-      if (!b) return;
-      const resolved = resolveDrop(b, dragged.path, overId);
-      if (resolved && refusedByLane(resolved.columnId, laneSubject(b, dragged))) {
-        // Board holds the make-room gap open across the drop and clears it when a reloaded board
-        // arrives, so a refusal still has to reload: that is what puts the card back where it was
-        // rather than leaving it in a gap no column draws.
-        await load();
-        return;
-      }
-      try {
-        await moveCardOver(repo, b, { card: dragged, overId });
-      } catch (e) {
-        // A move can now touch more than one note; what failed in a second note must be seen.
-        reportError(e);
-      } finally {
-        await load();
-      }
-    },
-    [repo, load, reportError, refusedByLane],
-  );
-
-  /** Adds the card, answering at once whether it was taken, so a refused title stays typed. */
-  const onAddCard = useCallback(
-    (columnId: string, title: string): boolean => {
-      const b = boardRef.current;
-      const ctx = matchCtxRef.current;
-      if (!b || !ctx) return false;
-      // A lane's rule is written onto the card where it names a plain value, so adding to an
-      // `area:research` lane makes a research card. What is left is judged before the note exists:
-      // a title that misses a lane's words, say, is a card that lane would never draw.
-      const fill = laneFill(b, columnId, ctx);
-      if (refusedByLane(columnId, prospectiveCard(title, columnId, fill))) return false;
-      void (async () => {
-        try {
-          const path = await addCard(repo, { title, columnId, fill });
-          await load();
-          // 'inline' (default): add-only — stay in the column, don't open the detail.
-          // 'inline-edit': open the new card's detail and focus its description for editing.
-          if (settings.addCardFlow === "inline-edit") {
-            setFocusNew(true);
-            setOpenId((n) => n + 1);
-            setSelected(path);
-          }
-        } catch (e) {
-          reportError(e);
-        }
-      })();
-      return true;
-    },
-    [repo, load, settings.addCardFlow, reportError, refusedByLane],
-  );
-
-  const doneColumnId = useMemo(
-    () => (board ? findDoneColumn(board.config.columns) : null),
-    [board],
-  );
-
-  const moveTo = useCallback(
-    async (card: Card, columnId: string): Promise<boolean> => {
-      const b = boardRef.current;
-      if (!b) return false;
-      // Answered, not swallowed: a caller that reports success afterwards must not report it over
-      // a refusal that already said the opposite.
-      if (refusedByLane(columnId, laneSubject(b, card))) return false;
-      try {
-        await moveCardTo(repo, b, { card, columnId });
-        return true;
-      } finally {
-        await load();
-      }
-    },
-    [repo, load, refusedByLane],
-  );
-
-  const setColumnsAndReload = useCallback(
-    async (cols: ColumnDef[]) => {
-      try {
-        await repo.setColumns(cols);
-      } finally {
-        await load();
-      }
-    },
-    [repo, load],
-  );
-
-  // What the board actually knows: its remembered vocabulary plus the values its cards carry.
-  // Empty for a board that has never seen a priority — the pickers substitute the todo.txt
-  // starting set below, but nothing empty is ever written back to the note.
-  const vocabulary = useMemo(
-    () => (board ? boardPriorities(board.config.priorities, Object.values(board.cards)) : []),
-    [board],
-  );
-  const priorities = useMemo(
-    () => (vocabulary.length ? vocabulary : [...DEFAULT_PRIORITIES]),
-    [vocabulary],
-  );
-
-  /**
-   * Set a card's priority and let the board note learn from it.
-   *
-   * The note only ever learns when the user sets a priority — never while loading — and what it
-   * learns is that one value, appended to the list it already holds. The rest of the vocabulary
-   * above stays a suggestion: those values are ordered by a tone guess and a spelling tie-break,
-   * and the note's order is a ranking, so writing them in would rank words nobody ranked. A value
-   * only a card carries therefore joins the note the first time someone actually picks it, and no
-   * more of the suggested `A`/`B`/`C` starting set is ever written than the one a user picks.
-   * Clearing a priority learns nothing: it is a removal, and the point of remembering is that the
-   * vocabulary survives its last card.
-   */
-  const setPriorityAndReload = useCallback(
-    async (path: string, raw: string) => {
-      // Whitespace-only is no priority at all, the way every other priority path reads it.
-      const value = raw.trim();
-      try {
-        const shown = boardRef.current?.cards[path]?.frontmatter.priority;
-        await setCardPriority(repo, {
-          path,
-          value,
-          ...(typeof shown === "string" ? { current: shown } : {}),
-        });
-      } catch (e) {
-        reportError(e);
-      } finally {
-        await load();
-      }
-    },
-    [repo, load, reportError],
-  );
-
-  // Opening a real card resets every add-card flow field so a stale create form can't resurface
-  // when the panel later flips to create mode (e.g. the opened card is deleted out from under it).
-  // Invariant: createColumn is null whenever a real card's details are on screen.
-  const openCard = useCallback((path: string) => {
-    setFocusNew(false);
-    setFocusAddSubcard(false);
-    setFocusTitleOverride(false);
-    setCreateColumn(null);
-    // An inline todo placed in its own column has no note of its own, so opening its tile opens the
-    // note that owns the checklist line — where the todo is edited, exactly as it always was. One
-    // place, so no caller has to know which kind of tile it just handed us.
-    const target = parseTodoPath(path)?.parentPath ?? path;
-    // A new panel identity ONLY when the panel is pointed at something else. Re-opening the card
-    // already showing — a second click on its tile, or a context-menu action on it — leaves the
-    // mount alone, because remounting would throw away everything half-typed in it. The one-shot
-    // focus actions still fire, on `focusSeq` rather than on the new mount.
-    if (target !== selectedRef.current) setOpenId((n) => n + 1);
-    setFocusSeq((n) => n + 1);
-    setSelected(target);
-  }, []);
-
-  /**
-   * Run a rename and let the view follow the file. A rename that moves the note is the card's
-   * identity changing, and everything this view keys by path has to move with it — otherwise a
-   * toggled card silently resets to the board default and its already-read comments all light up
-   * again, and the vacated path could later hand that state to an unrelated card reusing it.
-   * Settings move BEFORE the selection does: the detail panel snapshots the card's read marker on
-   * the render that first shows the new path, and it must find the migrated one there. The patch
-   * is built from the settings at write time, not this render's snapshot, so another view's write
-   * landing in between is not undone.
-   */
-  const runRename = useCallback(
-    async (path: string, rename: () => Promise<string>) => {
-      try {
-        const newPath = await rename();
-        if (newPath !== path) {
-          onUpdateSettings((s) => {
-            const migrated: Partial<BoardSettings> = {};
-            const collapsed = s.collapsedCards[path];
-            if (collapsed !== undefined)
-              migrated.collapsedCards = {
-                ...withoutKey(s.collapsedCards, path),
-                [newPath]: collapsed,
-              };
-            const seen = s.commentsSeen[path];
-            if (seen !== undefined)
-              migrated.commentsSeen = { ...withoutKey(s.commentsSeen, path), [newPath]: seen };
-            return migrated;
-          });
-          setSelected((cur) => (cur === path ? newPath : cur));
-        }
-      } catch (e) {
-        reportError(e);
-      } finally {
-        await load();
-      }
-    },
-    [load, onUpdateSettings, reportError],
-  );
-
-  const actions = useMemo<BoardActions>(
-    () => ({
-      open: openCard,
-      startCreate: (col) => {
-        setSelected(null);
-        setCreateColumn(col);
-        setOpenId((n) => n + 1);
-      },
-      addSubcard: (path) => {
-        // The subcard needs a title; route through the detail's existing add-subcard input
-        // (which calls repo.addSubcard on Enter) rather than inventing a separate prompt.
-        openCard(path);
-        setFocusAddSubcard(true);
-      },
-      editTitleOverride: (path) => {
-        openCard(path);
-        setFocusTitleOverride(true);
-      },
-      reportError,
-      refusedByLane,
-      complete: (card) => {
-        if (!doneColumnId) return;
-        void moveTo(card, doneColumnId)
-          .then((moved) => {
-            if (moved) notify(`${card.title} — done!`);
-          })
-          .catch(reportError);
-      },
-      remove: async (path) => {
-        let gone = false;
-        try {
-          gone = await repo.promptDeleteCard(path);
-          if (gone)
-            // Prune the per-path plugin data this card owned — its collapse-state override
-            // (§ collapse) and its comments-seen marker (§ unread). Left behind, either would
-            // silently hand its state to an unrelated card someone later creates at this same
-            // path. Built from the settings at write time, not this render's snapshot, so another
-            // view's write landing in between is not undone. Only once the file is actually gone:
-            // a delete that failed or was cancelled leaves the card, and it must keep what it had.
-            onUpdateSettings((s) => {
-              const prune: Partial<BoardSettings> = {};
-              if (s.collapsedCards[path] !== undefined)
-                prune.collapsedCards = withoutKey(s.collapsedCards, path);
-              if (s.commentsSeen[path] !== undefined)
-                prune.commentsSeen = withoutKey(s.commentsSeen, path);
-              return prune;
-            });
-        } catch (e) {
-          reportError(e);
-        }
-        if (gone) setSelected((cur) => (cur === path ? null : cur));
-        await load();
-        return gone;
-      },
-      openNote: (path, evt) => void repo.openCard(path, evt),
-      copyPath: (path, form) => {
-        const text = pathForm(path, form, boardRef.current?.config.path ?? "", repo);
-        if (text === null) {
-          // Only the filesystem form can be missing, and only where the vault has no filesystem
-          // path at all (mobile). Say that instead of copying something the person did not ask for.
-          notify("This vault has no filesystem path on this device", "error");
-          return;
-        }
-        // Not `navigator.clipboard?.writeText(…)`: where the API is missing, optional chaining
-        // short-circuits the whole chain and the click would do nothing at all, silently.
-        const clipboard = navigator.clipboard;
-        if (!clipboard) {
-          notify("This device gives the plugin no clipboard access", "error");
-          return;
-        }
-        void clipboard
-          .writeText(text)
-          .then(() => notify(`Copied ${text}`))
-          .catch(() => notify("Could not write to the clipboard", "error"));
-      },
-      markCommentsSeen: (path, marker) =>
-        onUpdateSettings((s) => {
-          if ((s.commentsSeen[path] ?? "") === marker) return {};
-          return {
-            commentsSeen: marker
-              ? { ...s.commentsSeen, [path]: marker }
-              : withoutKey(s.commentsSeen, path),
-          };
-        }),
-      setPriority: (path, value) => setPriorityAndReload(path, value),
-      setAssignee: async (path, value) => {
-        const next = typeof value === "string" ? value.trim() : value;
-        try {
-          // Nobody removes the key rather than leaving `assignee:` sitting there empty — an
-          // unassigned card should read as one in its note too, and `assignee:none` finds it
-          // either way.
-          if (next === null || next === "") await repo.unsetFrontmatterKey(path, "assignee");
-          else await repo.setFrontmatter(path, { assignee: next });
-        } catch (e) {
-          reportError(e);
-        } finally {
-          await load();
-        }
-      },
-      renameCard: (path, title) => {
-        const t = title.trim();
-        if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
-        void runRename(path, () => repo.renameCard(path, t));
-      },
-      renameFile: (path, newBasename) => {
-        const name = newBasename.trim();
-        if (!name) return; // a blank file name is no name at all — the field reverts
-        void runRename(path, () => repo.renameFile(path, name));
-      },
-      moveWithinColumn: (path, dir) => {
-        const b = boardRef.current;
-        const card = b?.cards[path];
-        // A checklist line has no slot of its own: its order is its place in its parent's list.
-        if (!b || !card || card.todoRef) return;
-        const col = columnOf(b, path);
-        if (!col) return;
-        const list = b.columns[col] ?? [];
-        const i = list.indexOf(path);
-        if (i < 0) return;
-        if (dir < 0 ? i <= 0 : i >= list.length - 1) return; // already at the edge
-        // dropIndex is computed against the list with `path` removed: up (-1) lands before the
-        // former predecessor, down (+1) lands after the former successor.
-        const dropIndex = i + dir;
-        void (async () => {
-          try {
-            await moveCardTo(repo, b, { card, columnId: col, index: dropIndex });
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
-      },
-      columnEdges: (path) => {
-        const b = boardRef.current;
-        if (!b) return { canMoveUp: false, canMoveDown: false };
-        const col = columnOf(b, path);
-        const list = col ? (b.columns[col] ?? []) : [];
-        const i = list.indexOf(path);
-        return { canMoveUp: i > 0, canMoveDown: i >= 0 && i < list.length - 1 };
-      },
-      readTodo: (path, index) => {
-        const b = boardRef.current;
-        const line = b && subtaskRef(b, path, index);
-        // A todo and nothing else. The actions this reading is taken for are the todo actions, and
-        // a line naming a child note is a different thing with a different write behind it — one
-        // that reaches into that other note. None of the callers can point at such a line today;
-        // handing one back would be the way that changes without anybody deciding it.
-        return line && isTodoLine(line) ? line : null;
-      },
-      toggleTodo: (path, line, done) => {
-        void (async () => {
-          try {
-            // The line as the caller read it, text and all: the write refuses rather than tick a
-            // position the note has since given to somebody else's todo.
-            const b = boardRef.current;
-            if (!b) throw new Error(`"${path}" no longer has the subtask that was clicked.`);
-            // Ticking a box is also a statement about where the work belongs, for a line that
-            // claims a column, so the claim is kept in step with the checkbox.
-            const ctx = matchCtxRef.current;
-            const refused = await setSubtaskDone(repo, b, {
-              path,
-              line,
-              done,
-              ...(ctx ? { ctx } : {}),
-            });
-            if (refused !== null) {
-              notify(`${refused} The box is ticked; its column is unchanged.`, "error");
-            }
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
-      },
-      moveTodo: (path, line, columnId) => {
-        void (async () => {
-          try {
-            const b = boardRef.current;
-            // The card has to be there, because the move is worked out against it: which column
-            // the card itself stands in. A board without it is one this choice no longer fits — a
-            // renamed card is on the board under its old path for a moment — and that is reported
-            // rather than swallowed, with the same reload behind it.
-            if (!b || !b.cards[path])
-              throw new Error(
-                `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
-              );
-            // A placed checklist line stands in a column exactly as a card does, so a lane may no
-            // more take one by hand.
-            if (columnId !== null) {
-              const todo = todoTile(b, path, line, columnId);
-              if (todo && refusedByLane(columnId, todo)) return;
-            }
-            // The line is named, so the one `null` left here is the line already standing, BY THE
-            // READING THIS CHOICE WAS MADE AGAINST, where it was just sent — which is the reading
-            // the person was looking at when they picked, the panel's row or the menu's ticked
-            // column. They asked for no change and there is none to report; a note that has moved
-            // on underneath is not something their pick failed at, and the reload below is what
-            // brings the board onto it. Every other pick does reach the write, and a claim that
-            // moved is refused there, loudly.
-            const mut = moveSubtask(b, path, line, columnId);
-            if (!mut) {
-              // "The line already says this", by the reading the choice was made against — and that
-              // stays the answer however far the note has drifted since, because a pick that asks
-              // for no change has none to report and nothing was written for a drifted note to
-              // refuse. What it cannot cover is a position the board holds no line at: there the
-              // reading was not merely older, it was of a row that has gone, and the pick has
-              // nowhere to have landed. Only that is said out loud.
-              if (subtaskRef(b, path, line.index)?.kind !== "todo")
-                throw new Error(
-                  `The board no longer draws the todo that was moved in "${path}". Let it reload and try again.`,
-                );
-              return;
-            }
-            await repo.applyMove(mut);
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
-      },
-      removeTodo: async (path, line) => {
-        try {
-          const ok = await repo.confirm({
-            title: "Remove todo",
-            message: `Remove "${line.text}" from the note's checklist?`,
-            cta: "Remove",
-          });
-          if (!ok) return;
-          // The line as it read when the person asked, not as it reads now: the note refuses the
-          // delete when the position no longer holds that line, however long they took.
-          await repo.removeSubtask(path, line);
-        } catch (e) {
-          reportError(e);
-        } finally {
-          await load();
-        }
-      },
-      doneColumnId,
-      columns: board?.config.columns ?? EMPTY_COLUMNS,
-      priorities,
-      priorityScale: board?.config.priorities ?? EMPTY_PRIORITIES,
-      renameColumn: (id, title) => {
-        const b = boardRef.current;
-        const t = title.trim();
-        if (!b || !t) return;
-        void setColumnsAndReload(
-          b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)),
-        );
-      },
-      updateColumn: (id, patch) => {
-        const b = boardRef.current;
-        if (!b) return;
-        // Merge the patch onto the current def; serializeColumns then drops anything equal to its
-        // default (group:"none", sort:"manual", opacity:1, parked:false) or blank, so the write
-        // stays byte-stable. We pass the merged def straight through and let §2 do the pruning.
-        void setColumnsAndReload(
-          b.config.columns.map((c) => (c.id === id ? applyColumnPatch(c, patch) : c)),
-        );
-      },
-      moveColumn: (id, dir) => {
-        const b = boardRef.current;
-        if (!b) return;
-        const cols = [...b.config.columns];
-        const i = cols.findIndex((c) => c.id === id);
-        const j = i + dir;
-        if (i < 0 || j < 0 || j >= cols.length) return;
-        const ci = cols[i];
-        const cj = cols[j];
-        if (!ci || !cj) return;
-        [cols[i], cols[j]] = [cj, ci];
-        void setColumnsAndReload(cols);
-      },
-      reorderColumns: (activeId, overId) => {
-        const b = boardRef.current;
-        if (!b) return;
-        const next = moveColumn(b.config.columns, activeId, overId);
-        if (next === b.config.columns) return; // no-op (same slot / unknown id)
-        void setColumnsAndReload(next);
-      },
-      deleteColumn: (id) => {
-        // Refused before asking, so nobody confirms a delete that cannot happen, and worked out
-        // again after: the board may have reloaded while the dialog was open.
-        const asked = boardRef.current && columnDeletePlan(boardRef.current, id);
-        if (!asked) return;
-        if ("refusal" in asked) {
-          notify(asked.refusal, "error");
-          return;
-        }
-        void (async () => {
-          const ok = await repo.confirm({
-            title: "Delete column",
-            message: `Delete "${asked.title}"? Its cards move to a neighbouring column.`,
-            cta: "Delete",
-          });
-          const b = boardRef.current;
-          const plan = ok && b ? columnDeletePlan(b, id) : null;
-          if (!b || !plan) return;
-          if ("refusal" in plan) {
-            notify(plan.refusal, "error");
-            return;
-          }
-          // Reassign this column's items to a neighbour so none are orphaned — cards through their
-          // frontmatter, placed inline todos through their own checklist line.
-          // One that cannot be rehomed does not stop the others, but it is not swallowed either:
-          // the column is about to go, and an item left claiming it would be stranded quietly.
-          let stranded: unknown;
-          for (const p of plan.orphans) {
-            if (!plan.neighbor) break;
-            const mut = reassignColumn(b, p, plan.neighbor);
-            if (!mut) continue;
-            try {
-              await repo.applyMove(mut);
-            } catch (e) {
-              stranded ??= e;
-            }
-          }
-          if (stranded !== undefined) reportError(stranded);
-          try {
-            await repo.setColumns(b.config.columns.filter((c) => c.id !== id));
-          } finally {
-            await load();
-          }
-        })();
-      },
-      addColumn: (title) => {
-        const b = boardRef.current;
-        const t = title.trim();
-        if (!b || !t) return;
-        const existing = new Set(b.config.columns.map((c) => c.id));
-        const base =
-          t
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "") || "column";
-        let id = base;
-        let n = 1;
-        while (existing.has(id)) id = `${base}-${n++}`;
-        void setColumnsAndReload([...b.config.columns, { id, title: t }]);
-      },
-    }),
-    [
-      openCard,
-      moveTo,
-      doneColumnId,
-      priorities,
-      board?.config.priorities,
-      repo,
-      load,
-      setColumnsAndReload,
-      setPriorityAndReload,
-      notify,
-      reportError,
-      refusedByLane,
-      board?.config.columns,
-      onUpdateSettings,
-    ],
-  );
-
-  const wipLimits = useMemo<Record<string, number>>(() => {
-    const map: Record<string, number> = {};
-    if (board)
-      for (const c of board.config.columns) if (typeof c.limit === "number") map[c.id] = c.limit;
-    return map;
-  }, [board]);
-
-  // Context configs (#14) for the marker provider. Every load() builds a fresh `board.contexts`
-  // object; key the memo on its serialized content so its identity only flips when a context's
-  // name/color/label actually changes — otherwise every CardItem (a consumer) would re-render on
-  // each reload, defeating App's deliberate frontmatter-reference memo optimization.
-  const contextsValue = board?.contexts ?? EMPTY_CONTEXTS;
-  const contextsKey = JSON.stringify(contextsValue);
-  const stableContexts = useMemo(() => contextsValue, [contextsKey]);
-
-  // Blocking markers: the counts every card tile reads. Recomputed per board load — an edit to
-  // one card changes what its neighbours show, so this can't live on the memoized card props.
-  const relationCountsValue = useMemo(
-    () => (board ? relationCounts(board, doneColumnId) : EMPTY_RELATION_COUNTS),
-    [board, doneColumnId],
-  );
-
-  // Parse the query once per change; Board/Column filter with this same parsed §1 Filter.
-  const filter = useMemo(() => parseFilter(query), [query]);
-
-  // The open card's seen-marker as it was when it was selected, so an `unread:` filter keeps the
-  // card on the board for the whole visit (see `unreadStateOf`). Re-read only when the selection
-  // changes: derived during render so it is captured before the panel's own effect marks the
-  // comments seen.
-  const [pinnedSeen, setPinnedSeen] = useState<PinnedSeen | null>(null);
-  if ((pinnedSeen?.path ?? null) !== selected) {
-    setPinnedSeen(selected ? { path: selected, seen: seenMarkerFor(settings, selected) } : null);
-  }
-  const matchCtx = useMemo<MatchContext>(
-    () => ({
-      today: todayValue,
-      doneColumnId,
-      relations: relationCountsValue,
-      unread: unreadStateOf(settings, pinnedSeen),
-      me: settings.userName,
-    }),
-    [todayValue, doneColumnId, relationCountsValue, settings, pinnedSeen],
-  );
-  matchCtxRef.current = matchCtx;
-
-  const counts = useMemo(() => {
-    let total = 0;
-    let match = 0;
-    if (board) {
-      const matchesFilter = (p: string) => {
-        const c = board.cards[p];
-        return c != null && matchCard(c, filter, matchCtx);
-      };
-      // The two halves of "N of M" are deliberately asymmetric. M is every card that EXISTS on the
-      // board, nested ones included, so the denominator does not shift while you type. N credits a
-      // card only when it both matches AND renders somewhere — `filterVisiblePaths` is the one
-      // place that decides "somewhere", mirroring Column: nested under a matching parent that is
-      // drawing its children, lifted to a plain column, or standing in a column that actually draws
-      // it. Counting nested cards in M is what keeps N ≤ M once a lifted subcard can be credited at
-      // all: the old bucket-only denominator could be exceeded by it.
-      const visible = filterVisiblePaths(board, {
-        matches: matchesFilter,
-        showsChildren: (p) => !isCollapsedIn(settings, p),
-        ctx: matchCtx,
-      });
-      for (const path of Object.keys(board.cards)) {
-        total++;
-        if (visible.has(path) && matchesFilter(path)) match++;
-      }
-    }
-    return { total, match };
-  }, [board, filter, matchCtx, settings]);
-
-  // "/" focuses the search box, as the placeholder advertises. The host owns when the key is this
-  // board's — only it knows which leaf has focus — and the board owns whether it wants that one.
-  // Bound only while there is a box to focus, because that is the only way to leave the key alone:
-  // once the host has the key registered, declining it does NOT pass it to another shortcut, it
-  // only stops Obsidian cancelling it, which is enough for the field the user is typing in to
-  // receive its own slash but not enough for a hotkey bound to "/" to fire. Unbinding is what
-  // takes the registration away entirely.
-  useEffect(() => {
-    if (!boardShown) return;
-    return host.bindSearchShortcut((event) => {
-      const el = event.target as HTMLElement | null;
-      const tag = el?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
-        return false;
-      searchRef.current?.focus();
-      return true;
-    });
-  }, [host, boardShown]);
+  useSearchShortcut(host, board !== null && error === null, searchRef);
 
   if (error) return <div className="folia-error">Couldn’t load the board: {error}</div>;
   if (!board) return <div className="folia-loading">Loading board…</div>;
 
-  const detailOpen =
-    selected != null && (board.cards[selected] != null || renamedTo?.to === selected);
-  // The create form hands over to the card it made once the board draws that card, whichever load
-  // brought it. Waiting on one particular load would not do: a newer one can supersede it.
-  const handedOver = createColumn != null && detailOpen;
-  if (handedOver) setCreateColumn(null);
-  const createMode = createColumn != null && !detailOpen;
-  const panelShown = detailOpen || createMode;
-
-  const closeDetail = () => {
-    setSelected(null);
-    setCreateColumn(null);
-    setFocusNew(false);
-    setFocusAddSubcard(false);
-    setFocusTitleOverride(false);
-  };
-
-  // Both branches share `openId` as their key on purpose: the create form and the card it creates
-  // are one panel the user never sees close, so they must be one mounted component.
-  const detail = detailOpen ? (
-    <CardDetail
-      key={openId}
-      path={selected}
-      board={board}
-      focusNew={focusNew}
-      focusAddSubcard={focusAddSubcard}
-      focusTitleOverride={focusTitleOverride}
-      focusSeq={focusSeq}
-      onClose={closeDetail}
-      onNavigate={openCard}
-      onChanged={() => void load()}
-    />
-  ) : createMode ? (
-    <CardDetail
-      key={openId}
-      path=""
-      board={board}
-      createColumn={createColumn}
-      onClose={closeDetail}
-      onChanged={() => void load()}
-      onCreated={(newPath) => {
-        // The create form stays up until a board that knows the new card arrives (see
-        // `handedOver` above); with no panel in between, the dialog would close and reopen. Once a
-        // read of ours has landed, the board is as current as it gets: a card it still does not
-        // draw is not coming, and the form goes rather than wait for it — unless the panel has been
-        // pointed at something else meanwhile, another create form included, which is not ours.
-        const panel = openIdRef.current;
-        setFocusNew(true);
-        setSelected(newPath);
-        void (async () => {
-          while (!(await load()));
-          if (openIdRef.current === panel) setCreateColumn(null);
-        })();
-      }}
-    />
-  ) : null;
-
+  const { shown, detail } = panel.render(board);
   return (
-    <SettingsContext.Provider value={settingsValue}>
+    <BoardContexts
+      settings={settingsValue}
+      repo={repo}
+      actions={writes.actions}
+      contexts={view.contexts}
+      relations={view.relations}
+      matchCtx={view.matchCtx}
+      root={rootRef}
+    >
+      <div className="folia-root folia-scope" ref={rootRef}>
+        <Toolbar
+          ref={searchRef}
+          query={query}
+          onChange={setQuery}
+          matchCount={view.counts.match}
+          totalCount={view.counts.total}
+          canFilterMine={settings.userName.trim() !== ""}
+        />
+        {board.cardFolderWarning && (
+          <div className="folia-card-folder-notice" role="status">
+            {board.cardFolderWarning}
+          </div>
+        )}
+        <div className="folia-main" role="region" aria-label="Board">
+          <Board
+            board={board}
+            today={todayValue}
+            selectedPath={panel.selected}
+            wipLimits={view.wipLimits}
+            filter={view.filter}
+            doneColumnId={view.doneColumnId}
+            onMove={(card, overId) => void writes.onMove(card, overId)}
+            onAddCard={writes.onAddCard}
+          />
+        </div>
+        {shown && (
+          <DetailDialog host={host} onClosed={panel.closeDetail}>
+            {detail}
+          </DetailDialog>
+        )}
+      </div>
+    </BoardContexts>
+  );
+}
+
+/** Everything the board's components read from context rather than props. */
+function BoardContexts({
+  settings,
+  repo,
+  actions,
+  contexts,
+  relations,
+  matchCtx,
+  root,
+  children,
+}: {
+  settings: SettingsContextValue;
+  repo: CardRepository;
+  actions: BoardActions;
+  contexts: Record<string, ContextConfig>;
+  relations: Record<string, RelationCount[]>;
+  matchCtx: MatchContext;
+  root: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  return (
+    <SettingsContext.Provider value={settings}>
       <RepoContext.Provider value={repo}>
         <BoardActionsContext.Provider value={actions}>
-          <ContextsContext.Provider value={stableContexts}>
-            <RelationCountsContext.Provider value={relationCountsValue}>
+          <ContextsContext.Provider value={contexts}>
+            <RelationCountsContext.Provider value={relations}>
               <MatchContextContext.Provider value={matchCtx}>
-                <BoardRootContext.Provider value={rootRef}>
-                  <div className="folia-root folia-scope" ref={rootRef}>
-                    <Toolbar
-                      ref={searchRef}
-                      query={query}
-                      onChange={setQuery}
-                      matchCount={counts.match}
-                      totalCount={counts.total}
-                      canFilterMine={settings.userName.trim() !== ""}
-                    />
-                    {board.cardFolderWarning && (
-                      <div className="folia-card-folder-notice" role="status">
-                        {board.cardFolderWarning}
-                      </div>
-                    )}
-                    <div className="folia-main" role="region" aria-label="Board">
-                      <Board
-                        board={board}
-                        today={todayValue}
-                        selectedPath={selected}
-                        wipLimits={wipLimits}
-                        filter={filter}
-                        doneColumnId={doneColumnId}
-                        onMove={(card, overId) => void onMove(card, overId)}
-                        onAddCard={onAddCard}
-                      />
-                    </div>
-                    {panelShown && (
-                      <DetailDialog host={host} onClosed={closeDetail}>
-                        {detail}
-                      </DetailDialog>
-                    )}
-                  </div>
-                </BoardRootContext.Provider>
+                <BoardRootContext.Provider value={root}>{children}</BoardRootContext.Provider>
               </MatchContextContext.Provider>
             </RelationCountsContext.Provider>
           </ContextsContext.Provider>
@@ -1104,37 +250,28 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
 }
 
 /**
- * What deleting a column means on this board: where its cards go, or why it cannot go. `null` for
- * a column that is not there, or the last one, which is kept.
+ * "/" focuses the search box, as the placeholder advertises. The host owns when the key is this
+ * board's — only it knows which leaf has focus — and the board owns whether it wants that one.
+ * Bound only while there is a box to focus, because that is the only way to leave the key alone:
+ * once the host has the key registered, declining it does NOT pass it to another shortcut, it
+ * only stops Obsidian cancelling it, which is enough for the field the user is typing in to
+ * receive its own slash but not enough for a hotkey bound to "/" to fire. Unbinding is what
+ * takes the registration away entirely.
  */
-function columnDeletePlan(
-  b: BoardModel,
-  id: string,
-): { title: string; neighbor: string | undefined; orphans: string[] } | { refusal: string } | null {
-  const cols = b.config.columns;
-  const idx = cols.findIndex((c) => c.id === id);
-  const col = cols[idx];
-  if (!col || cols.length <= 1) return null;
-  // A lane owns no card — it draws by its rule — so rehoming into one would set a `status` the
-  // lane may refuse, and the cards would surface in the fallback column with nothing said. The
-  // nearest column that is not a lane is the only honest neighbour.
-  const neighbor =
-    [...cols.slice(0, idx)].reverse().find((c) => !c.filter) ??
-    cols.slice(idx + 1).find((c) => !c.filter);
-  const orphans = b.columns[id] ?? [];
-  // An empty column needs no home for anything and just goes. A column with cards and no plain
-  // column left to take them cannot be deleted without stranding them, and says so rather than
-  // doing nothing.
-  if (!neighbor && orphans.length > 0)
-    return {
-      refusal: `"${col.title}" still holds cards, and every other column is filled by a rule rather than by status — there is nowhere to move them. Move them yourself first, or add a plain column.`,
-    };
-  return { title: col.title, neighbor: neighbor?.id, orphans };
-}
-
-/** A copy of a path-keyed map without one entry. */
-function withoutKey<T>(map: Record<string, T>, key: string): Record<string, T> {
-  const next = { ...map };
-  delete next[key];
-  return next;
+function useSearchShortcut(
+  host: BoardHost,
+  boardShown: boolean,
+  searchRef: { readonly current: Pick<HTMLElement, "focus"> | null },
+) {
+  useEffect(() => {
+    if (!boardShown) return;
+    return host.bindSearchShortcut((event) => {
+      const el = event.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable)
+        return false;
+      searchRef.current?.focus();
+      return true;
+    });
+  }, [host, boardShown, searchRef]);
 }

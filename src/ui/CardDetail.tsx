@@ -16,8 +16,6 @@ import { CardTitleFields } from "./TitleFields";
 import { useCardPanel, type CardPanelState } from "./useCardPanel";
 import type { DescriptionEditor } from "./useDescriptionEditor";
 
-export { DetailDialogContext } from "./detailDialog";
-
 interface Props {
   path: string;
   board: Board;

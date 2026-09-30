@@ -311,7 +311,7 @@ The detail panel and the edit-column dialog are Obsidian's `Modal`, and the menu
 
 **Decided 2026-09-30 (#94). 110ms for hover, reveal and state changes; 170ms for things that travel (a card's hover lift, a parked column's slide); `cubic-bezier(0.16, 1, 0.3, 1)` for both.**
 
-Obsidian documents no durations or curves; its `--anim-*` variables are not on the reference pages. Folding the two durations into one was considered and not done: it would speed up the card lift and the column slide, and nothing reported them as wrong. The drop animation in `src/ui/Board.tsx` is dnd-kit's, set in code: it copies the curve, which `test/themeGeometry.test.ts` holds equal to the stylesheet's, and runs 200ms, a third duration, set there because dnd-kit takes a number in code rather than a CSS value. Under `prefers-reduced-motion` every transition is shortened to 0.01ms rather than zero, so a `transitionend` still fires, and the drag motions are switched off through dnd-kit (see "Keep standard scrollbars and reduced-motion detection").
+Obsidian documents no durations or curves; its `--anim-*` variables are not on the reference pages. Folding the two durations into one was considered and not done: it would speed up the card lift and the column slide, and nothing reported them as wrong. The drop animation in `src/ui/BoardDragOverlay.tsx` is dnd-kit's, set in code: it copies the curve, which `test/themeGeometry.test.ts` holds equal to the stylesheet's, and runs 200ms, a third duration, set there because dnd-kit takes a number in code rather than a CSS value. Under `prefers-reduced-motion` every transition is shortened to 0.01ms rather than zero, so a `transitionend` still fires, and the drag motions are switched off through dnd-kit (see "Keep standard scrollbars and reduced-motion detection").
 
 **What would change this:** Obsidian documenting a motion scale, or a live report that one of the durations reads wrong.
 
@@ -663,7 +663,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 
 - **Drag and drop** (`@dnd-kit` in `src/ui/Board.tsx`, `Column.tsx` and `CardItem.tsx`): Obsidian's drag manager is not in `obsidian.d.ts`.
 - **The due-date field** (`<input type="date">` in `src/ui/CardDetail.tsx`): the API has no date component.
-- **Board panning** (`src/ui/Board.tsx`, the `boardPan` setting): the host has no panning facility.
+- **Board panning** (`src/ui/boardPan.ts`, the `boardPan` setting): the host has no panning facility.
 - **The `/` shortcut's check for a field being typed in** (`bindSearchShortcut` in `src/view.tsx`, its handler in `src/ui/App.tsx`): a `Scope` knows nothing of editable targets and stops at the first match whatever the handler returns, so the handler declines the key itself, and the key is registered only while there is a search box to focus.
 - **The day-change check** (`RECHECK_MS` in `src/ui/useToday.ts`, once a minute): Obsidian has no "day changed" event.
 - **The filter grammar** (`parseFilter` in `src/model/filter.ts`): `prepareSimpleSearch` and `prepareFuzzySearch` match text and know nothing of `due:`, lanes or the board's other tokens.
@@ -674,12 +674,12 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **The settings write chain** (`pendingWrite` in `src/main.ts`): `saveData` does not serialise calls, and two in flight can land on disk in either order.
 - **The agent-access queues** (the `turn` chain in `createServer`, `src/obsidian/mcpHttpServer.ts`, and `enqueue` in `src/obsidian/mcpService.ts` for starting and stopping the server): Node's server takes requests concurrently, two board writes must never compute against the same snapshot, and the API has no async queue.
 - **`onChange` and `onFileOp` on the repository port** (`src/model/repo.ts`): a thin layer over `vault.on`, because an `EventRef` cannot cross into the model.
-- **`navigator.clipboard` and `crypto.getRandomValues`** (`src/main.ts` and `src/ui/App.tsx`; `newMcpToken` in `src/obsidian/mcpService.ts`): the API has no helper for either.
+- **`navigator.clipboard` and `crypto.getRandomValues`** (`src/main.ts` and `src/ui/cardActions.ts`; `newMcpToken` in `src/obsidian/mcpService.ts`): the API has no helper for either.
 - **No translations**: `getLanguage()` tells a plugin the app's language, but Obsidian has no string catalogue or loader for plugins.
 - **The `.theme-light` override** (`src/theme/tokens.css`, the only place it is used): a host class, and still inside "Folia uses only what Obsidian documents", because the developer docs' "Build a theme" page tells themes to define the documented variables under `.theme-dark` or `.theme-light`. The scheme classes are how those variables are scoped, and the board's own scheme-dependent values follow them the same way.
 - **Thin scrollbars and reduced motion**: see "Keep standard scrollbars and reduced-motion detection".
 - **Stacking inside the leaf**: see "Stacking inside the board is plain numbers".
-- **Inline `style=` values** (`src/ui/Board.tsx`, `Column.tsx`, `CardItem.tsx` and `CardDetail.tsx`): runtime data such as dnd-kit's transforms, a column's or context's colour and a measured height, not design.
+- **Inline `style=` values** (`src/ui/BoardDragOverlay.tsx`, `Column.tsx`, `CardItem.tsx` and `CardDetail.tsx`): runtime data such as dnd-kit's transforms, a column's or context's colour and a measured height, not design.
 - **`var(--color-${name})` for column colours** (`src/ui/columnColors.ts`): these are Obsidian's documented palette variables, picked by name.
 - **The inline status lines**: see "The board's inline status lines stay its own".
 - **Already native, only hand-built looking**: `renderMarkdown` in `src/obsidian/vaultRepo.ts` renders through `MarkdownRenderer` with a `Component` it loads and unloads, React mounts on the view's `contentEl`, the `/` shortcut is registered on the view's own `Scope`, and `refreshViews` in `src/main.ts` walks `getLeavesOfType`.

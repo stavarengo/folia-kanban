@@ -16,7 +16,7 @@
   /* motion — Obsidian publishes no durations or easing curves */
   --folia-dur-fast: 110ms; /* hover, reveal and state changes */
   --folia-dur: 170ms; /* things that travel: a card's lift, a parked column's slide */
-  --folia-ease: cubic-bezier(0.16, 1, 0.3, 1); /* also the drop animation in src/ui/Board.tsx */
+  --folia-ease: cubic-bezier(0.16, 1, 0.3, 1); /* also the drop animation in src/ui/BoardDragOverlay.tsx */
 
   /* pointer targets — a theme that shrinks its inputs must not shrink them below 24px */
   --folia-hit-min: 24px; /* the smallest pointer target the board draws */
@@ -62,7 +62,7 @@
 
   /* Channels: written onto an element below this block, by the board's code or by a component
      rule, so the live value always wins where it is set. These are what every other element reads. */
-  --folia-col-accent: var(--interactive-accent); /* Column.tsx and Board.tsx write the column's colour */
+  --folia-col-accent: var(--interactive-accent); /* Column.tsx and BoardDragOverlay.tsx write the column's colour */
   --folia-col-opacity: 1; /* Column.tsx writes a parked column's fade */
   --folia-col-hover-opacity: 1; /* and the fade it lifts to on hover */
   /* `initial` is the guaranteed-invalid value, so `var(--folia-ctx-color, …)` still falls through to
