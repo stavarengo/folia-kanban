@@ -104,6 +104,20 @@ The second half of this is `await import("http")` in `src/obsidian/mcpHttpServer
 
 **What would change this:** someone wanting the board on a phone badly enough to fund the styling pass — touch-sized targets, the hover-only affordances given a tap route, and `.is-phone`/`.is-tablet` layouts — with a device to check it on. That is its own entry when it comes, not a manifest edit. Nothing about the gated `http` import changes with it: the server is desktop-only whatever the manifest says, because `http` does not exist on mobile.
 
+## Agent access stays an HTTP server the plugin hosts, not a command on Obsidian's CLI
+
+**Decided 2026-09-27 (#98). The MCP server keeps its own Streamable HTTP endpoint; `Plugin.registerCliHandler` is not used for it.**
+
+`Plugin.registerCliHandler` (since Obsidian 1.12.2) is the nearest native API, and it is a different behaviour rather than a native form of this one. It registers a command the `obsidian` command line can run: the handler receives one flat map of `string | 'true'` values (`CliData`) and returns one string (`CliHandler`), and the typings give it nothing else, no stdin and no way to write before it returns. An MCP client cannot be pointed at that. It speaks JSON-RPC over stdio or over HTTP, so the handler would sit behind a second program, shipped and installed outside the plugin, that turns every tool call into `obsidian folia-kanban:… key=value` and back, with the nested arguments the tools take (`properties`, whose values can be lists such as `assignee`, and `move_card`'s `line`, an object of its own) squeezed into strings.
+
+What that route would lose, per [Obsidian's CLI help](https://obsidian.md/help/cli):
+
+- **An agent in a container.** It reaches its host through the container's gateway, which is why the bind address exists (see "Moving it off this computer" in `docs/mcp.md`); the help documents no way to reach the CLI from another machine or a container, and no authentication for it, so the bind address and token model have nothing to attach to.
+- **A server that is either there or not.** The CLI needs the app running, and when it is not, the first command launches it: an agent's call would open Obsidian on the desktop. The HTTP server refuses the connection instead.
+- **Working with no setup outside the plugin.** The CLI needs the Obsidian 1.12 installer, not only the app version, so a user on an older installer has to download and reinstall Obsidian. It is then off until the user enables it under Settings → General and registers it on their PATH, and the handler needs 1.12.2 where the manifest's `minAppVersion` is 1.11.4.
+
+**What would change this:** Obsidian hosting MCP tools for plugins itself, which would replace the server outright, or a documented way for a CLI command to stay open and exchange messages over stdin and stdout, which would let a client launch it as a stdio server with nothing else installed. The second would be a reason to add stdio beside HTTP, not to move off it, since a client that is not on this computer would still need the HTTP server.
+
 ## A property row keeps the type its value already has, not the type Obsidian registered for the name
 
 **Decided 2026-09-29 (#77). Editing a custom property in the detail panel keeps the YAML type of the value in the note: a number stays a number, `true`/`false` stays a boolean, and text that type cannot hold is refused with the reason under the field.**
