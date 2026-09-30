@@ -71,7 +71,7 @@ module.exports = {
       name: "node-builtins-stay-in-adapter-and-shell",
       severity: "error",
       comment:
-        "Node's modules do not exist on mobile. The adapter loads the few it needs lazily behind a desktop check; nothing else in src may import them, dynamically or type-only included. The UI, model and MCP reach no module outside src but these, so a direct ban is a transitive one for them.",
+        "Node's modules are a platform detail. The adapter imports the few it needs, which is safe only because the manifest is isDesktopOnly (see docs/decisions.md); nothing else in src may import them, dynamically or type-only included. The UI, model and MCP reach no module outside src but these, so a direct ban is a transitive one for them.",
       from: { path: "^src/", pathNot: "^src/obsidian/|^src/(main\\.ts|view\\.tsx)$" },
       to: { dependencyTypes: ["core"] },
     },

@@ -21,9 +21,10 @@ const tree: Record<string, string> = {
   "src/bindAddress.ts": "export const bind = 1;\n",
   "src/settings.ts": 'export { bind } from "./bindAddress";\nexport type Settings = { a: 1 };\n',
   "src/obsidian/adapter.ts": [
+    'import { createServer } from "http";',
     'import { Plugin } from "obsidian";',
     'import { shell } from "electron";',
-    'export const adapter = async () => [Plugin, shell, await import("http")];',
+    "export const adapter = () => [Plugin, shell, createServer];",
     "",
   ].join("\n"),
   "src/model/io.ts":
@@ -114,7 +115,7 @@ describe("architecture boundaries (dependency-cruiser)", () => {
       "model-and-mcp-stay-off-the-ui-stack: src/model/a.ts → npm:react/index.js",
       "model-is-pure-domain: src/model/a.ts → src/settings.ts",
       // Node's modules stay in the adapter and shell, `node:`-prefixed, dynamic and type-only too;
-      // the adapter's own lazy import("http") stays allowed.
+      // the adapter's own import of "http" stays allowed.
       "node-builtins-stay-in-adapter-and-shell: src/mcp/store.ts → node:sqlite",
       "node-builtins-stay-in-adapter-and-shell: src/model/io.ts → fs",
       "node-builtins-stay-in-adapter-and-shell: src/model/io.ts → path",
