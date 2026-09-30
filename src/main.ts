@@ -1,8 +1,16 @@
-import type { MarkdownFileInfo, Menu, SettingDefinitionItem, TAbstractFile } from "obsidian";
+import type {
+  MarkdownFileInfo,
+  Menu,
+  PaneType,
+  SettingDefinitionItem,
+  TAbstractFile,
+} from "obsidian";
 import {
   FuzzySuggestModal,
+  Keymap,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -171,7 +179,11 @@ export default class FoliaKanbanPlugin extends Plugin {
         ),
     );
 
-    this.addRibbonIcon("layout-grid", "Open Folia Kanban board", () => void this.activateView());
+    this.addRibbonIcon(
+      "layout-grid",
+      "Open Folia Kanban board",
+      (evt) => void this.activateView(Keymap.isModEvent(evt)),
+    );
     this.addCommand({
       id: "folia-open-kanban-board",
       name: OPEN_BOARD_COMMAND_NAME,
@@ -447,11 +459,13 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.syncMarkdownActions();
   }
 
-  async activateView(): Promise<void> {
+  /** `newLeaf` is what the click asked for, as `Keymap.isModEvent` reads it: false for a plain
+   *  click, which leaves the choice of tab to {@link openBoard}. */
+  async activateView(newLeaf: PaneType | boolean = false): Promise<void> {
     // If the note in the editor is itself a board, open that one — no prompting.
     const active = this.app.workspace.getActiveFile();
     if (active && this.isBoard(active)) {
-      await this.openBoard(active.path);
+      await this.openBoard(active.path, newLeaf);
       return;
     }
 
@@ -465,11 +479,16 @@ export default class FoliaKanbanPlugin extends Plugin {
     }
     if (boards.length === 1) {
       const board = boards[0];
-      if (board) await this.openBoard(board.path);
+      if (board) await this.openBoard(board.path, newLeaf);
       return;
     }
-    // Several boards — let the user pick which to open.
-    new BoardChooserModal(this.app, boards, (f) => void this.openBoard(f.path)).open();
+    // Several boards — let the user pick which to open. A modifier held on the pick decides where it
+    // goes; without one, the click that raised the chooser still does.
+    new BoardChooserModal(
+      this.app,
+      boards,
+      (f, evt) => void this.openBoard(f.path, Keymap.isModEvent(evt) || newLeaf),
+    ).open();
   }
 
   /**
@@ -522,7 +541,7 @@ export default class FoliaKanbanPlugin extends Plugin {
         item
           .setTitle("Create Folia board here")
           .setIcon("layout-grid")
-          .onClick(() => void this.createBoard(target)),
+          .onClick((evt) => void this.createBoard(target, Keymap.isModEvent(evt))),
       );
       return;
     }
@@ -532,7 +551,7 @@ export default class FoliaKanbanPlugin extends Plugin {
         item
           .setTitle("Convert to Folia board")
           .setIcon("layout-grid")
-          .onClick(() => void this.convertToBoard(file)),
+          .onClick((evt) => void this.convertToBoard(file, Keymap.isModEvent(evt))),
       );
     }
   }
@@ -540,22 +559,25 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Make a note that is already a board. `parent` is the folder the user right-clicked; without
    *  one, the note lands wherever Obsidian's own "new note location" setting puts new notes — which
    *  is why the active file is passed along, since one of the settings means "beside it". */
-  private async createBoard(parent: TFolder | null): Promise<void> {
+  private async createBoard(
+    parent: TFolder | null,
+    newLeaf: PaneType | boolean = false,
+  ): Promise<void> {
     try {
       const source = this.app.workspace.getActiveFile()?.path ?? "";
       const folder = parent ?? this.app.fileManager.getNewFileParent(source);
       const path = uniqueNotePath(folder.path, NEW_BOARD_BASENAME, pathTaken(this.app.vault));
       const title = path.slice(path.lastIndexOf("/") + 1, -".md".length);
-      await this.makeBoard(await this.app.vault.create(path, boardNoteBody(title)));
+      await this.makeBoard(await this.app.vault.create(path, boardNoteBody(title)), newLeaf);
     } catch (e) {
       new Notice(`Folia Kanban: could not create the board note. ${String(e)}`, 8000);
     }
   }
 
   /** Add the board properties to a note that already exists. */
-  private async convertToBoard(file: TFile): Promise<void> {
+  private async convertToBoard(file: TFile, newLeaf: PaneType | boolean = false): Promise<void> {
     try {
-      await this.makeBoard(file);
+      await this.makeBoard(file, newLeaf);
     } catch (e) {
       new Notice(`Folia Kanban: could not convert this note into a board. ${String(e)}`, 8000);
     }
@@ -564,7 +586,7 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** The one step both guided paths share: write the board properties through Obsidian's own
    *  frontmatter API — which is what puts them at the very top, whether or not the note had any —
    *  give the board a card folder of its own, and show it. */
-  private async makeBoard(file: TFile): Promise<void> {
+  private async makeBoard(file: TFile, newLeaf: PaneType | boolean): Promise<void> {
     // The tab the board will land in is settled first, because it is also the one whose editor has
     // to be flushed *before* the write. A note being typed in has a buffer ahead of the disk, and
     // the tab swap writes that buffer out when the editor closes — after the properties have landed,
@@ -586,8 +608,11 @@ export default class FoliaKanbanPlugin extends Plugin {
     // Straight to the board view rather than through the file-open redirect: that one asks the
     // metadata cache what the note is, and the cache has not read the frontmatter written a moment
     // ago, so it would answer "ordinary note" and leave the user in the editor. A tab holding some
-    // *other* board is left alone too, which is where `openBoard` would have put this one.
-    const leaf = open ?? this.app.workspace.getLeaf(true);
+    // *other* board is left alone too, which is where `openBoard` would have put this one. A
+    // modifier asks for a new pane, and leaves the note's editor where it is.
+    const leaf = newLeaf
+      ? this.app.workspace.getLeaf(newLeaf)
+      : (open ?? this.app.workspace.getLeaf(true));
     await this.showBoardIn(leaf, file.path, true);
     await this.app.workspace.revealLeaf(leaf);
   }
@@ -603,15 +628,18 @@ export default class FoliaKanbanPlugin extends Plugin {
     return isBoardFrontmatter(this.app.metadataCache.getFileCache(f)?.frontmatter);
   }
 
-  private async openBoard(boardPath: string): Promise<void> {
+  /** `newLeaf` set means the user asked for a new tab, split or window with a modifier key, and
+   *  gets one even when a tab already shows this board, as Ctrl/Cmd-click does in the explorer. */
+  private async openBoard(boardPath: string, newLeaf: PaneType | boolean = false): Promise<void> {
     const { workspace } = this.app;
     // A tab already holding this note — as the board or as Markdown — is the one the user means.
-    let leaf =
-      this.leafShowing(VIEW_TYPE_KANBAN, boardPath) ?? this.leafShowing("markdown", boardPath);
     // Otherwise reuse an existing board tab, and only then open a new one (a board wants width).
-    leaf ??=
-      workspace.getLeavesOfType(VIEW_TYPE_KANBAN).find((l) => this.isEditingSurface(l)) ??
-      workspace.getLeaf(true);
+    const leaf = newLeaf
+      ? workspace.getLeaf(newLeaf)
+      : (this.leafShowing(VIEW_TYPE_KANBAN, boardPath) ??
+        this.leafShowing("markdown", boardPath) ??
+        workspace.getLeavesOfType(VIEW_TYPE_KANBAN).find((l) => this.isEditingSurface(l)) ??
+        workspace.getLeaf(true));
     await this.showBoardIn(leaf, boardPath, true);
     await workspace.revealLeaf(leaf);
   }
@@ -912,10 +940,29 @@ class BoardChooserModal extends FuzzySuggestModal<TFile> {
   constructor(
     app: App,
     private boards: TFile[],
-    private onChoose: (file: TFile) => void,
+    private onChoose: (file: TFile, evt: MouseEvent | KeyboardEvent) => void,
   ) {
     super(app);
     this.setPlaceholder("Choose a Folia Kanban board to open");
+    // The modal binds only a bare Enter. This takes Enter with any modifiers, as Obsidian's command
+    // palette does, and hands the key event to `onChooseItem`, where `Keymap.isModEvent` reads it the
+    // same way it reads a modified click.
+    this.scope.register(null, "Enter", (evt) => {
+      if (evt.isComposing) return;
+      this.selectActiveSuggestion(evt);
+      return false;
+    });
+    // Worded as the quick switcher words its own.
+    const mod = Platform.isMacOS ? "⌘" : "ctrl";
+    const alt = Platform.isMacOS ? "⌥" : "alt";
+    this.setInstructions([
+      { command: "↑↓", purpose: "to navigate" },
+      { command: "↵", purpose: "to open" },
+      { command: `${mod} ↵`, purpose: "to open in new tab" },
+      { command: `${mod} ${alt} ↵`, purpose: "to open to the right" },
+      { command: `${mod} ${alt} shift ↵`, purpose: "to open in new window" },
+      { command: "esc", purpose: "to dismiss" },
+    ]);
   }
 
   getItems(): TFile[] {
@@ -929,8 +976,8 @@ class BoardChooserModal extends FuzzySuggestModal<TFile> {
       : file.basename;
   }
 
-  onChooseItem(file: TFile): void {
-    this.onChoose(file);
+  onChooseItem(file: TFile, evt: MouseEvent | KeyboardEvent): void {
+    this.onChoose(file, evt);
   }
 }
 
