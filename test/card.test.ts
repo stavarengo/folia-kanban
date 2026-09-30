@@ -1331,3 +1331,28 @@ describe("does the note still read the line the caller described", () => {
     expect(commentStillReads(crlf, { index: 0, text: "one" })).toBe(true);
   });
 });
+
+describe("appending past a code fence left open inside the last section", () => {
+  it("closes the fence before the new line, with or without a trailing newline", () => {
+    const expected = "# T\n\n## Comments\n```\ncode\n```\n- _2026-08-23 10:00:_ new\n";
+    expect(appendComment("# T\n\n## Comments\n```\ncode", "new", "2026-08-23 10:00")).toBe(
+      expected,
+    );
+    expect(appendComment("# T\n\n## Comments\n```\ncode\n", "new", "2026-08-23 10:00")).toBe(
+      expected,
+    );
+  });
+
+  it("closes it before the trailing blank lines when the section ends the note", () => {
+    expect(addTodo("# T\n\n## Subtasks\n- [ ] one\n```\nx\n\n", "two")).toBe(
+      "# T\n\n## Subtasks\n- [ ] one\n```\nx\n```\n- [ ] two\n\n",
+    );
+  });
+});
+
+describe("clearing a status the line never had", () => {
+  it("leaves the line byte for byte, its own spacing included", () => {
+    const doc = "# T\n\n## Subtasks\n- [ ] Plain  text \n";
+    expect(setSubtaskStatus(doc, 0, null)).toBe(doc);
+  });
+});

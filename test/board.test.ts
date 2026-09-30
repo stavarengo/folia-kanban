@@ -1699,3 +1699,190 @@ describe("subitems in a column of their own", () => {
     });
   });
 });
+
+describe("buildBoard's full output on one board holding every kind of placement", () => {
+  const todo = (text: string, index: number, status?: string): TodoLine =>
+    status === undefined
+      ? { kind: "todo", text, done: false, index, occurrence: 0 }
+      : { kind: "todo", text, done: false, status, index, occurrence: 0 };
+  const link = (target: string, index: number): SubItem => ({
+    kind: "card",
+    text: `[[${target}]]`,
+    done: false,
+    link: target,
+    index,
+    occurrence: 0,
+  });
+  function note(path: string, fm: Partial<Card["frontmatter"]> = {}, items: SubItem[] = []): Card {
+    const basename = path.replace(/.*\//, "").replace(/\.md$/, "");
+    return {
+      path,
+      basename,
+      title: basename,
+      titleSource: "filename",
+      frontmatter: fm,
+      childLinks: items.flatMap((s) => (s.kind === "card" && s.link ? [s.link] : [])),
+      subItems: items,
+      stats: {
+        checklist: items.length,
+        checklistDone: 0,
+        subcards: items.filter((s) => s.kind === "card").length,
+        comments: 0,
+        commentMarks: [],
+        nextTodos: items.flatMap((s) =>
+          s.kind === "todo" ? [{ text: s.text, index: s.index }] : [],
+        ),
+      },
+    };
+  }
+  const root = "Tasks/ctx/Root.md";
+  const b = buildBoard(config, [
+    note(root, { status: "todo" }, [
+      todo("Placed", 0, "doing"),
+      todo("Finished", 1, "done"),
+      link("Child", 2),
+      todo("Plain", 3),
+      todo("Home", 4, "todo"),
+      link("Kid", 5),
+      link("Fin", 6),
+    ]),
+    note("Tasks/Child.md", { status: "doing" }),
+    note("Tasks/Kid.md"),
+    note("Tasks/X.md", { status: "doing" }, [link("Y", 0)]),
+    note("Tasks/Y.md", {}, [link("X", 0)]),
+    note("Tasks/Fin.md", { status: "done" }),
+  ]);
+  const t0 = makeTodoPath(root, 0);
+  const t1 = makeTodoPath(root, 1);
+
+  it("lists the real cards in input order, then the todo tiles", () => {
+    expect(Object.keys(b.cards)).toEqual([
+      root,
+      "Tasks/Child.md",
+      "Tasks/Kid.md",
+      "Tasks/X.md",
+      "Tasks/Y.md",
+      "Tasks/Fin.md",
+      t0,
+      t1,
+    ]);
+    expect(Object.values(b.cards).map((c) => c.context)).toEqual([
+      "ctx",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "ctx",
+      "ctx",
+    ]);
+  });
+
+  it("records parentage, placement and nesting in a stable order", () => {
+    expect(Object.entries(b.parentOf)).toEqual([
+      ["Tasks/Child.md", root],
+      ["Tasks/Kid.md", root],
+      ["Tasks/Fin.md", root],
+      ["Tasks/Y.md", "Tasks/X.md"],
+      ["Tasks/X.md", "Tasks/Y.md"],
+      [t0, root],
+      [t1, root],
+    ]);
+    expect(Object.entries(b.placedOf)).toEqual([
+      ["Tasks/Child.md", root],
+      ["Tasks/Fin.md", root],
+      [t0, root],
+      [t1, root],
+    ]);
+    expect(b.childrenOf).toEqual({ [root]: ["Tasks/Kid.md"] });
+    expect(b.columns).toEqual({
+      todo: [root, "Tasks/Y.md"],
+      doing: ["Tasks/Child.md", t0, "Tasks/X.md"],
+      done: ["Tasks/Fin.md", t1],
+    });
+  });
+
+  it("counts finished-by-column lines as done and drops placed todos from the next todos", () => {
+    expect(b.cards[root]?.stats).toEqual({
+      checklist: 7,
+      checklistDone: 2,
+      subcards: 3,
+      comments: 0,
+      commentMarks: [],
+      nextTodos: [
+        { text: "Plain", index: 3 },
+        { text: "Home", index: 4 },
+      ],
+    });
+    expect(b.cards[t1]).toEqual({
+      path: t1,
+      basename: "Root",
+      title: "Finished",
+      titleSource: "subtask",
+      frontmatter: { status: "done" },
+      childLinks: [],
+      todoRef: { parentPath: root, line: { ...todo("Finished", 1, "done"), kind: "todo" } },
+      context: "ctx",
+    });
+  });
+
+  it("builds a board with no columns at all without placing anything", () => {
+    const empty = buildBoard({ ...config, columns: [] }, [
+      note("Tasks/A.md", { status: "todo" }),
+      note("Tasks/P.md", {}, [link("A", 0)]),
+    ]);
+    expect(empty.columns).toEqual({});
+    expect(empty.placedOf).toEqual({});
+    expect(empty.childrenOf).toEqual({ "Tasks/P.md": ["Tasks/A.md"] });
+  });
+
+  describe("writes decided for a card that stands in no column of its own", () => {
+    // K is nested under P and drawn inside it, so `columnOf` has no answer for K itself.
+    const nest = buildBoard(config, [
+      note("Tasks/P.md", { status: "todo" }, [link("K", 0)]),
+      note("Tasks/K.md", {}, [todo("", 0, "doing"), link("Ghost", 1), link("Z", 2)]),
+      note("Tasks/Z.md", { status: "done" }),
+    ]);
+    const line = subtaskRef(nest, "Tasks/K.md", 0);
+    if (!line || !isTodoLine(line)) throw new Error("no todo 0 in K");
+
+    it("names an untitled todo, and a home that is no column, in its history", () => {
+      expect(moveSubtask(nest, "Tasks/K.md", line, null)).toEqual({
+        path: "Tasks/K.md",
+        setSubtaskStatus: { index: 0, text: "", occurrence: 0, claim: "doing", status: null },
+        history: 'Moved subtask "todo" from Doing to —',
+      });
+      expect(moveSubtask(nest, "Tasks/K.md", line, "done")?.history).toBe(
+        'Moved subtask "todo" from Doing to Done',
+      );
+    });
+
+    it("writes nothing for a linked line the board does not hold or cannot resolve", () => {
+      expect(syncSubtaskClaim(nest, "Tasks/K.md", link("Z", 9), true)).toBeNull();
+      expect(syncSubtaskClaim(nest, "Tasks/K.md", link("Ghost", 1), true)).toBeNull();
+    });
+
+    it("unticks a finished child home to a parent standing in no column", () => {
+      expect(syncSubtaskClaim(nest, "Tasks/K.md", link("Z", 2), false)).toEqual({
+        path: "Tasks/Z.md",
+        unsetFrontmatter: ["status"],
+        history: "Moved from Done to —",
+      });
+    });
+  });
+
+  it("leaves an unticked claim alone on a board with no done column", () => {
+    const two = buildBoard({ ...config, columns: config.columns.slice(0, 2) }, [
+      note("Tasks/R.md", { status: "todo" }, [todo("T", 0, "doing")]),
+    ]);
+    expect(syncSubtaskClaim(two, "Tasks/R.md", todo("T", 0, "doing"), false)).toBeNull();
+  });
+
+  it("moves a card to a column the board does not draw, naming it by its id", () => {
+    expect(moveCard(b, b.cards["Tasks/Child.md"]!, "nowhere", 0)).toEqual({
+      path: "Tasks/Child.md",
+      history: "Moved from Doing to nowhere",
+      setFrontmatter: { status: "nowhere", order: 0 },
+    });
+  });
+});

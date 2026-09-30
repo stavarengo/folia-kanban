@@ -337,3 +337,36 @@ describe("the Edit column dialog's draft and patch", () => {
     expect(columnPatch({ ...columnDraft({ id: "todo", title: "Todo" }), title: "   " })).toBeNull();
   });
 });
+
+describe("serializeColumns key order — the order the keys land in the note", () => {
+  it("writes every field in one fixed order, whatever order the def carries them in", () => {
+    const col: ColumnDef = {
+      parked: true,
+      hoverOpacity: 0.5,
+      opacity: 0.4,
+      sort: "due",
+      group: "due",
+      filter: "tag:x",
+      limit: 3,
+      color: "red",
+      title: "T",
+      id: "t",
+    };
+    expect(Object.keys(serializeColumns([col])[0] ?? {})).toEqual([
+      "id",
+      "title",
+      "color",
+      "limit",
+      "filter",
+      "group",
+      "sort",
+      "opacity",
+      "hoverOpacity",
+      "parked",
+    ]);
+  });
+
+  it("drops a blank bare-string entry", () => {
+    expect(normalizeColumns(["  ", "todo"])).toEqual([{ id: "todo", title: "Todo" }]);
+  });
+});

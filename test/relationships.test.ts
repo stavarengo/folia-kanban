@@ -378,6 +378,28 @@ describe("buildBoard relationships", () => {
     expect(link?.[0]?.targets).toEqual(["B", "Tasks/B"]);
   });
 
+  it("remembers every spelling of a link stated from its inverse end, too", () => {
+    const b = buildBoard(config, [
+      card("A", { status: "todo" }),
+      card("B", { status: "todo", "blocked-by": ["[[A]]", "[[Tasks/A]]"] }),
+    ]);
+    expect(b.cards["Tasks/A.md"]?.relations).toEqual([
+      {
+        type: "blocks",
+        direction: "out",
+        target: "B",
+        targets: ["B"],
+        path: "Tasks/B.md",
+        source: "inverse",
+      },
+    ]);
+    expect(b.cards["Tasks/B.md"]?.relations?.[0]).toMatchObject({
+      direction: "in",
+      targets: ["A", "Tasks/A"],
+      source: "own",
+    });
+  });
+
   it("keeps a target that matches no card, marked unresolved", () => {
     const b = buildBoard(config, [card("A", { status: "todo", blocks: ["[[Ghost]]"] })]);
     expect(b.cards["Tasks/A.md"]?.relations).toEqual([
