@@ -1,23 +1,23 @@
 /* ------------------------------------------------------------------ card quick actions + confirm */
 .folia-card-actions {
   position: absolute;
-  top: var(--folia-space-sm);
-  right: var(--folia-space-sm);
+  top: var(--size-2-3);
+  right: var(--size-2-3);
   display: flex;
-  gap: var(--folia-space-hair);
-  padding: var(--folia-space-xxs);
-  border-radius: var(--folia-r);
-  background: color-mix(in oklch, var(--folia-card-bg) 88%, transparent);
-  backdrop-filter: var(--folia-blur-actions);
+  gap: var(--size-2-1);
+  padding: var(--size-2-1);
+  border-radius: var(--radius-m);
+  background: color-mix(in oklch, var(--background-primary) 88%, transparent);
+  backdrop-filter: blur(3px);
   box-shadow: var(--folia-shadow-pop);
-  opacity: var(--folia-opacity-hidden);
-  transform: translateY(calc(-1 * var(--folia-action-rise)));
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--size-2-1)));
   transition: opacity var(--folia-dur-fast) ease, transform var(--folia-dur-fast) var(--folia-ease);
   pointer-events: none;
 }
 .folia-card:hover .folia-card-actions,
 .folia-card:focus-within .folia-card-actions {
-  opacity: var(--folia-opacity-shown);
+  opacity: 1;
   transform: none;
   pointer-events: auto;
 }
@@ -29,6 +29,6 @@
   height: var(--folia-hit-md);
   padding: 0;
 }
-.folia-scope .folia-action-done:hover:where(:not([aria-disabled="true"])) { color: var(--folia-text-success); }
-.folia-scope .folia-action-delete:hover:where(:not([aria-disabled="true"])) { color: var(--folia-text-error); }
+.folia-scope .folia-action-done:hover:where(:not([aria-disabled="true"])) { color: var(--text-success); }
+.folia-scope .folia-action-delete:hover:where(:not([aria-disabled="true"])) { color: var(--text-error); }
 

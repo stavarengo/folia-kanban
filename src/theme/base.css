@@ -4,8 +4,8 @@
   background: transparent;
   border: none;
   color: var(--folia-link-color);
-  cursor: var(--folia-cursor-link);
-  text-decoration: var(--folia-link-decoration);
+  cursor: var(--cursor-link);
+  text-decoration: var(--link-decoration);
   /* The decoration, but not its thickness: `text-decoration-thickness` is one of the longhands the
      community-directory CSS scan refuses (verified — `pnpm obsidian-scan:check` reports it), which
      is the same wall `.folia-link-missing` meets over the unresolved decoration style. A theme that
@@ -13,11 +13,11 @@
      The underline offset is the board's own: Obsidian publishes no variable for it, an underline
      on the baseline cuts the descenders of a card title, and it costs nothing when the theme's
      decoration is `none`. */
-  text-underline-offset: var(--folia-underline-offset);
+  text-underline-offset: var(--size-2-1);
   padding: 0;
   font: inherit;
   /* After `font: inherit`, which resets the weight the shorthand does not mention. */
-  font-weight: var(--folia-link-weight);
+  font-weight: var(--link-weight);
   text-align: left;
   /* Obsidian's app.css does two things to every button that text drawn inside a paragraph cannot
      survive: `white-space: nowrap`, so a long card name never wraps and pushes its panel sideways
@@ -29,13 +29,13 @@
 }
 .folia-scope .folia-link:hover:where(:not(:disabled)) {
   color: var(--folia-link-color-hover);
-  text-decoration: var(--folia-link-decoration-hover);
+  text-decoration: var(--link-decoration-hover);
 }
 /* `--text-muted`, not `--text-faint`: faint is 2.3:1 on the detail dialog in light and 3.0:1 in dark, and
    this is text someone has to read. The italic and the smaller size keep it secondary. */
 .folia-scope .folia-muted {
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
   font-style: italic;
 }
 
@@ -67,25 +67,25 @@
 
 .folia-loading,
 .folia-error {
-  padding: var(--folia-pad-block);
+  padding: 2em;
   color: var(--text-muted);
 }
 .folia-error {
-  color: var(--folia-text-error);
+  color: var(--text-error);
 }
 
 .folia-desc-refusal {
-  margin: var(--folia-space-para) 0 0;
+  margin: 0.25em 0 0;
   font-size: var(--folia-font-size-xs);
-  color: var(--folia-text-error);
+  color: var(--text-error);
 }
 
 .folia-card-folder-notice {
-  padding: var(--folia-pad-notice-y) var(--folia-space-lg);
+  padding: 0.5em var(--size-4-3);
   font-size: var(--folia-font-size-xs);
-  color: color-mix(in srgb, var(--folia-text-warning) 70%, var(--text-normal));
-  background: color-mix(in oklch, var(--folia-text-warning) 12%, transparent);
-  border-bottom: var(--folia-border-width) solid var(--folia-border);
+  color: color-mix(in srgb, var(--text-warning) 70%, var(--text-normal));
+  background: color-mix(in oklch, var(--text-warning) 12%, transparent);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
   flex: 0 0 auto;
 }
 
@@ -96,5 +96,5 @@
   --icon-stroke: var(--folia-icon-stroke);
   display: inline-flex;
   flex: 0 0 auto;
-  vertical-align: var(--folia-icon-baseline);
+  vertical-align: -0.15em;
 }

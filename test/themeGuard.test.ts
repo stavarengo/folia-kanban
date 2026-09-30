@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -18,319 +18,221 @@ const reject = (message: string) => {
 
 beforeEach(() => {
   fixture = mkdtempSync(join(tmpdir(), "folia-theme-"));
-  cpSync("src/theme", join(fixture, "src/theme"), { recursive: true });
-  cpSync("src/ui", join(fixture, "src/ui"), { recursive: true });
+  cpSync("src", join(fixture, "src"), { recursive: true });
   cpSync("manifest.json", join(fixture, "manifest.json"));
   cpSync("docs/decisions.md", join(fixture, "docs/decisions.md"));
 });
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
-describe("theme guard scheme overrides", () => {
-  it("accepts the shipped light overrides and an explicit dark override", () => {
-    edit(
-      "src/theme/tokens.css",
-      (s) => s + "\n.theme-dark .folia-scope { --folia-shadow-card: none; }\n",
+const accept = () => {
+  const result = spawnSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" });
+  expect(result.stderr).toBe("");
+  expect(result.status).toBe(0);
+};
+const json = (path: string, change: (data: Record<string, unknown>) => void) =>
+  edit(path, (s) => {
+    const data = JSON.parse(s) as Record<string, unknown>;
+    change(data);
+    return JSON.stringify(data, null, 2);
+  });
+type Registry = { variables: Record<string, { scope: string }> };
+type Floor = { version: string; variables: string[] };
+
+describe("theme guard owned values", () => {
+  it("accepts the shipped theme", accept);
+
+  it("refuses a --folia-* read that tokens.css does not declare", () => {
+    edit("src/theme/cards.css", (s) =>
+      s.replace("var(--folia-cue-thickness)", "var(--folia-strip)"),
     );
-    edit("src/theme/tokens/shadow.tokens.json", (s) =>
+    reject("var(--folia-strip) resolves to nothing");
+  });
+
+  it("refuses an owned value without its reason", () => {
+    edit("src/theme/tokens.css", (s) => s.replace(" /* the pointer outline on hover */", ""));
+    reject("--folia-control-outline needs its reason");
+  });
+
+  it("refuses a token nothing reads", () => {
+    edit("src/theme/tokens.css", (s) =>
       s.replace(
-        '"themes": {',
-        '"themes": { "dark": { "$value": "none", "source": { "owned": true, "reason": "Flat cards in this fixture." } },',
+        "  --folia-dur: 170ms;",
+        "  --folia-dur-slow: 400ms; /* unused */\n  --folia-dur: 170ms;",
       ),
     );
-    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
-      "check-theme: OK",
+    reject("--folia-dur-slow is declared but nothing reads it");
+  });
+
+  it("refuses a component inventing a --folia-* name", () => {
+    edit("src/theme/cards.css", (s) => s + "\n.folia-card { --folia-lift: 2px; }\n");
+    reject("--folia-lift is declared here, but a component may only write one of the channels");
+  });
+
+  it("refuses a component overriding one of the board's own values", () => {
+    edit("src/theme/cards.css", (s) => s + "\n.folia-card-actions { --folia-hit-md: 1px; }\n");
+    reject("--folia-hit-md is declared here, but a component may only write one of the channels");
+  });
+
+  it("refuses a --folia-* name in code that is not a channel", () => {
+    edit("src/ui/Column.tsx", (s) => s.replace('"--folia-col-accent"', '"--folia-col-acccent"'));
+    reject("--folia-col-acccent is not declared");
+  });
+
+  it("refuses a token that reads itself", () => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace("calc(var(--input-height) - var(--size-4-1))", "var(--folia-hit-md)"),
     );
+    reject("--folia-hit-md leads back to itself");
   });
 
-  it.each([
-    ".theme-light",
-    ".theme-light .folia-card",
-    ".theme-light.folia-scope",
-    ".theme-custom .folia-scope",
-  ])("rejects unsupported token selector %s", (selector) => {
-    edit("src/theme/tokens.css", (s) => s.replace(".theme-light .folia-scope {", `${selector} {`));
-    reject("Only .folia-scope");
+  it("refuses a token that leads back to itself through another", () => {
+    edit("src/theme/tokens.css", (s) =>
+      s
+        .replace("calc(var(--input-height) - var(--size-4-2))", "var(--folia-hit-md)")
+        .replace("calc(var(--input-height) - var(--size-4-1))", "var(--folia-hit-sm)"),
+    );
+    reject("--folia-hit-sm leads back to itself");
   });
 
-  it("rejects theme overrides in component files even when they only alias tokens", () => {
+  it("refuses a channel a component writes in terms of itself", () => {
     edit(
       "src/theme/cards.css",
-      (s) => s + "\n.theme-light .folia-card { --folia-shadow-card: var(--folia-shadow-pop); }\n",
+      (s) =>
+        s +
+        '\n.folia-card[data-urgency="overdue"] { --folia-urgency-tint: var(--folia-urgency-tint); }\n',
     );
-    reject("Theme token overrides belong only in tokens.css");
+    reject("--folia-urgency-tint leads back to itself here");
   });
 
-  it("requires metadata for every scheme declaration", () => {
-    edit("src/theme/tokens/shadow.tokens.json", (s) => s.replace('"light":', '"dark":'));
-    reject("--folia-shadow-card (light) has no metadata");
-  });
-
-  it("checks scheme values against metadata", () => {
-    edit("src/theme/tokens.css", (s) => s.replace("0 1px 1px rgba(0, 0, 0, 0.08)", "none"));
-    reject("one of the two is stale");
-  });
-
-  it("rejects a cycle introduced only by a scheme override", () => {
+  it("refuses a cycle that only a scheme override closes", () => {
     edit("src/theme/tokens.css", (s) =>
-      s.replace("0 1px 1px rgba(0, 0, 0, 0.08)", "var(--folia-shadow-card-selected)"),
+      s
+        .replace(
+          "--folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);",
+          "--folia-shadow-pop: var(--folia-shadow-overlay);",
+        )
+        .replace(
+          "  --folia-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.24);",
+          "  --folia-shadow-overlay: var(--folia-shadow-pop);",
+        )
+        .replace("  --folia-shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.14);\n", ""),
     );
-    reject("is a cycle");
+    reject("under .theme-light .folia-scope");
   });
 
-  it.each([
-    ["--folia-new: none;", "has no base declaration"],
-    ["color: red;", "may only redeclare --folia-*"],
-    ["--folia-shadow-card: none;", "is declared twice"],
-    ["--folia-shadow-pop: none !important;", "may not use !important"],
-    ["& { --folia-shadow-card: none; }", "flat lists of declarations"],
-  ])("rejects invalid theme declaration %s", (declaration, message) => {
+  it("accepts a component writing a channel tokens.css declares", () => {
+    edit(
+      "src/theme/cards.css",
+      (s) => s + "\n.folia-card { --folia-urgency-tint: transparent; }\n",
+    );
+    accept();
+  });
+
+  it("refuses a channel re-declared on .folia-scope", () => {
+    edit(
+      "src/theme/cards.css",
+      (s) => s + "\n.folia-scope { --folia-urgency-tint: transparent; }\n",
+    );
+    reject("re-declares the token block");
+  });
+
+  it("refuses a scheme override outside tokens.css", () => {
+    edit(
+      "src/theme/cards.css",
+      (s) => s + "\n.theme-light .folia-card { --folia-urgency-tint: transparent; }\n",
+    );
+    reject("belongs in src/theme/tokens.css");
+  });
+
+  it("refuses a rule nested inside the token block", () => {
     edit("src/theme/tokens.css", (s) =>
-      s.replace(".theme-light .folia-scope {", `.theme-light .folia-scope { ${declaration}`),
+      s.replace(
+        "  font-size: var(--font-ui-small);",
+        "  font-size: var(--font-ui-small);\n  @media (min-width: 1px) {\n    --folia-shadow-card: var(--folia-shadow-card);\n  }",
+      ),
     );
-    reject(message);
+    reject("may hold only declarations");
   });
 
-  it("rejects duplicate scheme rules", () => {
-    edit("src/theme/tokens.css", (s) => s + "\n.theme-light .folia-scope {}\n");
-    reject("Duplicate token rule");
+  it("refuses a scheme override of a name with no base value", () => {
+    edit("src/theme/tokens.css", (s) =>
+      s.replace(
+        ".theme-light .folia-scope {",
+        ".theme-light .folia-scope {\n  --folia-glow: none;",
+      ),
+    );
+    reject("--folia-glow is overridden for one scheme but has no base value");
   });
-});
 
-describe("theme guard adopted foundations", () => {
-  it.each(["9px", "9e0px", ".9px", "9PX"])(
-    "rejects an off-grid owned layout length %s",
-    (value) => {
-      edit("src/theme/tokens.css", (s) =>
-        s.replace("--folia-gap: var(--size-4-2)", `--folia-gap: ${value}`),
-      );
-      edit("src/theme/tokens/spacing.tokens.json", (s) =>
-        s.replace(
-          /"\$value": "var\(--size-4-2\)",\s*"cssVar": "--folia-gap",\s*"source": \{[^}]+\}/,
-          `"$value": "${value}", "cssVar": "--folia-gap", "source": { "owned": true, "reason": "Regression fixture." }`,
-        ),
-      );
-      reject("outside the host grid");
+  it("refuses a dead fallback on a token that is always declared", () => {
+    edit("src/theme/cards.css", (s) =>
+      s.replace("var(--folia-cue-thickness)", "var(--folia-cue-thickness, 3px)"),
+    );
+    reject("carries a fallback for a token that is always declared");
+  });
+
+  it.each(["#ff0000", "rgb(0 0 0)", "rebeccapurple"])(
+    "refuses the raw colour %s outside tokens.css",
+    (colour) => {
+      edit("src/theme/cards.css", (s) => s + `\n.folia-card { outline-color: ${colour}; }\n`);
+      reject("colour");
     },
   );
 
-  it("requires aliases for cursor defaults", () => {
-    edit("src/theme/tokens.css", (s) =>
-      s.replace("--folia-cursor-control: var(--cursor)", "--folia-cursor-control: default"),
-    );
-    edit("src/theme/tokens/cursor.tokens.json", (s) =>
-      s
-        .replace('"$value": "var(--cursor)"', '"$value": "default"')
-        .replace('"alias": "--cursor"', '"owned": true, "reason": "Regression fixture."'),
-    );
-    reject("Alias it:");
-  });
-
-  it("rejects literal icon sizing in container rules", () => {
-    edit("src/theme/chips.css", (s) =>
-      s.replace("--folia-icon-size: var(--icon-xs)", "--folia-icon-size: 15px"),
-    );
-    reject("15px is a raw length");
-  });
-  it("requires icon aliases through the icon token family", () => {
-    edit("src/theme/tokens.css", (s) =>
-      s.replace("--folia-icon-size: var(--icon-s)", "--folia-icon-size: 14px"),
-    );
-    edit("src/theme/tokens/icon.tokens.json", (s) =>
-      s
-        .replace('"$value": "var(--icon-s)"', '"$value": "14px"')
-        .replace('"alias": "--icon-s"', '"owned": true, "reason": "Regression fixture."'),
-    );
-    reject("Alias it: `--folia-icon-size: var(--icon-xs);");
-  });
-});
-
-describe("theme guard dependency parsing", () => {
-  const functions = ["var", "VAR", String.raw`v\61 r`];
-  const setSchemeShadow = (scheme: string, value: string) => {
-    edit("src/theme/tokens.css", (s) =>
-      scheme === "light"
-        ? s.replace("0 1px 1px rgba(0, 0, 0, 0.08)", value)
-        : s + `\n.theme-dark .folia-scope { --folia-shadow-card: ${value}; }\n`,
-    );
-    edit("src/theme/tokens/shadow.tokens.json", (s) => {
-      const metadata = JSON.parse(s) as {
-        card: {
-          themes: Record<string, { $value: string; source: { owned: boolean; reason: string } }>;
-        };
-      };
-      metadata.card.themes[scheme] = {
-        $value: value,
-        source: { owned: true, reason: "Dependency regression fixture." },
-      };
-      return JSON.stringify(metadata);
-    });
-  };
-
-  it.each(functions)("rejects base cycles spelled with %s()", (fn) => {
-    edit("src/theme/tokens.css", (s) =>
-      s.replace(
-        "--folia-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16)",
-        `--folia-shadow-card: ${fn}(--folia-shadow-card-selected)`,
-      ),
-    );
-    edit("src/theme/tokens/shadow.tokens.json", (s) =>
-      s.replace(
-        JSON.stringify("0 1px 2px rgba(0, 0, 0, 0.16)"),
-        JSON.stringify(`${fn}(--folia-shadow-card-selected)`),
-      ),
-    );
-    reject("is a cycle in the base scheme");
-  });
-
-  it.each(functions)("rejects direct component cycles spelled with %s()", (fn) => {
-    edit(
-      "src/theme/cards.css",
-      (s) => s + `\n.folia-card { --folia-accent: ${fn}(--folia-accent); }\n`,
-    );
-    reject("reads itself directly");
-  });
-
-  it.each(functions)("finds cycle edges inside fallback arguments spelled with %s()", (fn) => {
-    const value = `var(--interactive-accent, ${fn}(--folia-shadow-card-selected))`;
-    setSchemeShadow("light", value);
-    reject("is a cycle in the light scheme");
-  });
-
-  for (const scheme of ["light", "dark"]) {
-    it.each(functions)(`rejects a ${scheme}/component cycle with a %s() scheme edge`, (fn) => {
-      setSchemeShadow(scheme, `${fn}(--folia-accent)`);
-      edit(
-        "src/theme/swatches.css",
-        (s) =>
-          s + "\n.folia-swatches.folia-swatches { --folia-accent: var(--folia-shadow-card); }\n",
-      );
-      reject(`through the ${scheme} token map`);
-    });
-
-    it.each(functions)(`rejects a ${scheme}/component cycle with a %s() component edge`, (fn) => {
-      setSchemeShadow(scheme, "var(--folia-accent)");
-      edit(
-        "src/theme/swatches.css",
-        (s) =>
-          s + `\n.folia-swatches.folia-swatches { --folia-accent: ${fn}(--folia-shadow-card); }\n`,
-      );
-      reject(`through the ${scheme} token map`);
-    });
-  }
-
-  it("accepts a component reference when no scheme leads back to the overridden token", () => {
-    setSchemeShadow("light", "var(--folia-card-bg)");
-    edit(
-      "src/theme/swatches.css",
-      (s) => s + "\n.folia-swatches.folia-swatches { --folia-accent: var(--folia-shadow-card); }\n",
-    );
-    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
-      "check-theme: OK",
-    );
-  });
-});
-
-describe("theme guard observed host variables", () => {
-  /** Pin the manifest floor and add an entry of the fixture's own, so the cases do not move when the
-   *  shipped floor or the shipped entries change. */
-  const observe = (minAppVersion: string, oldestChecked?: string) => {
-    edit("manifest.json", (s) => JSON.stringify({ ...JSON.parse(s), minAppVersion }));
-    edit("src/theme/host/observed.json", (s) =>
-      JSON.stringify({
-        ...JSON.parse(s),
-        "--fixture-host": { observedIn: "1.13.7", where: "Regression fixture.", oldestChecked },
-      }),
-    );
-  };
-  const accept = () =>
-    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
-      "check-theme: OK",
-    );
-
-  it("accepts the shipped entries against the shipped manifest", accept);
-
-  it("accepts an entry checked back to exactly minAppVersion", () => {
-    observe("1.11.4", "1.11.4");
+  it("accepts a length written where it is used", () => {
+    edit("src/theme/cards.css", (s) => s + "\n.folia-card { margin-block: 7px; }\n");
     accept();
   });
-
-  it("refuses an entry checked only on builds newer than minAppVersion", () => {
-    observe("1.11.4", "1.13.7");
-    reject(
-      "--fixture-host is confirmed back to 1.13.7 only, but manifest.json admits Obsidian 1.11.4",
-    );
-  });
-
-  it("compares versions by number, not as text", () => {
-    observe("1.11.4", "1.9.0");
-    accept();
-    observe("1.9.0", "1.11.4");
-    reject("--fixture-host is confirmed back to 1.11.4 only");
-  });
-
-  it.each([undefined, "1.11", "latest"])("refuses an oldestChecked of %s", (value) => {
-    observe("1.11.4", value);
-    reject('--fixture-host needs "oldestChecked"');
-  });
-
-  it("refuses a minAppVersion it cannot compare", () => {
-    observe("1.11", "1.11.4");
-    reject("is not a MAJOR.MINOR.PATCH version");
-  });
 });
 
-describe("theme guard fallbacks", () => {
-  /** Turn a bare alias into one with a fallback, in both the CSS and the metadata, so the only
-   *  thing under test is whether the guard accepts that fallback. */
-  const giveFallback = (cssVar: string, alias: string, key: string, value: string) => {
-    edit("src/theme/tokens.css", (s) =>
-      s.replace(`${cssVar}: var(${alias});`, `${cssVar}: var(${alias}, ${value});`),
-    );
-    edit("src/theme/tokens/color.tokens.json", (s) =>
-      s.replace(
-        `"${key}": {\n    "$value": "var(${alias})",\n    "cssVar": "${cssVar}",\n    "source": {\n      "alias": "${alias}"\n    }\n  }`,
-        `"${key}": {\n    "$value": "var(${alias}, ${value})",\n    "cssVar": "${cssVar}",\n    "source": {\n      "alias": "${alias}",\n      "fallback": { "value": "${value}", "reason": "A sentence that sounds like an argument." }\n    }\n  }`,
-      ),
-    );
-  };
-
-  it("refuses a literal fallback on a variable whose default differs by scheme", () => {
-    // The audit's 02-03: one value cannot stand in for a light/dark pair, so whatever is written is
-    // guaranteed wrong in one of the two modes the branch could ever fire in.
-    giveFallback("--folia-danger", "--color-red", "danger", "#e5534b");
-    reject("documents --color-red per scheme");
+describe("theme guard host allowlist", () => {
+  it("refuses a host variable that is not on the allowlist", () => {
+    edit("src/theme/cards.css", (s) => s + "\n.folia-card { color: var(--shadow-s); }\n");
+    reject("var(--shadow-s) is not on the allowlist");
   });
 
-  it("refuses a literal fallback on a variable Obsidian publishes no default for", () => {
-    // The hole a reviewer found: only six of the variables this layer reads document a per-scheme
-    // default, so a rule that only caught those let the other literals straight back in, each one
-    // freezing a colour the theme is meant to choose.
-    giveFallback("--folia-text-error", "--text-error", "text-error", "#e93147");
-    reject("publishes no default for --text-error to agree with");
+  it("reads a var() call spelt with escapes", () => {
+    edit("src/theme/cards.css", (s) => s + "\n.folia-card { color: v\\61 r(--shadow-s); }\n");
+    reject("var(--shadow-s) is not on the allowlist");
   });
 
-  it("keeps accepting a fallback that is another var(), which is not a second opinion", () => {
-    expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
-      "check-theme: OK",
-    );
-  });
-});
-
-describe("theme guard column palette", () => {
-  it("refuses a palette name that resolves to a variable Obsidian does not document", () => {
-    edit("src/ui/columnColors.ts", (s) =>
-      s.replace("var(--color-${name})", "var(--colour-${name})"),
-    );
-    reject("which Obsidian does not document");
+  it("reads var() calls in the board's code as well as in the stylesheet", () => {
+    edit("src/ui/Board.tsx", (s) => s.replace('opacity: "0.5"', 'opacity: "var(--anim-opacity)"'));
+    reject("var(--anim-opacity) is not on the allowlist");
   });
 
-  it("refuses a resolver that paints more than the one variable it claims to", () => {
-    // `var(--color-red) var(--invented)` computes to an invalid colour on every board. Reading only
-    // the first var() out of the template let that pass while the guard reported OK.
-    edit("src/ui/columnColors.ts", (s) =>
-      s.replace("var(--color-${name})", "var(--color-${name}) var(--totally-made-up)"),
-    );
-    reject("could not find the");
+  it("reads the column palette through columnAccent", () => {
+    edit("src/ui/columnColors.ts", (s) => s.replace('  "yellow",', '  "yellow",\n  "teal",'));
+    reject("var(--color-teal) is not on the allowlist");
+  });
+
+  it("refuses a variable documented only for Publish", () => {
+    json("src/theme/host/variables.json", (d) => {
+      (d as Registry).variables["--background-primary"]!.scope = "publish";
+    });
+    reject("documented for Obsidian Publish");
+  });
+
+  it("refuses an allowlist entry nothing reads", () => {
+    json("src/theme/host/variables.json", (d) => {
+      (d as Registry).variables["--shadow-s"] = { scope: "app" };
+    });
+    reject("--shadow-s is on the allowlist but nothing reads it");
+  });
+
+  it("refuses a variable the oldest supported Obsidian does not declare", () => {
+    json("src/theme/host/floor.json", (d) => {
+      const floor = d as Floor;
+      floor.variables = floor.variables.filter((v) => v !== "--background-primary");
+    });
+    reject("var(--background-primary) is documented, but Obsidian");
+  });
+
+  it("refuses a floor list for another version than minAppVersion", () => {
+    json("manifest.json", (d) => {
+      d["minAppVersion"] = "1.12.0";
+    });
+    reject("manifest.json admits 1.12.0");
   });
 });
 
@@ -398,10 +300,7 @@ describe("theme button contract", () => {
   });
 
   it("rejects rules that reach host-rendered buttons", () => {
-    edit(
-      "src/theme/buttons.css",
-      (s) => s + "\n.folia-scope button:disabled { opacity: var(--folia-opacity-faint); }\n",
-    );
+    edit("src/theme/buttons.css", (s) => s + "\n.folia-scope button:disabled { opacity: 0.5; }\n");
     reject("not a bare button that reaches rendered Markdown");
   });
 
@@ -490,7 +389,7 @@ describe("theme button contract", () => {
   ])("rejects a wrapped host-button subject: %s", (selector) => {
     edit(
       "src/theme/buttons.css",
-      (s) => s + `\n.folia-scope ${selector}:disabled { opacity: var(--folia-opacity-faint); }\n`,
+      (s) => s + `\n.folia-scope ${selector}:disabled { opacity: 0.5; }\n`,
     );
     reject("not a bare button that reaches rendered Markdown");
   });

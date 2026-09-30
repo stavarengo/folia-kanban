@@ -5,18 +5,18 @@
 .folia-card-group {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-md);
+  gap: var(--size-4-2);
 }
 .folia-card-group + .folia-card-group {
-  margin-top: var(--folia-space-xs);
+  margin-top: var(--size-4-1);
 }
 .folia-card-group-heading {
   font-size: var(--folia-font-size-xxs);
-  font-weight: var(--folia-font-weight-semibold);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
   color: var(--text-muted);
-  padding: var(--folia-space-xxs) var(--folia-space-xxs) 0;
+  padding: var(--size-2-1) var(--size-2-1) 0;
 }
 
 /* #10 — per-column de-emphasis. opacity fades the resting column; on hover it reveals to
@@ -36,12 +36,12 @@
    logical column array (which still drives Move-left/right + dnd). */
 .folia-column.folia-is-parked {
   order: 1;
-  margin-left: var(--folia-col-park-margin);
+  margin-left: 60vw;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .folia-scope * {
-    transition-duration: var(--folia-dur-none);
+    transition-duration: 0.01ms; /* not zero, so a transitionend still fires */
   }
   /* The drag overlays still lift (their shadow/outline mark the grab), but without the scale/tilt tween. */
   .folia-card-overlay,

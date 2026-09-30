@@ -32,7 +32,7 @@
   min-height: 0;
   overflow-y: auto;
   /* A field scrolled into view lands below the sticky header, not under it (one line of title). */
-  scroll-padding-top: calc(2 * var(--folia-space-lg) + var(--folia-hit-md));
+  scroll-padding-top: calc(2 * var(--size-4-3) + var(--folia-hit-md));
   scrollbar-width: thin;
   display: flex;
   flex-direction: column;
@@ -41,17 +41,17 @@
 .folia-detail-header {
   display: flex;
   align-items: flex-start;
-  gap: var(--folia-space-md);
-  padding: var(--folia-space-lg);
-  border-bottom: var(--folia-border-width) solid var(--folia-border);
+  gap: var(--size-4-2);
+  padding: var(--size-4-3);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
   position: sticky;
   top: 0;
   background: var(--modal-background);
-  z-index: var(--folia-z-index-base);
+  z-index: 1;
 }
 /* The host draws its close button in the dialog's top corner, over where this header ends. */
 .folia-detail-modal .folia-detail-header {
-  padding-inline-end: calc(var(--folia-space-lg) + var(--folia-hit-md));
+  padding-inline-end: calc(var(--size-4-3) + var(--folia-hit-md));
 }
 /* The sticky header names the card; it is not where a long title is read. `overflow-wrap: anywhere`
    makes an unbreakable 200-character slug break instead of widening the panel or shouldering the
@@ -62,9 +62,9 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font-size: var(--folia-font-size-lg);
-  font-weight: var(--folia-font-weight-semibold);
-  line-height: var(--folia-line-height-heading);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  line-height: var(--line-height-tight);
   color: var(--text-normal);
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -98,15 +98,15 @@
 .folia-detail-body {
   /* The property gutter is a share of this box (see `--folia-prop-key-w`). */
   container-type: inline-size;
-  padding: var(--folia-space-lg);
+  padding: var(--size-4-3);
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-xl-plus);
+  gap: var(--size-4-4);
 }
 .folia-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 /* Status, priority, due and assignee are frontmatter properties like the rows below them, so they
    are laid out the same way: the name in the property gutter, the value beside it. The label stays
@@ -114,7 +114,7 @@
 .folia-fields label {
   display: flex;
   align-items: center;
-  gap: var(--folia-space-md);
+  gap: var(--size-4-2);
 }
 /* The text and date values are `.folia-prop-input`s like every other value in the panel. The status
    dropdown is the host's, chevron included, and takes only the value's type and height, so the four
@@ -135,10 +135,10 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: flex-end;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-assignee-field label {
-  flex: 1 1 calc(var(--folia-prop-key-w) + var(--folia-space-md) + var(--folia-assignee-input-w-min));
+  flex: 1 1 calc(var(--folia-prop-key-w) + var(--size-4-2) + calc(var(--size-4-1) * 25));
   min-width: 0;
 }
 .folia-assignee-me-slot {
@@ -149,7 +149,7 @@
 }
 .folia-assignee-hint {
   flex: 1 0 100%;
-  padding-left: calc(var(--folia-prop-key-w) + var(--folia-space-md));
+  padding-left: calc(var(--folia-prop-key-w) + var(--size-4-2));
   font-size: var(--folia-font-size-xs);
   color: var(--text-muted);
 }
@@ -157,13 +157,13 @@
 .folia-props {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-prop-row,
 .folia-prop-add {
   display: flex;
   align-items: center;
-  gap: var(--folia-space-md);
+  gap: var(--size-4-2);
 }
 /* The same object Obsidian's own property editor draws — a note's frontmatter, label and typed
    value — so the label's type and colour come from the metadata variables, in the sentence case
@@ -197,7 +197,7 @@
   min-width: 0;
   font: inherit;
   font-size: var(--metadata-input-font-size);
-  background: var(--folia-field-bg);
+  background: var(--background-modifier-form-field);
   color: var(--metadata-input-text-color);
   /* The row's identity — the type and colour of the label and of the value — comes from the
      metadata family, because that is what makes this read as the same object the note's own
@@ -206,9 +206,9 @@
      and in a panel this narrow that reads as no field at all. So the fill stays, the hairline stays,
      and the corner is `--input-radius` — with a border, this is a text input, not the property row
      (`.folia-prop-row`) that contains it. The fill's own divergence is 02-08's, not this finding's. */
-  border: var(--folia-border-width) solid var(--folia-border);
+  border: var(--border-width) solid var(--background-modifier-border);
   border-radius: var(--input-radius);
-  padding: var(--folia-space-xs) var(--folia-space-sm-plus);
+  padding: var(--size-4-1) var(--size-4-2);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 /* One height for every value box, text, date or select: the host's own for a property value. */
@@ -220,12 +220,12 @@
    that the untyped values beside it never get, so Due alone would react to the pointer. Held at rest
    instead, leaving focus to the rule below. */
 .folia-scope .folia-prop-input:not(:disabled):not(:focus):hover {
-  background: var(--folia-field-bg);
-  border-color: var(--folia-border);
+  background: var(--background-modifier-form-field);
+  border-color: var(--background-modifier-border);
 }
 .folia-scope .folia-prop-input:focus {
   outline: var(--folia-focus-ring-w) solid transparent;
-  border-color: var(--folia-accent);
+  border-color: var(--interactive-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-prop-add-slot {
@@ -239,19 +239,19 @@
 }
 /* A property value the row refused to write: the text stays in the field, marked, with why. */
 .folia-scope .folia-prop-input[aria-invalid="true"] {
-  border-color: var(--folia-text-error);
+  border-color: var(--text-error);
 }
 .folia-prop-refusal {
-  padding-left: calc(var(--folia-prop-key-w) + var(--folia-space-md));
-  color: var(--folia-text-error);
+  padding-left: calc(var(--folia-prop-key-w) + var(--size-4-2));
+  color: var(--text-error);
 }
 
 /* The title block at the top of the detail panel: the two inputs a card's title is made of (its
    file name and its `title:` override) and, under them, the title they produce. The result is
    read-only on purpose — it is an outcome, not a third place to type. */
 .folia-title-fields {
-  padding-bottom: var(--folia-gap);
-  border-bottom: var(--folia-border-width) solid var(--folia-border);
+  padding-bottom: var(--size-4-2);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
 }
 .folia-title-result {
   align-items: flex-start;
@@ -261,13 +261,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-xxs);
+  gap: var(--size-2-1);
 }
 
 .folia-scope .folia-title-value {
   display: block;
-  font-size: var(--folia-font-size-md);
-  font-weight: var(--folia-font-weight-semibold);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
   color: var(--text-normal);
 }
 
@@ -305,31 +305,31 @@
 /* The decision `resolveTitle` reported, one row per source it asked, the winner marked by its rule. */
 .folia-title-trace {
   list-style: none;
-  margin: var(--folia-gap) 0 0;
+  margin: var(--size-4-2) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-title-step {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: var(--folia-space-xxs) var(--folia-space-md);
-  padding-left: var(--folia-space-md);
-  border-left: var(--folia-border-width-thick) solid var(--folia-border);
+  gap: var(--size-2-1) var(--size-4-2);
+  padding-left: var(--size-4-2);
+  border-left: var(--folia-border-width-thick) solid var(--background-modifier-border);
 }
 .folia-title-step.folia-is-winner {
-  border-left-color: var(--folia-accent);
+  border-left-color: var(--interactive-accent);
 }
 .folia-title-step-source {
   font-size: var(--folia-font-size-xxs);
   text-transform: uppercase;
-  letter-spacing: var(--folia-tracking-key);
+  letter-spacing: 0.03em;
   color: var(--text-muted);
 }
 .folia-title-step-value {
   min-width: 0;
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
   color: var(--text-normal);
   overflow-wrap: anywhere;
 }
@@ -340,37 +340,37 @@
 }
 
 .folia-section h3 {
-  margin: 0 0 var(--folia-space-md);
+  margin: 0 0 var(--size-4-2);
   font-size: var(--folia-font-size-xs);
-  font-weight: var(--folia-font-weight-semibold);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
-  letter-spacing: var(--folia-tracking-heading);
+  letter-spacing: 0.05em;
   color: var(--text-muted);
 }
 .folia-desc {
   width: 100%;
-  min-height: var(--folia-desc-h-min);
+  min-height: var(--size-4-18);
   resize: vertical;
   font: inherit;
   /* Matches .folia-desc-rendered's pinned line-height, so entering edit mode
      doesn't change the line-box height under the preserved preview height. */
-  line-height: var(--folia-line-height);
-  background: var(--folia-field-bg);
+  line-height: var(--line-height-normal);
+  background: var(--background-modifier-form-field);
   color: var(--text-normal);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-md) var(--folia-gap);
-  margin-bottom: var(--folia-space-md);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-2) var(--size-4-2);
+  margin-bottom: var(--size-4-2);
 }
 
 /* Rendered-description view: click anywhere to edit; pencil surfaces on hover. */
 .folia-desc-view {
   position: relative;
-  cursor: var(--folia-cursor-text);
-  border: var(--folia-border-width) solid transparent;
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-xs) var(--folia-space-sm);
-  margin: 0 var(--folia-space-bleed);
+  cursor: text;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-s);
+  padding: var(--size-4-1) var(--size-2-3);
+  margin: 0 calc(-1 * var(--size-2-3));
   transition: background var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
 }
 
@@ -386,28 +386,28 @@
 }
 .folia-desc-view:hover {
   background: var(--background-modifier-hover);
-  border-color: var(--folia-border);
+  border-color: var(--background-modifier-border);
 }
 
 .folia-desc-edit-slot {
   position: absolute;
-  top: var(--folia-space-xs);
-  right: var(--folia-space-xs);
+  top: var(--size-4-1);
+  right: var(--size-4-1);
 }
 .folia-scope .folia-desc-edit {
-  opacity: var(--folia-opacity-hidden);
+  opacity: 0;
   transition: opacity var(--folia-dur-fast) ease;
 }
 .folia-desc-view:hover .folia-desc-edit,
 .folia-desc-view:focus-within .folia-desc-edit {
-  opacity: var(--folia-opacity-shown);
+  opacity: 1;
 }
 .folia-desc-behind {
-  margin: var(--folia-space-sm) 0 0;
-  padding: var(--folia-space-sm) var(--folia-gap);
+  margin: var(--size-2-3) 0 0;
+  padding: var(--size-2-3) var(--size-4-2);
   font-size: var(--folia-font-size-xs);
-  color: color-mix(in srgb, var(--folia-text-warning) 70%, var(--text-normal));
-  background: color-mix(in oklch, var(--folia-text-warning) 12%, transparent);
+  color: color-mix(in srgb, var(--text-warning) 70%, var(--text-normal));
+  background: color-mix(in oklch, var(--text-warning) 12%, transparent);
   /* Read as a callout by anyone who uses Obsidian, so it is cornered like one. The rest of the
      callout geometry stays out: its padding and title block would make a one-line inline notice
      considerably heavier than this panel wants. */
@@ -419,10 +419,10 @@
   width: 100%;
   text-align: left;
   background: transparent;
-  border: var(--folia-border-width) dashed var(--folia-border);
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-md) var(--folia-gap);
-  cursor: var(--folia-cursor-text);
+  border: var(--border-width) dashed var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-2) var(--size-4-2);
+  cursor: text;
 }
 
 /* Rendered markdown block. font-size/line-height stay pinned to the panel's own scale, matching the
@@ -430,8 +430,8 @@
    preview height holds. The rest is panel-specific: long tokens wrapping in a narrow column, and
    trimming the lead/trail margin the prose leaves around the block. */
 .folia-desc-rendered {
-  font-size: var(--folia-font-size-md);
-  line-height: var(--folia-line-height);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
   overflow-wrap: anywhere;
 }
 .folia-desc-rendered > :first-child,
@@ -444,9 +444,9 @@
    and let weight, not size, carry the structure. */
 .folia-desc-rendered :is(h1, h2, h3, h4, h5, h6) {
   margin-block: var(--p-spacing);
-  font-size: var(--folia-font-size-md);
-  line-height: var(--folia-line-height-heading);
-  font-weight: var(--folia-font-weight-semibold);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-semibold);
 }
 .folia-desc-rendered :is(p, pre, table, ul, ol) + :is(h1, h2, h3, h4, h5, h6) {
   margin-top: var(--heading-spacing);
@@ -533,7 +533,9 @@
      carries the code font chosen in Settings. Inline code has no host rule outside the reading view,
      and the variable that carries that choice (`--font-monospace`) is not documented, so it takes
      the theme's code font, else the app's default stack. */
-  font-family: var(--folia-font-mono);
+  font-family:
+    var(--font-monospace-theme), SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono",
+    "Liberation Mono", Menlo, Monaco, Consolas, "Source Code Pro", monospace;
 }
 :is(.folia-desc-rendered, .folia-comment-text) pre {
   position: relative;
@@ -564,7 +566,7 @@
   background-color: var(--background-modifier-hover);
 }
 :is(.folia-desc-rendered, .folia-comment-text) pre:not(:hover, :focus-within) > button {
-  opacity: var(--folia-opacity-hidden);
+  opacity: 0;
 }
 :is(.folia-desc-rendered, .folia-comment-text) table {
   border-collapse: collapse;
@@ -633,27 +635,27 @@
 .folia-comments,
 .folia-history {
   list-style: none;
-  margin: 0 0 var(--folia-space-md);
+  margin: 0 0 var(--size-4-2);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-subtask {
   display: flex;
   align-items: flex-start; /* keep checkbox + remove aligned to the first line of wrapped text */
-  gap: var(--folia-space-md);
-  font-size: var(--folia-font-size-md);
-  line-height: var(--folia-line-height-title);
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
 }
 .folia-subtask input[type="checkbox"] {
   flex: 0 0 auto;
-  margin-top: var(--folia-space-xxs);
+  margin-top: var(--size-2-1);
 }
 /* The subitem's own column. Quiet until hovered/focused: most subitems live with their card, so
    the control should not compete with the subtask text for attention. The fade dims the whole
-   control, frame and chevron included; at `--folia-opacity-subtle` its label fell under WCAG AA in
-   both schemes, and `--folia-opacity-muted` clears it. A disabled one (a link naming no card) has
+   control, frame and chevron included; at 0.6 its label fell under WCAG AA in both schemes, and 0.7
+   clears it. A disabled one (a link naming no card) has
    nothing to reveal, so hovering its row leaves it quiet. */
 .folia-subtask-column-slot {
   flex: 0 0 auto;
@@ -665,30 +667,30 @@
   min-width: 0;
   font-size: var(--folia-font-size-xs);
   /* Only the height: the host's own side padding holds the room its chevron is drawn in. */
-  padding-block: var(--folia-space-hair);
-  opacity: var(--folia-opacity-muted);
+  padding-block: var(--size-2-1);
+  opacity: 0.7;
 }
 .folia-scope .folia-subtask:hover .folia-subtask-column:not(:disabled),
 .folia-scope .folia-subtask-column:focus {
-  opacity: var(--folia-opacity-shown);
+  opacity: 1;
 }
 /* One relationship row: the linked card, then either its remove button or a note saying the link
    is declared on the other card (see RelationRow). */
 .folia-relation {
   display: flex;
   align-items: flex-start;
-  gap: var(--folia-space-md);
-  font-size: var(--folia-font-size-md);
-  line-height: var(--folia-line-height-title);
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
 }
 .folia-relation-note {
   /* Flushed right like the remove button on its sibling rows, so the list doesn't zig-zag. */
   margin-left: auto;
-  cursor: var(--folia-cursor-help);
+  cursor: help;
 }
 .folia-link-missing {
   color: var(--folia-link-unresolved-color);
-  filter: var(--folia-link-unresolved-filter);
+  filter: var(--link-unresolved-filter);
   /* Still drawn as a border rather than as a text-decoration, and the reason survived the move onto
      the link variables: the community-directory CSS scan flags the text-decoration longhands and
      the multi-keyword shorthand as only partially supported, and it flags the PROPERTY, so putting
@@ -696,38 +698,38 @@
      lines). The colour comes from the theme; the dashes stay a literal, because
      `--link-unresolved-decoration-style` can be `wavy`, which is not a border style, and a border
      that inherited it would collapse to no line at all. */
-  border-bottom: var(--folia-border-width) dashed;
+  border-bottom: var(--border-width) dashed;
   /* A separate longhand, not the third slot of the shorthand above: an unresolved value in the
      shorthand is invalid at computed-value time and `border-bottom` does not inherit, so the whole
      line would disappear rather than change colour. As a longhand it degrades to `currentColor`,
      which is what drew these dashes before. That is the same failure this file's decision refuses
      for `--link-unresolved-decoration-style`, and it applies to any variable put in that slot. */
-  border-bottom-color: var(--folia-link-unresolved-decoration-color);
-  cursor: var(--folia-cursor-help);
+  border-bottom-color: var(--link-unresolved-decoration-color);
+  cursor: help;
 }
 .folia-done {
-  text-decoration: var(--folia-done-decoration);
-  color: var(--folia-done-color);
+  text-decoration: var(--checklist-done-decoration);
+  color: var(--checklist-done-color);
 }
 
 .folia-comments li,
 .folia-history li {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-hair);
-  font-size: var(--folia-font-size-md);
-  padding-left: var(--folia-gap);
+  gap: var(--size-2-1);
+  font-size: var(--font-ui-small);
+  padding-left: var(--size-4-2);
   /* Shaped like a blockquote and deliberately not drawn from the blockquote variables. This border
      IS the unread signal — read, unread and reply are told apart by its hue — and a comment is not a
      quotation. `--blockquote-border-color` resolves to the accent, which collides with the reply
      hue; `--blockquote-border-thickness` would let a theme that draws borderless quotes erase the
      rail and the state with it. Both stay the board's; see docs/decisions.md. */
-  border-left: var(--folia-border-width-thick) solid var(--folia-border);
+  border-left: var(--folia-border-width-thick) solid var(--background-modifier-border);
 }
 .folia-comment-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--folia-space-xs);
+  gap: var(--size-4-1);
 }
 .folia-comment-text {
   flex: 1 1 auto;
@@ -735,79 +737,79 @@
   overflow-wrap: anywhere;
 }
 .folia-comment-text {
-  font-size: var(--folia-font-size-md);
-  line-height: var(--folia-line-height);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
 }
 /* edit/delete affordances stay quiet until the comment is hovered/focused */
 .folia-comment-row .folia-mini {
-  opacity: var(--folia-opacity-hidden);
+  opacity: 0;
   transition: opacity var(--folia-dur-fast) ease;
 }
 .folia-comments li:hover .folia-mini,
 .folia-comments li:focus-within .folia-mini {
-  opacity: var(--folia-opacity-shown);
+  opacity: 1;
 }
 .folia-comment-edit {
   width: 100%;
-  min-height: var(--folia-comment-edit-h-min);
+  min-height: var(--size-4-12);
   resize: vertical;
   font: inherit;
-  font-size: var(--folia-font-size-md);
+  font-size: var(--font-ui-small);
   /* Matches .folia-comment-text's pinned line-height, for the same reason as
      .folia-desc above. */
-  line-height: var(--folia-line-height);
-  background: var(--folia-field-bg);
+  line-height: var(--line-height-normal);
+  background: var(--background-modifier-form-field);
   color: var(--text-normal);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-sm) var(--folia-space-md);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-2-3) var(--size-4-2);
 }
 .folia-comment-edit:focus {
   outline: var(--folia-focus-ring-w) solid transparent;
-  border-color: var(--folia-accent);
+  border-color: var(--interactive-accent);
   box-shadow: var(--folia-ring);
 }
 /* One row for a comment's metadata; the <li> itself stacks (metadata, then the comment body). */
 .folia-comment-head {
   display: flex;
   align-items: baseline;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-comment-author {
   font-size: var(--folia-font-size-xxs);
   color: var(--text-muted);
-  font-weight: var(--folia-font-weight-medium);
+  font-weight: var(--font-medium);
 }
 /* Tinted like the priority chips above, and for their reason: mixing the hue INTO `--text-normal`
    and laying it over a translucent wash of itself keeps the contrast the theme already guarantees,
    where white-on-hue at this size would land near 3:1 in either theme. */
 .folia-comment-flag {
   font-size: var(--folia-font-size-xxs);
-  font-weight: var(--folia-font-weight-semibold);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
-  border-radius: var(--folia-r-pill);
-  padding: 0 var(--folia-space-sm);
+  border-radius: 999px;
+  padding: 0 var(--size-2-3);
   /* The text mixes into an opaque colour and stays in srgb — see src/theme/README.md. */
-  color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
-  background: color-mix(in oklch, var(--folia-unread) 20%, transparent);
+  color: color-mix(in srgb, var(--color-blue) 55%, var(--text-normal));
+  background: color-mix(in oklch, var(--color-blue) 20%, transparent);
 }
 .folia-comment-reply .folia-comment-flag {
-  color: color-mix(in srgb, var(--folia-unread-reply) 55%, var(--text-normal));
-  background: color-mix(in oklch, var(--folia-unread-reply) 22%, transparent);
+  color: color-mix(in srgb, var(--color-purple) 55%, var(--text-normal));
+  background: color-mix(in oklch, var(--color-purple) 22%, transparent);
 }
 .folia-comments li.folia-comment-unread,
 .folia-comments li.folia-comment-reply {
-  padding: var(--folia-space-xxs) var(--folia-space-sm) var(--folia-space-xxs-plus) var(--folia-gap);
-  border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
+  padding: var(--size-2-1) var(--size-2-3) var(--size-4-1) var(--size-4-2);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
 }
 .folia-comments li.folia-comment-unread {
-  border-left-color: var(--folia-unread);
-  background: color-mix(in oklch, var(--folia-unread) 8%, transparent);
+  border-left-color: var(--color-blue);
+  background: color-mix(in oklch, var(--color-blue) 8%, transparent);
 }
 .folia-comments li.folia-comment-reply {
-  border-left-color: var(--folia-unread-reply);
-  background: color-mix(in oklch, var(--folia-unread-reply) 10%, transparent);
+  border-left-color: var(--color-purple);
+  background: color-mix(in oklch, var(--color-purple) 10%, transparent);
 }
 /* The "New" rule: where the comments you have already read end. Specificity has to beat the
    `.folia-comments li` block above, which stacks children and draws the quote-style left border. */
@@ -816,21 +818,21 @@
   flex-direction: row;
   border-left-color: transparent;
   align-items: center;
-  gap: var(--folia-space-md);
+  gap: var(--size-4-2);
   font-size: var(--folia-font-size-xxs);
-  font-weight: var(--folia-font-weight-semibold);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
   letter-spacing: var(--folia-tracking-label);
-  color: color-mix(in srgb, var(--folia-unread) 55%, var(--text-normal));
+  color: color-mix(in srgb, var(--color-blue) 55%, var(--text-normal));
   /* Left padding matches the comments beneath it, so the word lines up with them instead of
      hanging out into the border gutter. */
-  padding: var(--folia-space-xxs) 0 0 var(--folia-gap);
+  padding: var(--size-2-1) 0 0 var(--size-4-2);
 }
 .folia-comments li.folia-comments-divider::after {
   content: "";
   flex: 1 1 auto;
-  height: var(--folia-divider-h);
-  background: color-mix(in oklch, var(--folia-unread) 45%, transparent);
+  height: var(--border-width);
+  background: color-mix(in oklch, var(--color-blue) 45%, transparent);
 }
 .folia-ts {
   font-size: var(--folia-font-size-xxs);

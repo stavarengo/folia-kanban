@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Produces the documented host-variable registry so theme guards can check Obsidian aliases.
+// Writes src/theme/host/variables.json: the host variables the board reads, each as Obsidian's
+// developer docs describe it, and the docs commit they were read at. `--check` fails when the file
+// differs from what the docs say now, including when the board reads a variable they do not list.
 // Conflicting fields keep the first non-empty value in sorted page order and record its page.
 
 import { execFileSync } from "node:child_process";
@@ -13,6 +15,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hostReads } from "./theme-bundle.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -195,6 +198,15 @@ function sortedKeys(value) {
   );
 }
 
+// Only what the board reads is listed, so the file is the allowlist `pnpm theme:check` holds the
+// theme to. A read the docs do not describe is not written at all, and fails here.
+process.chdir(root);
+const reads = await hostReads();
+for (const [name, where] of reads) {
+  if (!variables.has(name)) warn(`${name} (read at ${where[0]}) is not documented at this commit`);
+}
+for (const name of [...variables.keys()]) if (!reads.has(name)) variables.delete(name);
+
 const output = sortedKeys({
   $source: {
     repository: "obsidianmd/obsidian-developer-docs",
@@ -226,7 +238,7 @@ if (check) {
 }
 if (warnings > 0) process.exitCode = 1;
 console.error(
-  `sync-host-variables: ${pages.length} pages read, ${variables.size} variables found, ${warnings} warnings${
+  `sync-host-variables: ${pages.length} pages read, ${variables.size} variables listed, ${warnings} warnings${
     check ? "" : `, written to ${destination}`
   }`,
 );

@@ -2,8 +2,8 @@
 .folia-add-card {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
-  padding: var(--folia-space-xxs);
+  gap: var(--size-2-3);
+  padding: var(--size-2-1);
 }
 .folia-add-card textarea,
 .folia-add-inline input,
@@ -11,11 +11,11 @@
   width: 100%;
   resize: vertical;
   font: inherit;
-  background: var(--folia-field-bg);
+  background: var(--background-modifier-form-field);
   color: var(--text-normal);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--size-4-2) var(--size-4-2);
   transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
 .folia-add-card textarea:focus,
@@ -23,19 +23,19 @@
 .folia-add-inline textarea:focus,
 .folia-desc:focus {
   outline: var(--folia-focus-ring-w) solid transparent;
-  border-color: var(--folia-accent);
+  border-color: var(--interactive-accent);
   box-shadow: var(--folia-ring);
 }
 .folia-row-actions {
   display: flex;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-add-card-fill {
   margin: 0;
-  padding: 0 var(--folia-space-xxs);
+  padding: 0 var(--size-2-1);
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
 }
 .folia-section > .folia-add-card-fill {
-  margin-block: var(--folia-space-sm);
+  margin-block: var(--size-2-3);
 }

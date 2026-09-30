@@ -2,7 +2,7 @@
 .folia-card-next-todos {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-xxs-plus);
+  gap: var(--size-4-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -10,7 +10,7 @@
 .folia-card-next-todo {
   display: flex;
   align-items: center;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
   font-size: var(--folia-font-size-xs);
   color: var(--text-muted);
 }
@@ -23,10 +23,10 @@
    follows when a theme moves, not about how it looks now. */
 .folia-card-next-todo-mark {
   flex-shrink: 0;
-  width: var(--folia-todo-mark);
-  height: var(--folia-todo-mark);
-  border: var(--folia-border-width-hair) solid var(--checkbox-border-color);
-  border-radius: var(--folia-r-sm);
+  width: var(--size-4-2);
+  height: var(--size-4-2);
+  border: var(--border-width) solid var(--checkbox-border-color);
+  border-radius: var(--radius-s);
 }
 .folia-card-next-todo-text {
   min-width: 0;

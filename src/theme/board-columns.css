@@ -2,8 +2,8 @@
 .folia-board {
   display: flex;
   align-items: flex-start;
-  gap: var(--folia-gap);
-  padding: var(--folia-space-lg);
+  gap: var(--size-4-2);
+  padding: var(--size-4-3);
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1 1 auto;
@@ -12,17 +12,17 @@
   scrollbar-width: thin;
 }
 .folia-board.folia-is-pan-scrolling {
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
   user-select: none;
 }
 /* In "click and drag" mode the bare board background is itself draggable to pan, so it advertises a
    grab cursor. Columns/cards/buttons sit above and keep their own cursors, so the hint only shows on
    the empty space the pan actually responds to. */
 .folia-board[data-pan="empty"] {
-  cursor: var(--folia-cursor-grab);
+  cursor: grab;
 }
 .folia-board[data-pan="empty"].folia-is-pan-scrolling {
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
 }
 
 .folia-column {
@@ -31,31 +31,31 @@
   flex: 0 0 var(--folia-col-w);
   width: var(--folia-col-w);
   max-height: 100%;
-  background: var(--folia-col-bg);
-  border: var(--folia-border-width) solid var(--folia-border);
+  background: var(--background-secondary);
+  border: var(--border-width) solid var(--background-modifier-border);
   border-top: var(--folia-cue-thickness) solid var(--folia-col-accent);
-  border-radius: var(--folia-r-lg);
+  border-radius: var(--radius-l);
   overflow: hidden;
 }
 
 .folia-column-header {
   display: flex;
   align-items: center;
-  gap: var(--folia-space-md);
-  padding: var(--folia-space-md-plus) var(--folia-pad);
-  background: var(--folia-col-header-bg);
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3);
+  background: var(--background-secondary-alt);
   position: relative;
 }
 .folia-column-dot {
-  width: var(--folia-dot);
-  height: var(--folia-dot);
-  border-radius: var(--folia-r-pill);
+  width: var(--size-4-2);
+  height: var(--size-4-2);
+  border-radius: 999px;
   background: var(--folia-col-accent);
   flex: 0 0 auto;
 }
 .folia-column-title {
-  font-weight: var(--folia-font-weight-semibold);
-  font-size: var(--folia-font-size-md);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
   color: var(--text-normal);
   flex: 1 1 auto;
   white-space: nowrap;
@@ -67,43 +67,43 @@
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
-  gap: var(--folia-space-xxs-plus);
+  gap: var(--size-4-1);
   font-size: var(--folia-font-size-xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--background-modifier-border);
-  border-radius: var(--folia-r-pill);
-  padding: var(--folia-space-hair) var(--folia-space-md);
-  min-width: var(--folia-count-w-min);
+  border-radius: 999px;
+  padding: var(--size-2-1) var(--size-4-2);
+  min-width: var(--size-4-5);
   justify-content: center;
 }
 /* A danger tint behind the normal text colour, not white on the palette red, which is 3.5:1 in dark
    and 4.2:1 in light: small text needs 4.5:1. The column's red edge and header tint say the rest. */
 .folia-scope .folia-column-count.folia-is-over-limit {
   color: var(--text-normal);
-  background: color-mix(in oklch, var(--folia-danger) 22%, transparent);
+  background: color-mix(in oklch, var(--color-red) 22%, transparent);
 }
 /* These two mix into opaque colours and stay in srgb — see src/theme/README.md. */
 .folia-column.folia-is-over-limit {
-  border-color: color-mix(in srgb, var(--folia-danger) 50%, var(--folia-border));
+  border-color: color-mix(in srgb, var(--color-red) 50%, var(--background-modifier-border));
 }
 .folia-column.folia-is-over-limit .folia-column-header {
-  background: color-mix(in srgb, var(--folia-danger) 8%, var(--folia-col-header-bg));
+  background: color-mix(in srgb, var(--color-red) 8%, var(--background-secondary-alt));
 }
 
 .folia-column-body {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-md);
-  padding: var(--folia-space-md);
+  gap: var(--size-4-2);
+  padding: var(--size-4-2);
   overflow-y: auto;
-  min-height: var(--folia-column-body-h-min);
+  min-height: var(--size-4-12);
   flex: 1 1 auto;
   scrollbar-width: thin;
   transition: background var(--folia-dur-fast) ease;
 }
 .folia-column-body.folia-is-over {
-  background: var(--folia-drop-target-bg);
+  background: var(--background-modifier-active-hover);
 }
 .folia-column-empty {
   --folia-icon-size: var(--icon-l);
@@ -112,39 +112,39 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--folia-space-sm);
-  padding: var(--folia-space-xl-plus) var(--folia-space-md);
+  gap: var(--size-2-3);
+  padding: var(--size-4-4) var(--size-4-2);
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
-  border: var(--folia-border-width) dashed var(--folia-border);
-  border-radius: var(--folia-r);
+  font-size: var(--font-ui-smaller);
+  border: var(--border-width) dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
 }
 .folia-column-empty.folia-is-filtered {
   border: none;
-  padding: var(--folia-gap) var(--folia-space-md);
+  padding: var(--size-4-2) var(--size-4-2);
   font-style: italic;
 }
 
 .folia-column-rule {
-  margin: 0 var(--folia-space-md) var(--folia-space-md);
+  margin: 0 var(--size-4-2) var(--size-4-2);
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
   text-align: center;
 }
 
 .folia-scope .folia-column-add {
   display: flex;
   align-items: center;
-  gap: var(--folia-space-sm);
-  margin: 0 var(--folia-space-md) var(--folia-space-md);
-  padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
+  gap: var(--size-2-3);
+  margin: 0 var(--size-4-2) var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-2);
   background: var(--interactive-normal);
   border: none;
   border-radius: var(--button-radius);
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
-  font-weight: var(--folia-font-weight-medium);
-  cursor: var(--folia-cursor-control);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  cursor: var(--cursor);
   text-align: left;
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }

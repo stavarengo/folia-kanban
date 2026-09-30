@@ -2,13 +2,13 @@
 /* The title doubles as the drag handle and the rename click target. Grab cursor signals drag;
    the dnd distance:5 sensor still lets a clean click through to enter rename. */
 .folia-column-title {
-  cursor: var(--folia-cursor-grab);
+  cursor: grab;
   user-select: none;
 }
 .folia-column-title:focus-visible {
   outline: var(--folia-focus-ring-w) solid var(--folia-col-accent);
-  outline-offset: var(--folia-focus-ring-offset);
-  border-radius: var(--folia-r-sm);
+  outline-offset: var(--size-2-1);
+  border-radius: var(--radius-s);
 }
 /* The column being dragged: dim + lift it out of the row so the gap reads as the drop slot.
    A faded column (#10 `--folia-col-opacity` < 1, e.g. parked) must still read as "dragging", so
@@ -16,24 +16,24 @@
    mid-drag only `.folia-is-faded` and `.folia-is-dragging` match (equal specificity) and this later rule wins —
    a parked+faded column never goes invisible mid-drag. */
 .folia-column.folia-is-dragging {
-  opacity: var(--folia-opacity-subtle);
-  cursor: var(--folia-cursor-grabbing);
-  z-index: var(--folia-z-index-raised);
+  opacity: 0.6;
+  cursor: grabbing;
+  z-index: 2;
 }
 .folia-column.folia-is-dragging .folia-column-title {
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
 }
 /* Inline rename input — sits in the title's slot, inheriting its weight/size so the swap is seamless. */
 .folia-column-title-input {
   flex: 1 1 auto;
   min-width: 0;
-  font-weight: var(--folia-font-weight-semibold);
-  font-size: var(--folia-font-size-md);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-small);
   color: var(--text-normal);
   background: var(--background-primary);
-  border: var(--folia-border-width) solid var(--folia-col-accent);
-  border-radius: var(--folia-r-sm);
-  padding: var(--folia-space-hair) var(--folia-space-sm);
+  border: var(--border-width) solid var(--folia-col-accent);
+  border-radius: var(--radius-s);
+  padding: var(--size-2-1) var(--size-2-3);
 }
 /* Suppressing the outline and stopping there left focus indistinguishable from rest, since the
    resting state already carries the column's accent border. The ring is what changes now. The
@@ -51,10 +51,10 @@
   width: var(--folia-hit-md);
   height: var(--folia-hit-md);
   padding: 0;
-  opacity: var(--folia-opacity-hidden);
+  opacity: 0;
   transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
 .folia-column:hover .folia-column-menu-btn,
 .folia-scope .folia-column-menu-btn:focus-visible {
-  opacity: var(--folia-opacity-shown);
+  opacity: 1;
 }

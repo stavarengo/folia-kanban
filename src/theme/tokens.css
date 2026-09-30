@@ -1,274 +1,91 @@
-/* The --folia-* translation layer over Obsidian's design foundations. Every token is either an
-   alias of a variable Obsidian documents or an owned value with a reason; src/theme/README.md and
-   `pnpm theme:check` are where those two rules live.
+/* The board reads Obsidian's documented CSS variables directly. What is declared here is the rest:
+   the design values Obsidian publishes nothing for, each with its reason (docs/decisions.md, "The
+   board's own design values"), and the channels the board's code writes live, with the value an
+   element reads where nothing was written. `pnpm theme:check` refuses any other `--folia-*` name.
 
-   The token block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down
-   the tree, and several surfaces are portalled OUT of the board root — the card context menu and
-   the column popover to the document body, the drag overlay to
-   the board's own body — so a token declared on the root alone resolves to nothing inside them:
-   priority chips lose their colour, radii, shadows and font sizes go dead. Every element the
-   plugin portals outside the root therefore carries `folia-scope` as well, which re-declares the
-   same tokens there. `pnpm portals:check` (scripts/check-portal-scope.mjs) keeps that pairing
-   honest, including the one portal that must NOT carry it: the detail panel is portalled INTO the
-   root, where the tokens already inherit, so the class would only re-declare the block a second
-   time below the root — shadowing anything set live on the root element with the static
-   fallback for everything under that portal.
+   The block hangs off `folia-scope`, not `folia-root`. Custom properties only inherit down the tree,
+   and the drag overlay, the detail dialog's content and the edit-column swatch row live outside the
+   board root, so each of them carries `folia-scope` too (`pnpm portals:check` keeps that pairing).
 
-   Raw design values are allowed HERE and nowhere else in the bundle. */
+   Raw colours are allowed here and nowhere else in the bundle. */
 
 .folia-scope {
-  /* The board's base size travels with the token scope, not with the root: a portalled menu sits in
-     the document body, where `font: inherit` on its buttons would otherwise mean the app's font
-     rather than the board's. It lives in this rule rather than in a second one wearing the same
-     selector, so `.folia-scope` names exactly one rule: the token block `pnpm theme:check` reads. */
-  font-size: var(--folia-font-size-md);
+  /* The board's base size travels with the scope, so a surface portalled out of the root keeps it. */
+  font-size: var(--font-ui-small);
 
-  /* radii */
-  --folia-r-sm: var(--radius-s);
-  --folia-r: var(--radius-m);
-  --folia-r-lg: var(--radius-l);
-  --folia-r-pill: 999px;
+  /* motion — Obsidian publishes no durations or easing curves */
+  --folia-dur-fast: 110ms; /* hover, reveal and state changes */
+  --folia-dur: 170ms; /* things that travel: a card's lift, a parked column's slide */
+  --folia-ease: cubic-bezier(0.16, 1, 0.3, 1); /* also the drop animation in src/ui/Board.tsx */
 
-  /* Gaps and padding follow the host grid; board dimensions use multiples of its base unit. */
-  --folia-space-hair: var(--size-2-1);
-  --folia-space-xxs: var(--size-2-1);
-  --folia-space-xxs-plus: var(--size-4-1);
-  --folia-space-xs: var(--size-4-1);
-  --folia-space-xs-plus: var(--size-4-1);
-  --folia-space-sm: var(--size-2-3);
-  --folia-space-sm-plus: var(--size-4-2);
-  --folia-space-md: var(--size-4-2);
-  --folia-space-md-plus: var(--size-4-2);
-  --folia-gap: var(--size-4-2);
-  --folia-pad: var(--size-4-3);
-  --folia-space-lg: var(--size-4-3);
-  --folia-space-xl: var(--size-4-4);
-  --folia-space-xl-plus: var(--size-4-4);
-  --folia-space-xxl: var(--size-4-6);
-  --folia-space-bleed: calc(-1 * var(--size-2-3)); /* pulls a hover surface back out over its own padding */
-  --folia-space-pull: calc(-1 * var(--size-4-1)); /* closes the gap a block above already left */
-  --folia-pad-block: 2em; /* a state message that fills a pane, sized in its own text */
-  --folia-pad-notice-y: 0.5em;
-  --folia-space-para: 0.25em;
-
-  /* layout — the sizes the board's own furniture is cut to */
-  --folia-col-w: calc(var(--size-4-1) * 75); /* single source for column width + drag-overlay width */
-  --folia-search-w: calc(var(--size-4-1) * 80);
-  --folia-add-column-w: calc(var(--size-4-1) * 55);
-  /* Capped at 40% of the panel body, which is a size container (`.folia-detail-body`), so a narrow
-     panel keeps most of each row for the value and the longest names wrap instead. A percentage
-     would resolve against whatever box uses the width — the assignee label is narrower than the
-     row whenever its button sits beside it — and pull that row's values out of line. */
-  --folia-prop-key-w: min(calc(var(--size-4-1) * 30), 40cqi);
-  --folia-assignee-input-w-min: calc(var(--size-4-1) * 25);
-  --folia-card-pad-x: var(--folia-pad); /* a card's own side padding; a nested card narrows it */
+  /* pointer targets — a theme that shrinks its inputs must not shrink them below 24px */
+  --folia-hit-min: 24px; /* the smallest pointer target the board draws */
+  --folia-hit-sm: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-2))); /* mini buttons: two grid steps under an input */
+  --folia-hit-md: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-1))); /* icon buttons: one grid step under an input */
   /* One quick-action button and the hair beside it. A cluster of n buttons has n-1 gaps, and the
      title keeps one more hair of clearance, so n of these measure the buttons plus that clearance. */
-  --folia-card-action-step: calc(var(--folia-hit-md) + var(--folia-space-hair));
+  --folia-card-action-step: calc(var(--folia-hit-md) + var(--size-2-1));
   /* How far a full `.folia-card-actions` reaches in from a card's edge: its inset, its own padding
-     and three steps. Every term is a token that cluster is built from, so this cannot drift from
-     the thing it measures; a card with no "mark done" button reserves one step less. What a title
-     reserves is this less the card's own side padding, which the title rule subtracts — a custom
-     property substitutes where it is DECLARED, so doing it here would freeze the scope's padding
-     and miss the narrower one a nested card sets. */
-  --folia-card-actions-reach: calc(
-    var(--folia-space-sm) + 2 * var(--folia-space-xxs) + 3 * var(--folia-card-action-step)
-  );
-  --folia-card-overlay-inset: calc(2 * var(--folia-border-width) + 2 * var(--folia-space-md)); /* the lifted card is narrower than the column it came from */
-  --folia-desc-h-min: var(--size-4-18);
-  --folia-desc-h-max-offset: calc(var(--size-4-1) * 55); /* what the rendered description leaves of the viewport */
-  --folia-comment-edit-h-min: var(--size-4-12);
-  --folia-column-body-h-min: var(--size-4-12);
-  --folia-viewport-h: 100vh;
-  --folia-col-park-margin: 60vw; /* how far a parked column slides out of the row */
-  --folia-action-rise: var(--size-2-1);
-  --folia-control-h: var(--input-height);
-  --folia-control-pad-x: var(--size-4-3);
-  --folia-hit-min: 24px;
-  --folia-hit-sm: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-2)));
-  --folia-hit-md: max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-1)));
-  --folia-count-w-min: var(--size-4-5);
-  --folia-dot: var(--size-4-2);
-  --folia-unread-dot: var(--size-2-3);
-  --folia-todo-mark: var(--size-4-2);
-  --folia-divider-h: var(--border-width);
-  --folia-ctx-strip-inset: var(--size-2-3); /* the context strip is inset past the priority bar beside it */
-  --folia-icon-size: var(--icon-s);
-  --folia-icon-stroke: var(--icon-s-stroke-width);
-  --folia-icon-baseline: -0.15em;
+     and three steps. What a title reserves is this less the card's side padding, which the title
+     rule subtracts: a custom property substitutes where it is DECLARED, so doing it here would
+     freeze the scope's padding and miss the narrower one a nested card sets. */
+  --folia-card-actions-reach: calc(var(--size-2-3) + 2 * var(--size-2-1) + 3 * var(--folia-card-action-step));
 
-  /* borders */
-  --folia-border-width: var(--border-width);
-  --folia-border-width-hair: var(--border-width);
-  --folia-border-width-thick: 2px;
-  --folia-control-outline: 1px solid currentColor;
-  --folia-focus-ring-w: 2px;
-  --folia-focus-ring-offset: var(--size-2-1);
-  --folia-focus-ring-offset-inset: calc(-1 * var(--folia-focus-ring-offset));
-  --folia-underline-offset: var(--size-2-1);
+  /* layout */
+  --folia-col-w: calc(var(--size-4-1) * 75); /* a column, and the drag overlay that stands in for one */
+  /* The detail panel's property gutter, capped at 40% of the panel body, which is a size container
+     (`.folia-detail-body`). A percentage would resolve against whatever box uses the width, and pull
+     a row whose label sits beside a button out of line with the rest. */
+  --folia-prop-key-w: min(calc(var(--size-4-1) * 30), 40cqi);
 
-  /* the lines and strips the board draws itself, which are elements rather than borders */
+  /* lines — a theme may zero its border widths, and these carry a state on their own */
+  --folia-border-width-thick: 2px; /* an edge that carries meaning: a chosen swatch, a pressed outline */
+  --folia-control-outline: 1px solid currentColor; /* the pointer outline on hover */
+  --folia-focus-ring-w: 2px; /* the keyboard focus outline */
   --folia-cue-thickness: 3px; /* the priority strip, the urgency band and a column's accent rail */
-  --folia-ctx-strip-w: 2px; /* the context strip, thinner so it reads as a different cue */
+  --folia-ring: 0 0 0 2px color-mix(in oklch, var(--interactive-accent) 30%, transparent); /* a field being edited */
 
-  /* motion */
-  --folia-dur-fast: 110ms;
-  --folia-dur: 170ms;
-  --folia-dur-none: 0.01ms; /* what `prefers-reduced-motion` shortens every transition to */
-  --folia-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --folia-tilt: 1.5deg;
-  --folia-tilt-flat: 0deg;
-  --folia-rotate-collapsed: -90deg;
+  /* elevation — Obsidian publishes no shadow a plugin may read; these are the dark scheme's */
+  --folia-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16); /* a card at rest */
+  --folia-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.22); /* a card under the pointer */
+  --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28); /* the hover-action cluster over a card */
+  --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4); /* a lifted card or column */
 
-  /* surfaces & lines */
-  --folia-border: var(--background-modifier-border);
-  --folia-border-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
-  --folia-card-bg: var(--background-primary);
-  --folia-col-bg: var(--background-secondary);
-  --folia-col-header-bg: var(--background-secondary-alt);
-  --folia-drop-target-bg: var(--background-modifier-active-hover);
-  --folia-field-bg: var(--background-modifier-form-field);
+  /* type */
+  --folia-font-size-xs: calc(var(--font-ui-smaller) * 11 / 12); /* secondary labels, 11px at the default */
+  --folia-font-size-xxs: calc(var(--font-ui-smaller) * 5 / 6); /* compact badges, 10px at the default */
+  --folia-tracking-label: 0.04em; /* the uppercase micro-labels */
 
-  /* elevation (subtle in dark, structure carried by borders) */
-  --folia-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.16);
-  --folia-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.22);
-  --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4);
-  --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);
-  --folia-ring: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent);
-  --folia-ring-soft: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent);
-  --folia-shadow-card-selected: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);
-  --folia-shadow-swatch-active: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
-  --folia-blur-actions: blur(3px);
-
-  /* priority ramp (urgent -> trivial), tinted off the theme's accent palette */
-  --folia-prio-1: var(--color-red);
-  --folia-prio-2: var(--color-orange);
-  --folia-prio-3: var(--color-yellow);
-  --folia-prio-4: var(--color-blue);
-  --folia-accent: var(--interactive-accent);
-  /* Obsidian splits the accent in two: `--interactive-accent` is the FILL behind an accented
-     control, `--text-accent` is accented TEXT. A theme darkens the second for legibility while
-     keeping the first bright, so a foreground painted with the fill sits on a background it was
-     never meant to sit on. `--folia-accent` above is the fill; these two are the foreground. */
-  --folia-text-accent: var(--text-accent);
-  --folia-text-accent-hover: var(--text-accent-hover);
-  /* `danger` is a FILL — the over-limit badge, the urgency tint — and Obsidian publishes no
-     variable for it, so it stays on the palette. The three below are the foregrounds, and they are
-     separate for the same reason the accent is: a theme tunes error text for legibility without
-     touching what an error fill looks like. */
-  --folia-danger: var(--color-red);
-  --folia-text-error: var(--text-error);
-  --folia-text-warning: var(--text-warning);
-  --folia-text-success: var(--text-success);
-
-  /* A finished subtask or card is the same object as a ticked checklist line, so it is drawn with
-     the same two variables the app draws those with. They also route around the community scan,
-     which flags a literal multi-keyword `text-decoration` but cannot see inside a var(). */
-  --folia-done-decoration: var(--checklist-done-decoration);
-  --folia-done-color: var(--checklist-done-color);
-
-  /* Links. Obsidian distinguishes three kinds and the board draws two of them: a resolved internal
-     link, and a name that matches no card on the board, which is the unresolved case. */
-  /* The colour is owned: the default light accent Obsidian links with, #8a5cf5, is 4.26:1 even on
-     #ffffff, so no surface can make it pass WCAG AA. Mixed toward --text-normal it keeps the theme's
-     hue and, for the default accent, clears 4.5:1 on --background-primary, -secondary and
-     -primary-alt in both schemes. The hover colour is a lighter accent in light, so it takes more
-     --text-normal (see docs/decisions.md). */
+  /* Links, mixed toward the text colour because the default light link colour fails WCAG AA on
+     every surface (docs/decisions.md, "Readable text beats the host's exact colour"). */
   --folia-link-color: color-mix(in srgb, var(--link-color) 75%, var(--text-normal));
-  --folia-link-color-hover: color-mix(in srgb, var(--link-color-hover) 55%, var(--text-normal));
-  --folia-link-decoration: var(--link-decoration);
-  --folia-link-decoration-hover: var(--link-decoration-hover);
-  --folia-link-weight: var(--link-weight);
-  /* A missing link is dimmed by colour, not by Obsidian's `--link-unresolved-opacity`: its 0.7 over
-     the accent is 2.7:1 on the detail dialog in light. Half the accent in --text-muted still reads as
-     quieter than a resolved link. */
-  --folia-link-unresolved-color: color-mix(in srgb, var(--link-unresolved-color) 50%, var(--text-muted));
-  --folia-link-unresolved-filter: var(--link-unresolved-filter);
-  --folia-link-unresolved-decoration-color: var(--link-unresolved-decoration-color);
-  /* Unread comments (§ unread): "someone wrote something you haven't read" vs the louder "someone
-     answered you". Two hues, never a lone colour difference — the tile pairs each with its own
-     shape (dot vs arrow) and the panel with a word (NEW vs REPLY). */
-  --folia-unread: var(--color-blue);
-  --folia-unread-reply: var(--color-purple);
+  --folia-link-color-hover: color-mix(in srgb, var(--link-color-hover) 55%, var(--text-normal)); /* a lighter accent, so more text colour */
+  --folia-link-unresolved-color: color-mix(in srgb, var(--link-unresolved-color) 50%, var(--text-muted)); /* dimmed by colour, not by opacity */
 
-  /* Controls follow the host arrow convention; links use the host link cursor. */
-  --folia-cursor-link: var(--cursor-link);
-  --folia-cursor-control: var(--cursor);
-  --folia-cursor-inert: var(--cursor);
-  --folia-cursor-grab: grab;
-  --folia-cursor-grabbing: grabbing;
-  --folia-cursor-text: text;
-  --folia-cursor-help: help;
-
-  /* typography — font sizes */
-  --folia-font-size-xxs: calc(var(--font-ui-smaller) * 5 / 6);
-  --folia-font-size-xs: calc(var(--font-ui-smaller) * 11 / 12);
-  --folia-font-size-sm: var(--font-ui-smaller);
-  --folia-font-size-md: var(--font-ui-small);
-  --folia-font-size-lg: var(--font-ui-medium);
-  --folia-font-mono: var(--font-monospace-theme), SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, Consolas, "Source Code Pro", monospace;
-
-  /* typography — font weights */
-  --folia-font-weight-medium: var(--font-medium);
-  --folia-font-weight-semibold: var(--font-semibold);
-
-  /* typography — line heights and tracking */
-  --folia-line-height: var(--line-height-normal);
-  --folia-line-height-tight: var(--line-height-tight);
-  --folia-line-height-title: var(--line-height-tight);
-  --folia-line-height-heading: var(--line-height-tight);
-  --folia-line-height-mark: 1;
-  --folia-tracking-label: 0.04em;
-  --folia-tracking-key: 0.03em;
-  --folia-tracking-heading: 0.05em;
-
-  /* z-index — in-board rungs. Every surface using one of these renders inside the workspace leaf,
-     and app.css gives `.workspace-leaf` `contain: strict` + `isolation: isolate`, so the leaf is a
-     stacking context of its own: these numbers are only ever compared with each other, never with
-     the app's. An app overlay is above the whole leaf whatever number it carries. They are
-     Folia's to choose — which is also why `theme:check` does not offer to alias the ones that
-     happen to equal a `--layer-*` default: the equality is a coincidence, not a meaning. */
-  --folia-z-index-base: 1;
-  --folia-z-index-raised: 2;
-  --folia-z-index-sticky: 30;
-
-  /* opacity. `hidden` and `shown` are the two ends of a fade rather than a shade of anything —
-     they are named so the rules that reveal a hover affordance say which end they mean. */
-  --folia-opacity-hidden: 0;
-  --folia-opacity-shown: 1;
-  --folia-opacity-muted: 0.7;
-  --folia-opacity-subtle: 0.6;
-  --folia-opacity-faint: 0.5;
-
-  /* Set live from the board's own JavaScript, and declared here so the fallback is a token like any
-     other rather than a literal repeated at every call site. Each is written onto an element BELOW
-     this block, so the live value always wins where it is set; these are what every other element
-     reads. */
-  --folia-col-accent: var(--folia-accent);
-  --folia-col-opacity: 1;
-  --folia-col-hover-opacity: 1;
-  /* `initial` is the one deliberate exception, and it is load-bearing: it is the guaranteed-invalid
-     value, so `var(--folia-ctx-color, …)` still falls through to each call site's own answer when
-     the runtime wrote nothing. A card can have a folder context and no colour for it, and the two
-     places that draw one disagree about what that should look like on purpose — the strip recedes
-     to a border, the chip to muted text. Give this token a real value and both silently change. */
+  /* Channels: written onto an element below this block, by the board's code or by a component
+     rule, so the live value always wins where it is set. These are what every other element reads. */
+  --folia-col-accent: var(--interactive-accent); /* Column.tsx and Board.tsx write the column's colour */
+  --folia-col-opacity: 1; /* Column.tsx writes a parked column's fade */
+  --folia-col-hover-opacity: 1; /* and the fade it lifts to on hover */
+  /* `initial` is the guaranteed-invalid value, so `var(--folia-ctx-color, …)` still falls through to
+     each call site's own answer when CardItem.tsx wrote nothing: a card can have a context and no
+     colour for it, and the strip and the chip answer that differently on purpose. */
   --folia-ctx-color: initial;
-  /* The swatch's fill, written inline by the palette row because there is one rule and nine
-     possible colours. `initial` is the guaranteed-invalid value, so on the "no colour" swatch —
-     the same class with nothing written onto it — the declaration that reads this token is thrown
-     away entirely and the swatch is left transparent, which is the empty slot it is meant to be.
-     Its face is `.folia-swatch-none`, of equal specificity and LATER in swatches.css; move it
-     above and the base rule's thick transparent border, fixed width and zero padding win back, and
-     the dashed pill around "No color" collapses into a circle. */
+  /* The swatch fill, written inline by the edit-column dialog. On the "no colour" swatch nothing is
+     written, the declaration reading this is thrown away, and the swatch stays the empty slot it is
+     meant to be. */
   --folia-swatch-color: initial;
-  --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
-  --folia-urgency-color: transparent;
-  --folia-urgency-tint: transparent;
+  --folia-desc-max-h: calc(100vh - var(--size-4-1) * 55); /* CardDetail.tsx writes the measured cap */
+  --folia-urgency-color: transparent; /* cards.css sets it per due-date urgency */
+  --folia-urgency-tint: transparent; /* and the wash behind it */
+  --folia-icon-size: var(--icon-s); /* an icon container sets the pair from the host icon scale */
+  --folia-icon-stroke: var(--icon-s-stroke-width); /* the stroke that matches that size */
+  --folia-card-pad-x: var(--size-4-3); /* a nested card narrows it */
 }
 
 .theme-light .folia-scope {
   --folia-shadow-card: 0 1px 1px rgba(0, 0, 0, 0.08);
   --folia-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.12);
-  --folia-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.24);
   --folia-shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.14);
+  --folia-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.24);
 }

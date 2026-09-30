@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parse } from "postcss";
 import { describe, expect, it } from "vitest";
+import { COLUMN_COLORS, columnAccent } from "../src/ui/columnColors";
 
 const entry = readFileSync("src/theme/index.css", "utf8");
 const files = [...entry.matchAll(/@import "\.\/([^\"]+)"/g)].map((match) => match[1]);
@@ -64,10 +65,10 @@ describe("icon geometry contract", () => {
 
 describe("composite dimensions", () => {
   it("keeps the drag overlay inset tied to both column borders and body paddings", () => {
-    expect(declarations(".folia-column")["border"]).toContain("var(--folia-border-width)");
-    expect(declarations(".folia-column-body")["padding"]).toBe("var(--folia-space-md)");
-    expect(declarations(".folia-scope")["--folia-card-overlay-inset"]).toBe(
-      "calc(2 * var(--folia-border-width) + 2 * var(--folia-space-md))",
+    expect(declarations(".folia-column")["border"]).toContain("var(--border-width)");
+    expect(declarations(".folia-column-body")["padding"]).toBe("var(--size-4-2)");
+    expect(declarations(".folia-card-overlay")["width"]).toBe(
+      "calc(var(--folia-col-w) - 2 * var(--border-width) - 2 * var(--size-4-2))",
     );
   });
 
@@ -75,16 +76,14 @@ describe("composite dimensions", () => {
     const tokens = declarations(".folia-scope");
     const flat = (value: string | undefined) => value?.replace(/\s+/g, " ");
     expect(declarations(".folia-card-actions")).toMatchObject({
-      top: "var(--folia-space-sm)",
-      right: "var(--folia-space-sm)",
-      gap: "var(--folia-space-hair)",
-      padding: "var(--folia-space-xxs)",
+      top: "var(--size-2-3)",
+      right: "var(--size-2-3)",
+      gap: "var(--size-2-1)",
+      padding: "var(--size-2-1)",
     });
-    expect(tokens["--folia-card-action-step"]).toBe(
-      "calc(var(--folia-hit-md) + var(--folia-space-hair))",
-    );
+    expect(tokens["--folia-card-action-step"]).toBe("calc(var(--folia-hit-md) + var(--size-2-1))");
     expect(flat(tokens["--folia-card-actions-reach"])).toBe(
-      "calc( var(--folia-space-sm) + 2 * var(--folia-space-xxs) + 3 * var(--folia-card-action-step) )",
+      "calc(var(--size-2-3) + 2 * var(--size-2-1) + 3 * var(--folia-card-action-step))",
     );
     expect(declarations(".folia-card-title")["padding-right"]).toBe(
       "calc(var(--folia-card-actions-reach) - var(--folia-card-pad-x))",
@@ -136,11 +135,34 @@ describe("the no-value choice", () => {
   it("is an empty slot, never a filled swatch", () => {
     expect(declarations(".folia-scope .folia-swatch-none")).toMatchObject({
       background: "transparent",
-      border: "var(--folia-border-width) dashed var(--text-faint)",
+      border: "var(--border-width) dashed var(--text-faint)",
     });
   });
 
   it("drops the swatch's inset hairline, which would draw a solid line inside the dashed edge", () => {
     expect(declarations(".folia-scope .folia-swatch-none")["box-shadow"]).toBe("none");
+  });
+});
+
+describe("values the board's code shares with the theme", () => {
+  it("drops a card with the theme's own easing curve", () => {
+    const board = readFileSync("src/ui/Board.tsx", "utf8");
+    expect(board).toContain(`easing: "${declarations(".folia-scope")["--folia-ease"]}"`);
+  });
+
+  it("paints every column colour with a variable Obsidian documents and the oldest supported version declares", () => {
+    const registry = JSON.parse(readFileSync("src/theme/host/variables.json", "utf8")) as {
+      variables: Record<string, { scope: string }>;
+    };
+    const floor = JSON.parse(readFileSync("src/theme/host/floor.json", "utf8")) as {
+      variables: string[];
+    };
+    expect(COLUMN_COLORS).toHaveLength(8);
+    for (const name of COLUMN_COLORS) {
+      const variable = /^var\((--[a-z-]+)\)$/.exec(columnAccent(name))?.[1];
+      expect(variable, name).toBeDefined();
+      expect(registry.variables[variable!]?.scope, variable).toBe("app");
+      expect(floor.variables, variable).toContain(variable);
+    }
   });
 });

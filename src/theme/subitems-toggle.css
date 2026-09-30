@@ -5,14 +5,14 @@
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
-  gap: var(--folia-space-xs);
-  margin: var(--folia-space-xxs) 0 0;
+  gap: var(--size-4-1);
+  margin: var(--size-2-1) 0 0;
   padding: 0;
   border: none;
   background: none;
   color: var(--text-muted);
   font-size: var(--folia-font-size-xs);
-  cursor: var(--folia-cursor-control);
+  cursor: var(--cursor);
 }
 .folia-scope .folia-card-subitems-toggle:hover:where(:not(:disabled)),
 .folia-scope .folia-card-subitems-toggle:focus-visible {
@@ -28,5 +28,5 @@
   transition: transform var(--folia-dur-fast) var(--folia-ease);
 }
 .folia-icon.folia-is-collapsed {
-  transform: rotate(var(--folia-rotate-collapsed));
+  transform: rotate(-90deg);
 }

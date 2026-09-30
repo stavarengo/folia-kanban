@@ -415,8 +415,8 @@ export function Board({
         createPortal(
           <DragOverlay
             // Portalled out of the root, so the wrapper carries the token scope itself — without it
-            // the lifted ghost draws with dead `--folia-*` vars (no radius, no shadow, no priority
-            // stripe). See the scope note at the top of src/theme/tokens.css.
+            // the lifted ghost draws with dead `--folia-*` vars (no shadow, no width, no lift). See
+            // the scope note at the top of src/theme/tokens.css.
             className="folia-scope"
             // The live make-room gap (`dragReloc`) keeps the dragged card's placeholder at its
             // destination slot for BOTH same- and cross-column drops, so the overlay always tweens
@@ -431,7 +431,7 @@ export function Board({
                     // Briefly dim the overlay as it settles into the placeholder, so the lift
                     // visibly "lands" rather than blinking out.
                     sideEffects: defaultDropAnimationSideEffects({
-                      styles: { active: { opacity: "var(--folia-opacity-faint)" } },
+                      styles: { active: { opacity: "0.5" } },
                     }),
                   }
             }

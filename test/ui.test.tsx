@@ -7137,7 +7137,7 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // The hiding rule and the revealing ones weigh the same, so the reveal has to come later.
     const own = rule(".folia-scope .folia-column-menu-btn");
     expect(own).toContain("width: var(--folia-hit-md)");
-    expect(own).toContain("opacity: var(--folia-opacity-hidden)");
+    expect(own).toContain("opacity: 0");
     expect(own).toContain("transition: opacity");
     // The state selectors share one rule, so `ruleAt` (which anchors on a rule's own line) does not
     // reach them; their position in the file is what matters here.
@@ -7156,8 +7156,8 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // `font: inherit`. The scoped refinement restores the title styling.
     expect(value).toHaveClass("folia-link");
     const own = rule(".folia-scope .folia-title-value");
-    expect(own).toContain("font-size: var(--folia-font-size-md)");
-    expect(own).toContain("font-weight: var(--folia-font-weight-semibold)");
+    expect(own).toContain("font-size: var(--font-ui-small)");
+    expect(own).toContain("font-weight: var(--font-semibold)");
     expect(own).toContain("color: var(--text-normal)");
   });
 

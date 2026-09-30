@@ -2,7 +2,7 @@
 .folia-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 /* The app's own colour-input geometry, floored at the board's minimum hit target: Obsidian ships a
    22px swatch, which is under it, so the board draws 24px until a theme asks for more. */
@@ -30,7 +30,7 @@
      puts a gradient on plain buttons would otherwise paint it over the colour this swatch exists
      to show. The rest of the shorthand's longhands are left alone deliberately. */
   background-image: none;
-  cursor: var(--folia-cursor-control);
+  cursor: var(--cursor);
   padding: 0;
   transition: transform var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
 }
@@ -39,24 +39,26 @@
 }
 .folia-scope .folia-swatch.folia-is-active {
   /* two-tone ring readable over any swatch fill, in either theme */
-  box-shadow: var(--folia-shadow-swatch-active);
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
 }
 /* The disabled custom-colour swatch is a read-only colour sample, not an unavailable action. */
 .folia-scope .folia-swatch:disabled {
-  opacity: var(--folia-opacity-shown);
-  cursor: var(--folia-cursor-inert);
+  opacity: 1;
+  cursor: var(--cursor);
   transform: none;
 }
 /* "No colour" is words, not a swatch: an unlabelled ✕ among the colours read as one more of them,
    or as "close". It keeps the swatch height and ring and widens into a pill around its label, an
    empty dashed slot, with an inset dashed outline for its pointer cue (buttons.css), not the
-   colour swatches' zoom. */
+   colour swatches' zoom. It must stay AFTER the base swatch rule, which ties with it: moved above,
+   the base rule's thick transparent border, fixed width and zero padding win back and the dashed
+   pill collapses into a circle. */
 .folia-scope .folia-swatch-none {
   width: auto;
-  padding: 0 var(--folia-space-md);
-  border: var(--folia-border-width) dashed var(--text-faint);
-  border-radius: var(--folia-r-pill);
-  font-size: var(--folia-font-size-sm);
+  padding: 0 var(--size-4-2);
+  border: var(--border-width) dashed var(--text-faint);
+  border-radius: 999px;
+  font-size: var(--font-ui-smaller);
   /* The swatch's own inset hairline would draw a solid line inside the dashed edge. */
   box-shadow: none;
   background: transparent;

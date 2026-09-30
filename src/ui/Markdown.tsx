@@ -16,8 +16,8 @@ interface Props {
  * always unloaded on unmount or when the markdown/path changes — no leaked Components.
  *
  * The container wears no Obsidian class: `markdown-rendered` is what themes scope reading-view prose
- * to, and the developer docs do not publish it (docs/decisions.md, "Folia's components do not wear
- * Obsidian's undocumented class names"). What `MarkdownRenderer.render` puts inside it is the API's.
+ * to, and the developer docs do not publish it (docs/decisions.md, "Folia uses only what Obsidian
+ * documents"). What `MarkdownRenderer.render` puts inside it is the API's.
  */
 export function Markdown({ markdown, sourcePath, className, onFollowLink }: Props) {
   const repo = useRepo();

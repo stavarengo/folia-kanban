@@ -1,7 +1,7 @@
-// Custom properties inherit down the DOM, and `createPortal` moves a subtree out of it. Every
-// `--folia-*` token is declared in one rule, `.folia-scope` in src/theme/tokens.css, so a surface the
-// plugin portals to the document body resolves NONE of them unless it carries that class itself:
-// priority chips lose their colour, radii, shadows and font sizes silently fall back to nothing.
+// Custom properties inherit down the DOM, and `createPortal` moves a subtree out of it. The board's
+// own values and channel defaults are declared in one rule, `.folia-scope` in src/theme/tokens.css,
+// so a surface the plugin portals to the document body resolves NONE of them unless it carries that
+// class itself: durations, hit sizes, shadows and the base font size silently fall back to nothing.
 // jsdom cannot see this — it loads no stylesheet, so every test renders exactly what the component
 // wrote. This check is that missing eye, at the source level.
 //
@@ -15,8 +15,7 @@
 // board is compared only with its siblings and may use Folia's own rungs freely. A surface
 // portalled to the document body leaves that bubble and lands beside Obsidian's notices, menus,
 // tooltips and modals, where a private number can only tie or win by accident. So a body-portalled
-// surface must take its `z-index` from the app's `--layer-*` scale — directly, or through one of
-// the `--folia-z-index-app-*` aliases that name the rung it sits on.
+// surface must take its `z-index` from the app's `--layer-*` scale.
 //
 // Which side a portal is on is therefore a real question, and this check refuses to guess: only three
 // container shapes are recognised, a document body (outside), the board root ref (inside), and the
@@ -50,8 +49,8 @@ const OUTSIDE_ROOT = [/(^|\.)body$/];
 const SCOPED_CONTAINER = [{ file: join("src", "ui", "App.tsx"), container: /^modal\.contentEl$/ }];
 const isScopedContainer = (file, container) =>
   SCOPED_CONTAINER.some((c) => c.file === file && c.container.test(container));
-/** `z-index` values a body-portalled surface may take: the app's scale, or an alias naming a rung of it. */
-const APP_RUNG = /^var\(\s*(--layer-[a-z-]+|--folia-z-index-app-[a-z-]+)\b/;
+/** `z-index` values a body-portalled surface may take: the app's scale. */
+const APP_RUNG = /^var\(\s*--layer-[a-z-]+\b/;
 
 /**
  * Characters after which a `'` can legitimately open a JS string. In JSX TEXT an apostrophe is just
@@ -310,7 +309,7 @@ for (const file of (await sourceFiles(SRC_DIR)).sort()) {
     if (!scoped) {
       errors.push(
         `[${where}] portals outside the board root without \`${SCOPE}\` on its root element, so ` +
-          `every --folia-* token resolves to nothing inside it. Add the class (classes: "${classes}").`,
+          `every token in src/theme/tokens.css resolves to nothing inside it. Add the class (classes: "${classes}").`,
       );
     }
     for (const cls of classes.match(/[A-Za-z0-9_-]+/g) ?? []) {
@@ -319,7 +318,7 @@ for (const file of (await sourceFiles(SRC_DIR)).sort()) {
         errors.push(
           `[${where}] \`.${cls}\` sets \`z-index: ${value}\`, but this surface is portalled to the ` +
             `document body, where it is stacked against Obsidian's own overlays. Read the app's ` +
-            `scale instead — \`var(--layer-…)\` or a \`--folia-z-index-app-*\` alias — so the order ` +
+            `scale instead, \`var(--layer-…)\`, so the order ` +
             `is a decision rather than a coincidence.`,
         );
       }

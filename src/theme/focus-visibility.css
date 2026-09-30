@@ -1,13 +1,13 @@
 /* ------------------------------------------------------------------ focus visibility */
 .folia-scope :focus-visible {
-  outline: var(--folia-focus-ring-w) solid var(--folia-accent);
-  outline-offset: var(--folia-focus-ring-offset);
+  outline: var(--folia-focus-ring-w) solid var(--interactive-accent);
+  outline-offset: var(--size-2-1);
 }
 .folia-card-main:focus-visible {
-  outline-offset: var(--folia-focus-ring-offset-inset);
+  outline-offset: calc(-1 * var(--size-2-1));
 }
 
 .folia-column-title:focus-visible,
 .folia-card-parent-ref:focus-visible {
-  border-radius: var(--folia-r-sm);
+  border-radius: var(--radius-s);
 }

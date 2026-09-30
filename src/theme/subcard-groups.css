@@ -7,41 +7,41 @@
 .folia-card-tree {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-subcard-group {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
   /* A nesting guide is a documented object, so the distances it indents by come from the file
      explorer's. Its colour and its thickness do not. The accent tint is what says "these belong to
      the card above", which the theme's neutral guide colour would flatten, and the rule's existence
      is that same signal: `--nav-indentation-guide-width` is `0` in any theme that hides indentation
      guides, and a board is not a file tree — hiding one should not hide the other. */
   margin-left: var(--nav-item-children-margin-start);
-  padding: var(--folia-space-sm) 0 var(--folia-space-sm) var(--nav-item-children-padding-start);
+  padding: var(--size-2-3) 0 var(--size-2-3) var(--nav-item-children-padding-start);
   border-left: var(--folia-border-width-thick) solid color-mix(in oklch, var(--folia-col-accent) 55%, transparent);
   background: color-mix(in oklch, var(--folia-col-accent) 5%, transparent);
-  border-radius: 0 var(--folia-r-sm) var(--folia-r-sm) 0;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
 }
 .folia-subcard {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 /* Nested cards are a touch smaller and denser; the grab affordance they shed comes from
    `--static` above, which every non-draggable tile carries. */
 .folia-card--nested {
   /* The title's clearance for the hover cluster subtracts this, so the narrower side padding has to
      be declared here rather than written into the padding shorthand below. */
-  --folia-card-pad-x: var(--folia-gap);
+  --folia-card-pad-x: var(--size-4-2);
   box-shadow: none;
-  border-color: color-mix(in oklch, var(--folia-border) 80%, transparent);
+  border-color: color-mix(in oklch, var(--background-modifier-border) 80%, transparent);
 }
 .folia-card--nested .folia-card-main {
-  gap: var(--folia-space-xs-plus);
-  padding: var(--folia-space-sm-plus) var(--folia-card-pad-x);
+  gap: var(--size-4-1);
+  padding: var(--size-4-2) var(--folia-card-pad-x);
 }
 .folia-card--nested .folia-card-title {
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
 }

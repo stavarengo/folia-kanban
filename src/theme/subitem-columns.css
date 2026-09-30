@@ -16,8 +16,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin: var(--folia-space-pull) 0 0;
-  padding: 0 var(--folia-card-pad-x) var(--folia-space-md-plus);
+  margin: calc(-1 * var(--size-4-1)) 0 0;
+  padding: 0 var(--folia-card-pad-x) var(--size-4-2);
   text-align: left;
   border: 0;
   border-radius: 0;
@@ -25,32 +25,32 @@
   background: none;
   color: var(--text-muted);
   font-size: var(--folia-font-size-xs);
-  line-height: var(--folia-line-height-tight);
-  cursor: var(--folia-cursor-control);
+  line-height: var(--line-height-tight);
+  cursor: var(--cursor);
 }
 .folia-scope .folia-card-parent-ref:hover {
-  color: var(--folia-text-accent-hover);
+  color: var(--text-accent-hover);
   text-decoration: underline;
 }
 
 /* drag overlay (the lifted ghost) — the card the cursor actually carries. A faint lift (scale + tilt)
    plus a deep shadow reads as "picked up and floating above the board". */
 .folia-card-overlay {
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
   box-shadow: var(--folia-shadow-overlay);
-  border-color: var(--folia-accent);
-  transform: scale(1.03) rotate(var(--folia-tilt));
+  border-color: var(--interactive-accent);
+  transform: scale(1.03) rotate(1.5deg);
   /* Subtract the same borders and body padding as the source column. */
-  width: calc(var(--folia-col-w) - var(--folia-card-overlay-inset));
+  width: calc(var(--folia-col-w) - 2 * var(--border-width) - 2 * var(--size-4-2));
   /* The lift is the resting state; the drop animation tweens back to the slot from here. */
   animation: folia-card-lift var(--folia-dur-fast) var(--folia-ease);
 }
 @keyframes folia-card-lift {
   from {
-    transform: scale(1) rotate(var(--folia-tilt-flat));
+    transform: scale(1) rotate(0deg);
   }
   to {
-    transform: scale(1.03) rotate(var(--folia-tilt));
+    transform: scale(1.03) rotate(1.5deg);
   }
 }
 
@@ -59,10 +59,10 @@
    ghost (rendered by the DragOverlay) is what actually follows the pointer, mirroring the card lift. */
 .folia-column-overlay {
   width: var(--folia-col-w);
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
   box-shadow: var(--folia-shadow-overlay);
   border-color: var(--folia-col-accent);
-  transform: rotate(var(--folia-tilt));
+  transform: rotate(1.5deg);
   /* A header-only ghost — no body — so it reads as "this column, picked up" without a tall slab. */
   overflow: hidden;
 }

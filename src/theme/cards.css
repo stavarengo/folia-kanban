@@ -1,9 +1,9 @@
 /* ------------------------------------------------------------------ cards */
 .folia-card {
   position: relative;
-  background: var(--folia-card-bg);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r-lg);
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
   box-shadow: var(--folia-shadow-card);
   transition: box-shadow var(--folia-dur) var(--folia-ease), border-color var(--folia-dur-fast) ease;
 }
@@ -11,16 +11,16 @@
   content: "";
   position: absolute;
   left: 0;
-  top: var(--folia-space-sm);
-  bottom: var(--folia-space-sm);
+  top: var(--size-2-3);
+  bottom: var(--size-2-3);
   width: var(--folia-cue-thickness);
-  border-radius: var(--folia-r-pill);
+  border-radius: 999px;
   background: transparent;
 }
-.folia-card[data-prio="prio-1"]::before { background: var(--folia-prio-1); }
-.folia-card[data-prio="prio-2"]::before { background: var(--folia-prio-2); }
-.folia-card[data-prio="prio-3"]::before { background: var(--folia-prio-3); }
-.folia-card[data-prio="prio-4"]::before { background: var(--folia-prio-4); }
+.folia-card[data-prio="prio-1"]::before { background: var(--color-red); }
+.folia-card[data-prio="prio-2"]::before { background: var(--color-orange); }
+.folia-card[data-prio="prio-3"]::before { background: var(--color-yellow); }
+.folia-card[data-prio="prio-4"]::before { background: var(--color-blue); }
 
 /* #3 urgency cue — a whole-card, at-a-glance signal that intensifies as the due date nears
    (strongest when overdue), for fast visual scanning. It is distinct from the easy-to-miss due chip.
@@ -37,47 +37,47 @@
       var(--folia-cue-thickness) no-repeat,
     /* flat background tint over the whole card */
     linear-gradient(var(--folia-urgency-tint), var(--folia-urgency-tint)),
-    var(--folia-card-bg);
+    var(--background-primary);
 }
 .folia-card[data-urgency="overdue"] {
-  --folia-urgency-color: var(--folia-danger);
-  --folia-urgency-tint: color-mix(in oklch, var(--folia-danger) 10%, transparent);
+  --folia-urgency-color: var(--color-red);
+  --folia-urgency-tint: color-mix(in oklch, var(--color-red) 10%, transparent);
 }
 .folia-card[data-urgency="today"] {
-  --folia-urgency-color: var(--folia-prio-2);
-  --folia-urgency-tint: color-mix(in oklch, var(--folia-prio-2) 9%, transparent);
+  --folia-urgency-color: var(--color-orange);
+  --folia-urgency-tint: color-mix(in oklch, var(--color-orange) 9%, transparent);
 }
 .folia-card[data-urgency="soon"] {
   /* medium: amber top band, no background tint */
-  --folia-urgency-color: var(--folia-prio-2);
+  --folia-urgency-color: var(--color-orange);
 }
 
 .folia-card:hover {
-  border-color: var(--folia-border-strong);
+  border-color: var(--background-modifier-border-hover);
   box-shadow: var(--folia-shadow-card-hover);
 }
 .folia-card.folia-is-selected {
-  border-color: var(--folia-accent);
-  box-shadow: var(--folia-shadow-card-selected);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent), var(--folia-shadow-card);
 }
 /* The dragged card stays in flow as a quiet "slot" — the lifted copy lives in the DragOverlay. We
    hollow the source out (drop its content, shadow and own border) and leave only a dashed accent
    outline, so the gap reads as "this is where it'll land" rather than a half-faded duplicate. */
 .folia-card.folia-is-dragging {
-  opacity: var(--folia-opacity-shown);
-  background: color-mix(in oklch, var(--folia-accent) 7%, transparent);
+  opacity: 1;
+  background: color-mix(in oklch, var(--interactive-accent) 7%, transparent);
   border-color: transparent;
   box-shadow: none;
 }
 .folia-card.folia-is-dragging > * {
-  opacity: var(--folia-opacity-hidden);
+  opacity: 0;
 }
 .folia-card.folia-is-dragging::after {
   content: "";
   position: absolute;
   inset: 0;
-  border: var(--folia-border-width-hair) dashed color-mix(in oklch, var(--folia-accent) 60%, transparent);
-  border-radius: var(--folia-r-lg);
+  border: var(--border-width) dashed color-mix(in oklch, var(--interactive-accent) 60%, transparent);
+  border-radius: var(--radius-l);
 }
 /* The priority strip would otherwise still show on the hollowed slot. */
 .folia-card.folia-is-dragging::before {
@@ -87,25 +87,25 @@
 .folia-card-main {
   display: flex;
   flex-direction: column;
-  gap: var(--folia-space-sm-plus);
-  padding: var(--folia-gap) var(--folia-card-pad-x);
-  cursor: var(--folia-cursor-grab);
-  border-radius: var(--folia-r-lg);
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--folia-card-pad-x);
+  cursor: grab;
+  border-radius: var(--radius-l);
 }
 .folia-card-main:active {
-  cursor: var(--folia-cursor-grabbing);
+  cursor: grabbing;
 }
 /* A tile that cannot be drag-reordered — nested inside a parent's group, or lifted to a column's
    top level by the active filter and so a member of no column bucket — must not offer a grab
    cursor it has no way to honour. Keyed to the same condition CardItem disables the sortable on. */
 .folia-card--static .folia-card-main,
 .folia-card--static .folia-card-main:active {
-  cursor: var(--folia-cursor-inert);
+  cursor: var(--cursor);
 }
 .folia-card-title {
-  font-size: var(--folia-font-size-md);
-  font-weight: var(--folia-font-weight-semibold);
-  line-height: var(--folia-line-height-title);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  line-height: var(--line-height-tight);
   color: var(--text-normal);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -132,15 +132,15 @@
    metrics so swapping in/out doesn't shift the card; keeps the same right gutter as the title. */
 .folia-card-title-input {
   font: inherit;
-  font-size: var(--folia-font-size-md);
-  font-weight: var(--folia-font-weight-semibold);
-  line-height: var(--folia-line-height-title);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  line-height: var(--line-height-tight);
   width: 100%;
   margin: 0;
-  padding: var(--folia-space-hair) var(--folia-space-xs);
+  padding: var(--size-2-1) var(--size-4-1);
   color: var(--text-normal);
   background: var(--background-primary);
-  border: var(--folia-border-width) solid var(--folia-accent);
-  border-radius: var(--folia-r-sm);
-  box-shadow: var(--folia-ring-soft);
+  border: var(--border-width) solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--interactive-accent) 25%, transparent);
 }

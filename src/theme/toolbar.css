@@ -2,27 +2,27 @@
 .folia-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--folia-gap);
-  padding: var(--folia-space-md) var(--folia-space-lg);
-  border-bottom: var(--folia-border-width) solid var(--folia-border);
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
   background: var(--background-primary);
   flex: 0 0 auto;
 }
 /* Obsidian's own search field (`SearchComponent`) draws the box, icon, focus ring and clear button;
    the toolbar only gives it its share of the row. */
 .folia-search {
-  flex: 0 1 var(--folia-search-w);
+  flex: 0 1 calc(var(--size-4-1) * 80);
 }
 .folia-toolbar-filters {
   display: flex;
-  gap: var(--folia-space-sm);
+  gap: var(--size-2-3);
 }
 .folia-scope .folia-filter-chip {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: inline-flex;
   align-items: center;
-  gap: var(--folia-space-xs-plus);
+  gap: var(--size-4-1);
   /* A filter chip is a multi-select pill with an on/off state, so it takes the pill's corner. Not
      its padding: Obsidian spends `--pill-padding-x` as an asymmetric inset on the pill's content and
      its remove button, never as symmetric box padding, so reading it here would be borrowing a
@@ -30,31 +30,31 @@
      `--pill-border-width: 0`, and this chip recolours its border to say it is on. And not
      `--pill-padding-y`, because the height stays the host input height: these sit in one row with
      the search box, and only a shared height keeps that row aligned. */
-  height: var(--folia-control-h);
-  padding: 0 var(--folia-control-pad-x);
+  height: var(--input-height);
+  padding: 0 var(--size-4-3);
   border-radius: var(--pill-radius);
-  border: var(--folia-border-width) solid var(--folia-border);
+  border: var(--border-width) solid var(--background-modifier-border);
   background: var(--background-primary);
   color: var(--text-muted);
-  font-size: var(--folia-font-size-sm);
-  font-weight: var(--folia-font-weight-medium);
-  cursor: var(--folia-cursor-control);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  cursor: var(--cursor);
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
 }
 .folia-scope .folia-filter-chip:hover:where(:not(:disabled)) {
   color: var(--text-normal);
 }
 .folia-scope .folia-filter-chip.folia-is-on {
-  background: color-mix(in oklch, var(--folia-accent) 16%, transparent);
-  border-color: color-mix(in oklch, var(--folia-accent) 45%, transparent);
-  color: var(--folia-text-accent);
+  background: color-mix(in oklch, var(--interactive-accent) 16%, transparent);
+  border-color: color-mix(in oklch, var(--interactive-accent) 45%, transparent);
+  color: var(--text-accent);
 }
 .folia-toolbar-status {
   display: flex;
   align-items: center;
-  gap: var(--folia-gap);
+  gap: var(--size-4-2);
   margin-left: auto;
-  font-size: var(--folia-font-size-sm);
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }

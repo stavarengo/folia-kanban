@@ -6,12 +6,12 @@
    Cross-track note: the #3 urgency cue (card track) owns the top edge + bg tint per contract §6/§8. */
 .folia-card-context-strip {
   position: absolute;
-  left: var(--folia-ctx-strip-inset);
-  top: var(--folia-space-sm);
-  bottom: var(--folia-space-sm);
-  width: var(--folia-ctx-strip-w);
-  border-radius: var(--folia-r-pill);
-  background: var(--folia-ctx-color, var(--folia-border-strong));
+  left: var(--size-2-3);
+  top: var(--size-2-3);
+  bottom: var(--size-2-3);
+  width: 2px;
+  border-radius: 999px;
+  background: var(--folia-ctx-color, var(--background-modifier-border-hover));
   pointer-events: none;
 }
 /* The strip occupies left 5–7px; `.folia-card-main`'s existing 12px left padding already clears it,
