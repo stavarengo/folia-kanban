@@ -2,18 +2,22 @@
 // tile read the same list, in the same order.
 import type { Card } from "./types";
 
-/** The card's own `area` and `tags` properties, in that order. */
+/** `frontmatter.tags` as written, for a card the adapter did not read tags for. */
+function writtenTags(tags: unknown): string[] {
+  if (typeof tags === "string") return tags ? [tags] : [];
+  if (!Array.isArray(tags)) return [];
+  return tags.filter((t): t is string => typeof t === "string" && t !== "");
+}
+
+/**
+ * The card's own `area`, then its frontmatter tags as Obsidian reads them. `area` is Folia's own
+ * key and no Obsidian helper reads it, so it is taken as written (docs/decisions.md, "A card's
+ * `area` counts as a tag").
+ */
 export function frontmatterTagValues(card: Card): string[] {
-  const fm = card.frontmatter;
-  const out: string[] = [];
-  if (typeof fm.area === "string" && fm.area) out.push(fm.area);
-  const fmTags = fm["tags"];
-  if (Array.isArray(fmTags)) {
-    for (const t of fmTags) if (typeof t === "string" && t) out.push(t);
-  } else if (typeof fmTags === "string" && fmTags) {
-    out.push(fmTags);
-  }
-  return out;
+  const area = card.frontmatter.area;
+  const tags = card.frontmatterTags ?? writtenTags(card.frontmatter["tags"]);
+  return typeof area === "string" && area ? [area, ...tags] : tags;
 }
 
 /**

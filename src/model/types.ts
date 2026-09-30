@@ -283,6 +283,13 @@ export interface Card {
    */
   bodyTags?: string[];
   /**
+   * The tags Obsidian reads out of the frontmatter `tags` key (`parseFrontMatterTags`), without
+   * the leading `#`. Filled by the adapter so a card credits exactly the frontmatter tags Obsidian
+   * itself recognises; `area` is not among them (see `tags.ts`). Absent on a card that did not come
+   * through the adapter, which then reads `frontmatter.tags` as written.
+   */
+  frontmatterTags?: string[];
+  /**
    * Typed relationships to other cards, both directions, resolved against the board. Filled by
    * `buildBoard` from the vocabulary's frontmatter keys — derived, never written back as a whole
    * (only an outgoing list is ever written, by the card that declares it). Outgoing links first,

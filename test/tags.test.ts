@@ -45,6 +45,18 @@ describe("frontmatterTagValues", () => {
   });
 });
 
+describe("frontmatterTagValues on a card the adapter read tags for", () => {
+  it("credits Obsidian's reading of `tags` instead of the value as written, after `area`", () => {
+    const c = { ...card({ area: "ops", tags: ["red", "a b"] }), frontmatterTags: ["red"] };
+    expect(frontmatterTagValues(c)).toEqual(["ops", "red"]);
+  });
+
+  it("credits no frontmatter tag Obsidian did not find, but still the `area`", () => {
+    const c = { ...card({ area: "ops", tags: "a, b" }), frontmatterTags: [] };
+    expect(frontmatterTagValues(c)).toEqual(["ops"]);
+  });
+});
+
 describe("tagValues", () => {
   it("adds the body's tags after the frontmatter's, without repeating one in another case", () => {
     expect(
