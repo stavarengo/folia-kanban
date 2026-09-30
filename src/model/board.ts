@@ -21,6 +21,7 @@ import type {
   TodoLine,
 } from "./types";
 import { dateOnly } from "./dates";
+import { linkpath } from "./links";
 import type { MatchContext } from "./filter";
 import { isDrawnSomewhere } from "./lanes";
 import { BLOCKS, readInverse, readRelations } from "./relationships";
@@ -164,13 +165,6 @@ export type LinkResolver = (link: string) => string | null;
  */
 export type SourcedLinkResolver = NonNullable<Board["resolveLink"]>;
 
-/** The part of a link that names a note: the `#anchor` and the `|alias` dropped. */
-function linkpathOf(link: string): string {
-  const noAnchor = link.split("#");
-  const noAlias = (noAnchor[0] ?? link).split("|");
-  return (noAlias[0] ?? "").trim();
-}
-
 /**
  * Build the one resolver every reading of a `[[wikilink]]` goes through — subcard parentage,
  * blocking relationships, and the detail panel's rows alike — so they can never disagree about
@@ -201,7 +195,7 @@ function linkResolver(cards: Iterable<Card>, host?: SourcedLinkResolver): Source
     else byBasename.set(c.basename, [c.path]);
   }
   return (link, sourcePath) => {
-    const raw = linkpathOf(link);
+    const raw = linkpath(link);
     if (raw === "") return null;
     if (host !== undefined) {
       const hit = host(raw, sourcePath);

@@ -12,6 +12,7 @@
 import type { CardBody, CardStats, LineDrift, LineRef, SubItem, SubtaskRef } from "./types";
 import { fencedLines, unclosedFence } from "./fences";
 import { FrontmatterSchema, decode } from "./schemas";
+import { linkpath } from "./links";
 import { normalizeAuthor } from "./unread";
 
 // Where Obsidian's metadata reader, and so the properties Folia shows, says the frontmatter ends:
@@ -334,9 +335,7 @@ function parseSubItem(rawText: string, index: number, done: boolean): Omit<SubIt
   const { text: trimmed, status } = splitInlineStatus(rawText.trim());
   const m = WIKILINK_ONLY_RE.exec(trimmed);
   if (m) {
-    const group1 = m[1] ?? "";
-    const target = group1.split("|")[0]?.split("#")[0]?.trim() ?? "";
-    return { kind: "card", text: trimmed, done, link: target, index };
+    return { kind: "card", text: trimmed, done, link: linkpath(m[1] ?? ""), index };
   }
   return status === undefined
     ? { kind: "todo", text: trimmed, done, index }

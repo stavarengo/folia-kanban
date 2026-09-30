@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { vaultLinktext } from "../src/model/links";
+import { linkpath, vaultLinktext } from "../src/model/links";
 
 describe("vaultLinktext", () => {
   it("returns a link to a note exactly as the href attribute carries it", () => {
@@ -31,5 +31,18 @@ describe("vaultLinktext", () => {
   it("returns nothing for an anchor without an href", () => {
     expect(vaultLinktext(null)).toBeNull();
     expect(vaultLinktext("")).toBeNull();
+  });
+});
+
+describe("linkpath", () => {
+  it("splits at the first `#` the way Obsidian's parseLinktext does, after dropping the alias", () => {
+    expect(linkpath("A")).toBe("A");
+    expect(linkpath("Sub/A.md#Heading#Sub")).toBe("Sub/A.md");
+    expect(linkpath("A#^block")).toBe("A");
+    expect(linkpath("A#h|alias")).toBe("A");
+    expect(linkpath("A|alias#x")).toBe("A");
+    expect(linkpath("  A  #h")).toBe("A");
+    expect(linkpath("#h")).toBe("");
+    expect(linkpath("|alias")).toBe("");
   });
 });

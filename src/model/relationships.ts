@@ -3,6 +3,7 @@
 // only; resolving a target to a card on the board happens in `buildBoard`, the one place that
 // already knows how a `[[wikilink]]` binds.
 
+import { linkpath } from "./links";
 import { FOLIA_CARD_KEYS } from "./properties";
 import { RelationTypeEntrySchema } from "./schemas";
 import type { RelationType, RelationTypeDef } from "./types";
@@ -114,7 +115,7 @@ export function relationTarget(value: string): string {
  * how the board itself binds a link.
  */
 function targetIdentity(value: string): string {
-  return (relationTarget(value).split("#")[0]?.split("|")[0] ?? "").trim();
+  return linkpath(relationTarget(value));
 }
 
 /**

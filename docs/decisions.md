@@ -506,3 +506,11 @@ The preview fired the workspace `hover-link` event for links it found by the und
 **Decided 2026-09-30 (#106).** Folia writes wikilinks for card relationships and subtasks, using `MetadataCache.fileToLinktext` to choose the path inside the brackets. Shortest, relative and absolute paths omit `.md`. When Obsidian is configured to generate Markdown links, the old `generateMarkdownLink` plus bracket-stripping code discarded its Markdown-link result and fell back to the target's full vault path. The new call follows the vault's path setting in that case too. Folia still writes wikilinks because its card reader expects them; reading and writing Markdown links belongs to #40.
 
 **What would change this:** #40 adding Markdown-link reading for card relationships and subtasks. Folia could then write Markdown links when the vault setting asks for them.
+
+## Link text is split in the model
+
+**Decided 2026-09-30 (#106). `linkpath` in `src/model/links.ts` splits a link's text; the model does not receive Obsidian's `parseLinktext`.**
+
+Every reading of a `[[wikilink]]` in the model needs the note it names: the subcard line in the checklist, the fallback resolver in `buildBoard`, and the identity that folds `[[A]]`, `[[A|see this]]` and `[[A#Notes]]` into one relationship. `parseLinktext` answers only half of that. In Obsidian 1.13.7 it is `indexOf("#")` and nothing else: no `|` handling and no trimming, since Obsidian's own callers split the alias off first. So a port would carry a one-line split into the model, which would still have to split the alias and trim around it, and the checklist reading runs inside `vault.process` with no host at all (see "The model splits frontmatter itself"). `linkpath` does the same `#` split after dropping the alias, and all three readings now go through it instead of three hand-written splits that ran in different orders. A relationship value written without brackets (`blocks: Other card`) is still read as a target, as #27 decided.
+
+**What would change this:** `parseLinktext` taking on the alias or trimming, or the model gaining a host-supplied parser for other reasons. Compare `linkpath`'s tests in `test/links.test.ts` with the `parseLinktext` in the installed Obsidian's `app.js`.
