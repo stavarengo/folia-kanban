@@ -85,6 +85,8 @@ export async function checkButtons(roots, fail) {
     if (!decisions.includes(`\n## ${heading}\n`))
       fail("docs/decisions.md", `The hand-drawn button group "${heading}" needs its entry.`);
   const buttons = [];
+  // Classes the board puts on a host button: their face rules must still beat the host's.
+  const hostClasses = new Set();
   const families = new Set();
   for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
     f.endsWith(".tsx"),
@@ -98,6 +100,16 @@ export async function checkButtons(roots, fail) {
       ts.ScriptKind.TSX,
     );
     function visit(node) {
+      if (
+        (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+        ["HostButton", "HostIconButton"].includes(node.tagName.getText(source))
+      ) {
+        const attr = node.attributes.properties.find(
+          (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
+        );
+        for (const value of classValues(attr?.initializer))
+          for (const c of value.split(/\s+/)) if (/^folia-[\w-]+$/.test(c)) hostClasses.add(c);
+      }
       if (
         (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
         node.tagName.getText(source) === "button"
@@ -125,7 +137,7 @@ export async function checkButtons(roots, fail) {
   }
   if (!buttons.length)
     fail("src/ui", "Button guard found no JSX buttons; check the source location.");
-  const names = new Set(buttons.flatMap((b) => b.classes));
+  const names = new Set([...buttons.flatMap((b) => b.classes), ...hostClasses]);
   const bases = [];
   const colouredHovers = [];
   const unconditionalRules = new Map();

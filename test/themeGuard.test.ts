@@ -340,6 +340,14 @@ describe("theme button contract", () => {
     reject("needs .folia-scope");
   });
 
+  it.each(["folia-btn", "folia-card-action"])(
+    "rejects an unscoped face rule on the host button class %s",
+    (name) => {
+      edit("src/theme/buttons.css", (s) => s + `\n.${name} { background: transparent; }\n`);
+      reject("needs .folia-scope");
+    },
+  );
+
   it("rejects a button without its own class", () => {
     edit("src/ui/AddColumn.tsx", (s) => s.replace('className="folia-add-column"', 'className=""'));
     reject("Every button branch needs");
