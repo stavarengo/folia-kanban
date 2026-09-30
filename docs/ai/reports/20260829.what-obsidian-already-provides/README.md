@@ -224,7 +224,7 @@ Each on the strength of its own **Read**, which in every case also says what wou
 | 04-14 | Not worth it: no Obsidian API replaces the recent-writes window; revisit only after 20260829.26 scopes the reload |
 | 06-12 | Not worth it: the inline add-column editor preserves context a dialog would lose |
 | 06-14 | Not worth it: the React effect cleanups already cover the lifecycle correctly |
-| 07-10 | Not worth it, and effectively decided by the tooling: the lint rule accepts only `Platform.isDesktop`, which is what the code spells |
+| 07-10 | Not worth it, and effectively decided by the tooling: the lint rule accepts only `Platform.isDesktop`, which is what the code spells. *Moot since 2026-09-30 (#102): no platform check is left to spell* |
 | 07-11 | Not worth it: each `Promise` constructor is a case async/await cannot express, which the checklist's own wording allows |
 
 ### Decided
