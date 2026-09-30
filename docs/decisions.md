@@ -669,7 +669,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **The filter grammar** (`parseFilter` in `src/model/filter.ts`): `prepareSimpleSearch` and `prepareFuzzySearch` match text and know nothing of `due:`, lanes or the board's other tokens.
 - **The `## History` lines** (`src/model/history.ts`): a log of what happened to the card, kept in its note, not an undo stack.
 - **`sanitizeFilename`** (`src/model/cardTitle.ts`): Obsidian exports no filename sanitiser.
-- **`.` and `..` in `card-folder`** (`cardFolderCandidates` and `resolveSegments` in `src/model/board.ts`, `relativeToFolder` in `src/model/pathOps.ts`): `normalizePath` tidies separators and leaves those segments alone.
+- **`.` and `..` in `card-folder`** (`cardFolderCandidates` and `resolveSegments` in `src/model/cardFolder.ts`, `relativeToFolder` in `src/model/pathOps.ts`): `normalizePath` tidies separators and leaves those segments alone.
 - **The property names in use** (`propertyNamesInUse` in `src/obsidian/vaultRepo.ts`, a walk over the frontmatter cache): `getAllPropertyInfos` is not in `obsidian.d.ts`.
 - **The settings write chain** (`pendingWrite` in `src/main.ts`): `saveData` does not serialise calls, and two in flight can land on disk in either order.
 - **The agent-access queues** (the `turn` chain in `createServer`, `src/obsidian/mcpHttpServer.ts`, and `enqueue` in `src/obsidian/mcpService.ts` for starting and stopping the server): Node's server takes requests concurrently, two board writes must never compute against the same snapshot, and the API has no async queue.
