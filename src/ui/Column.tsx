@@ -544,7 +544,7 @@ export function Column({
           {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
         <HostIconButton
-          className="folia-icon-btn folia-column-menu-btn"
+          className="folia-column-menu-btn"
           icon="ellipsis"
           label={`Column options for ${column.title}`}
           ariaHaspopup="menu"
@@ -660,7 +660,7 @@ export function Column({
             )}
             <div className="folia-row-actions">
               <HostButton
-                className="folia-btn folia-btn-primary"
+                className="folia-btn"
                 cta
                 text="Add card"
                 keepFocus
