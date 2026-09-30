@@ -206,7 +206,7 @@
   --folia-font-size-sm: var(--font-ui-smaller);
   --folia-font-size-md: var(--font-ui-small);
   --folia-font-size-lg: var(--font-ui-medium);
-  --folia-font-mono: var(--font-monospace);
+  --folia-font-mono: var(--font-monospace-theme), SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, Consolas, "Source Code Pro", monospace;
 
   /* typography — font weights */
   --folia-font-weight-medium: var(--font-medium);

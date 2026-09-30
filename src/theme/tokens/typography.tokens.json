@@ -40,10 +40,11 @@
     }
   },
   "font-mono": {
-    "$value": "var(--font-monospace)",
+    "$value": "var(--font-monospace-theme), SFMono-Regular, \"Cascadia Mono\", \"Roboto Mono\", \"DejaVu Sans Mono\", \"Liberation Mono\", Menlo, Monaco, Consolas, \"Source Code Pro\", monospace",
     "cssVar": "--folia-font-mono",
     "source": {
-      "alias": "--font-monospace"
+      "owned": true,
+      "reason": "inline code in rendered Markdown: the theme's code font, else the app's default stack. The variable the app composes them into, --font-monospace, is not documented."
     }
   },
   "weight": {

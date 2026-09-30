@@ -526,8 +526,14 @@
   border-radius: var(--radius-s);
   background-color: var(--code-background);
   color: var(--code-normal);
-  font-family: var(--folia-font-mono);
   font-size: var(--code-size);
+}
+:is(.folia-desc-rendered, .folia-comment-text) code:not([class*="language-"]) {
+  /* A fenced block with a language takes Obsidian's own `code[class*="language-"]` rule, which
+     carries the code font chosen in Settings. Inline code has no host rule outside the reading view,
+     and the variable that carries that choice (`--font-monospace`) is not documented, so it takes
+     the theme's code font, else the app's default stack. */
+  font-family: var(--folia-font-mono);
 }
 :is(.folia-desc-rendered, .folia-comment-text) pre {
   position: relative;
