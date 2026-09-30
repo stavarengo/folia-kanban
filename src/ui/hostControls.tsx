@@ -127,6 +127,9 @@ interface IconButtonProps extends IconButtonOptions, SlotProps {
   onClick: (evt?: MouseEvent) => void;
   disabled?: boolean;
   className?: string;
+  /** Kept in sync with the mounted control's element, for a caller that anchors something to it
+   *  (e.g. a menu) — needed because a key press hands `onClick` no event to read a target off. */
+  elRef?: MutableRefObject<HTMLElement | null>;
 }
 
 export function HostIconButton({
@@ -136,6 +139,7 @@ export function HostIconButton({
   disabled = false,
   className,
   slotClassName,
+  elRef,
   ...options
 }: IconButtonProps) {
   const click = useLatest(onClick);
@@ -147,6 +151,7 @@ export function HostIconButton({
     button?.setIcon(icon);
     button?.setLabel(label);
     button?.setDisabled(disabled);
+    if (elRef) elRef.current = button?.el ?? null;
   });
   return <Slot slot={slot} slotClassName={slotClassName} />;
 }

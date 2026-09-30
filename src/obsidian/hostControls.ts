@@ -59,7 +59,7 @@ export function mountButton(
 export function mountIconButton(
   container: HTMLElement,
   onClick: (evt?: MouseEvent) => void,
-  { middleClick, ...options }: IconButtonOptions = {},
+  { middleClick, ariaHaspopup, ...options }: IconButtonOptions = {},
 ): IconButtonControl {
   let click: MouseEvent | undefined;
   const button = new ExtraButtonComponent(container).onClick(() => {
@@ -69,6 +69,7 @@ export function mountIconButton(
   });
   const el = button.extraSettingsEl;
   el.setAttribute("role", "button");
+  if (ariaHaspopup) el.setAttribute("aria-haspopup", ariaHaspopup);
   el.addEventListener(
     "click",
     (e) => {

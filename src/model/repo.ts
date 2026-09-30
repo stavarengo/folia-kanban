@@ -176,6 +176,8 @@ export interface IconButtonControl extends HostControl {
 export interface IconButtonOptions extends HostControlOptions {
   /** A middle click presses the button too, and stops there. */
   middleClick?: boolean;
+  /** Announces what the button opens (e.g. "menu"). Set once, at mount. */
+  ariaHaspopup?: string;
 }
 
 export interface DropdownOption {
