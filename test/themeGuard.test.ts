@@ -197,7 +197,9 @@ describe("theme guard host allowlist", () => {
   });
 
   it("reads var() calls in the board's code as well as in the stylesheet", () => {
-    edit("src/ui/Board.tsx", (s) => s.replace('opacity: "0.5"', 'opacity: "var(--anim-opacity)"'));
+    edit("src/ui/BoardDragOverlay.tsx", (s) =>
+      s.replace('opacity: "0.5"', 'opacity: "var(--anim-opacity)"'),
+    );
     reject("var(--anim-opacity) is not on the allowlist");
   });
 

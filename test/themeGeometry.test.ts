@@ -144,8 +144,8 @@ describe("the no-value choice", () => {
 
 describe("values the board's code shares with the theme", () => {
   it("drops a card with the theme's own easing curve", () => {
-    const board = readFileSync("src/ui/Board.tsx", "utf8");
-    expect(board).toContain(`easing: "${declarations(".folia-scope")["--folia-ease"]}"`);
+    const overlay = readFileSync("src/ui/BoardDragOverlay.tsx", "utf8");
+    expect(overlay).toContain(`easing: "${declarations(".folia-scope")["--folia-ease"]}"`);
   });
 
   it("paints every column colour with a variable Obsidian documents and the oldest supported version declares", () => {
