@@ -598,7 +598,6 @@ Obsidian bundles Moment and hands it to plugins as `moment` (it is `window.momen
 A folder or file spelled exactly as written always wins, so Linux, where `Cards/` and `cards/` can coexist, keeps meaning what it says. Only the part the value itself wrote is compared ignoring case: the board note's own folder is a real path, so `./Cards` beside `basic/Board.md` never takes a `Basic/cards` next to it. Without an exact match the board used to load empty and then create the folder as written beside the real one, which hid the real cards with no message. Obsidian's own case-insensitive lookup, `getAbstractFileByPathInsensitive`, is not in `obsidian.d.ts` and returns the first hit, so it cannot tell one match from several; the matches are counted over `getAllLoadedFiles()` instead, the way `pathTaken` judges new names. Guessing between several spellings was left out: whichever one it picked, the cards in the others would vanish from the board as silently as before, and creating the folder as written would add one more spelling.
 
 **What would change this:** Obsidian documenting a case-insensitive lookup that reports every match, which would replace the walk over every loaded file.
-||||||| parent of 2da7f29 (docs: record which controls are Obsidian's and which stay the board's)
 
 ## A subtask's done tick stays a checkbox
 
