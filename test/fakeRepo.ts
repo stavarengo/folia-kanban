@@ -2,7 +2,12 @@
 // the real adapter treats them) and runs the REAL model functions on the body, so UI tests
 // exercise genuine parse/mutate logic without Obsidian.
 
-import type { CardRepository, PropertyNamesInUse, PropertySuggestSource } from "../src/model/repo";
+import type {
+  CardRepository,
+  PropertyNamesInUse,
+  SearchField,
+  SuggestSource,
+} from "../src/model/repo";
 import { staleLine } from "../src/model/repo";
 import { vaultLinktext } from "../src/model/links";
 import type { FileOp } from "../src/model/pathOps";
@@ -445,8 +450,6 @@ export class FakeRepo implements CardRepository {
    * Obsidian's metadata index.
    */
   propertyNames: PropertyNamesInUse = { inCardFolder: [], elsewhere: [] };
-  /** The suggester the panel attached, so a test can ask it what it would offer and pick one. */
-  attachedSuggest: { input: HTMLInputElement; source: PropertySuggestSource } | null = null;
 
   /** Set by a test that wants the vault to refuse the question. */
   propertyNamesFails = false;
@@ -461,10 +464,35 @@ export class FakeRepo implements CardRepository {
       : Promise.resolve(this.propertyNames);
   }
 
-  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void {
-    this.attachedSuggest = { input, source };
+  /** Every live suggester, by the input it is attached to. The fake has no popup to show. */
+  readonly suggests = new Map<HTMLInputElement, SuggestSource>();
+
+  attachSuggest(input: HTMLInputElement, source: SuggestSource): () => void {
+    this.suggests.set(input, source);
     return () => {
-      if (this.attachedSuggest?.source === source) this.attachedSuggest = null;
+      if (this.suggests.get(input) === source) this.suggests.delete(input);
+    };
+  }
+
+  /** The suggester on `input`; throws when there is none, so a test cannot read a missing one. */
+  suggestOn(input: HTMLElement): SuggestSource {
+    const source = input instanceof HTMLInputElement && this.suggests.get(input);
+    if (!source) throw new Error("no suggester on that input");
+    return source;
+  }
+
+  /** A bare `type="search"` input standing in for `SearchComponent`, clear button aside. */
+  mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField {
+    const input = container.ownerDocument.createElement("input");
+    input.type = "search";
+    input.addEventListener("input", () => onChange(input.value));
+    container.append(input);
+    return {
+      input,
+      setValue: (value) => {
+        input.value = value;
+      },
+      remove: () => input.remove(),
     };
   }
 

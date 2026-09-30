@@ -954,11 +954,6 @@ await checkButtons(componentRoots, fail);
 // `outline: none` never is, so none is refused on a focus selector. The declaration is what is
 // read, not whether it wins the cascade.
 const FOCUS_OUTLINE_EXEMPT = new Map([
-  [".folia-search input:focus", "toolbar.css outlines the .folia-search:focus-within wrapper"],
-  [
-    ".folia-search input:focus-visible",
-    "toolbar.css outlines the .folia-search:focus-within wrapper",
-  ],
   [".folia-menu-field input:focus", "leaves with the column menu's inline field (#89)"],
   [".folia-field input:focus", "leaves with the column config dialog (#87)"],
 ]);

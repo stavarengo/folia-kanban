@@ -347,10 +347,25 @@ describe("card detail — priority", () => {
   };
 
   it("suggests the board's own values rather than a predefined word scale", async () => {
-    const { field } = await openPriority();
+    const { repo, field } = await openPriority();
     expect(field).toHaveValue("A");
-    const list = field.ownerDocument.getElementById(field.getAttribute("list")!);
-    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.value)).toEqual(["A"]);
+    // A free-text field offers its values once something is typed; emptied, it offers nothing.
+    expect(repo.suggestOn(field).candidates("")).toEqual([]);
+    expect(
+      repo
+        .suggestOn(field)
+        .candidates("x")
+        .map((s) => s.text),
+    ).toEqual(["A"]);
+  });
+
+  it("commits a picked row the way Enter does, by leaving the field", async () => {
+    const { repo, user, field } = await openPriority();
+    await user.clear(field);
+    await user.type(field, "bl");
+    act(() => repo.suggestOn(field).onPick({ text: "blocker" }));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm.priority).toBe("blocker"));
+    expect(field).not.toHaveFocus();
   });
 
   it("accepts a value the board has never seen and remembers it on the board note", async () => {
@@ -399,12 +414,12 @@ describe("card detail — priority", () => {
     await user.click(await screen.findByText("Solo"));
     const detail = await screen.findByTestId("card-detail");
     const field = within(detail).getByLabelText("Priority") as HTMLInputElement;
-    const list = field.ownerDocument.getElementById(field.getAttribute("list")!);
-    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.value)).toEqual([
-      "A",
-      "B",
-      "C",
-    ]);
+    expect(
+      repo
+        .suggestOn(field)
+        .candidates("x")
+        .map((s) => s.text),
+    ).toEqual(["A", "B", "C"]);
     await user.type(field, "blocker{Enter}");
     await waitFor(() => expect(repo.config.priorities).toEqual(["blocker"]));
   });
@@ -1207,11 +1222,13 @@ describe("property names suggest themselves (20260827.08)", () => {
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     const input = within(detail).getByLabelText("New property name") as HTMLInputElement;
-    await waitFor(() => expect(repo.attachedSuggest).not.toBeNull());
     await waitFor(() =>
-      expect(repo.attachedSuggest!.source.suggestions("").some((s) => s.group !== "folia")).toBe(
-        true,
-      ),
+      expect(
+        repo
+          .suggestOn(input)
+          .candidates("")
+          .some((s) => s.note === "in your vault"),
+      ).toBe(true),
     );
     return { user, detail, input };
   };
@@ -1229,10 +1246,9 @@ describe("property names suggest themselves (20260827.08)", () => {
     const repo = suggestingRepo();
     const { input } = await openAlpha(repo);
 
-    expect(repo.attachedSuggest!.input).toBe(input);
-    const offered = repo.attachedSuggest!.source.suggestions("");
+    const offered = repo.suggestOn(input).candidates("");
     // Alpha already carries status, priority, area and type, so none of those is offered again.
-    expect(offered.map((s) => s.key)).toEqual([
+    expect(offered.map((s) => s.text)).toEqual([
       "order",
       "due",
       "assignee",
@@ -1247,7 +1263,7 @@ describe("property names suggest themselves (20260827.08)", () => {
     ]);
     // The ones the panel edits itself are offered — a misspelling is answered with the right
     // spelling — but marked, so the popup says where that name actually lives.
-    expect(offered.filter((s) => s.editedInPanel).map((s) => s.key)).toEqual([
+    expect(offered.filter((s) => s.note === "edited in this panel").map((s) => s.text)).toEqual([
       "order",
       "due",
       "assignee",
@@ -1256,26 +1272,17 @@ describe("property names suggest themselves (20260827.08)", () => {
       "blocks",
       "blocked-by",
     ]);
-    expect(offered.filter((s) => s.group === "board").map((s) => s.key)).toEqual(["energy"]);
-    expect(offered.filter((s) => s.group === "vault").map((s) => s.key)).toEqual(["mood"]);
-  });
-
-  it("narrows to what is typed, whatever case it is typed in", async () => {
-    const repo = suggestingRepo();
-    const { user, input } = await openAlpha(repo);
-
-    await user.type(input, "MOO");
-
-    expect(repo.attachedSuggest!.source.suggestions(input.value).map((s) => s.key)).toEqual([
-      "mood",
+    expect(offered.filter((s) => s.note === "on this board").map((s) => s.text)).toEqual([
+      "energy",
     ]);
+    expect(offered.filter((s) => s.note === "in your vault").map((s) => s.text)).toEqual(["mood"]);
   });
 
   it("puts a picked name in the field, and it stays there through the next render", async () => {
     const repo = suggestingRepo();
     const { user, detail, input } = await openAlpha(repo);
 
-    act(() => repo.attachedSuggest!.source.onPick("energy"));
+    act(() => repo.suggestOn(input).onPick({ text: "energy" }));
 
     expect(input.value).toBe("energy");
     // The value field re-renders the form; a name written behind React's back would vanish here.
@@ -1340,8 +1347,12 @@ describe("property names suggest themselves (20260827.08)", () => {
     await waitFor(() => expect(repo.propertyNamesAsked).toBe(1));
 
     expect(input).toBeInTheDocument();
-    expect(repo.attachedSuggest!.source.suggestions("mood")).toEqual([]);
-    expect(repo.attachedSuggest!.source.suggestions("due").map((s) => s.key)).toEqual(["due"]);
+    const offered = repo
+      .suggestOn(input)
+      .candidates("")
+      .map((s) => s.text);
+    expect(offered).toContain("due");
+    expect(offered).not.toContain("mood");
   });
 });
 
@@ -4059,28 +4070,88 @@ describe("search filter (single source of truth)", () => {
     expect(within(doingCol).queryByText("Gamma")).toBeNull(); // no area
   });
 
-  it("offers filter-key autocomplete and inserting a key fills the input", async () => {
+  it("offers the filter keys for a bare word, and a pick replaces only the word under the caret", async () => {
     const user = userEvent.setup();
-    render_(makeRepo());
+    const repo = makeRepo();
+    render_(repo);
     await screen.findByText("Alpha");
-    const search = screen.getByLabelText("Search cards");
-    await user.type(search, "ar");
-    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
-    const option = within(list).getByRole("option", { name: /area:/ });
-    await user.click(option);
-    expect(search).toHaveValue("area:");
+    const search = screen.getByLabelText("Search cards") as HTMLInputElement;
+    await user.type(search, "status:todo ar");
+    const source = repo.suggestOn(search);
+
+    const fragment = source.queryAt!(search.value, search.selectionStart!);
+    expect(fragment).toBe("ar");
+    expect(source.candidates(fragment)).toContainEqual({ text: "area:", note: "frontmatter area" });
+    act(() => source.onPick({ text: "area:" }));
+    // A key keeps the caret after its colon, so the value is typed next.
+    expect(search).toHaveValue("status:todo area:");
+    expect(search.selectionStart).toBe(search.value.length);
   });
 
-  it("suggests due: values once a due token is being typed", async () => {
+  it("offers a key's values once its colon is typed, ending a picked token with a space", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards") as HTMLInputElement;
+    await user.type(search, "due:o");
+    const source = repo.suggestOn(search);
+
+    expect(source.candidates("due:o").map((s) => s.text)).toEqual([
+      "due:overdue",
+      "due:soon",
+      "due:today",
+      "due:none",
+    ]);
+    act(() => source.onPick({ text: "due:overdue" }));
+    expect(search).toHaveValue("due:overdue ");
+    // The pick is reported like typing: the board filters on it.
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    expect(within(todoCol).queryByText("Alpha")).toBeNull();
+  });
+
+  it("keeps a plain word on Enter rather than turning it into the key it resembles", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards") as HTMLInputElement;
+    await user.type(search, "read");
+    const source = repo.suggestOn(search);
+
+    expect(source.freeText?.("read")).toBe(true);
+    expect(source.freeText?.("due:o")).toBe(false);
+    // The typed word is the first row, so Enter picks it, and picking it changes nothing.
+    act(() => source.onPick({ text: "read" }));
+    expect(search).toHaveValue("read");
+  });
+
+  it("suggests for the word the caret is in, not the end of the query", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo);
+    await screen.findByText("Alpha");
+    const search = screen.getByLabelText("Search cards") as HTMLInputElement;
+    await user.type(search, "due:o area:h");
+    search.setSelectionRange(5, 5);
+    const source = repo.suggestOn(search);
+
+    expect(source.queryAt!(search.value, 5)).toBe("due:o");
+    act(() => source.onPick({ text: "due:overdue" }));
+    expect(search).toHaveValue("due:overdue area:h");
+  });
+
+  it("clears a non-empty query on Escape, and leaves the field on the next one", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
     await screen.findByText("Alpha");
     const search = screen.getByLabelText("Search cards");
-    await user.type(search, "due:o");
-    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
-    expect(within(list).getByRole("option", { name: /due:overdue/ })).toBeInTheDocument();
-    await user.click(within(list).getByRole("option", { name: /due:overdue/ }));
-    expect(search).toHaveValue("due:overdue ");
+    await user.type(search, "alpha");
+    await user.keyboard("{Escape}");
+    expect(search).toHaveValue("");
+    expect(search).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(search).not.toHaveFocus();
   });
 });
 
@@ -4813,11 +4884,11 @@ describe("blocking relationships", () => {
     );
   }
 
-  // The panel has more than one datalist (priority has one too), so read the one this field points at.
-  const blockSuggestions = (detail: HTMLElement) => {
-    const input = within(detail).getByLabelText("Link a card under Blocks") as HTMLInputElement;
-    return [...(input.list?.options ?? [])].map((o) => o.value);
-  };
+  const blockSuggestions = (repo: FakeRepo, detail: HTMLElement) =>
+    repo
+      .suggestOn(within(detail).getByLabelText("Link a card under Blocks"))
+      .candidates("x")
+      .map((s) => s.text);
 
   // The detail panel repeats the card's title, so pick the occurrence that is a board tile.
   const cardOf = (title: string) =>
@@ -4878,6 +4949,21 @@ describe("blocking relationships", () => {
     expect(repo.files.get("Tasks/Loose.md")!.body).toContain("Blocks added: [[Waiting]]");
   });
 
+  it("adds the card a picked row names, whatever was typed", async () => {
+    const user = userEvent.setup();
+    const repo = blockRepo();
+    render_(repo);
+    await user.click(await screen.findByText("Loose"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("Link a card under Blocks");
+    await user.type(input, "Wai");
+    act(() => repo.suggestOn(input).onPick({ text: "Waiting" }));
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Loose.md")!.fm["blocks"]).toEqual(["[[Waiting]]"]),
+    );
+    expect(input).toHaveValue("");
+  });
+
   it("keeps placed inline todos out of the blocking picker — they are lines, not notes", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
@@ -4891,7 +4977,7 @@ describe("blocking relationships", () => {
     await user.click(await screen.findByText("Loose", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
     const input = within(detail).getByLabelText("Link a card under Blocks") as HTMLInputElement;
-    const options = Array.from(input.list?.querySelectorAll("option") ?? []).map((o) => o.value);
+    const options = blockSuggestions(repo, detail);
     // The subtask's own title is not a link target, and the note that owns it is still offered
     // under its own name — the synthetic card borrows that name and must not make it ambiguous.
     expect(options).toContain("Waiting");
@@ -5070,7 +5156,7 @@ describe("blocking relationships", () => {
     const detail = await screen.findByTestId("card-detail");
     // Neither the shared file name nor the title (which equals it here) can pick one of the two,
     // so each is offered under its path instead — the one label that names exactly one note.
-    expect(blockSuggestions(detail)).toEqual(["Tasks/One/B", "Tasks/Two/B"]);
+    expect(blockSuggestions(repo, detail)).toEqual(["Tasks/One/B", "Tasks/Two/B"]);
   });
 
   it("refuses a link to the card itself, which the board would only drop again", async () => {
@@ -5111,7 +5197,7 @@ describe("blocking relationships", () => {
     render_(repo);
     await user.click(await screen.findByText("Here"));
     const detail = await screen.findByTestId("card-detail");
-    const options = blockSuggestions(detail);
+    const options = blockSuggestions(repo, detail);
     // The shared title is not on offer; each file name still is, since those are unambiguous.
     expect(options).not.toContain("Review");
     expect(options).toEqual(expect.arrayContaining(["dup-1", "dup-2"]));
@@ -5720,21 +5806,12 @@ describe("is: and unread: in the search box and chips", () => {
   });
 
   it("suggests is: and unread: values once the key is typed", async () => {
-    const user = userEvent.setup();
-    render_(mixedRepo(), asRafa);
+    const repo = mixedRepo();
+    render_(repo, asRafa);
     await screen.findByText("Blocker");
-    const search = screen.getByLabelText("Search cards");
-    await user.type(search, "is:");
-    const list = await screen.findByRole("listbox", { name: "Filter suggestions" });
-    expect(within(list).getByRole("option", { name: /is:unblocked/ })).toBeInTheDocument();
-    await user.clear(search);
-    await user.type(search, "unread:r");
-    expect(
-      within(await screen.findByRole("listbox", { name: "Filter suggestions" })).getByRole(
-        "option",
-        { name: /unread:replies/ },
-      ),
-    ).toBeInTheDocument();
+    const source = repo.suggestOn(screen.getByLabelText("Search cards"));
+    expect(source.candidates("is:").map((s) => s.text)).toContain("is:unblocked");
+    expect(source.candidates("unread:r").map((s) => s.text)).toContain("unread:replies");
   });
 });
 
@@ -7457,6 +7534,21 @@ describe("assigning a card (20260827.03)", () => {
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
   });
 
+  it("saves on Enter and on a picked row while there is no Assign-to-me button to leave for", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Gamma.md")!.fm["assignee"] = "Robin";
+    const { user, detail } = await openPanel(repo);
+    const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
+
+    // Enter blurs the field, and a blur that goes nowhere is not a move to the missing button.
+    await user.type(field, "Rob{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rob"));
+
+    await user.click(field);
+    act(() => repo.suggestOn(field).onPick({ text: "Robin" }));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Robin"));
+  });
+
   it("assigns to the reader in one click, and the same button hands the card back", async () => {
     const repo = makeRepo();
     const { user, detail } = await openPanel(repo, named("Rafa"));
@@ -7484,12 +7576,13 @@ describe("assigning a card (20260827.03)", () => {
     repo.files.get("Tasks/Gamma.md")!.fm["assignee"] = "Zoe";
     repo.files.get("Tasks/Beta.md")!.fm["assignee"] = "alex";
     const { detail } = await openPanel(repo);
-    const field = within(detail).getByLabelText("Assignee") as HTMLInputElement;
-    const list = detail.querySelector(`#${CSS.escape(field.getAttribute("list")!)}`)!;
-    expect([...list.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual([
-      "alex",
-      "Zoe",
-    ]);
+    const field = within(detail).getByLabelText("Assignee");
+    expect(
+      repo
+        .suggestOn(field)
+        .candidates("x")
+        .map((s) => s.text),
+    ).toEqual(["alex", "Zoe"]);
   });
 
   it("takes the card from the board itself, through the card's context menu", async () => {

@@ -1,7 +1,9 @@
-import { forwardRef, useId, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { Icon, type IconName } from "./icons";
+import { useRepo } from "./context";
 
 import { hasToken, toggleToken, type FilterKey } from "../model/filter";
+import type { SearchField, Suggestion } from "../model/repo";
 
 interface Props {
   /** The single source of truth: the raw search query string (#9). */
@@ -18,7 +20,7 @@ interface Props {
   canFilterMine: boolean;
 }
 
-/** The §1 keys, with a one-line hint each, surfaced as autocomplete suggestions. */
+/** The §1 keys, with a one-line hint each, offered as suggestions. */
 const KEY_HINTS: ReadonlyArray<{ key: FilterKey; hint: string }> = [
   { key: "area", hint: "frontmatter area" },
   { key: "status", hint: "column id" },
@@ -42,37 +44,23 @@ const KEY_VALUES: Partial<Record<FilterKey, readonly string[]>> = {
   unread: ["comments", "replies", "none"],
 };
 
-interface Suggestion {
-  /** The full token text inserted when chosen (e.g. "area:" or "due:overdue"). */
-  insert: string;
-  /** What the row shows as its primary label. */
-  label: string;
-  /** Secondary, muted hint text. */
-  hint: string;
+/**
+ * What to offer for the fragment the caret sits in: every key while a bare word is typed, that
+ * key's closed values once it has its colon. Purely presentational over the §1 grammar — it never
+ * invents new syntax — and unfiltered: the host matches the fragment against these itself.
+ */
+function candidatesFor(fragment: string): Suggestion[] {
+  const colon = fragment.indexOf(":");
+  if (colon < 0) return KEY_HINTS.map(({ key, hint }) => ({ text: `${key}:`, note: hint }));
+  const key = fragment.slice(0, colon).toLowerCase();
+  const values = KEY_HINTS.some((k) => k.key === key) ? KEY_VALUES[key as FilterKey] : undefined;
+  return (values ?? []).map((v) => ({ text: `${key}:${v}` }));
 }
 
-/**
- * Build autocomplete suggestions for the fragment the caret sits in (the last space-delimited run
- * of the query up to the caret). It's purely presentational over the §1 grammar — it never invents
- * new syntax. Returns [] when there's nothing useful to offer (so the dropdown stays hidden).
- */
-function suggestionsFor(fragment: string): Suggestion[] {
-  const frag = fragment.toLowerCase();
-  const colon = frag.indexOf(":");
-  if (colon < 0) {
-    // Typing a bare word — offer the keys it could be the start of (or all keys for an empty box).
-    return KEY_HINTS.filter(({ key }) => key.startsWith(frag)).map(({ key, hint }) => ({
-      insert: `${key}:`,
-      label: `${key}:`,
-      hint,
-    }));
-  }
-  const key = frag.slice(0, colon);
-  const partial = frag.slice(colon + 1);
-  const values = KEY_HINTS.some((k) => k.key === key) ? KEY_VALUES[key as FilterKey] : undefined;
-  return (values ?? [])
-    .filter((v) => v.startsWith(partial))
-    .map((v) => ({ insert: `${key}:${v}`, label: `${key}:${v}`, hint: "" }));
+/** The fragment the caret sits in: the run since the previous space, up to the caret. */
+function fragmentAt(query: string, caret: number): string {
+  const before = query.slice(0, caret);
+  return before.slice(before.lastIndexOf(" ") + 1);
 }
 
 /** Replace the caret's fragment (last run since the previous space) with `insert`. */
@@ -93,45 +81,71 @@ function applySuggestion(
   return { query: next + trailing + after, caret: next.length + trailing.length };
 }
 
-export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
+export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function Toolbar(
   { query, onChange, matchCount, totalCount, canFilterMine },
   ref,
 ) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  useImperativeHandle(ref, () => inputRef.current as HTMLInputElement, []);
-  // Unique per Toolbar so two open Folia Kanban panes don't collide on the listbox id / aria-controls.
-  const listId = useId();
-
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  const repo = useRepo();
+  const box = useRef<HTMLDivElement>(null);
+  const field = useRef<SearchField | null>(null);
+  const report = useRef(onChange);
+  useEffect(() => {
+    report.current = onChange;
+  }, [onChange]);
+  useImperativeHandle(ref, () => ({ focus: () => field.current?.input.focus() }), []);
 
   const active = query.trim() !== "";
 
-  // The fragment under the caret drives the suggestions. Computed each render (cheap) so it tracks
-  // both the query and the live caret; falls back to the query tail when the caret can't be read.
-  const caretPos = inputRef.current?.selectionStart ?? query.length;
-  const before = query.slice(0, caretPos);
-  const fragment = before.slice(before.lastIndexOf(" ") + 1);
-  const suggestions = open ? suggestionsFor(fragment) : [];
-  const showList = open && suggestions.length > 0;
-
-  const choose = (s: Suggestion) => {
-    const el = inputRef.current;
-    const caret = el?.selectionStart ?? query.length;
-    const { query: next, caret: nextCaret } = applySuggestion(query, caret, s.insert);
-    onChange(next);
-    setHighlight(0);
-    // Restore focus + caret after React commits the new value.
-    window.requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(nextCaret, nextCaret);
+  // The field is the host's, so it is mounted rather than rendered, and it holds its own value:
+  // the effect below writes `query` into it whenever the query changes from somewhere else.
+  useLayoutEffect(() => {
+    if (!box.current) return;
+    const search = repo.mountSearch(box.current, (value) => report.current(value));
+    const { input } = search;
+    field.current = search;
+    input.placeholder = "Search cards…  (press /)";
+    input.setAttribute("aria-label", "Search cards");
+    input.autocomplete = "off";
+    const detach = repo.attachSuggest(input, {
+      candidates: candidatesFor,
+      queryAt: fragmentAt,
+      // A bare word is a search term as much as the start of a key: offered as typed, it is what
+      // Enter keeps, so typing `read` and pressing Enter does not turn it into `unread:`.
+      freeText: (fragment) => !fragment.includes(":"),
+      onPick: ({ text }) => {
+        if (!text.includes(":")) return;
+        const next = applySuggestion(input.value, input.selectionStart ?? input.value.length, text);
+        search.setValue(next.query);
+        input.setSelectionRange(next.caret, next.caret);
+        report.current(next.query);
+      },
     });
-  };
+    // With the popup open, Escape only closes it: the popup takes the key before it gets here.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (input.value) {
+        e.preventDefault();
+        e.stopPropagation();
+        search.setValue("");
+        report.current("");
+      } else {
+        input.blur();
+      }
+    };
+    input.addEventListener("keydown", onKeyDown);
+    return () => {
+      input.removeEventListener("keydown", onKeyDown);
+      detach();
+      search.remove();
+      field.current = null;
+    };
+  }, [repo]);
+  useLayoutEffect(() => {
+    if (field.current && field.current.input.value !== query) field.current.setValue(query);
+  }, [query]);
 
   const toggle = (key: FilterKey, value: string) => {
     onChange(toggleToken(query, key, value));
-    setOpen(false);
   };
   const chip = (key: FilterKey, value: string, icon: IconName, label: string) => (
     <button
@@ -144,111 +158,9 @@ export const Toolbar = forwardRef<HTMLInputElement, Props>(function Toolbar(
     </button>
   );
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (showList) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setHighlight((h) => (h + 1) % suggestions.length);
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setHighlight((h) => (h - 1 + suggestions.length) % suggestions.length);
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        {
-          const s = suggestions[Math.min(highlight, suggestions.length - 1)];
-          if (s) choose(s);
-        }
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setOpen(false);
-        return;
-      }
-    }
-    if (e.key === "Escape") {
-      if (query) {
-        e.stopPropagation();
-        onChange("");
-      } else {
-        inputRef.current?.blur();
-      }
-    }
-  };
-
   return (
     <div className="folia-toolbar" role="search" aria-label="Filter board">
-      <div className="folia-search">
-        <Icon name="search" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          placeholder="Search cards…  (press /)"
-          aria-label="Search cards"
-          role="combobox"
-          aria-expanded={showList}
-          aria-controls={listId}
-          aria-activedescendant={
-            showList && suggestions.length > 0 ? `${listId}-opt-${highlight}` : undefined
-          }
-          aria-autocomplete="list"
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setOpen(true);
-            setHighlight(0);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onKeyDown={onKeyDown}
-        />
-        {query && (
-          <button
-            className="folia-icon-btn folia-mini"
-            aria-label="Clear search"
-            title="Clear"
-            onClick={() => onChange("")}
-          >
-            <Icon name="close" />
-          </button>
-        )}
-        {showList && (
-          <ul
-            className="folia-filter-suggest"
-            id={listId}
-            role="listbox"
-            aria-label="Filter suggestions"
-          >
-            {suggestions.map((s, i) => (
-              <li key={s.insert}>
-                <button
-                  type="button"
-                  role="option"
-                  id={`${listId}-opt-${i}`}
-                  aria-selected={i === highlight}
-                  className={"folia-filter-suggest-item" + (i === highlight ? " is-active" : "")}
-                  // Commit before the input's onBlur fires (pointerdown/mousedown precede blur).
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    choose(s);
-                  }}
-                  onMouseEnter={() => setHighlight(i)}
-                >
-                  <span className="folia-filter-suggest-key">{s.label}</span>
-                  {s.hint && <span className="folia-filter-suggest-hint">{s.hint}</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <div className="folia-search" ref={box} />
 
       <div className="folia-toolbar-filters" role="group" aria-label="Quick filters">
         {/* Offered while there is a "me" to filter for — and, whatever the setting says now, while

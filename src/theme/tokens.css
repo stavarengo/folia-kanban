@@ -59,7 +59,6 @@
   --folia-menu-h-max: calc(var(--size-4-1) * 110);
   --folia-modal-w: var(--dialog-width);
   --folia-menu-pad: var(--size-4-3);
-  --folia-suggest-h-max: calc(var(--size-4-1) * 70);
   --folia-search-w: calc(var(--size-4-1) * 80);
   --folia-add-column-w: calc(var(--size-4-1) * 55);
   /* Capped at 40% of the panel body, which is a size container (`.folia-detail-body`), so a narrow
@@ -148,7 +147,6 @@
   --folia-shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.22);
   --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4);
   --folia-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.28);
-  --folia-suggestion-marker: inset var(--folia-border-width-thick) 0 0 var(--text-normal);
   --folia-ring: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent);
   --folia-ring-soft: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent);
   --folia-shadow-card-selected: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);

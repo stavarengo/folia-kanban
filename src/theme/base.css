@@ -111,3 +111,37 @@
   from { opacity: var(--folia-opacity-hidden); transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
   to { opacity: var(--folia-opacity-shown); transform: translate(-50%, 0) scale(1); }
 }
+
+.folia-loading,
+.folia-error {
+  padding: var(--folia-pad-block);
+  color: var(--text-muted);
+}
+.folia-error {
+  color: var(--folia-text-error);
+}
+
+.folia-desc-refusal {
+  margin: var(--folia-space-para) 0 0;
+  font-size: var(--folia-font-size-xs);
+  color: var(--folia-text-error);
+}
+
+.folia-card-folder-notice {
+  padding: var(--folia-pad-notice-y) var(--folia-space-lg);
+  font-size: var(--folia-font-size-xs);
+  color: color-mix(in srgb, var(--folia-text-warning) 70%, var(--text-normal));
+  background: color-mix(in oklch, var(--folia-text-warning) 12%, transparent);
+  border-bottom: var(--folia-border-width) solid var(--folia-border);
+  flex: 0 0 auto;
+}
+
+.folia-icon {
+  --icon-size: var(--folia-icon-size);
+  --icon-stroke: var(--folia-icon-stroke);
+  width: var(--icon-size);
+  height: var(--icon-size);
+  stroke-width: var(--icon-stroke);
+  flex: 0 0 auto;
+  vertical-align: var(--folia-icon-baseline);
+}

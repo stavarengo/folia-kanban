@@ -8,58 +8,10 @@
   background: var(--background-primary);
   flex: 0 0 auto;
 }
+/* Obsidian's own search field (`SearchComponent`) draws the box, icon, focus ring and clear button;
+   the toolbar only gives it its share of the row. */
 .folia-search {
-  position: relative; /* anchors the #9 filter-suggestion dropdown */
-  display: flex;
-  align-items: center;
-  gap: var(--folia-space-sm);
   flex: 0 1 var(--folia-search-w);
-  padding: 0 var(--folia-space-md);
-  height: var(--folia-control-h);
-  border: var(--folia-border-width) solid var(--folia-border);
-  border-radius: var(--folia-r);
-  background: var(--folia-field-bg);
-  color: var(--text-muted);
-  transition: border-color var(--folia-dur-fast) ease, box-shadow var(--folia-dur-fast) ease;
-}
-.folia-search:focus-within {
-  border-color: var(--folia-accent);
-  box-shadow: var(--folia-ring);
-}
-.folia-search input {
-  flex: 1 1 auto;
-  border: none;
-  background: transparent;
-  color: var(--text-normal);
-  font: inherit;
-  outline: none;
-  min-width: 0;
-}
-/* The field is the wrapper, not the input: the input is borderless and transparent and sits inside
-   the wrapper's padding, beside the clear button. Anything the input draws for focus therefore
-   lands INSIDE the wrapper's own border and ring, and there were two such things. The board's
-   blanket `:focus-visible` rule drew an accent rectangle 2px outside a borderless box, which fell
-   across the ✕; and Obsidian's `input[type="text"]:focus` adds
-   `0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus)`, a second ring in
-   `#555555` dark and `#bdbdbd` light. Both are suppressed here, leaving the wrapper's accent border
-   plus ring as the one indication, on the box the user is actually looking at.
-   The host rule is matched on `:focus` rather than `:focus-visible` because that is the state it
-   itself uses, and it is beaten on source order rather than weight: both selectors compute to the
-   same specificity, and the plugin's sheet is appended after the app's. */
-.folia-search input:focus,
-.folia-search input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-/* Forced-colours mode drops every `box-shadow` and repaints both borders in the same system colour,
-   so the wrapper's ring and its accent border both stop saying anything and the line above would
-   leave the field with no focus indication at all. An outline survives that mode, and on the
-   wrapper it marks the whole field rather than the borderless input inside it. */
-@media (forced-colors: active) {
-  .folia-search:focus-within {
-    outline: var(--folia-focus-ring-w) solid var(--folia-accent);
-    outline-offset: var(--folia-focus-ring-offset);
-  }
 }
 .folia-toolbar-filters {
   display: flex;

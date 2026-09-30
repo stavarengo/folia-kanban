@@ -111,7 +111,6 @@
 .folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .is-editing)),
 .folia-scope .folia-column-add:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-item:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-filter-suggest-item:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-prio:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:hover:where(:not(:disabled, :focus-visible)) {
@@ -124,7 +123,6 @@
 .folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .is-editing)),
 .folia-scope .folia-column-add:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-item:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-filter-suggest-item:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-prio:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:active:where(:not(:disabled, :focus-visible)) {
@@ -162,7 +160,6 @@
 .folia-scope .folia-filter-chip:disabled,
 .folia-scope .folia-column-add:disabled,
 .folia-scope .folia-add-column:disabled,
-.folia-scope .folia-filter-suggest-item:disabled,
 .folia-scope .folia-menu-item:disabled,
 .folia-scope .folia-menu-prio:disabled,
 .folia-scope .folia-menu-column:disabled,

@@ -15,14 +15,23 @@ if (hasDom) {
   // Obsidian adds DOM helpers of its own to every element, and jsdom has none of them. Only the
   // ones the plugin actually calls under test are stood in for — an unimplemented helper should
   // fail loudly the first time a test reaches it, not quietly do half of what Obsidian's does.
-  if (!HTMLElement.prototype.createSpan) {
-    HTMLElement.prototype.createSpan = function (this: HTMLElement, o?: DomElementInfo | string) {
-      const span = this.ownerDocument.createElement("span");
+  if (!HTMLElement.prototype.createEl) {
+    HTMLElement.prototype.createEl = function <K extends keyof HTMLElementTagNameMap>(
+      this: HTMLElement,
+      tag: K,
+      o?: DomElementInfo | string,
+    ): HTMLElementTagNameMap[K] {
+      const el = this.ownerDocument.createElement(tag);
       const info = typeof o === "string" ? { cls: o } : (o ?? {});
-      if (info.cls) span.className = Array.isArray(info.cls) ? info.cls.join(" ") : info.cls;
-      if (typeof info.text === "string") span.textContent = info.text;
-      this.appendChild(span);
-      return span;
+      if (info.cls) el.className = Array.isArray(info.cls) ? info.cls.join(" ") : info.cls;
+      if (typeof info.text === "string") el.textContent = info.text;
+      this.appendChild(el);
+      return el;
+    };
+  }
+  if (!HTMLElement.prototype.createDiv) {
+    HTMLElement.prototype.createDiv = function (this: HTMLElement, o?: DomElementInfo | string) {
+      return this.createEl("div", o);
     };
   }
 

@@ -248,7 +248,7 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<{ text: string; tone: "success" | "error" } | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<Pick<HTMLElement, "focus">>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number | null>(null);
   const todayValue = useToday(today);

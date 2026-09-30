@@ -24,13 +24,14 @@ import type {
 import { boardLinkResolver, isTodoLine, syncSubcardLines, type LinkResolver } from "../model/board";
 import { addCard, setSubtaskDone } from "../model/boardOps";
 import { descriptionRefusal } from "../model/card";
-import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
+import type { PropertyNamesInUse, Suggestion, SuggestSource } from "../model/repo";
 import { TITLE_KEY, TITLE_SOURCE_LABEL, resolveTitle, sanitizeFilename } from "../model/cardTitle";
 import {
   FOLIA_CARD_KEYS,
   PANEL_FIELD_KEYS,
   editScalar,
   propertySuggestions,
+  type PropertySuggestion,
   type ScalarValue,
 } from "../model/properties";
 import { laneFill, prospectiveCard } from "../model/lanes";
@@ -96,17 +97,25 @@ function useFieldDraft(
   onCommit: (v: string) => void,
   normalize: (v: string) => string | null = (v) => v,
 ) {
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraftState] = useState(value);
+  // Mirrors the draft for a commit that follows a `setDraft` in the same event (a picked
+  // suggestion), before React has re-rendered with the new draft.
+  const latest = useRef(value);
+  const setDraft = useCallback((d: string) => {
+    latest.current = d;
+    setDraftState(d);
+  }, []);
   const shown = useRef(value);
   useEffect(() => {
     const before = shown.current;
     shown.current = value;
-    setDraft((d) => (d === before ? value : d));
-  }, [value]);
+    if (latest.current === before) setDraft(value);
+  }, [value, setDraft]);
   const commit = () => {
-    const next = normalize(draft);
+    const typed = latest.current;
+    const next = normalize(typed);
     if (next === null) return;
-    if (next !== draft) setDraft(next);
+    if (next !== typed) setDraft(next);
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
     if (next === normalize(value)) return;
     shown.current = next;
@@ -116,6 +125,74 @@ function useFieldDraft(
 }
 
 const trimmed = (v: string) => v.trim();
+
+/**
+ * Give an input the host's type-ahead: spread `ref` on the input. The host binds a popup to an
+ * element for good, so the source is attached once per element and reads the current render's
+ * words and handlers through a ref instead of re-attaching.
+ */
+function useSuggest(source: SuggestSource) {
+  const repo = useRepo();
+  const latest = useRef(source);
+  useEffect(() => {
+    latest.current = source;
+  });
+  const stable = useRef<SuggestSource>({
+    ...source,
+    candidates: (query) => latest.current.candidates(query),
+    onPick: (item) => latest.current.onPick(item),
+  });
+  const input = useRef<HTMLInputElement | null>(null);
+  const off = useRef<(() => void) | null>(null);
+  const ref = useCallback(
+    (el: HTMLInputElement | null) => {
+      off.current?.();
+      input.current = el;
+      off.current = el ? repo.attachSuggest(el, stable.current) : null;
+    },
+    [repo],
+  );
+  return { ref, input };
+}
+
+/** What each group of property names is called in the popup, so the three-part order is visible. */
+const GROUP_NOTE: Record<PropertySuggestion["group"], string> = {
+  folia: "Folia Kanban",
+  board: "on this board",
+  vault: "in your vault",
+};
+
+/**
+ * A free-text field's rows, one per value it could take. Nothing while the field is empty, so no
+ * popup opens there and Enter on an emptied field still clears it.
+ */
+const freeTextRows =
+  (values: () => readonly string[]) =>
+  (query: string): Suggestion[] =>
+    query.trim() ? values().map((text) => ({ text })) : [];
+const always = () => true;
+
+/**
+ * A free-text field's suggestions: what was typed stays what Enter commits, and picking a row
+ * commits that row the way Enter does, by leaving the field.
+ */
+function useFreeTextSuggest(
+  values: readonly string[],
+  setDraft: (text: string) => void,
+  commit: () => void,
+) {
+  const suggest = useSuggest({
+    freeText: always,
+    candidates: freeTextRows(() => values),
+    onPick: ({ text }) => {
+      setDraft(text);
+      const el = suggest.input.current;
+      if (el && el === el.ownerDocument.activeElement) el.blur();
+      else commit();
+    },
+  });
+  return suggest.ref;
+}
 
 /**
  * One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. The
@@ -213,7 +290,7 @@ function PropRow({
 /**
  * The PRIORITY field: a free-text combobox over whatever priority values the board itself uses.
  *
- * `list` + `<datalist>` is what keeps the vocabulary a set of SUGGESTIONS rather than a closed
+ * Free text with suggestions is what keeps the vocabulary a set of SUGGESTIONS rather than a closed
  * menu — a value the board has never seen can simply be typed, which is the only way a board's
  * vocabulary ever grows. Commits on blur/Enter (and never per keystroke) so a half-typed value
  * never reaches the note, matching how the custom-property rows behave. Emptying the field clears
@@ -228,14 +305,14 @@ function PriorityField({
   options: string[];
   onCommit: (v: string) => void;
 }) {
-  const listId = useId();
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
+  const suggestRef = useFreeTextSuggest(options, setDraft, commit);
   return (
     <label>
       <span className="folia-prop-key">Priority</span>
       <input
+        ref={suggestRef}
         className="folia-prop-input"
-        list={listId}
         value={draft}
         placeholder="—"
         onChange={(e) => setDraft(e.target.value)}
@@ -247,11 +324,6 @@ function PriorityField({
           }
         }}
       />
-      <datalist id={listId}>
-        {options.map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
     </label>
   );
 }
@@ -260,7 +332,7 @@ function PriorityField({
  * The ASSIGNEE field: who is working on this card, typed as a name.
  *
  * Same shape as the priority field, and for the same reason — a board's people are whoever its
- * cards already name, so the `<datalist>` is a set of suggestions rather than a closed menu and a
+ * cards already name, so what it offers is a set of suggestions rather than a closed menu and a
  * name nobody has used yet is simply typed. Emptying the field unassigns the card.
  *
  * Beside it sits the one-click case: assign this card to me. It appears only when the **Your name**
@@ -286,11 +358,11 @@ function AssigneeField({
   /** Put your name on the card, or take only yours off — the one-click case. */
   onToggleMine: () => void;
 }) {
-  const listId = useId();
   const hintId = useId();
   const meButton = useRef<HTMLButtonElement>(null);
   const value = names.join(", ");
   const { draft, setDraft, commit } = useFieldDraft(value, onCommit, trimmed);
+  const suggestRef = useFreeTextSuggest(options, setDraft, commit);
   const mine = me !== "" && names.some((name) => sameAssignee(name, me));
   return (
     // The button is a sibling of the label, not inside it: a label belongs to one control, and one
@@ -299,8 +371,8 @@ function AssigneeField({
       <label>
         <span className="folia-prop-key">Assignee</span>
         <input
+          ref={suggestRef}
           className="folia-prop-input"
-          list={listId}
           value={draft}
           placeholder="—"
           aria-describedby={me === "" ? hintId : undefined}
@@ -311,7 +383,7 @@ function AssigneeField({
           // would decide the answer. Reading `relatedTarget` catches both ways of getting there,
           // the pointer and the Tab key, which is why it is here rather than on the press.
           onBlur={(e) => {
-            if (e.relatedTarget === meButton.current) {
+            if (meButton.current && e.relatedTarget === meButton.current) {
               setDraft(value);
               return;
             }
@@ -340,11 +412,6 @@ function AssigneeField({
           {mine ? "Unassign me" : "Assign to me"}
         </button>
       )}
-      <datalist id={listId}>
-        {options.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
       {me === "" && (
         <span className="folia-assignee-hint" id={hintId}>
           Set “Your name” in the plugin settings to assign cards to yourself in one click.
@@ -723,7 +790,6 @@ function RelationTypeSections({
   board,
   path,
   choices,
-  listId,
   onNavigate,
   mutate,
 }: {
@@ -732,12 +798,25 @@ function RelationTypeSections({
   board: Board;
   path: string;
   choices: Map<string, string>;
-  listId: string;
   onNavigate: ((path: string) => void) | undefined;
   mutate: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
   const repo = useRepo();
   const [draft, setDraft] = useState("");
+  const add = (typed: string) => {
+    // Text naming no card is kept as typed: it becomes a link to a card that is not there, which
+    // the list shows as missing rather than swallow.
+    setDraft("");
+    void mutate(() => repo.addRelation(path, type.key, choices.get(typed) ?? typed)).then((ok) => {
+      // A failed write hands the text back, into an empty box only.
+      if (!ok) setDraft((cur) => cur || typed);
+    });
+  };
+  const suggest = useSuggest({
+    freeText: always,
+    candidates: freeTextRows(() => [...choices.keys()]),
+    onPick: ({ text }) => add(text),
+  });
   const outgoing = links.filter((l) => l.direction === "out");
   const incoming = links.filter((l) => l.direction === "in");
   return (
@@ -765,7 +844,7 @@ function RelationTypeSections({
         </ul>
         <div className="folia-add-inline">
           <input
-            list={listId}
+            ref={suggest.ref}
             value={draft}
             placeholder="Link a card…"
             aria-label={`Link a card under ${type.label}`}
@@ -774,15 +853,7 @@ function RelationTypeSections({
               const typed = draft.trim();
               if (e.key !== "Enter" || !typed) return;
               e.preventDefault();
-              // Text naming no card is kept as typed: it becomes a link to a card that is not
-              // there, which the list shows as missing rather than swallow.
-              setDraft("");
-              void mutate(() => repo.addRelation(path, type.key, choices.get(typed) ?? typed)).then(
-                (ok) => {
-                  // A failed write hands the text back, into an empty box only.
-                  if (!ok) setDraft((cur) => cur || typed);
-                },
-              );
+              add(typed);
             }}
           />
         </div>
@@ -932,8 +1003,6 @@ export function CardDetail({
   // resized, not only when a window is.
   const [descMaxHeight, setDescMaxHeight] = useState<number | null>(null);
 
-  // One datalist for every relationship field: they all offer the same cards.
-  const relationListId = useId();
   // Ties the "…has a field of its own" note under the add-property row to the name input it is about.
   const ownFieldHintId = useId();
   // Rebuilt only when the board or the open card changes — not on every keystroke in any field.
@@ -976,29 +1045,16 @@ export function CardDetail({
     }),
     [board.config.relations, namesInUse, card?.frontmatter, editedKeys],
   );
-  // The suggester is attached to the input element ONCE and reads through this ref, because
-  // Obsidian's type-ahead binds to an element for good and has no teardown: re-attaching per
-  // render would stack popups on one field.
-  const suggestListsRef = useRef(suggestLists);
-  useEffect(() => {
-    suggestListsRef.current = suggestLists;
-  }, [suggestLists]);
-  const suggestSource = useRef<PropertySuggestSource>({
-    suggestions: (query) => propertySuggestions(query, suggestListsRef.current),
+  const propKeySuggest = useSuggest({
+    candidates: () =>
+      propertySuggestions(suggestLists).map(({ key, group, editedInPanel }) => ({
+        text: key,
+        note: editedInPanel ? "edited in this panel" : GROUP_NOTE[group],
+      })),
     // The picked key goes into React state, never straight into the input: this field is
     // controlled, so a value written behind React's back is gone at the next render.
-    onPick: (key) => setNewProp((cur) => ({ ...cur, key })),
+    onPick: ({ text }) => setNewProp((cur) => ({ ...cur, key: text })),
   });
-  const suggestOff = useRef<(() => void) | null>(null);
-  // A callback ref rather than an effect: the panel's create form has no property field at all,
-  // so attachment has to follow the element itself appearing and disappearing.
-  const propKeyRef = useCallback(
-    (el: HTMLInputElement | null) => {
-      suggestOff.current?.();
-      suggestOff.current = el ? repo.suggestProperties(el, suggestSource.current) : null;
-    },
-    [repo],
-  );
   // The same reading of a `[[wikilink]]` the board used to nest subcards, read from THIS card the
   // way the vault reads a link written in it — so a link the board bound is never shown here as
   // missing, and neither reading can bind a name to a card the other one refused.
@@ -1640,7 +1696,7 @@ export function CardDetail({
             ))}
             <div className="folia-prop-add">
               <input
-                ref={propKeyRef}
+                ref={propKeySuggest.ref}
                 className="folia-prop-input"
                 value={newProp.key}
                 placeholder="property"
@@ -1967,16 +2023,10 @@ export function CardDetail({
               board={board}
               path={path}
               choices={relationChoicesValue}
-              listId={relationListId}
               onNavigate={onNavigate}
               mutate={mutate}
             />
           ))}
-          <datalist id={relationListId}>
-            {[...relationChoicesValue.keys()].map((label) => (
-              <option key={label} value={label} />
-            ))}
-          </datalist>
 
           <section className="folia-section">
             <h3>Comments</h3>

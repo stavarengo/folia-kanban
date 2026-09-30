@@ -15,7 +15,6 @@ import type {
 } from "./types";
 import type { CardMutation } from "./board";
 import type { FileOp } from "./pathOps";
-import type { PropertySuggestion } from "./properties";
 
 /**
  * A write that was refused because the note no longer reads the way the caller described it: the
@@ -69,15 +68,43 @@ export interface PropertyNamesInUse {
   elsewhere: string[];
 }
 
+/** One row of a suggesting input's popup. */
+export interface Suggestion {
+  /** What the row says, what the typed text is matched against, and what picking it means. */
+  text: string;
+  /** A quieter second line: where the text comes from, or what it does. */
+  note?: string;
+}
+
 /**
- * What a suggesting input offers and what it does with the answer. The host owns the popup; this
- * owns the words in it, so the ordering rules stay in the model where they can be tested.
+ * What a suggesting input offers and what it does with the answer. The host owns the popup and the
+ * matching (fuzzy, highlighted, best match first); this owns the words, and their order before
+ * anything is typed.
  */
-export interface PropertySuggestSource {
-  /** The suggestions for what has been typed so far, in the order they should be shown. */
-  suggestions(query: string): readonly PropertySuggestion[];
-  /** The user picked one, by pointer or by keyboard. */
-  onPick(key: string): void;
+export interface SuggestSource {
+  /** Everything worth offering for `query`, before matching. */
+  candidates(query: string): readonly Suggestion[];
+  /**
+   * The part of the field the suggestions are for. The whole value when absent; given, the host
+   * also re-queries when the caret moves, since the popup itself only listens for typing and focus.
+   */
+  queryAt?(value: string, caret: number): string;
+  /**
+   * Whether `query` is free text, which is then offered first when no candidate spells it exactly:
+   * the popup pre-selects its first row, and Enter must keep committing what was typed.
+   */
+  freeText?(query: string): boolean;
+  /** The user picked a row, by pointer or by keyboard. */
+  onPick(item: Suggestion): void;
+}
+
+/** The host's own search field, mounted into an element the caller renders. */
+export interface SearchField {
+  readonly input: HTMLInputElement;
+  /** Show `value` without reporting it back as a change. */
+  setValue(value: string): void;
+  /** Take the field back out of its container. */
+  remove(): void;
 }
 
 /**
@@ -238,11 +265,14 @@ export interface CardRepository {
 
   /**
    * Attach the host's own type-ahead to a text input (Obsidian's `AbstractInputSuggest` in the
-   * vault adapter; nothing at all in tests, which have no popup to show). `source` stays live for
-   * as long as the attachment does, so the caller feeds fresh suggestions through it instead of
-   * re-attaching. Returns a cleanup function the caller runs on unmount.
+   * vault adapter). `source` stays live for as long as the attachment does, so the caller feeds
+   * fresh suggestions through it instead of re-attaching. Returns a cleanup function the caller
+   * runs on unmount.
    */
-  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void;
+  attachSuggest(input: HTMLInputElement, source: SuggestSource): () => void;
+
+  /** Mount the host's search field (Obsidian's `SearchComponent`, clear button included). */
+  mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField;
 
   /** Subscribe to external changes; returns an unsubscribe function. */
   onChange(cb: () => void): () => void;

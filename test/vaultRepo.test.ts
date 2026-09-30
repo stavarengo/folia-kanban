@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, FileManager, MetadataCache, Vault } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
+import type { Suggestion, SuggestSource } from "../src/model/repo";
 import { moveCardOver, moveCardTo, setCardPriority } from "../src/model/boardOps";
 import { planDrop } from "../src/model/board";
 import { DataCorruptionError } from "../src/model/schemas";
@@ -1842,33 +1843,101 @@ describe("the property names the detail panel can suggest", () => {
 });
 
 describe("the suggester attached to a text input", () => {
-  /** One suggestion source, and what it was asked and told. */
-  function source(keys: string[]) {
+  /** A source over `texts`, and what it was told was picked. */
+  function source(texts: string[], extra: Partial<SuggestSource> = {}) {
     const picked: string[] = [];
     return {
       picked,
-      suggestions: (query: string) =>
-        keys.filter((k) => k.includes(query)).map((key) => ({ key, group: "folia" as const })),
-      onPick: (key: string) => {
-        picked.push(key);
+      candidates: () => texts.map((text) => ({ text })),
+      onPick: ({ text }: Suggestion) => {
+        picked.push(text);
       },
+      ...extra,
     };
   }
 
-  it("offers what the source offers, and hands a pick back instead of writing it into the input", async () => {
+  /** What the popup would show for `value` typed into `input`, as the texts of its rows. */
+  async function offered(input: HTMLInputElement, value: string) {
+    input.value = value;
+    const rows = (await AbstractInputSuggest.instances.at(-1)!.suggestionsFor(value)) as {
+      item: Suggestion;
+    }[];
+    return rows.map((r) => r.item.text);
+  }
+
+  it("matches fuzzily, best match first, and hands a pick back instead of writing it", async () => {
     const { repo } = setup();
     const input = document.createElement("input");
-    const src = source(["status", "priority"]);
+    const src = source(["Review PR - settings", "priority", "Write tests", "project-id"]);
 
-    repo.suggestProperties(input, src);
+    repo.attachSuggest(input, src);
+    expect(await offered(input, "wri")).toEqual(["Write tests", "Review PR - settings"]);
+    // Everything, in the source's order, before anything is typed.
+    expect(await offered(input, "")).toEqual([
+      "Review PR - settings",
+      "priority",
+      "Write tests",
+      "project-id",
+    ]);
+
     const suggest = AbstractInputSuggest.instances.at(-1)!;
-    const offered = (await suggest.suggestionsFor("stat")) as { key: string }[];
-
-    expect(offered.map((s) => s.key)).toEqual(["status"]);
-    suggest.selectSuggestion(offered[0], new MouseEvent("click"));
-    expect(src.picked).toEqual(["status"]);
-    // The field is React-controlled: writing the value here would be reverted by the next render.
+    input.value = "";
+    const [first] = (await suggest.suggestionsFor("")) as unknown[];
+    suggest.selectSuggestion(first, new MouseEvent("click"));
+    expect(src.picked).toEqual(["Review PR - settings"]);
+    // The caller decides what a pick means; a React-controlled field would revert a written value.
     expect(input.value).toBe("");
+  });
+
+  it("offers what was typed first in a free-text field, unless a row spells it exactly", async () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    repo.attachSuggest(input, source(["Robin", "Rob", "Roberta"], { freeText: () => true }));
+
+    // Enter takes the first row, so "Rob" + Enter must stay "Rob".
+    const partial = await offered(input, "Ro");
+    expect(partial[0]).toBe("Ro");
+    expect(partial.slice(1).sort()).toEqual(["Rob", "Roberta", "Robin"]);
+    const exact = await offered(input, "Rob");
+    expect(exact[0]).toBe("Rob");
+    expect(exact).toHaveLength(3);
+    // Nothing else to offer: no popup, so Enter reaches the field's own handler.
+    expect(await offered(input, "zz")).toEqual([]);
+  });
+
+  it("asks for the fragment under the caret, and re-asks when the caret leaves it", async () => {
+    const { repo } = setup();
+    const input = document.body.appendChild(document.createElement("input"));
+    const asked: string[] = [];
+    repo.attachSuggest(
+      input,
+      source([], {
+        queryAt: (value, caret) => value.slice(value.lastIndexOf(" ", caret - 1) + 1, caret),
+        candidates: (query) => {
+          asked.push(query);
+          return [];
+        },
+      }),
+    );
+    const requeries = vi.fn();
+    input.addEventListener("input", requeries);
+    input.focus();
+    input.value = "due:o area:h";
+    await AbstractInputSuggest.instances.at(-1)!.suggestionsFor(input.value);
+    expect(asked).toEqual(["area:h"]);
+
+    input.dispatchEvent(new Event("selectionchange"));
+    expect(requeries).not.toHaveBeenCalled();
+    input.setSelectionRange(5, 5);
+    input.dispatchEvent(new Event("selectionchange"));
+    expect(requeries).toHaveBeenCalledTimes(1);
+
+    // Only while the field has focus: a chip rewriting the query must not open the popup.
+    input.blur();
+    input.setSelectionRange(1, 1);
+    input.dispatchEvent(new Event("selectionchange"));
+    expect(requeries).toHaveBeenCalledTimes(1);
+    input.remove();
   });
 
   it("re-points the one suggester at the new source rather than binding a second to the same input", async () => {
@@ -1876,52 +1945,60 @@ describe("the suggester attached to a text input", () => {
     const input = document.createElement("input");
     const before = AbstractInputSuggest.instances.length;
 
-    repo.suggestProperties(input, source(["status"]))();
-    const second = source(["energy"]);
-    repo.suggestProperties(input, second);
+    repo.attachSuggest(input, source(["status"]))();
+    repo.attachSuggest(input, source(["energy"]));
 
     expect(AbstractInputSuggest.instances.length).toBe(before + 1);
-    const suggest = AbstractInputSuggest.instances.at(-1)!;
-    expect(((await suggest.suggestionsFor("")) as { key: string }[]).map((s) => s.key)).toEqual([
-      "energy",
-    ]);
+    expect(await offered(input, "")).toEqual(["energy"]);
   });
 
   it("offers nothing once the panel that attached it is gone", async () => {
     const { repo } = setup();
     const input = document.createElement("input");
 
-    repo.suggestProperties(input, source(["status"]))();
+    repo.attachSuggest(input, source(["status"]))();
 
+    expect(await offered(input, "")).toEqual([]);
+  });
+
+  it("renders a row as its text, matches highlighted, over its note", async () => {
+    const { repo } = setup();
+    const input = document.createElement("input");
+    repo.attachSuggest(input, {
+      candidates: () => [{ text: "status", note: "on this board" }],
+      onPick: () => {},
+    });
     const suggest = AbstractInputSuggest.instances.at(-1)!;
-    expect(await suggest.suggestionsFor("")).toEqual([]);
-  });
-
-  it("renders a suggestion as its name plus the list it came from", () => {
-    const { repo } = setup();
-    const input = document.createElement("input");
-    repo.suggestProperties(input, source(["status"]));
+    input.value = "sts";
+    const [row] = (await suggest.suggestionsFor("sts")) as unknown[];
     const el = document.createElement("div");
 
-    AbstractInputSuggest.instances.at(-1)!.renderSuggestion({ key: "status", group: "board" }, el);
+    suggest.renderSuggestion(row, el);
 
-    // Obsidian lays a title-over-note row out only for an item marked complex.
-    expect(el.classList.contains("mod-complex")).toBe(true);
-    expect(el.querySelector(".suggestion-title")?.textContent).toBe("status");
-    expect(el.querySelector(".suggestion-note")?.textContent).toBe("on this board");
+    expect(el.querySelector("div")?.textContent).toBe("status");
+    expect([...el.querySelectorAll(".suggestion-highlight")].map((s) => s.textContent)).toEqual([
+      "st",
+      "s",
+    ]);
+    expect(el.querySelector("small")?.textContent).toBe("on this board");
   });
+});
 
-  it("says where a name with a field of its own is really edited", () => {
+describe("the search field", () => {
+  it("reports typing, shows a value it is given without reporting it, and can be taken out", () => {
     const { repo } = setup();
-    const input = document.createElement("input");
-    repo.suggestProperties(input, source(["status"]));
-    const el = document.createElement("div");
+    const container = document.createElement("div");
+    const changes: string[] = [];
+    const field = repo.mountSearch(container, (value) => changes.push(value));
 
-    AbstractInputSuggest.instances
-      .at(-1)!
-      .renderSuggestion({ key: "status", group: "folia", editedInPanel: true }, el);
+    field.input.value = "due:";
+    field.input.dispatchEvent(new Event("input"));
+    field.setValue("area:home");
 
-    expect(el.querySelector(".suggestion-note")?.textContent).toBe("edited in this panel");
+    expect(changes).toEqual(["due:"]);
+    expect(field.input.value).toBe("area:home");
+    field.remove();
+    expect(container.childElementCount).toBe(0);
   });
 });
 

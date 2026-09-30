@@ -72,7 +72,7 @@ describe("what the property-name field offers", () => {
   };
 
   it("offers the plugin's own keys, then the board's, then the vault's", () => {
-    expect(propertySuggestions("", lists)).toEqual([
+    expect(propertySuggestions(lists)).toEqual([
       // Marked, because the panel edits these three itself: the popup says where they live rather
       // than letting someone pick a name the Add button will refuse.
       { key: "status", group: "folia", editedInPanel: true },
@@ -86,24 +86,21 @@ describe("what the property-name field offers", () => {
 
   it("marks a name with a field of its own however either side spells it", () => {
     const shouty = { ...lists, board: ["Sprint"], editedInPanel: new Set(["SPRINT"]) };
-    expect(propertySuggestions("sprint", shouty)).toEqual([
-      { key: "Sprint", group: "board", editedInPanel: true },
-    ]);
+    expect(propertySuggestions(shouty)).toContainEqual({
+      key: "Sprint",
+      group: "board",
+      editedInPanel: true,
+    });
   });
 
   it("never offers one name twice, whichever lists hold it", () => {
-    const keys = propertySuggestions("", lists).map((s) => s.key);
+    const keys = propertySuggestions(lists).map((s) => s.key);
     expect(new Set(keys).size).toBe(keys.length);
-  });
-
-  it("matches anywhere in the name and ignores case, so a misspelt key finds its original", () => {
-    expect(propertySuggestions("PRIO", lists).map((s) => s.key)).toEqual(["priority"]);
-    expect(propertySuggestions("ner", lists).map((s) => s.key)).toEqual(["energy"]);
   });
 
   it("leaves out the keys the card already carries, whichever list they came from", () => {
     const withExcluded = { ...lists, exclude: new Set(["priority", "energy"]) };
-    expect(propertySuggestions("", withExcluded).map((s) => s.key)).toEqual([
+    expect(propertySuggestions(withExcluded).map((s) => s.key)).toEqual([
       "status",
       "due",
       "sprint",
@@ -113,11 +110,7 @@ describe("what the property-name field offers", () => {
 
   it("treats an excluded key as excluded however it is spelled", () => {
     const withExcluded = { ...lists, exclude: new Set(["Priority"]) };
-    expect(propertySuggestions("", withExcluded).map((s) => s.key)).not.toContain("priority");
-  });
-
-  it("offers nothing for a query no key holds", () => {
-    expect(propertySuggestions("zzz", lists)).toEqual([]);
+    expect(propertySuggestions(withExcluded).map((s) => s.key)).not.toContain("priority");
   });
 });
 

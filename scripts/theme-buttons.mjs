@@ -188,7 +188,7 @@ export async function checkButtons(roots, fail) {
     )
       fail("src/theme/index.css", `${refinement} must follow the base icon hover rule.`);
   }
-  // Pin the two owned signals and their consumers, not arbitrary state interactions.
+  // Pin the owned pointer outline and its consumers, not arbitrary state interactions.
   const requireSignal = (selector, property, value) => {
     if (unconditionalRules.get(selector)?.get(property) !== value)
       fail("src/theme", `Button signal ${selector} needs ${property}: ${value}.`);
@@ -199,7 +199,6 @@ export async function checkButtons(roots, fail) {
     "folia-add-column",
     "folia-column-add",
     "folia-menu-item",
-    "folia-filter-suggest-item",
     "folia-menu-column",
     "folia-menu-prio",
   ];
@@ -225,15 +224,9 @@ export async function checkButtons(roots, fail) {
         requireSignal(selector, "outline-width", "var(--folia-border-width-thick)");
     }
   }
-  requireSignal(
-    ".folia-scope .folia-filter-suggest-item.is-active",
-    "box-shadow",
-    "var(--folia-suggestion-marker)",
-  );
   const signalTokens = new Map([
     ["--folia-control-outline", "1px solid currentColor"],
     ["--folia-border-width-thick", "2px"],
-    ["--folia-suggestion-marker", "inset var(--folia-border-width-thick) 0 0 var(--text-normal)"],
   ]);
   const tokens = postcss.parse(await readFile("src/theme/tokens.css", "utf8"));
   tokens.walkDecls((decl) => {

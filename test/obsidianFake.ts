@@ -186,6 +186,63 @@ export abstract class AbstractInputSuggest<T> {
   }
 }
 
+/**
+ * A case-insensitive subsequence match, standing in for Obsidian's fuzzy scorer: the fewer runs the
+ * query is split into, the better the score.
+ */
+export function prepareFuzzySearch(query: string) {
+  const needle = query.toLowerCase().replace(/\s+/g, "");
+  return (text: string): { score: number; matches: [number, number][] } | null => {
+    const hay = text.toLowerCase();
+    const matches: [number, number][] = [];
+    let from = 0;
+    for (const ch of needle) {
+      const at = hay.indexOf(ch, from);
+      if (at < 0) return null;
+      const last = matches.at(-1);
+      if (last && last[1] === at) last[1] = at + 1;
+      else matches.push([at, at + 1]);
+      from = at + 1;
+    }
+    return { score: -matches.length, matches };
+  };
+}
+
+/** Writes `text` into `el`, each matched range in a highlight span, as Obsidian's does. */
+export function renderMatches(
+  el: HTMLElement,
+  text: string,
+  matches: [number, number][] | null,
+): void {
+  let at = 0;
+  for (const [from, to] of matches ?? []) {
+    el.append(text.slice(at, from));
+    el.createEl("span", { cls: "suggestion-highlight", text: text.slice(from, to) });
+    at = to;
+  }
+  el.append(text.slice(at));
+}
+
+/** The input and the change callback of Obsidian's search field; the clear button is not drawn. */
+export class SearchComponent {
+  readonly inputEl: HTMLInputElement;
+
+  constructor(containerEl: HTMLElement) {
+    this.inputEl = containerEl.createDiv("search-input-container").createEl("input");
+    this.inputEl.type = "search";
+  }
+
+  onChange(callback: (value: string) => void): this {
+    this.inputEl.addEventListener("input", () => callback(this.inputEl.value));
+    return this;
+  }
+
+  setValue(value: string): this {
+    this.inputEl.value = value;
+    return this;
+  }
+}
+
 export interface EventRef {
   name: string;
   fn: (...args: never[]) => void;

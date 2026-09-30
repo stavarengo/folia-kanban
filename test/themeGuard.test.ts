@@ -459,17 +459,9 @@ describe("theme button contract", () => {
     reject("needs outline-offset: calc(-1 * 2 * var(--folia-border-width-thick))");
   });
 
-  it("requires the keyboard suggestion marker consumer", () => {
-    edit("src/theme/filter-suggest.css", (s) =>
-      s.replace("box-shadow: var(--folia-suggestion-marker)", "box-shadow: none"),
-    );
-    reject("needs box-shadow: var(--folia-suggestion-marker)");
-  });
-
   it.each([
     ["--folia-control-outline", "none"],
     ["--folia-border-width-thick", "0px"],
-    ["--folia-suggestion-marker", "none"],
   ])("protects owned signal %s from being zeroed", (name, value) => {
     edit("src/theme/tokens.css", (s) =>
       s.replace(new RegExp(`${name}: [^;]+;`), `${name}: ${value};`),

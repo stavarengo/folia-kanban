@@ -166,29 +166,21 @@ export interface PropertySuggestion {
 }
 
 /**
- * The property names to offer for what has been typed so far, in three groups and in this order:
- * the plugin's own vocabulary, then the keys used by notes in this board's card folder, then every
- * other key used anywhere in the vault. A key offered by an earlier group is never repeated by a
- * later one, and `exclude` drops the keys the form cannot add — the ones this card already carries,
- * matched without regard to case so a vault-wide `Area` is not offered to a card that has `area`.
- *
- * Matching is a case-insensitive substring, so `pri` finds `priority` and `PRIORITY` finds it too:
- * the point of the list is to catch a key typed in the wrong case before it becomes a second,
- * silently ignored property. An empty query offers everything, the way Obsidian's own property
- * suggestions do.
+ * The property names to offer, in three groups and in this order: the plugin's own vocabulary, then
+ * the keys used by notes in this board's card folder, then every other key used anywhere in the
+ * vault. A key offered by an earlier group is never repeated by a later one, and `exclude` drops the
+ * keys the form cannot add — the ones this card already carries, matched without regard to case so
+ * a vault-wide `Area` is not offered to a card that has `area`. Matching them against what was typed
+ * is the host's job.
  */
-export function propertySuggestions(
-  query: string,
-  lists: {
-    folia: readonly string[];
-    board: readonly string[];
-    vault: readonly string[];
-    exclude: ReadonlySet<string>;
-    /** Names that have a control of their own in the panel, so the popup can say so. */
-    editedInPanel: ReadonlySet<string>;
-  },
-): PropertySuggestion[] {
-  const needle = query.trim().toLowerCase();
+export function propertySuggestions(lists: {
+  folia: readonly string[];
+  board: readonly string[];
+  vault: readonly string[];
+  exclude: ReadonlySet<string>;
+  /** Names that have a control of their own in the panel, so the popup can say so. */
+  editedInPanel: ReadonlySet<string>;
+}): PropertySuggestion[] {
   const excluded = new Set([...lists.exclude].map((key) => key.toLowerCase()));
   const edited = new Set([...lists.editedInPanel].map((key) => key.toLowerCase()));
   const seen = new Set<string>();
@@ -198,7 +190,6 @@ export function propertySuggestions(
       const lower = key.toLowerCase();
       if (seen.has(lower) || excluded.has(lower)) continue;
       seen.add(lower);
-      if (needle && !lower.includes(needle)) continue;
       out.push(edited.has(lower) ? { key, group, editedInPanel: true } : { key, group });
     }
   };

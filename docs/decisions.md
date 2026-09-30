@@ -387,15 +387,15 @@ This is not the only mechanism that could have worked; it is the one that costs 
 
 The outline width and its two offsets belong to Folia because a theme may zero its border widths and shadows. Neither moves layout, alters the selected-choice shadow, or recolours the entire control with a brightness filter. Keyboard focus keeps its separate 2px accent outline; disabled controls and the add-column form do not receive the pointer outline.
 
-The keyboard-selected filter suggestion needs a persistent signal while focus stays in the search input. It has a fixed 2px inset marker in `--text-normal` in addition to `--background-modifier-hover`. This marker survives transparent hover backgrounds and equal button fills. The resting suggestion row is transparent because it is an option in a list, not a raised button.
+Suggestions need no signal of Folia's. Every suggesting input, the search box included, opens Obsidian's own popup (`AbstractInputSuggest`), and the popup draws its selected row itself. The 2px inset marker Folia's hand-built filter dropdown carried went with that dropdown.
 
 Borders must remain distinguishable from the fills they enclose. The dashed add-column tile returns to transparent with no shadow, filter chips rest on `--background-primary`, and column-choice chips rest on `--background-modifier-hover`. Bordered controls retain these fills while hovered or pressed; `--interactive-hover` can equal their border by definition on macOS. Their pointer outline supplies the state change. The add-column editing form keeps its resting appearance under the pointer. Selected colours and rings remain unchanged.
 
 A disabled custom-colour swatch is a read-only sample, so it retains full opacity and its selection ring. Disabled-action styling names Folia classes explicitly and cannot fade host-rendered Markdown buttons. Focus rounding is local to the column title and parent reference, which otherwise have no corner; controls with a radius retain their own.
 
-The priority shape declares geometry and shadow only. Its coloured instances get background and text from the finite `ChipTone` variants returned by `priorityTone`; the No priority instance supplies its own empty face. The button guard reads that declared string union and checks every possible variant, so it no longer requires unused base colours. Mutation tests protect the pointer-outline consumers, pressed width and keyboard suggestion marker, including their owned token values. These are source contracts, not a contrast or general state-cascade resolver: default-theme and macOS-variable checks in the running app remain the evidence for distinct appearances.
+The priority shape declares geometry and shadow only. Its coloured instances get background and text from the finite `ChipTone` variants returned by `priorityTone`; the No priority instance supplies its own empty face. The button guard reads that declared string union and checks every possible variant, so it no longer requires unused base colours. Mutation tests protect the pointer-outline consumers and pressed width, including their owned token values. These are source contracts, not a contrast or general state-cascade resolver: default-theme and macOS-variable checks in the running app remain the evidence for distinct appearances.
 
-**What would change this:** an equally dependable host contract for hover, pressed and keyboard-selected signals across platforms and themes. A difference in the default Linux values alone is not enough.
+**What would change this:** an equally dependable host contract for hover and pressed signals across platforms and themes. A difference in the default Linux values alone is not enough.
 
 ## "No value" is words in the row, not an icon
 
@@ -436,3 +436,11 @@ A click is followed only when the anchor's `href` attribute names a note. An `hr
 The `href` is passed on undecoded. Read live in Obsidian 1.12.7 and 1.13.7, it is the linktext exactly as the metadata cache records it (`A%20B`, `100% Done`), not a URL, and it equals `data-href`. A Markdown link arrives already decoded: `[x](A%20B.md)` renders as `A B.md`. Decoded, a link to a note named `A%20B` resolves to nothing, and a click would create a stray `A B`.
 
 **What would change this:** a documented way to tell a heading link from a tag or a footnote, or a way to scroll the card note in the panel itself. If a later Obsidian starts percent-encoding the `href`, the decode has to come back.
+
+## Suggestions are Obsidian's popup, even though screen readers cannot see it
+
+**Decided 2026-09-30 (#93). Every suggesting input uses Obsidian's `AbstractInputSuggest` popup, which exposes no roles to assistive technology.**
+
+The toolbar search used to be a hand-built combobox with `role="combobox"`, `aria-expanded` and `aria-activedescendant` over a labelled listbox, and the priority, assignee and relationship fields used `<datalist>`, which browsers expose natively. Obsidian's popup, as shipped in 1.13.7, sets no role and no `aria-*` on the input or its rows, so a screen-reader user typing in these fields is not told that suggestions exist or which one is selected. Adding the combobox attributes from the plugin was rejected: the rows and the selection belong to the popup, which offers no documented hook to give a row an id or to hear the selection move, so `aria-expanded` would announce a list that cannot be read. Enter keeps what was typed wherever the text is free (a plain search word, a priority, a name, a card link), so a user who cannot see the popup does not have a row chosen for them.
+
+**What would change this:** Obsidian giving its suggestion popup accessible roles, or documenting a hook for row ids and selection changes that would let the plugin supply them.

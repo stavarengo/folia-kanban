@@ -24,12 +24,12 @@ import type {
   SubItem,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
-import type { PropertyNamesInUse, PropertySuggestSource } from "../model/repo";
+import type { PropertyNamesInUse, SearchField, SuggestSource } from "../model/repo";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
 import { VIEW_TYPE_KANBAN } from "../viewType";
 import { parseFrontmatter } from "./frontmatter";
-import { attachPropertySuggest } from "./propertySuggest";
+import { attachSuggest, mountSearch } from "./inputSuggest";
 import { pathTaken } from "./pathTaken";
 import { buildBoard, claimInStep, resolveCardFolder } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
@@ -1067,8 +1067,12 @@ export class VaultRepository implements CardRepository, HoverParent {
     return this.propertyNames;
   }
 
-  suggestProperties(input: HTMLInputElement, source: PropertySuggestSource): () => void {
-    return attachPropertySuggest(this.app, input, source);
+  attachSuggest(input: HTMLInputElement, source: SuggestSource): () => void {
+    return attachSuggest(this.app, input, source);
+  }
+
+  mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField {
+    return mountSearch(container, onChange);
   }
 
   absolutePath(path: string): string | null {
