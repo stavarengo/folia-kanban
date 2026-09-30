@@ -594,6 +594,23 @@ describe("a subcard reaching Done and its parent's checklist line", () => {
     expect(seen).toContain("Child @ Tasks/Parent.md");
   });
 
+  it("reads the note name out of every way a link can be decorated", () => {
+    const seen: string[] = [];
+    const b = buildBoard(config, [card("Child", {})], {}, (link) => {
+      seen.push(link);
+      return null;
+    });
+    const resolve = boardLinkResolver(b, "Tasks/Parent.md");
+    for (const l of ["Child#h|al", "Child|al#h", "Child.md#h", "  Child  ", "Sub/Child#^block"]) {
+      resolve(l);
+    }
+    expect(seen).toEqual(["Child", "Child", "Child.md", "Child", "Sub/Child"]);
+    // A link to a heading of the note it is written in names no card, and the vault is not asked.
+    expect(resolve("#Notes")).toBeNull();
+    expect(resolve("|alias")).toBeNull();
+    expect(seen).toHaveLength(5);
+  });
+
   it("does not bind an ambiguous link to either card", () => {
     const b = buildBoard(config, [
       withItems("Parent", { status: "todo" }, [link("Child", 0)]),

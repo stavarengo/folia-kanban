@@ -117,6 +117,21 @@ describe("relationship frontmatter", () => {
     expect(withRelation({ blocks: ["[[A]]"] }, "blocks", "a")).toEqual(["[[A]]", "[[a]]"]);
   });
 
+  it("reads the card a target names whichever order its anchor and alias come in", () => {
+    const one = ["[[A#h|al]]", "[[A|al#h]]", "[[ A #h]]", "A#h", "A|al"];
+    expect(readRelations({ blocks: ["[[A]]", ...one] }, "blocks")).toEqual(["A"]);
+    for (const t of one) expect(isSelfRelation("Tasks/A.md", "A", t)).toBe(true);
+    expect(isSelfRelation("Tasks/A.md", "A", "[[A.md#h]]")).toBe(true);
+    // A target that names no note is a link to this card's own heading, and so a self-link.
+    expect(isSelfRelation("Tasks/A.md", "A", "[[#h]]")).toBe(true);
+    expect(readRelations({ blocks: ["[[#h]]", "[[|al]]"] }, "blocks")).toEqual([]);
+  });
+
+  it("points a bare hand-written target somewhere (#27)", () => {
+    expect(readRelations({ blocks: ["Other card"] }, "blocks")).toEqual(["Other card"]);
+    expect(readRelations({ blocks: "Other card" }, "blocks")).toEqual(["Other card"]);
+  });
+
   it("normalizes a bare hand-written target only as a side effect of editing that list", () => {
     expect(withRelation({ blocks: ["A"] }, "blocks", "B")).toEqual(["[[A]]", "[[B]]"]);
   });
