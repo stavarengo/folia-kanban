@@ -269,17 +269,18 @@ export class VaultRepository implements CardRepository {
   }
 
   /**
-   * How to write `card-folder` so it names the folder it matched only by case, exactly. A `./`
-   * value keeps its `./` form, and with it the portability it was written for; anything else gets
-   * the real path, which the vault-root reading always takes first.
+   * How to write `card-folder` so it names the folder it matched only by case, exactly. A `./` or
+   * `../` value stays relative to the board note, and with it keeps the portability it was written
+   * for; anything else gets the real path, which the vault-root reading always takes first.
    */
   private exactSpelling(config: ResolvedBoardConfig): string {
-    const beside = this.boardPath.includes("/")
-      ? this.boardPath.slice(0, this.boardPath.lastIndexOf("/") + 1)
-      : "";
-    return config.cardFolderRaw.startsWith("./") && config.cardFolder.startsWith(beside)
-      ? `./${config.cardFolder.slice(beside.length)}`
-      : config.cardFolder;
+    if (!/^\.\.?(\/|$)/.test(config.cardFolderRaw)) return config.cardFolder;
+    const home = this.boardPath.split("/").slice(0, -1);
+    const target = config.cardFolder.split("/");
+    let shared = 0;
+    while (shared < home.length && home[shared] === target[shared]) shared++;
+    const up = home.slice(shared).map(() => "..");
+    return [...(up.length === 0 ? ["."] : up), ...target.slice(shared)].join("/");
   }
 
   private cardFolderFor(raw: string): { path: string; existing: string[]; caseMatches: string[] } {

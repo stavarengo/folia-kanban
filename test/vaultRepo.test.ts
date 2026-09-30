@@ -273,6 +273,7 @@ describe("card-folder resolution against a live vault", () => {
         ["./Cards", "basic/cards", "./cards"],
         ["CARDS", "cards", "cards"],
         ["Cards", "basic/cards", "basic/cards"],
+        ["../Shared", "shared", "../shared"],
       ] as const) {
         const first = setup(`card-folder: ${written}`);
         first.app.vault.addFolder(real);
