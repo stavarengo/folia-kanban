@@ -185,7 +185,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       (evt) => void this.activateView(Keymap.isModEvent(evt)),
     );
     this.addCommand({
-      id: "folia-open-kanban-board",
+      id: "open-board",
       name: OPEN_BOARD_COMMAND_NAME,
       callback: () => void this.activateView(),
     });
@@ -499,7 +499,7 @@ export default class FoliaKanbanPlugin extends Plugin {
    */
   private registerBoardSetupActions(): void {
     this.addCommand({
-      id: "folia-create-board",
+      id: "create-board",
       name: "Create board",
       checkCallback: (checking) => {
         if (!this.settings.boardSetupCommands) return false;
@@ -508,7 +508,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       },
     });
     this.addCommand({
-      id: "folia-convert-note-to-board",
+      id: "convert-note-to-board",
       name: "Convert this note into a board",
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
