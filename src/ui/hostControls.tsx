@@ -47,12 +47,30 @@ function useHostControl<T extends HostControl>(
   return [slot, control];
 }
 
-/** Takes no box of its own, so the control inside is laid out as the slot's parent's child. */
-function Slot({ slot }: { slot: RefObject<HTMLSpanElement> }) {
-  return <span ref={slot} className="folia-host-slot" />;
+/**
+ * The box the control is laid out in. The caller places the control through `slotClassName` (flex
+ * sizing, margins, position) and dresses it through `className`.
+ */
+interface SlotProps {
+  slotClassName?: string;
 }
 
-interface ButtonProps extends HostControlOptions {
+function Slot({
+  slot,
+  slotClassName,
+}: {
+  slot: RefObject<HTMLSpanElement>;
+  slotClassName: string | undefined;
+}) {
+  return (
+    <span
+      ref={slot}
+      className={slotClassName ? `folia-host-slot ${slotClassName}` : "folia-host-slot"}
+    />
+  );
+}
+
+interface ButtonProps extends HostControlOptions, SlotProps {
   text: string;
   onClick: (evt: MouseEvent) => void;
   cta?: boolean;
@@ -66,6 +84,7 @@ export function HostButton({
   cta = false,
   disabled = false,
   className,
+  slotClassName,
   ...options
 }: ButtonProps) {
   const click = useLatest(onClick);
@@ -78,10 +97,10 @@ export function HostButton({
     button?.setCta(cta);
     button?.setDisabled(disabled);
   });
-  return <Slot slot={slot} />;
+  return <Slot slot={slot} slotClassName={slotClassName} />;
 }
 
-interface IconButtonProps extends IconButtonOptions {
+interface IconButtonProps extends IconButtonOptions, SlotProps {
   /** A Lucide icon id. */
   icon: string;
   /** The accessible name, which is also the tooltip. */
@@ -98,6 +117,7 @@ export function HostIconButton({
   onClick,
   disabled = false,
   className,
+  slotClassName,
   ...options
 }: IconButtonProps) {
   const click = useLatest(onClick);
@@ -110,10 +130,10 @@ export function HostIconButton({
     button?.setLabel(label);
     button?.setDisabled(disabled);
   });
-  return <Slot slot={slot} />;
+  return <Slot slot={slot} slotClassName={slotClassName} />;
 }
 
-interface DropdownProps {
+interface DropdownProps extends SlotProps {
   options: readonly DropdownOption[];
   value: string;
   onChange: (value: string) => void;
@@ -129,6 +149,7 @@ export function HostDropdown({
   onChange,
   disabled = false,
   className,
+  slotClassName,
   "aria-label": ariaLabel,
   title,
 }: DropdownProps) {
@@ -150,7 +171,7 @@ export function HostDropdown({
     setAttr(dropdown.el, "aria-label", ariaLabel);
     setAttr(dropdown.el, "title", title);
   });
-  return <Slot slot={slot} />;
+  return <Slot slot={slot} slotClassName={slotClassName} />;
 }
 
 function setAttr(el: HTMLElement, name: string, value: string | undefined): void {
@@ -159,10 +180,14 @@ function setAttr(el: HTMLElement, name: string, value: string | undefined): void
 }
 
 /** A picture of `percent`, with no role: the caller's element states the value. */
-export function HostProgressBar({ percent, className }: { percent: number; className?: string }) {
+export function HostProgressBar({
+  percent,
+  className,
+  slotClassName,
+}: SlotProps & { percent: number; className?: string }) {
   const [slot, bar] = useHostControl((repo, el) => repo.mountProgressBar(el), className);
   useLayoutEffect(() => {
     bar?.setValue(percent);
   });
-  return <Slot slot={slot} />;
+  return <Slot slot={slot} slotClassName={slotClassName} />;
 }

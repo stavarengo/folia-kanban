@@ -5,6 +5,7 @@
   gap: var(--folia-space-sm-plus);
 }
 /* The host's bar, whose face is the host's; it takes the room the label leaves. */
+.folia-progress-slot,
 .folia-progress-track {
   flex: 1 1 auto;
 }

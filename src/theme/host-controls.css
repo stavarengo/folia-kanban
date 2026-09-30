@@ -1,5 +1,6 @@
 /* ------------------------------------------------------------------ host controls */
-/* The slot a host control is mounted into lays it out as its parent's own child. */
+/* The box a host control is mounted into, wrapped around it. The slot is what the parent lays out,
+   so a caller places the control through a class of its own on the slot. */
 .folia-host-slot {
-  display: contents;
+  display: inline-flex;
 }

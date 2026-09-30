@@ -332,6 +332,7 @@ function CardItemInner({
             aria-label={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
           >
             <HostProgressBar
+              slotClassName="folia-progress-slot"
               className="folia-progress-track"
               percent={(stats.checklistDone / stats.checklist) * 100}
             />

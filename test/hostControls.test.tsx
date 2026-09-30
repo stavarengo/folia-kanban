@@ -219,6 +219,24 @@ describe("the React wrappers", () => {
     expect(root).toBeEmptyDOMElement();
   });
 
+  it("put the layout class on the slot and the face class on the control", () => {
+    const { getByRole } = render(
+      inRepo(
+        <HostIconButton
+          icon="x"
+          label="Close"
+          className="folia-face"
+          slotClassName="folia-place"
+          onClick={() => {}}
+        />,
+      ),
+    );
+    const el = getByRole("button", { name: "Close" });
+    expect(el).toHaveClass("folia-face");
+    expect(el).not.toHaveClass("folia-place");
+    expect(el.parentElement).toHaveClass("folia-host-slot", "folia-place");
+  });
+
   it("draw a text button's text, face and state", () => {
     const { getByRole, rerender } = render(
       inRepo(<HostButton text="Save" cta onClick={() => {}} />),
