@@ -85,8 +85,9 @@ export async function checkButtons(roots, fail) {
     if (!decisions.includes(`\n## ${heading}\n`))
       fail("docs/decisions.md", `The hand-drawn button group "${heading}" needs its entry.`);
   const buttons = [];
-  // Classes the board puts on a host button: their face rules must still beat the host's.
-  const hostClasses = new Set();
+  // Classes the board puts on a host button: their face rules must still beat the host's. The
+  // wrappers add `folia-host-control` to every control themselves, outside any JSX.
+  const hostClasses = new Set(["folia-host-control"]);
   const families = new Set();
   for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
     f.endsWith(".tsx"),

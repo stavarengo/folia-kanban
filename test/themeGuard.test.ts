@@ -340,7 +340,7 @@ describe("theme button contract", () => {
     reject("needs .folia-scope");
   });
 
-  it.each(["folia-btn", "folia-card-action"])(
+  it.each(["folia-btn", "folia-card-action", "folia-host-control"])(
     "rejects an unscoped face rule on the host button class %s",
     (name) => {
       edit("src/theme/buttons.css", (s) => s + `\n.${name} { background: transparent; }\n`);
