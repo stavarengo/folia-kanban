@@ -14,6 +14,7 @@ import { fencedLines, unclosedFence } from "./fences";
 import { FrontmatterSchema, decode } from "./schemas";
 import { linkpath } from "./links";
 import { normalizeAuthor } from "./unread";
+import { bodyCr, joinLines } from "./lineEndings";
 
 // Where Obsidian's metadata reader, and so the properties Folia shows, says the frontmatter ends:
 // at the first line after the opening `---` that starts with `---`, the very next line included
@@ -176,49 +177,6 @@ export function descriptionRefusal(
   return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
 
-/**
- * Whether `s`'s lines are majority `\r\n`-terminated (`"\r"`) or majority bare-`\n` (`""`), or
- * `null` when `s` has no real line separator to judge at all (empty, or a single line with no
- * newline in it). Judged by majority, not "any `\r\n` anywhere": a file that is genuinely uniform
- * but happens to carry one stray CRLF (or one stray bare LF) line must not flip the verdict for
- * the whole file. An exact tie (equally many of each) resolves to CRLF, arbitrarily but
- * deterministically — a real 50/50 split is rare enough that which way it falls matters less than
- * that it always falls the same way.
- */
-function lineEndingOf(s: string): "\r" | "" | null {
-  const lines = s.split("\n");
-  const total = lines.length - 1; // the last element never carries separator info of its own
-  if (total === 0) return null;
-  let crCount = 0;
-  for (let i = 0; i < total; i++) if ((lines[i] ?? "").endsWith("\r")) crCount++;
-  return crCount * 2 >= total ? "\r" : "";
-}
-
-/**
- * `lines.join("\n")`, but corrected for a case plain `join` cannot represent: if the array's LAST
- * element ends in a bare `\r` with nothing after it, that `\r` was never that line's own — it is
- * the leftover half of a `\r\n` pair whose `\n` belonged to content that has since been deleted
- * (deleting a note's true final line always does this to whatever becomes the new final line, if
- * that line used to sit mid-file and end in `\r\n`). Left alone it would write a lone `\r` as the
- * file's last byte, a line ending no real line of this file ever had on its own. Dropped here
- * rather than fixed up per call site, so every deleting mutation gets this for free.
- */
-function joinLines(lines: readonly string[]): string {
-  const out = lines.join("\n");
-  return out.endsWith("\r") ? out.slice(0, -1) : out;
-}
-
-/**
- * The line ending a brand-new line appended to `body` should carry. The body's own MAJORITY
- * convention wins whenever the body has any real separator to judge — even when the card's
- * frontmatter disagrees, since the body is what is actually being edited. Only falls back to
- * `fullText` (frontmatter included) when the body itself carries no separator evidence at all: an
- * empty body (frontmatter-only card) or a single line with no newline in it.
- */
-function bodyCr(body: string, fullText: string): string {
-  return lineEndingOf(body) ?? lineEndingOf(fullText) ?? "";
-}
-
 /** Append a single line to a section, creating the section at end if absent. `fullText` is the
  * card's full original text (frontmatter included), the fallback for a body with no line-ending
  * evidence of its own — see {@link bodyCr}. */
@@ -229,15 +187,11 @@ function appendToSection(body: string, name: string, line: string, fullText: str
   const cr = bodyCr(body, fullText);
   const newLine = `${line}${cr}`;
   if (start === -1) {
-    let out = body;
-    if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
     // A fence left open runs to the end of the note, and would swallow the new section with it.
-    const open = unclosedFence(lines);
-    if (open !== null) out += `${open.marker}${cr}\n`;
+    let out = closedTail(body, unclosedFence(lines), cr);
     // ensure a blank line before the new heading when there's preceding content
     if (out.trim() !== "" && !out.endsWith(`${cr}\n${cr}\n`)) out += `${cr}\n`;
-    out += `## ${name}${cr}\n${newLine}\n`;
-    return out;
+    return out + `## ${name}${cr}\n${newLine}\n`;
   }
   const end = sectionEnd(lines, start, fenced);
   let insert = end;
@@ -254,14 +208,18 @@ function appendToSection(body: string, name: string, line: string, fullText: str
     // corrupting the join or rewriting a byte of a line this function must not touch. Appending a
     // real `\r\n` (or `\n`) here is new content placed after the existing end of the file, not a
     // change to any existing byte, so it stays inside the "append only" contract.
-    let out = body;
-    if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
-    if (open !== null) out += `${open.marker}${cr}\n`;
-    out += `${newLine}\n`;
-    return out;
+    return closedTail(body, open, cr) + `${newLine}\n`;
   }
   lines.splice(insert, 0, ...(open === null ? [newLine] : [`${open.marker}${cr}`, newLine]));
   return lines.join("\n");
+}
+
+/** `body` ending on a line break, with the fence left `open` (if any) closed after it. */
+function closedTail(body: string, open: { marker: string } | null, cr: string): string {
+  let out = body;
+  if (out.length > 0 && !out.endsWith("\n")) out += `${cr}\n`;
+  if (open !== null) out += `${open.marker}${cr}\n`;
+  return out;
 }
 
 /** Line index of the index-th checklist line under `## Subtasks`, or -1. */
@@ -598,22 +556,22 @@ export function setSubtaskStatus(text: string, index: number, status: string | n
     const prefix = m[1] ?? "";
     const box = m[2] ?? " ";
     const content = m[3] ?? "";
-    const field = status === null ? "" : `[status:: ${status}]`;
-    const existing = INLINE_STATUS_RE.exec(content);
-    const before = existing ? content.slice(0, existing.index) : "";
-    const after = existing ? content.slice(existing.index + existing[0].length) : "";
-    let next: string;
-    if (existing && field !== "") {
-      // Replace the field exactly where it sits: every other byte of the line is the author's.
-      next = before + field + after;
-    } else if (existing) {
-      next = closeGap(before, after).trimEnd();
-    } else {
-      next = field === "" ? content : `${content.trimEnd()} ${field}`;
-    }
+    const next = withStatusField(content, status);
     lines[i] = `${prefix}[${box}] ${next}${cr}`;
     return lines.join("\n");
   });
+}
+
+/** A checklist line's content with its `[status:: …]` field set to `status`, or removed for `null`. */
+function withStatusField(content: string, status: string | null): string {
+  const field = status === null ? "" : `[status:: ${status}]`;
+  const existing = INLINE_STATUS_RE.exec(content);
+  if (!existing) return field === "" ? content : `${content.trimEnd()} ${field}`;
+  const before = content.slice(0, existing.index);
+  const after = content.slice(existing.index + existing[0].length);
+  // Replace the field exactly where it sits: every other byte of the line is the author's.
+  if (field !== "") return before + field + after;
+  return closeGap(before, after).trimEnd();
 }
 
 export function removeSubtask(text: string, index: number): string {

@@ -131,37 +131,47 @@ export function normalizeColumns(raw: unknown): ColumnDef[] {
   if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_COLUMNS;
   const cols: ColumnDef[] = [];
   for (const c of raw) {
-    if (typeof c === "string") {
-      if (c.trim()) cols.push({ id: c, title: titleCase(c) });
-      continue;
-    }
-    if (c === null || typeof c !== "object") continue; // skip null / number / other malformed entries
-    const obj = c as Record<string, unknown>;
-    // A hand-written `id:` may come back as a number or a boolean; anything with a shape (a
-    // mapping, a list) is corruption, and stringifying it would produce "[object Object]".
-    const id = scalarText(obj["id"]);
-    if (id.trim() === "") continue; // a column needs a usable id
-    const col: ColumnDef = {
-      id,
-      title: typeof obj["title"] === "string" && obj["title"] ? obj["title"] : titleCase(id),
-    };
-    if (typeof obj["color"] === "string") col.color = obj["color"];
-    if (typeof obj["limit"] === "number" && Number.isFinite(obj["limit"])) col.limit = obj["limit"];
-
-    if (typeof obj["filter"] === "string" && obj["filter"].trim()) col.filter = obj["filter"];
-    const group = asGroup(obj["group"]);
-    if (group && group !== COLUMN_DEFAULTS.group) col.group = group;
-    const sort = asSort(obj["sort"]);
-    if (sort && sort !== COLUMN_DEFAULTS.sort) col.sort = sort;
-    const opacity = clamp01(obj["opacity"]);
-    if (opacity !== undefined && opacity !== COLUMN_DEFAULTS.opacity) col.opacity = opacity;
-    const hoverOpacity = clamp01(obj["hoverOpacity"]);
-    if (hoverOpacity !== undefined) col.hoverOpacity = hoverOpacity;
-    if (obj["parked"] === true) col.parked = true;
-
-    cols.push(col);
+    const col = readColumn(c);
+    if (col) cols.push(col);
   }
   return cols.length ? cols : DEFAULT_COLUMNS;
+}
+
+function readColumn(c: unknown): ColumnDef | null {
+  if (typeof c === "string") return c.trim() ? { id: c, title: titleCase(c) } : null;
+  if (c === null || typeof c !== "object") return null; // skip null / number / other malformed entries
+  const obj = c as Record<string, unknown>;
+  // A hand-written `id:` may come back as a number or a boolean; anything with a shape (a
+  // mapping, a list) is corruption, and stringifying it would produce "[object Object]".
+  const id = scalarText(obj["id"]);
+  if (id.trim() === "") return null; // a column needs a usable id
+  const col: ColumnDef = {
+    id,
+    title: typeof obj["title"] === "string" && obj["title"] ? obj["title"] : titleCase(id),
+  };
+  readContentFields(obj, col);
+  readViewFields(obj, col);
+  return col;
+}
+
+/** The fields that say what a column holds, each kept only when it is usable. */
+function readContentFields(obj: Record<string, unknown>, col: ColumnDef): void {
+  if (typeof obj["color"] === "string") col.color = obj["color"];
+  if (typeof obj["limit"] === "number" && Number.isFinite(obj["limit"])) col.limit = obj["limit"];
+  if (typeof obj["filter"] === "string" && obj["filter"].trim()) col.filter = obj["filter"];
+}
+
+/** The fields that shape how a column shows its cards, each kept only when it is not the default. */
+function readViewFields(obj: Record<string, unknown>, col: ColumnDef): void {
+  const group = asGroup(obj["group"]);
+  if (group && group !== COLUMN_DEFAULTS.group) col.group = group;
+  const sort = asSort(obj["sort"]);
+  if (sort && sort !== COLUMN_DEFAULTS.sort) col.sort = sort;
+  const opacity = clamp01(obj["opacity"]);
+  if (opacity !== undefined && opacity !== COLUMN_DEFAULTS.opacity) col.opacity = opacity;
+  const hoverOpacity = clamp01(obj["hoverOpacity"]);
+  if (hoverOpacity !== undefined) col.hoverOpacity = hoverOpacity;
+  if (obj["parked"] === true) col.parked = true;
 }
 
 /**
@@ -175,12 +185,17 @@ export function serializeColumns(columns: ColumnDef[]): Record<string, unknown>[
     if (c["color"]) out["color"] = c["color"];
     if (typeof c["limit"] === "number") out["limit"] = c["limit"];
     if (typeof c["filter"] === "string" && c["filter"].trim()) out["filter"] = c["filter"];
-    if (c["group"] && c["group"] !== COLUMN_DEFAULTS.group) out["group"] = c["group"];
-    if (c["sort"] && c["sort"] !== COLUMN_DEFAULTS.sort) out["sort"] = c["sort"];
-    if (typeof c["opacity"] === "number" && c["opacity"] !== COLUMN_DEFAULTS.opacity)
-      out["opacity"] = c["opacity"];
-    if (typeof c["hoverOpacity"] === "number") out["hoverOpacity"] = c["hoverOpacity"];
-    if (c["parked"] === true) out["parked"] = true;
+    writeViewFields(c, out);
     return out;
   });
+}
+
+/** The non-default view fields, written after the rest and in this order: it is the note's key order. */
+function writeViewFields(c: ColumnDef, out: Record<string, unknown>): void {
+  if (c["group"] && c["group"] !== COLUMN_DEFAULTS.group) out["group"] = c["group"];
+  if (c["sort"] && c["sort"] !== COLUMN_DEFAULTS.sort) out["sort"] = c["sort"];
+  if (typeof c["opacity"] === "number" && c["opacity"] !== COLUMN_DEFAULTS.opacity)
+    out["opacity"] = c["opacity"];
+  if (typeof c["hoverOpacity"] === "number") out["hoverOpacity"] = c["hoverOpacity"];
+  if (c["parked"] === true) out["parked"] = true;
 }

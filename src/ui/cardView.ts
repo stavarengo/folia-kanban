@@ -464,24 +464,27 @@ export function cardChips(
     });
   }
   if (typeof fm.due === "string" && fm.due) {
-    const done = fm.status === doneColumnId;
-    const info = dueInfo(fm.due, today, done);
-    const tone: ChipTone =
-      info.urgency === "overdue"
-        ? "danger"
-        : info.urgency === "today" || info.urgency === "soon"
-          ? "warn"
-          : "muted";
-    chips.push({
-      key: "due",
-      label: info.label,
-      tone,
-      icon: info.urgency === "overdue" ? "triangle-alert" : "calendar",
-      tooltip: "Due " + fm.due,
-    });
+    chips.push(dueChip(fm.due, today, fm.status === doneColumnId));
   }
 
   return chips;
+}
+
+function dueChip(due: string, today: string, done: boolean): CardChip {
+  const info = dueInfo(due, today, done);
+  const tone: ChipTone =
+    info.urgency === "overdue"
+      ? "danger"
+      : info.urgency === "today" || info.urgency === "soon"
+        ? "warn"
+        : "muted";
+  return {
+    key: "due",
+    label: info.label,
+    tone,
+    icon: info.urgency === "overdue" ? "triangle-alert" : "calendar",
+    tooltip: "Due " + due,
+  };
 }
 
 /**
