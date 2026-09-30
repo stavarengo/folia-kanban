@@ -247,6 +247,71 @@ describe("card-folder resolution against a live vault", () => {
     );
   });
 
+  describe("a folder that exists only in another letter case (#117)", () => {
+    it("loads its cards and contexts under its real path, and says how to write it exactly", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/cards/One.md", card("status: todo"));
+      app.vault.addFile("basic/cards/Work/_context.md", note("context-name: Work", "\nDay job.\n"));
+      app.vault.addFile("basic/cards/Work/Two.md", card("status: done"));
+
+      const board = await repo.loadBoard();
+
+      expect(board.config.cardFolder).toBe("basic/cards");
+      expect(Object.keys(board.cards).sort()).toEqual([
+        "basic/cards/One.md",
+        "basic/cards/Work/Two.md",
+      ]);
+      expect(board.cards["basic/cards/Work/Two.md"]?.context).toBe("Work");
+      expect(Object.keys(board.contexts)).toEqual(["Work"]);
+      expect(board.cardFolderWarning).toBe(
+        'Card folder "./Cards" matches "basic/cards" only when letter case is ignored. Using it — write the path as "./cards" to match it exactly.',
+      );
+    });
+
+    it("suggests a spelling that then matches with no warning", async () => {
+      for (const [written, real, suggested] of [
+        ["./Cards", "basic/cards", "./cards"],
+        ["CARDS", "cards", "cards"],
+        ["Cards", "basic/cards", "basic/cards"],
+      ] as const) {
+        const first = setup(`card-folder: ${written}`);
+        first.app.vault.addFolder(real);
+        expect((await first.repo.loadBoard()).cardFolderWarning).toContain(`"${suggested}"`);
+
+        const again = setup(`card-folder: ${suggested}`);
+        again.app.vault.addFolder(real);
+        const board = await again.repo.loadBoard();
+        expect(board.config.cardFolder).toBe(real);
+        expect(board.cardFolderWarning).toBeUndefined();
+      }
+    });
+
+    it("puts a new card in it rather than creating the folder as written beside it", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/cards/One.md", card("status: todo"));
+
+      const path = await repo.createCard("Two", "todo");
+
+      expect(path).toBe("basic/cards/Two.md");
+      expect(app.vault.getFolderByPath("basic/Cards")).toBeNull();
+    });
+
+    it("refuses to guess between two spellings, and to create a third", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/cards/One.md", card("status: todo"));
+      app.vault.addFile("basic/CARDS/Two.md", card("status: todo"));
+      const refusal =
+        'Card folder "./Cards" matches "basic/cards", "basic/CARDS" only when letter case is ignored, so it is not clear which one holds the cards. Rename all but one of them, or write the one you mean exactly.';
+
+      const board = await repo.loadBoard();
+
+      expect(Object.keys(board.cards)).toEqual([]);
+      expect(board.cardFolderWarning).toBe(refusal);
+      await expect(repo.createCard("Three", "todo")).rejects.toThrow(refusal);
+      expect(app.vault.getFolderByPath("basic/Cards")).toBeNull();
+    });
+  });
+
   it("takes the cards under the folder only — not the board note, a context note, or a lookalike folder", async () => {
     const { app, repo } = setup();
     app.vault.addFile("basic/Cards/One.md", card("status: todo"));

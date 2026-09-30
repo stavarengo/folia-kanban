@@ -539,3 +539,11 @@ Obsidian bundles Moment and hands it to plugins as `moment` (it is `window.momen
 `src/model/` cannot import `obsidian` either, so using Moment would mean a formatter port threaded to `lanes.ts`, `board.ts`, the adapter, the plugin entry and `useToday.ts`, carrying four lines of padding and one subtraction. `test/dates.test.ts` pins the formats and the day boundaries, around midnight and across both daylight-saving changes.
 
 **What would change this:** what #35 already names: due dates accepting another form, a configurable date format, or configurable calendar behaviour. Moment then earns its place, called with an explicit `en` locale and a strict format.
+
+## A card folder that matches only by letter case is used when it is the only one
+
+**Decided 2026-09-30 (#117). A `card-folder` with no exact match takes the one folder that matches it ignoring case, under that folder's real path, and says so; with two or more, the board picks none and refuses to add a card.**
+
+A folder spelled exactly as written always wins, so Linux, where `Cards/` and `cards/` can coexist, keeps meaning what it says. Without an exact match the board used to load empty and then create the folder as written beside the real one, which hid the real cards with no message. Obsidian's own case-insensitive lookup, `getAbstractFileByPathInsensitive`, is not in `obsidian.d.ts` and returns the first hit, so it cannot tell one match from several; the matches are counted over `getAllLoadedFiles()` instead, the way `pathTaken` judges new names. Guessing between several spellings was left out: whichever one it picked, the cards in the others would vanish from the board as silently as before, and creating the folder as written would add one more spelling.
+
+**What would change this:** Obsidian documenting a case-insensitive lookup that reports every match, which would replace the walk over every loaded file.

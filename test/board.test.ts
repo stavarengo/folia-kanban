@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   applyReloc,
   buildBoard,
@@ -725,7 +725,12 @@ describe("resolveCardFolder (#20260821.08)", () => {
   const board = "basic/Example Board.md";
   /** Resolve `value` against a vault where exactly `folders` exist. */
   const pick = (boardPath: string, value: string, folders: string[] = []) =>
-    resolveCardFolder(boardPath, value, (p) => folders.includes(p));
+    resolveCardFolder(
+      boardPath,
+      value,
+      (p) => folders.includes(p),
+      () => folders,
+    );
 
   describe("which readings a value allows", () => {
     it("prefers the vault-root reading of a plain path, with the board note's as fallback", () => {
@@ -789,13 +794,76 @@ describe("resolveCardFolder (#20260821.08)", () => {
     it("keeps the vault-root reading when neither exists, so the folder is still created there", () => {
       // The create-on-first-card story predates this: a board with no card folder yet must keep
       // creating it exactly where it always did, not silently move it beside the board note.
-      expect(pick(board, "Cards")).toEqual({ path: "Cards", existing: [] });
+      expect(pick(board, "Cards")).toEqual({ path: "Cards", existing: [], caseMatches: [] });
     });
     it("stays with the board-note reading of a `./` path even when a root folder exists", () => {
-      expect(pick(board, "./Cards", ["Cards"])).toEqual({ path: "basic/Cards", existing: [] });
+      expect(pick(board, "./Cards", ["Cards"])).toEqual({
+        path: "basic/Cards",
+        existing: [],
+        caseMatches: [],
+      });
     });
     it("reports both readings when both exist, so the caller can flag the ambiguity", () => {
       expect(pick(board, "Cards", ["Cards", "basic/Cards"])?.existing).toHaveLength(2);
+    });
+  });
+
+  describe("a folder whose letter case differs (#117)", () => {
+    it("loses to an exact vault-root folder", () => {
+      expect(pick(board, "Cards", ["Cards", "basic/cards"])).toEqual({
+        path: "Cards",
+        existing: ["Cards"],
+        caseMatches: [],
+      });
+    });
+    it("loses to an exact folder beside the board note", () => {
+      expect(pick(board, "Cards", ["cards", "basic/Cards"])).toEqual({
+        path: "basic/Cards",
+        existing: ["basic/Cards"],
+        caseMatches: [],
+      });
+    });
+    it("is taken under its real path when it is the only one, from the vault-root reading", () => {
+      expect(pick(board, "Cards", ["cards"])).toEqual({
+        path: "cards",
+        existing: [],
+        caseMatches: ["cards"],
+      });
+    });
+    it("is taken under its real path when it is the only one, from the board-note reading", () => {
+      expect(pick(board, "./Cards", ["basic/cards"])?.path).toBe("basic/cards");
+      expect(pick(board, "Cards", ["basic/cards"])?.path).toBe("basic/cards");
+    });
+    it("matches the whole path, so a parent folder in another case counts too", () => {
+      expect(pick(board, "./Cards", ["Basic/cards"])?.path).toBe("Basic/cards");
+      expect(pick(board, "Area/Cards", ["area/CARDS"])?.path).toBe("area/CARDS");
+    });
+    it("is not searched for under a reading the value does not allow", () => {
+      // `./` means beside the board note only, whatever the case of a folder at the vault root.
+      expect(pick(board, "./Cards", ["cards"])).toEqual({
+        path: "basic/Cards",
+        existing: [],
+        caseMatches: [],
+      });
+    });
+    it("is not guessed at when two spellings of one reading exist", () => {
+      expect(pick(board, "./Cards", ["basic/cards", "basic/CARDS"])).toEqual({
+        path: "basic/Cards",
+        existing: [],
+        caseMatches: ["basic/cards", "basic/CARDS"],
+      });
+    });
+    it("is not guessed at when each reading finds one", () => {
+      expect(pick(board, "Cards", ["cards", "basic/cards"])).toEqual({
+        path: "Cards",
+        existing: [],
+        caseMatches: ["cards", "basic/cards"],
+      });
+    });
+    it("never walks the vault when a reading exists exactly", () => {
+      const folders = vi.fn(() => ["cards"]);
+      resolveCardFolder(board, "Cards", (p) => p === "Cards", folders);
+      expect(folders).not.toHaveBeenCalled();
     });
   });
 });

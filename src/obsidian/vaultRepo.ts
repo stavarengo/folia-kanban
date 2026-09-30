@@ -139,6 +139,8 @@ interface ResolvedBoardConfig extends BoardConfig {
   cardFolderRaw: string;
   /** Every candidate path that exists as a folder right now, in the order they were preferred. */
   cardFolderExisting: string[];
+  /** The real paths of the folders a candidate names in another letter case, when none is exact. */
+  cardFolderCaseMatches: string[];
 }
 
 export class VaultRepository implements CardRepository {
@@ -260,10 +262,41 @@ export class VaultRepository implements CardRepository {
    */
   private propertyNames: PropertyNamesInUse | null = null;
 
-  private cardFolderFor(raw: string): { path: string; existing: string[] } {
+  /** The folders an ambiguous-by-case `card-folder` could mean, for the notice and for refusals. */
+  private ambiguousCaseMessage(config: ResolvedBoardConfig): string {
+    const names = config.cardFolderCaseMatches.map((p) => `"${p}"`).join(", ");
+    return `Card folder "${config.cardFolderRaw}" matches ${names} only when letter case is ignored, so it is not clear which one holds the cards. Rename all but one of them, or write the one you mean exactly.`;
+  }
+
+  /**
+   * How to write `card-folder` so it names the folder it matched only by case, exactly. A `./`
+   * value keeps its `./` form, and with it the portability it was written for; anything else gets
+   * the real path, which the vault-root reading always takes first.
+   */
+  private exactSpelling(config: ResolvedBoardConfig): string {
+    const beside = this.boardPath.includes("/")
+      ? this.boardPath.slice(0, this.boardPath.lastIndexOf("/") + 1)
+      : "";
+    return config.cardFolderRaw.startsWith("./") && config.cardFolder.startsWith(beside)
+      ? `./${config.cardFolder.slice(beside.length)}`
+      : config.cardFolder;
+  }
+
+  private cardFolderFor(raw: string): { path: string; existing: string[]; caseMatches: string[] } {
     // `normalizePath` only tidies separators (it leaves `.` and `..` alone and turns an empty
     // value into "/"), so the `.`/`..` resolution and the two readings live in the pure helper.
-    const resolved = resolveCardFolder(this.boardPath, normalizePath(raw), (p) => this.isFolder(p));
+    const resolved = resolveCardFolder(
+      this.boardPath,
+      normalizePath(raw),
+      (p) => this.isFolder(p),
+      // Obsidian's own case-insensitive lookup is undocumented and returns the first hit, which
+      // cannot tell one match from several; see `pathTaken` for the same rule applied to new names.
+      () =>
+        this.app.vault
+          .getAllLoadedFiles()
+          .filter((f) => f instanceof TFolder)
+          .map((f) => f.path),
+    );
     if (resolved === null) {
       // Nothing left after dropping the readings that climb out of the vault or land on its root.
       // Unlike a folder that simply isn't there yet, adding a card cannot fix this, so it fails
@@ -297,7 +330,11 @@ export class VaultRepository implements CardRepository {
     const named: unknown =
       parseFrontMatterEntry(fm, /^card-folder$/) ?? parseFrontMatterEntry(fm, /^card_folder$/);
     const cardFolderRaw = typeof named === "string" ? named : "Tasks";
-    const { path: cardFolder, existing: cardFolderExisting } = this.cardFolderFor(cardFolderRaw);
+    const {
+      path: cardFolder,
+      existing: cardFolderExisting,
+      caseMatches: cardFolderCaseMatches,
+    } = this.cardFolderFor(cardFolderRaw);
     const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
     return {
       path: this.boardPath,
@@ -308,6 +345,7 @@ export class VaultRepository implements CardRepository {
       cardFolderRaw,
       titleMode,
       cardFolderExisting,
+      cardFolderCaseMatches,
     };
   }
 
@@ -340,12 +378,20 @@ export class VaultRepository implements CardRepository {
     // board-note-relative reading keeps working until someone creates a same-named folder at the
     // vault root, and then loads empty with the folder it wanted still sitting right there. Name
     // the winner rather than let that look like an ordinary empty board.
+    //
+    // A folder found only by ignoring letter case is used, under its real path, and named too: on
+    // Linux a folder spelled exactly as written can still appear beside it and take over.
+    const caseMatches = config.cardFolderCaseMatches;
     const cardFolderWarning =
-      folder === null
-        ? `Card folder ${this.describeCardFolder(config)} was not found. It will be created when you add your first card.`
-        : config.cardFolderExisting.length > 1
-          ? `Card folder "${config.cardFolderRaw}" matches both "${config.cardFolderExisting[0]}" and "${config.cardFolderExisting[1]}". Using "${config.cardFolder}" — write the path as "./…" to always mean the one beside this board note.`
-          : undefined;
+      caseMatches.length > 1
+        ? this.ambiguousCaseMessage(config)
+        : folder === null
+          ? `Card folder ${this.describeCardFolder(config)} was not found. It will be created when you add your first card.`
+          : config.cardFolderExisting.length > 1
+            ? `Card folder "${config.cardFolderRaw}" matches both "${config.cardFolderExisting[0]}" and "${config.cardFolderExisting[1]}". Using "${config.cardFolder}" — write the path as "./…" to always mean the one beside this board note.`
+            : caseMatches.length === 1
+              ? `Card folder "${config.cardFolderRaw}" matches "${config.cardFolder}" only when letter case is ignored. Using it — write the path as "${this.exactSpelling(config)}" to match it exactly.`
+              : undefined;
     const prefix = folderPath + "/";
     this.cardFolderPrefix = prefix;
     const files: TFile[] = [];
@@ -811,6 +857,8 @@ export class VaultRepository implements CardRepository {
 
   async createCard(title: string, status: string): Promise<string> {
     const config = await this.readConfig();
+    // Creating the folder as written would only add one more spelling beside the ones already there.
+    if (config.cardFolderCaseMatches.length > 1) throw new Error(this.ambiguousCaseMessage(config));
     await this.ensureFolder(config.cardFolder);
     const path = await this.uniquePath(config.cardFolder, title);
     this.markWrite(path);

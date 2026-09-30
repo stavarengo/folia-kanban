@@ -111,18 +111,33 @@ function cardFolderCandidates(boardPath: string, cardFolder: string): string[] {
  * the first one wins and keeps its create-on-first-card story: for a value without an explicit
  * `./`, that is the vault-root reading, exactly where the folder has always been created.
  *
+ * Only when no reading exists exactly are the vault's `folders` asked for (walking them is the
+ * expensive part), to find the ones a reading names in another letter case. Exactly one such
+ * folder is taken, under its real path, since every consumer compares that path exactly; with two
+ * or more, which one was meant is unknowable, so `path` stays the preferred reading and
+ * `caseMatches` lists them for the caller to refuse on. Linux lets `Cards/` and `cards/` coexist.
+ *
  * `null` when no reading survives at all — see {@link cardFolderCandidates}.
  */
 export function resolveCardFolder(
   boardPath: string,
   cardFolder: string,
   isFolder: (path: string) => boolean,
-): { path: string; existing: string[] } | null {
+  folders: () => readonly string[],
+): { path: string; existing: string[]; caseMatches: string[] } | null {
   const candidates = cardFolderCandidates(boardPath, cardFolder);
   const [preferred] = candidates;
   if (preferred === undefined) return null;
   const existing = candidates.filter(isFolder);
-  return { path: existing[0] ?? preferred, existing };
+  if (existing[0] !== undefined) return { path: existing[0], existing, caseMatches: [] };
+  const wanted = new Set(candidates.map((c) => c.toLowerCase()));
+  const caseMatches = folders().filter((f) => wanted.has(f.toLowerCase()));
+  const [only] = caseMatches;
+  return {
+    path: only !== undefined && caseMatches.length === 1 ? only : preferred,
+    existing,
+    caseMatches,
+  };
 }
 
 /** Join `base` with `path`, resolving `.`/`..` segments. `null` when it climbs above the root. */
