@@ -1,3 +1,5 @@
+import { normalizePath, parseFrontMatterEntry } from "obsidian";
+
 /** Name the card folder of a guided board starts from. */
 const CARD_FOLDER_BASE = "Cards";
 
@@ -31,7 +33,9 @@ export function applyBoardFrontmatter(
   frontmatter["folia-board"] = true;
   // `card_folder` is the underscore spelling the board loader also accepts; a note using it already
   // names its folder, so adding the dashed key would give the note two answers to one question.
-  const named = frontmatter["card-folder"] ?? frontmatter["card_folder"];
+  const named: unknown =
+    parseFrontMatterEntry(frontmatter, /^card-folder$/) ??
+    parseFrontMatterEntry(frontmatter, /^card_folder$/);
   const ownFolder = typeof named === "string" && named.trim() !== "";
   if (!ownFolder) frontmatter["card-folder"] = cardFolder;
   if (needsColumns(frontmatter["columns"])) frontmatter["columns"] = [...DEFAULT_COLUMNS];
@@ -58,10 +62,10 @@ export interface CardFolder {
  * each would show the other's cards, with nothing on either board saying why.
  */
 export function cardFolderFor(parentPath: string, exists: (path: string) => boolean): CardFolder {
-  const dir = parentPath === "" || parentPath === "/" ? "" : `${parentPath}/`;
   for (let n = 0; ; n++) {
     const name = n === 0 ? CARD_FOLDER_BASE : `${CARD_FOLDER_BASE} ${n}`;
-    if (!exists(`${dir}${name}`)) return { property: `./${name}`, path: `${dir}${name}` };
+    const path = normalizePath(`${parentPath}/${name}`);
+    if (!exists(path)) return { property: `./${name}`, path };
   }
 }
 
@@ -74,8 +78,8 @@ export function uniqueNotePath(
   base: string,
   exists: (path: string) => boolean,
 ): string {
-  const dir = folderPath === "" || folderPath === "/" ? "" : `${folderPath}/`;
-  let candidate = `${dir}${base}.md`;
-  for (let n = 1; exists(candidate); n++) candidate = `${dir}${base} ${n}.md`;
+  let candidate = normalizePath(`${folderPath}/${base}.md`);
+  for (let n = 1; exists(candidate); n++)
+    candidate = normalizePath(`${folderPath}/${base} ${n}.md`);
   return candidate;
 }

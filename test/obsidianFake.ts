@@ -15,6 +15,90 @@
 import type { PaneType } from "obsidian";
 import { parse, stringify } from "yaml";
 
+interface FakeDebouncer<T extends unknown[], V> {
+  (...args: T): FakeDebouncer<T, V>;
+  cancel(): FakeDebouncer<T, V>;
+  run(): V | void;
+}
+
+export function debounce<T extends unknown[], V>(
+  cb: (...args: T) => V,
+  timeout = 0,
+  resetTimer = false,
+): FakeDebouncer<T, V> {
+  let timer: number | null = null;
+  let context: unknown = null;
+  let args: T | null = null;
+  let resetDeadline = 0;
+  let scheduledUntil = 0;
+  const activeTimerWindow = () => (globalThis as { activeWindow?: Window }).activeWindow ?? window;
+  let timerWindow = activeTimerWindow();
+  const invoke = () => {
+    const callContext = context;
+    const callArgs = args;
+    context = null;
+    args = null;
+    if (callArgs !== null) return cb.apply(callContext, callArgs);
+  };
+  const fire = () => {
+    if (resetDeadline) {
+      const now = Date.now();
+      if (now < resetDeadline) {
+        timerWindow = activeTimerWindow();
+        timer = timerWindow.setTimeout(fire, resetDeadline - now);
+        resetDeadline = 0;
+        return;
+      }
+    }
+    scheduledUntil = 0;
+    timer = null;
+    invoke();
+  };
+  function schedule(this: unknown, ...nextArgs: T) {
+    context = this;
+    args = nextArgs;
+    const now = Date.now();
+    if (timer !== null) {
+      if (resetTimer) resetDeadline = scheduledUntil = now + timeout;
+      else if (timerWindow !== activeTimerWindow() && scheduledUntil <= now) {
+        timerWindow.clearTimeout(timer);
+        timerWindow = activeTimerWindow();
+        timer = timerWindow.setTimeout(fire, 0);
+      }
+    } else {
+      timerWindow = activeTimerWindow();
+      scheduledUntil = now + timeout;
+      timer = timerWindow.setTimeout(fire, timeout);
+    }
+    return schedule;
+  }
+  schedule.cancel = () => {
+    if (timer !== null) {
+      timerWindow.clearTimeout(timer);
+      timer = null;
+    }
+    return schedule;
+  };
+  schedule.run = () => {
+    if (timer === null) return;
+    timerWindow.clearTimeout(timer);
+    timer = null;
+    return invoke();
+  };
+  return schedule;
+}
+
+export function parseFrontMatterEntry(
+  frontmatter: Record<string, unknown> | null,
+  key: string | RegExp,
+): unknown | null {
+  if (frontmatter === null) return null;
+  const match = Object.keys(frontmatter).find((name) =>
+    typeof key === "string" ? name === key : key.test(name),
+  );
+  return match === undefined ? null : (frontmatter[match] ?? null);
+}
+
 /** Obsidian's own `normalizePath`: tidy separators only — `.` and `..` are left for callers. */
 export function normalizePath(path: string): string {
   const tidied = path
@@ -305,6 +389,15 @@ function joinNote(fm: Record<string, unknown>, body: string): string {
 }
 
 export class FakeVault extends Events {
+  static recurseChildren(root: TFolder, cb: (file: TAbstractFile) => unknown): void {
+    let pending: TAbstractFile[] = [root];
+    while (pending.length > 0) {
+      const file = pending.pop();
+      if (!file) continue;
+      cb(file);
+      if (file instanceof TFolder) pending = pending.concat(file.children);
+    }
+  }
   private nodes = new Map<string, TAbstractFile>();
   private texts = new Map<string, string>();
   /** Every read that went through `cachedRead`, in order — the freshness rule's evidence. */
@@ -393,6 +486,11 @@ export class FakeVault extends Events {
     return f instanceof TFile ? f : null;
   }
 
+  getFolderByPath(path: string): TFolder | null {
+    const f = this.getAbstractFileByPath(path);
+    return f instanceof TFolder ? f : null;
+  }
+
   getAbstractFileByPath(path: string): TAbstractFile | null {
     return this.nodes.get(path) ?? null;
   }
@@ -402,9 +500,11 @@ export class FakeVault extends Events {
   }
 
   getMarkdownFiles(): TFile[] {
-    return [...this.nodes.values()].filter(
-      (n): n is TFile => n instanceof TFile && n.path.endsWith(".md"),
-    );
+    const files: TFile[] = [];
+    FakeVault.recurseChildren(this.root(), (node) => {
+      if (node instanceof TFile && node.extension === "md") files.push(node);
+    });
+    return files;
   }
 
   cachedRead(file: TFile): Promise<string> {
@@ -496,9 +596,43 @@ export class FakeVault extends Events {
   }
 }
 
+export { FakeVault as Vault };
+
 export class FakeMetadataCache extends Events {
   private caches = new Map<string, Record<string, unknown>>();
   private tags = new Map<string, { tag: string }[]>();
+  newLinkFormat: "shortest" | "relative" | "absolute" = "shortest";
+
+  fileToLinktext(file: TFile, sourcePath: string, omitMdExtension = true): string {
+    const path = file.extension === "md" && omitMdExtension ? file.path.slice(0, -3) : file.path;
+    if (this.newLinkFormat === "absolute") return path;
+    if (this.newLinkFormat === "relative") {
+      const slash = sourcePath.lastIndexOf("/");
+      let sourceFolder = slash === -1 ? "" : sourcePath.slice(0, slash);
+      let prefix = "";
+      while (sourceFolder && !path.startsWith(`${sourceFolder}/`)) {
+        prefix += "../";
+        sourceFolder = sourceFolder.slice(0, sourceFolder.lastIndexOf("/"));
+      }
+      return prefix + (sourceFolder ? path.slice(sourceFolder.length + 1) : path);
+    }
+    const name = file.extension === "md" && omitMdExtension ? file.basename : file.name;
+    const files = this.vault
+      .getAllLoadedFiles()
+      .filter((node): node is TFile => node instanceof TFile);
+    const matching = (candidate: string) =>
+      files.filter((node) => node.name.toLowerCase() === candidate.toLowerCase());
+    let lookup = name;
+    let matches = name.includes(".") ? matching(lookup) : [];
+    if (matches.length === 0) {
+      lookup += ".md";
+      matches = matching(lookup);
+    }
+    if (matches.length === 1 && matches[0] === file) return name;
+    const exact = matches.find((node) => node.path.toLowerCase() === lookup.toLowerCase());
+    return exact === file ? name : path;
+  }
+
   constructor(private vault: FakeVault) {
     super();
     // A real vault has a cache entry for every file it knows about. Only a WRITE leaves the cache
@@ -596,7 +730,11 @@ export class FakeMetadataCache extends Events {
 }
 
 export class FakeFileManager {
-  constructor(private vault: FakeVault) {}
+  constructor(
+    private vault: FakeVault,
+    private cache: FakeMetadataCache,
+  ) {}
+  useMarkdownLinks = false;
 
   async processFrontMatter(file: TFile, fn: (fm: Record<string, unknown>) => void): Promise<void> {
     this.vault.writeFrontmatter(file.path, fn);
@@ -607,9 +745,9 @@ export class FakeFileManager {
    * `newLinkFormat: "shortest"`), so a file name two folders share is written as a full path.
    * Wikilink form, which is what the vault this is a fake of is set to.
    */
-  generateMarkdownLink(file: TFile, _sourcePath: string): string {
-    const shared = this.vault.getMarkdownFiles().filter((f) => f.basename === file.basename);
-    return shared.length > 1 ? `[[${file.path.replace(/\.md$/i, "")}]]` : `[[${file.basename}]]`;
+  generateMarkdownLink(file: TFile, sourcePath: string): string {
+    const linktext = this.cache.fileToLinktext(file, sourcePath, true);
+    return this.useMarkdownLinks ? `[${file.basename}](${linktext}.md)` : `[[${linktext}]]`;
   }
 
   async renameFile(file: TAbstractFile, dest: string): Promise<void> {
@@ -634,7 +772,7 @@ export class FakeFileManager {
 export class FakeApp {
   readonly vault = new FakeVault();
   readonly metadataCache = new FakeMetadataCache(this.vault);
-  readonly fileManager = new FakeFileManager(this.vault);
+  readonly fileManager = new FakeFileManager(this.vault, this.metadataCache);
   /** Every note `openCard` asked the workspace to open. */
   readonly opened: string[] = [];
   /** Where each of those opens was asked to land, in `getLeaf`'s own vocabulary, same order. */

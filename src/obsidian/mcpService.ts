@@ -103,8 +103,8 @@ export function vaultBoardHost(options: Pick<McpServiceOptions, "app" | "getSett
         .map((f) => ({ path: f.path, name: f.basename }));
     },
     repoFor(boardPath: string): CardRepository | null {
-      const file = app.vault.getMarkdownFiles().find((f) => f.path === boardPath);
-      if (!file || !isBoard(file)) return null;
+      const file = app.vault.getFileByPath(boardPath);
+      if (file === null || file.extension !== "md" || !isBoard(file)) return null;
       return new VaultRepository(
         app,
         boardPath,

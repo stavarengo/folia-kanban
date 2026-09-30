@@ -5,7 +5,7 @@
 // reach the board.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { App, FileManager, MetadataCache, Vault } from "obsidian";
+import { Vault, type App, type FileManager, type MetadataCache } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import type { Suggestion, SuggestSource } from "../src/model/repo";
 import { moveCardOver, moveCardTo, setCardPriority } from "../src/model/boardOps";
@@ -52,6 +52,8 @@ const MIRRORED: {
   vault: [
     "adapter",
     "getAbstractFileByPath",
+    "getFileByPath",
+    "getFolderByPath",
     "getAllLoadedFiles",
     "getMarkdownFiles",
     "cachedRead",
@@ -62,7 +64,7 @@ const MIRRORED: {
     "on",
     "offref",
   ],
-  metadataCache: ["getFileCache", "getFirstLinkpathDest", "on", "offref"],
+  metadataCache: ["getFileCache", "getFirstLinkpathDest", "fileToLinktext", "on", "offref"],
   fileManager: ["processFrontMatter", "renameFile", "trashFile", "generateMarkdownLink"],
 };
 
@@ -72,6 +74,7 @@ describe("the fake this suite runs against", () => {
     for (const name of MIRRORED.vault) expect(app.vault).toHaveProperty(name);
     for (const name of MIRRORED.metadataCache) expect(app.metadataCache).toHaveProperty(name);
     for (const name of MIRRORED.fileManager) expect(app.fileManager).toHaveProperty(name);
+    expect(Vault).toHaveProperty("recurseChildren");
   });
 });
 
@@ -146,6 +149,14 @@ describe("card-folder resolution against a live vault", () => {
     expect(board.config.cardFolder).toBe("basic/Cards");
     expect(Object.keys(board.cards)).toEqual(["basic/Cards/One.md"]);
     expect(board.cardFolderWarning).toBeUndefined();
+  });
+
+  it("keeps dashed-key precedence after decoding the board config", async () => {
+    const { app, repo } = setup("card_folder: Other\ncard-folder: Chosen");
+    app.vault.addFile("Chosen/One.md", card("status: todo"));
+    app.vault.addFile("Other/Two.md", card("status: todo"));
+
+    expect(Object.keys((await repo.loadBoard()).cards)).toEqual(["Chosen/One.md"]);
   });
 
   it("reads a bare value from the vault root when only that folder exists", async () => {
@@ -224,6 +235,52 @@ describe("card-folder resolution against a live vault", () => {
     expect(Object.keys(board.cards).sort()).toEqual([
       "basic/Cards/One.md",
       "basic/Cards/Work/Two.md",
+    ]);
+  });
+
+  it("loads Markdown cards at every depth and skips non-Markdown files", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Root.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/Work/Nested.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/Work/Deep/Leaf.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/Work/Not a card.txt", "plain text");
+    expect(Object.keys((await repo.loadBoard()).cards).sort()).toEqual([
+      "basic/Cards/Root.md",
+      "basic/Cards/Work/Deep/Leaf.md",
+      "basic/Cards/Work/Nested.md",
+    ]);
+  });
+
+  it("does not walk the whole vault to find cards in the card folder", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Work/Card.md", card("status: todo"));
+    const wholeVaultWalk = vi.spyOn(app.vault, "getMarkdownFiles");
+
+    await repo.loadBoard();
+
+    expect(wholeVaultWalk).not.toHaveBeenCalled();
+  });
+
+  it("keeps getMarkdownFiles traversal order when two cards claim the same child", async () => {
+    const { app, repo } = setup();
+    const parent = card("status: todo", "\n## Subtasks\n- [ ] [[Child]]\n");
+    app.vault.addFile("basic/Cards/A/Parent.md", parent);
+    app.vault.addFile("basic/Cards/Root.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/B/Parent.md", parent);
+    app.vault.addFile("basic/Cards/Child.md", card("status: todo"));
+    const expected = app.vault
+      .getMarkdownFiles()
+      .filter((file) => file.path.startsWith("basic/Cards/"))
+      .map((file) => file.path);
+
+    const board = await repo.loadBoard();
+
+    expect(Object.keys(board.cards)).toEqual(expected);
+    expect(board.parentOf["basic/Cards/Child.md"]).toBe("basic/Cards/B/Parent.md");
+    expect(board.columns["todo"]).toEqual([
+      "basic/Cards/B/Parent.md",
+      "basic/Cards/A/Parent.md",
+      "basic/Cards/Root.md",
     ]);
   });
 
@@ -481,6 +538,20 @@ describe("links, read and written the way the vault reads and writes them", () =
     await repo.addSubcard("basic/Cards/Parent.md", "Child");
 
     expect(app.vault.text("basic/Cards/Parent.md")).toContain("- [ ] [[Child]]");
+  });
+
+  it.each([
+    ["relative", "../y/Child"],
+    ["absolute", "basic/Cards/y/Child"],
+  ] as const)("writes %s link paths without the .md extension", async (format, expected) => {
+    const { app, repo } = setup();
+    app.metadataCache.newLinkFormat = format;
+    app.vault.addFile("basic/Cards/x/Parent.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/y/Child.md", card("status: todo"));
+
+    await repo.addRelation("basic/Cards/x/Parent.md", "blocks", "Child");
+
+    expect(app.vault.frontmatter("basic/Cards/x/Parent.md")["blocks"]).toEqual([`[[${expected}]]`]);
   });
 
   it("stores a relationship as a link to the card the name reaches from this note", async () => {
@@ -1330,6 +1401,43 @@ describe("telling our own writes apart from someone else's (onChange)", () => {
     vi.advanceTimersByTime(1);
     expect(reload).toHaveBeenCalledTimes(1);
 
+    off();
+  });
+
+  it("restarts the 150 ms wait on every event", () => {
+    const { app, repo } = setup();
+    const file = app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    const reload = vi.fn();
+    const off = repo.onChange(reload);
+
+    app.vault.emitEvent("modify", file);
+    vi.advanceTimersByTime(100);
+    app.vault.emitEvent("modify", file);
+    vi.advanceTimersByTime(149);
+    expect(reload).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it("reloads after create, modify, delete, and rename across the card-folder boundary", () => {
+    const { app, repo } = setup();
+    const file = app.vault.addFile("Elsewhere/One.md", card("status: todo"));
+    const reload = vi.fn();
+    const off = repo.onChange(reload);
+
+    app.vault.emitEvent("create", file);
+    vi.advanceTimersByTime(150);
+    app.vault.move(file, "basic/Cards/One.md");
+    vi.advanceTimersByTime(150);
+    app.vault.emitEvent("modify", file);
+    vi.advanceTimersByTime(150);
+    app.vault.move(file, "Elsewhere/One.md");
+    vi.advanceTimersByTime(150);
+    app.vault.emitEvent("delete", file);
+    vi.advanceTimersByTime(150);
+
+    expect(reload).toHaveBeenCalledTimes(5);
     off();
   });
 

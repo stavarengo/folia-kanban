@@ -75,7 +75,7 @@ import {
   boardNoteBody,
   cardFolderFor,
   uniqueNotePath,
-} from "./boardNote";
+} from "./obsidian/boardNote";
 import {
   McpService,
   newMcpToken,

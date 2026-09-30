@@ -6,7 +6,10 @@ import {
   MarkdownRenderer,
   TFile,
   TFolder,
+  Vault,
+  debounce,
   normalizePath,
+  parseFrontMatterEntry,
 } from "obsidian";
 import type {
   Board,
@@ -169,8 +172,8 @@ export class VaultRepository implements CardRepository {
   }
 
   private file(path: string): TFile {
-    const f = this.app.vault.getAbstractFileByPath(path);
-    if (!(f instanceof TFile)) throw new Error(`Not a file: ${path}`);
+    const f = this.app.vault.getFileByPath(path);
+    if (f === null) throw new Error(`Not a file: ${path}`);
     return f;
   }
 
@@ -195,11 +198,10 @@ export class VaultRepository implements CardRepository {
    * therefore gets a wikilink here — the honest shape until reading Markdown links is built too.
    */
   private linkTextTo(targetPath: string, sourcePath: string): string {
-    const file = this.app.vault.getAbstractFileByPath(targetPath);
+    const file = this.app.vault.getFileByPath(targetPath);
     const bare = targetPath.replace(/\.md$/i, "");
-    if (!(file instanceof TFile)) return bare;
+    if (file === null) return bare;
     const generated = this.app.fileManager.generateMarkdownLink(file, sourcePath).trim();
-    // The full vault path is the fallback because it names exactly one note under every setting.
     return /^\[\[[^\]]+\]\]$/.test(generated) ? generated.slice(2, -2) : bare;
   }
 
@@ -275,7 +277,7 @@ export class VaultRepository implements CardRepository {
   }
 
   private isFolder(path: string): boolean {
-    return this.app.vault.getAbstractFileByPath(path) instanceof TFolder;
+    return this.app.vault.getFolderByPath(path) !== null;
   }
 
   private async readConfig(): Promise<ResolvedBoardConfig> {
@@ -293,7 +295,9 @@ export class VaultRepository implements CardRepository {
     // `ensureFolder`/`createCard` — agrees on the exact same vault path. A leading slash, doubled
     // slashes, a `..` segment or a board-note-relative reading must not make one of those
     // consumers see the folder (or a card's context) and another not.
-    const cardFolderRaw = fm["card-folder"] ?? fm["card_folder"] ?? "Tasks";
+    const named: unknown =
+      parseFrontMatterEntry(fm, /^card-folder$/) ?? parseFrontMatterEntry(fm, /^card_folder$/);
+    const cardFolderRaw = typeof named === "string" ? named : "Tasks";
     const { path: cardFolder, existing: cardFolderExisting } = this.cardFolderFor(cardFolderRaw);
     const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
     return {
@@ -327,8 +331,8 @@ export class VaultRepository implements CardRepository {
     // is, and would fail with no useful feedback surfaced anywhere in the UI. That case stays a
     // hard failure instead of a soft notice, so the board (and its "Add card" controls) are simply
     // not reachable rather than reachable-but-broken.
-    const folder = this.app.vault.getAbstractFileByPath(folderPath);
-    if (folder !== null && !(folder instanceof TFolder)) {
+    const folder = this.app.vault.getFolderByPath(folderPath);
+    if (folder === null && this.app.vault.getFileByPath(folderPath) !== null) {
       throw new Error(
         `Card folder ${this.describeCardFolder(config)} is not a folder. Fix the board's card-folder property.`,
       );
@@ -345,13 +349,17 @@ export class VaultRepository implements CardRepository {
           : undefined;
     const prefix = folderPath + "/";
     this.cardFolderPrefix = prefix;
-    const files = this.app.vault
-      .getMarkdownFiles()
-      // Skip the board note and the per-context config notes (#14) — `_context.md` is a folder
-      // config, not a card, so it must never surface as a phantom card on the board.
-      .filter(
-        (f) => f.path.startsWith(prefix) && f.path !== this.boardPath && f.name !== CONTEXT_NOTE,
-      );
+    const files: TFile[] = [];
+    if (folder !== null)
+      Vault.recurseChildren(folder, (child) => {
+        if (
+          child instanceof TFile &&
+          child.extension === "md" &&
+          child.path !== this.boardPath &&
+          child.name !== CONTEXT_NOTE
+        )
+          files.push(child);
+      });
 
     const cards: Card[] = [];
     for (const f of files) {
@@ -398,9 +406,9 @@ export class VaultRepository implements CardRepository {
     // Already the resolved path when it comes from a caller — `readConfig` is the only place that
     // turns the raw property into one, so re-normalizing here could only make the two disagree.
     const folderPath = cardFolder ?? (await this.readConfig()).cardFolder;
-    const root = this.app.vault.getAbstractFileByPath(folderPath);
+    const root = this.app.vault.getFolderByPath(folderPath);
     const out: Record<string, ContextConfig> = {};
-    if (!(root instanceof TFolder)) return out;
+    if (root === null) return out;
     // Each immediate subfolder is a context. An optional `_context.md` inside it supplies the
     // display name / color / label / body; a subfolder without the note still counts as a context
     // (name = folder), so its cards can be filtered by `context:` even before it's configured.
@@ -1065,11 +1073,7 @@ export class VaultRepository implements CardRepository {
   }
 
   onChange(cb: () => void): () => void {
-    let timer: number | null = null;
-    const schedule = () => {
-      if (timer !== null) window.clearTimeout(timer);
-      timer = window.setTimeout(cb, 150);
-    };
+    const schedule = debounce(cb, 150, true);
     const fireVault = (path: string) => {
       const last = this.recentWrites.get(path);
       if (last !== undefined) {
@@ -1098,7 +1102,7 @@ export class VaultRepository implements CardRepository {
       }
     });
     return () => {
-      if (timer !== null) window.clearTimeout(timer);
+      schedule.cancel();
       for (const ref of vaultRefs) this.app.vault.offref(ref);
       this.app.metadataCache.offref(metaRef);
     };

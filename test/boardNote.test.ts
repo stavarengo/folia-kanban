@@ -6,7 +6,7 @@ import {
   boardNoteBody,
   cardFolderFor,
   uniqueNotePath,
-} from "../src/boardNote";
+} from "../src/obsidian/boardNote";
 import { isBoardFrontmatter, resolveBoardViewMode } from "../src/obsidian/viewMode";
 import { pathTaken } from "../src/obsidian/pathTaken";
 import { FakeVault } from "./obsidianFake";
@@ -74,6 +74,15 @@ describe("applyBoardFrontmatter — the properties a guided setup writes", () =>
     expect(underscored["card-folder"]).toBeUndefined();
   });
 
+  it("prefers the dashed spelling when both card-folder properties exist", () => {
+    const frontmatter: Record<string, unknown> = {
+      card_folder: "Other",
+      "card-folder": "Chosen",
+    };
+    expect(applyBoardFrontmatter(frontmatter, "./Cards")).toBe(false);
+    expect(frontmatter["card-folder"]).toBe("Chosen");
+  });
+
   it("treats an empty card-folder as no card folder at all", () => {
     const frontmatter: Record<string, unknown> = { "card-folder": "   " };
     expect(applyBoardFrontmatter(frontmatter, "./Cards")).toBe(true);
@@ -116,6 +125,10 @@ describe("cardFolderFor", () => {
   it("handles a board note sitting at the vault root", () => {
     expect(cardFolderFor("", () => false)).toEqual({ property: "./Cards", path: "Cards" });
     expect(cardFolderFor("/", () => false)).toEqual({ property: "./Cards", path: "Cards" });
+  });
+
+  it("normalizes leading and trailing separators in the parent path", () => {
+    expect(cardFolderFor("/Projects/Acme/", () => false).path).toBe("Projects/Acme/Cards");
   });
 
   it("steps past a name already taken, so two boards in one folder do not share their cards", () => {
@@ -163,5 +176,9 @@ describe("uniqueNotePath", () => {
   it("writes a vault-root path without a leading slash", () => {
     expect(uniqueNotePath("/", "Board", taken())).toBe("Board.md");
     expect(uniqueNotePath("", "Board", taken("Board.md"))).toBe("Board 1.md");
+  });
+
+  it("normalizes leading and trailing separators in the folder path", () => {
+    expect(uniqueNotePath("/Projects/Acme/", "Board", taken())).toBe("Projects/Acme/Board.md");
   });
 });

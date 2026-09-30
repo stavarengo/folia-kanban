@@ -2,7 +2,7 @@
 // hands out is configured with, and the start/stop lifecycle the settings toggle drives.
 
 import type { App } from "obsidian";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { McpService, newMcpToken, vaultBoardHost, type McpState } from "../src/obsidian/mcpService";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
 import { DEFAULT_SETTINGS, type KanbanSettings } from "../src/settings";
@@ -69,6 +69,33 @@ describe("the MCP token", () => {
 });
 
 describe("the board host the plugin builds", () => {
+  it("resolves a known board path", () => {
+    const app = new FakeApp();
+    app.vault.addFile("Work/Board.md", BOARD);
+    app.vault.addFile("Notes/Plain.md", PLAIN);
+    const host = vaultBoardHost({
+      app: app as unknown as App,
+      getSettings: () => DEFAULT_SETTINGS,
+    });
+    expect(host.repoFor("Work/Board.md")).toBeInstanceOf(VaultRepository);
+    expect(host.repoFor("Notes/Plain.md")).toBeNull();
+    expect(host.repoFor("Work")).toBeNull();
+    expect(host.repoFor("Missing.md")).toBeNull();
+  });
+
+  it("does not walk Markdown files to resolve a known board path", () => {
+    const app = new FakeApp();
+    app.vault.addFile("Work/Board.md", BOARD);
+    const host = vaultBoardHost({
+      app: app as unknown as App,
+      getSettings: () => DEFAULT_SETTINGS,
+    });
+    const wholeVaultWalk = vi.spyOn(app.vault, "getMarkdownFiles");
+
+    expect(host.repoFor("Work/Board.md")).toBeInstanceOf(VaultRepository);
+    expect(wholeVaultWalk).not.toHaveBeenCalled();
+  });
+
   it("offers only the notes carrying the board flag", async () => {
     const s = setup({ mcpEnabled: true, mcpToken: newMcpToken(), mcpPort: 0 });
     live = s.service;
