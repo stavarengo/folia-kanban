@@ -121,6 +121,32 @@ describe("the icon button", () => {
     expect(around).toHaveBeenCalledTimes(1);
   });
 
+  it("is reached and pressed from the keyboard on a release whose button answers clicks only", () => {
+    // Before 1.13 the host's icon button had no tab stop and no Enter/Space.
+    fake.extraButtonShape.keyboard = false;
+    try {
+      const got: (MouseEvent | undefined)[] = [];
+      const button = mountIconButton(container(), (evt) => got.push(evt));
+      button.setDisabled(false);
+      expect(button.el).toHaveAttribute("tabindex", "0");
+
+      fireEvent.keyDown(button.el, { key: "Enter" });
+      fireEvent.keyDown(button.el, { key: " " });
+      fireEvent.keyDown(button.el, { key: "a" });
+      expect(got).toEqual([undefined, undefined]);
+
+      button.setDisabled(true);
+      expect(button.el).not.toHaveAttribute("tabindex");
+      fireEvent.keyDown(button.el, { key: "Enter" });
+      expect(got).toHaveLength(2);
+
+      button.setDisabled(false);
+      expect(button.el).toHaveAttribute("tabindex", "0");
+    } finally {
+      fake.extraButtonShape.keyboard = true;
+    }
+  });
+
   it("draws an icon once however often it is asked for the same one", () => {
     const button = mountIconButton(container(), () => {});
     button.setIcon("trash-2");

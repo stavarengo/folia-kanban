@@ -863,17 +863,22 @@ export class ButtonComponent {
  * A focusable `div` with no role. Enter and Space press it without a click, and its callback gets no
  * event. Disabled, it ignores presses and leaves the tab order.
  */
+/** Which release's icon button the fake draws. Before 1.13 it had no tab stop and no key handling. */
+export const extraButtonShape = { keyboard: true };
+
 export class ExtraButtonComponent {
   readonly extraSettingsEl: HTMLElement;
   disabled = false;
+  private readonly keyboard = extraButtonShape.keyboard;
   private callback: () => unknown = () => {};
 
   constructor(containerEl: HTMLElement) {
     this.extraSettingsEl = containerEl.createDiv("clickable-icon");
-    this.extraSettingsEl.tabIndex = 0;
     this.extraSettingsEl.addEventListener("click", () => {
       if (!this.disabled) this.callback();
     });
+    if (!this.keyboard) return;
+    this.extraSettingsEl.tabIndex = 0;
     this.extraSettingsEl.addEventListener("keydown", (evt) => {
       if (evt.key !== "Enter" && evt.key !== " ") return;
       evt.preventDefault();
@@ -904,6 +909,7 @@ export class ExtraButtonComponent {
   setDisabled(disabled: boolean): this {
     this.disabled = disabled;
     this.extraSettingsEl.classList.toggle("is-disabled", disabled);
+    if (!this.keyboard) return this;
     if (disabled) this.extraSettingsEl.removeAttribute("tabindex");
     else this.extraSettingsEl.tabIndex = 0;
     return this;

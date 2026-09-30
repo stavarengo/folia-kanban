@@ -92,6 +92,7 @@ export function mountIconButton(
       onClick(e);
     });
   applyOptions(el, options);
+  const keys = ensureKeyboard(el, button, () => onClick());
   let icon: string | undefined;
   return {
     el,
@@ -105,9 +106,35 @@ export function mountIconButton(
     },
     setDisabled: (disabled) => {
       button.setDisabled(disabled);
+      keys.setDisabled(disabled);
       el.setAttribute("aria-disabled", String(disabled));
     },
     remove: () => container.empty(),
+  };
+}
+
+/**
+ * Before 1.13 the host's icon button is a bare `div` that answers a click only: no tab stop, no
+ * Enter or Space. Where the host gave it none, the button gets both here, and loses its tab stop
+ * while disabled, as the host's own does from 1.13.
+ */
+function ensureKeyboard(
+  el: HTMLElement,
+  button: ExtraButtonComponent,
+  press: () => void,
+): { setDisabled(disabled: boolean): void } {
+  if (el.hasAttribute("tabindex")) return { setDisabled: () => {} };
+  el.tabIndex = 0;
+  el.addEventListener("keydown", (e) => {
+    if ((e.key !== "Enter" && e.key !== " ") || button.disabled) return;
+    e.preventDefault();
+    press();
+  });
+  return {
+    setDisabled: (disabled) => {
+      if (disabled) el.removeAttribute("tabindex");
+      else el.tabIndex = 0;
+    },
   };
 }
 
