@@ -110,6 +110,8 @@ export async function checkButtons(roots, fail) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
         );
+        if (node.attributes.properties.some((p) => ts.isJsxSpreadAttribute(p)))
+          fail(lineOf(node), "A spread on a host button can hand it a class the check never sees.");
         for (const value of classValues(attr?.initializer)) {
           if (value.includes("?"))
             fail(

@@ -458,6 +458,14 @@ describe("theme button contract", () => {
     reject("A host button's className must be written out");
   });
 
+  it("rejects a spread on a host button, which can carry a class of its own", () => {
+    edit(
+      "src/ui/AddColumn.tsx",
+      (s) => s + '\nconst probe = <HostIconButton className="folia-action-done" {...props} />;\n',
+    );
+    reject("A spread on a host button");
+  });
+
   it("checks buttons outside src/ui too", () => {
     writeFileSync(
       join(fixture, "src/elsewhere.tsx"),
