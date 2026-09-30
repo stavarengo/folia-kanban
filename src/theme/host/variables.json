@@ -207,6 +207,16 @@
       "pages": ["Foundations/Typography.md"],
       "scope": "app"
     },
+    "--font-smaller": {
+      "default": "0.875em",
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
+    },
+    "--font-smallest": {
+      "default": "0.8em",
+      "pages": ["Foundations/Typography.md"],
+      "scope": "app"
+    },
     "--font-ui-medium": {
       "default": "15px",
       "pages": ["Foundations/Typography.md"],

@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: var(--size-2-3);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   color: var(--text-muted);
 }
 /* An unchecked checkbox drawn as an ornament, not a control: it previews a to-do the card holds and

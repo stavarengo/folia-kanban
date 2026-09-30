@@ -24,7 +24,7 @@
   box-shadow: none;
   background: none;
   color: var(--text-muted);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   line-height: var(--line-height-tight);
   cursor: var(--cursor);
 }

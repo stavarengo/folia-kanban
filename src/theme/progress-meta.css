@@ -15,7 +15,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--size-2-1);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
@@ -30,7 +30,7 @@
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   display: flex;
   gap: var(--size-4-3);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   color: var(--text-muted);
 }
 .folia-card-meta span {
@@ -56,7 +56,6 @@
 }
 /* The reply state's own shape, so the two unread cues differ by more than hue. */
 .folia-unread-reply-mark {
-  font-size: var(--folia-font-size-xs);
   line-height: 1;
   margin-left: var(--size-2-1);
 }

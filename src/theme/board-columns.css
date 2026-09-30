@@ -68,7 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--size-4-1);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   background: var(--background-modifier-border);

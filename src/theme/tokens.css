@@ -52,8 +52,6 @@
   --folia-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.4); /* a lifted card or column */
 
   /* type */
-  --folia-font-size-xs: calc(var(--font-ui-smaller) * 11 / 12); /* secondary labels, 11px at the default */
-  --folia-font-size-xxs: calc(var(--font-ui-smaller) * 5 / 6); /* compact badges, 10px at the default */
   --folia-tracking-label: 0.04em; /* the uppercase micro-labels */
 
   /* Links, mixed toward the text colour because the default light link colour fails WCAG AA on

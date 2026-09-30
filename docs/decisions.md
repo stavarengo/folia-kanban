@@ -198,7 +198,7 @@ A component from the API is a different matter (#103). `ButtonComponent`, `Extra
 
 **Decided 2026-09-21. Search and filter chips share `--input-height`; icon buttons subtract one grid step, and mini buttons subtract two, with a fixed 24px minimum for both.**
 
-The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print uses five-sixths and eleven-twelfths of the smallest host UI font, producing 10px and 11px at its 12px default without depending on spacing. Pill ends are a literal `999px` because a fixed radius rung cannot guarantee a rounded end at every control height.
+The board keeps smaller actions inside cards and comments, but their height now moves with the theme's inputs. Making every action input-sized would enlarge those rows unnecessarily. Small print is the host's `--font-smaller` and `--font-smallest` (see "Small type is the host's relative steps"). Pill ends are a literal `999px` because a fixed radius rung cannot guarantee a rounded end at every control height.
 
 **Reviewed live 2026-09-21** in Obsidian 1.13.7, dark and light. The toolbar, cards, detail panel and edit-column dialog all hold: nothing clips, every control clears the 24px pointer-target minimum, and both schemes read the same. The review did surface that the mini tier never actually derives anything at Obsidian's own defaults, which is worth stating rather than leaving to be rediscovered: at `--input-height: 30px` the two-step reduction gives 22px, below the 24px minimum, so the mini tier (`--folia-hit-sm`) resolves to a flat 24px and only starts tracking the host above `--input-height: 32px`. The floor binding is the intended outcome — a pointer target below 24px is not an acceptable thing to derive — and 24px is also what the token was before it became a formula, so this changes no pixels today. It is kept as a `max()` rather than rewritten as a literal because a theme with taller inputs should still get taller mini buttons.
 
@@ -288,7 +288,7 @@ A value stays named when at least one of these holds: several rules must move to
 - **Layout**: the column width, shared with the drag overlay that stands in for a column, and the detail panel's property gutter, which every row lines up on.
 - **Lines that carry a state**: the 2px thick border and the 1px pointer outline (pinned by the button guard, see "Host button fills cannot be the only interaction signal"), the 2px focus outline, the 3px cue strip that priority, urgency and a column's accent share, and the accent ring on a field being edited. A theme may zero its border widths, which is why none of these reads `--border-width`.
 - **Elevation**: four shadows (see "Elevation is the board's own").
-- **Type**: the two small sizes, eleven twelfths and five sixths of `--font-ui-smaller`, and the tracking of the uppercase micro-labels (0.04em; the property keys' 0.03em and the section headings' 0.05em each have one rule, where they are written). Obsidian publishes no letter-spacing.
+- **Type**: the tracking of the uppercase micro-labels. The small sizes went to the host (see "Small type is the host's relative steps").
 - **Links**: the three link colours mixed toward the text colour (see "Readable text beats the host's exact colour").
 
 The channels are the column's accent and its two fades, the context and swatch colours, the description's measured height cap, the urgency cue's colour and wash, the icon size and stroke pair, and a card's side padding, which a nested card narrows. They are data, not design: `tokens.css` holds only the value everything reads where nothing was written.
@@ -322,6 +322,16 @@ Obsidian documents no durations or curves; its `--anim-*` variables are not on t
 `app.css` gives `.workspace-leaf` `contain: strict` and `isolation: isolate`, so the leaf is a stacking context of its own and numbers inside it are only compared with each other; the same holds inside Obsidian's dialog box. Two are in use, a dragged column over its neighbours and the detail dialog's sticky header over the body scrolling under it, each in one rule, where it is written. A surface portalled to the body is stacked against Obsidian's notices, menus and dialogs, and `pnpm portals:check` makes it read the app's scale. The board has no such surface today: its menus and dialogs are Obsidian's own.
 
 **What would change this:** a surface inside the leaf that has to sit between those two, or one that has to leave the leaf.
+
+## Small type is the host's relative steps
+
+**Decided 2026-09-30 (#94). Secondary labels are `--font-smaller`, compact badges `--font-smallest`. Tracking stays the board's.**
+
+The board used to size its small print from `--font-ui-smaller`: eleven twelfths of it for secondary labels and five sixths for badges, 11px and 10px at the default. Obsidian documents two relative steps for exactly that kind of text, and uses them itself for secondary interface text such as a setting description's code, a Bases summary name and the counts in the backlinks pane. Adopted, they measured 11.375px and 10.4px in every place the board uses them in Obsidian 1.13.7, light and dark, because every one sits in the board's 13px base text; the difference is under half a pixel and follows a theme that retunes the steps. They are relative to the text around them, so a small label nested in another small label shrinks twice: the reply arrow inside a card's comment count did, and now inherits the count's size instead.
+
+Obsidian publishes no letter-spacing. The uppercase micro-labels keep 0.04em, named because three rules share it; the property keys (0.03em) and the section headings (0.05em) each have one rule, where the value is written.
+
+**What would change this:** a theme that sets the relative steps far from their defaults and makes the board's labels unreadable, or Obsidian documenting a tracking value.
 
 ## What the board keeps painting itself, now that Obsidian's colour variables are in reach
 

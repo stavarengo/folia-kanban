@@ -7170,17 +7170,15 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     // The reason line wears `.folia-muted`, whose base rule sets a larger size than this line
     // asks for, so the refinement needs the same scope.
     expect(reason).toHaveClass("folia-muted");
-    expect(rule(".folia-scope .folia-title-reason")).toContain(
-      "font-size: var(--folia-font-size-xs)",
-    );
+    expect(rule(".folia-scope .folia-title-reason")).toContain("font-size: var(--font-smaller)");
     const why = within(detail).getByRole("button", { name: "Why this title?" });
     expect(why).toHaveClass("folia-link");
-    expect(rule(".folia-scope .folia-title-why")).toContain("font-size: var(--folia-font-size-xs)");
+    expect(rule(".folia-scope .folia-title-why")).toContain("font-size: var(--font-smaller)");
     await user.click(why);
     const step = detail.querySelector(".folia-title-step-reason") as HTMLElement;
     expect(step).toHaveClass("folia-muted");
     expect(rule(".folia-scope .folia-title-step-reason")).toContain(
-      "font-size: var(--folia-font-size-xs)",
+      "font-size: var(--font-smaller)",
     );
   });
 });

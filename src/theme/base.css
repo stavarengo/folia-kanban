@@ -76,13 +76,13 @@
 
 .folia-desc-refusal {
   margin: 0.25em 0 0;
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   color: var(--text-error);
 }
 
 .folia-card-folder-notice {
   padding: 0.5em var(--size-4-3);
-  font-size: var(--folia-font-size-xs);
+  font-size: var(--font-smaller);
   color: color-mix(in srgb, var(--text-warning) 70%, var(--text-normal));
   background: color-mix(in oklch, var(--text-warning) 12%, transparent);
   border-bottom: var(--border-width) solid var(--background-modifier-border);

@@ -93,10 +93,8 @@ describe("composite dimensions", () => {
     );
   });
 
-  it("keeps small text independent of spacing and targets above their fixed floor", () => {
+  it("keeps pointer targets above their fixed floor", () => {
     const tokens = declarations(".folia-scope");
-    expect(tokens["--folia-font-size-xxs"]).toBe("calc(var(--font-ui-smaller) * 5 / 6)");
-    expect(tokens["--folia-font-size-xs"]).toBe("calc(var(--font-ui-smaller) * 11 / 12)");
     expect(tokens["--folia-hit-min"]).toBe("24px");
     expect(declarations(".folia-scope .folia-swatch")).toMatchObject({
       "min-width": "var(--folia-hit-min)",
