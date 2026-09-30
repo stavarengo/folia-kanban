@@ -44,7 +44,6 @@ function makeRepo() {
  *  lets a test fire it at a chosen target, the way the view's keymap scope does. */
 function fakeHost() {
   let onSlash: ((event: KeyboardEvent) => boolean) | null = null;
-  let placement: (() => void) | null = null;
   return {
     bindSearchShortcut(handler: (event: KeyboardEvent) => boolean) {
       onSlash = handler;
@@ -65,21 +64,12 @@ function fakeHost() {
     },
     bound: () => onSlash !== null,
     ...fakeDetailModals(),
-    onPlacementChange(cb: () => void) {
-      placement = cb;
-      return () => {
-        placement = null;
-      };
-    },
-    /** Stand in for the leaf being moved, split, or otherwise put somewhere new. */
-    moved: () => act(() => placement?.()),
   };
 }
 
 /**
  * Swap in a ResizeObserver a test can drive. Records every (observer, target) pair so a test can
- * fire the one it means — the board watches several boxes at once, and which one moved is the
- * whole point of most of these assertions.
+ * fire the one it means.
  */
 function captureResizeObserver() {
   const original = globalThis.ResizeObserver;
@@ -102,8 +92,8 @@ function captureResizeObserver() {
   return {
     targets: () => watches.map((w) => w.target),
     /**
-     * Notify every observer watching `target`, the way one real resize does — the board watches
-     * its root from two places at once. `entries` defaults to that same target.
+     * Notify every observer watching `target`, the way one real resize does. `entries` defaults to
+     * that same target.
      */
     fire: (target: Element, entries: Element[] = [target]) => {
       const matching = watches.filter((w) => w.target === target);
@@ -444,115 +434,6 @@ describe("card detail — priority", () => {
   });
 });
 
-describe("status bar clearance", () => {
-  // Obsidian's bar lives outside the React tree, so RTL's unmount does not take it with it.
-  afterEach(() => document.querySelectorAll(".status-bar").forEach((el) => el.remove()));
-
-  /** Put a `.status-bar` of the given height into a document, the way Obsidian's own is. */
-  function addStatusBar(doc: Document, height: number) {
-    const bar = doc.createElement("div");
-    bar.className = "status-bar";
-    Object.defineProperty(bar, "getBoundingClientRect", {
-      configurable: true,
-      value: () => ({ height, width: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0 }),
-    });
-    doc.body.appendChild(bar);
-    return bar;
-  }
-
-  const clearance = () =>
-    (document.querySelector(".folia-root") as HTMLElement).style.getPropertyValue(
-      "--folia-statusbar-clearance",
-    );
-
-  it("reserves the bar's height plus a gutter when the board's window has one", async () => {
-    addStatusBar(document, 25);
-    render_(makeRepo());
-    await screen.findByText("Alpha");
-    expect(clearance()).toBe("31px");
-  });
-
-  it("reserves nothing when there is no bar, rather than guessing a height for it", async () => {
-    // A pop-out window has no status bar. The old code could not tell that apart from a failed
-    // measurement and reserved 32px anyway — dead space at the foot of every column.
-    render_(makeRepo());
-    await screen.findByText("Alpha");
-    expect(clearance()).toBe("0px");
-  });
-
-  it("follows a move to a window of the very same size, which resizes nothing", async () => {
-    // A ResizeObserver reports box changes, not a change of document, so a move into an
-    // identically sized window is silent. The host's placement signal is what covers that.
-    const host = fakeHost();
-    addStatusBar(document, 25);
-    render(
-      <App
-        repo={makeRepo()}
-        settings={DEFAULT_SETTINGS}
-        onUpdateSettings={() => {}}
-        today="2026-06-13"
-        mountedIn={document.body}
-        host={host}
-      />,
-    );
-    await screen.findByText("Alpha");
-    const root = document.querySelector(".folia-root") as HTMLElement;
-    expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("31px");
-
-    const home = root.parentElement!;
-    const frame = document.createElement("iframe");
-    document.body.appendChild(frame);
-    const popout = frame.contentDocument!;
-    try {
-      popout.body.appendChild(popout.adoptNode(root));
-      host.moved();
-      expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
-    } finally {
-      home.appendChild(document.adoptNode(root));
-    }
-  });
-
-  it("re-asks which bar the window has when the board is moved to another one", async () => {
-    // "Move to new window" carries the board's DOM across without re-rendering it, so nothing in
-    // React marks the move. Without re-resolving, the board keeps the old window's clearance.
-    const observers = captureResizeObserver();
-    try {
-      addStatusBar(document, 25);
-      render_(makeRepo());
-      await screen.findByText("Alpha");
-      const root = document.querySelector(".folia-root") as HTMLElement;
-      expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("31px");
-
-      const home = root.parentElement!;
-      const frame = document.createElement("iframe");
-      document.body.appendChild(frame);
-      const popout = frame.contentDocument!;
-      try {
-        popout.body.appendChild(popout.adoptNode(root));
-        expect(root.ownerDocument).toBe(popout);
-        // The root getting a new box is the only signal the move leaves behind.
-        observers.fire(root);
-        expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
-      } finally {
-        // Hand it back so the render's own teardown still finds what it mounted.
-        home.appendChild(document.adoptNode(root));
-      }
-    } finally {
-      observers.restore();
-    }
-  });
-
-  it("reads the bar from the board's own window, not from whichever one has focus", async () => {
-    // The pop-out case: the focused window has a status bar, the board's own window has none. The
-    // board must reserve nothing, not the 32px the old fallback wrote whenever it found no bar.
-    addStatusBar(document, 25);
-    const { doc, findByText } = renderInSecondWindow(makeRepo(), 800);
-    await findByText("Alpha");
-    const root = doc.querySelector(".folia-root") as HTMLElement;
-    expect(root.style.getPropertyValue("--folia-statusbar-clearance")).toBe("0px");
-  });
-});
-
 describe("card detail — description preview height", () => {
   /** Open Alpha's panel with the observer captured, and hand back the pieces a test measures. */
   async function openWithObserver() {
@@ -666,8 +547,8 @@ describe("card detail", () => {
     // View mode: fakeRepo renders the markdown as textContent (no raw editor yet).
     const rendered = await within(detail).findByText("Desc A");
     expect(rendered).toHaveClass("folia-desc-rendered");
-    // Obsidian's own reading-view class, so theme CSS (community themes/snippets scope to it) applies.
-    expect(rendered).toHaveClass("markdown-rendered");
+    // Obsidian's reading-view class is not published, so the container does not wear it.
+    expect(rendered).not.toHaveClass("markdown-rendered");
     expect(within(detail).queryByLabelText("Edit description")).not.toBeNull();
     expect(within(detail).queryByRole("textbox", { name: "Edit description" })).toBeNull();
     // Clicking the rendered area flips to the raw textarea.
@@ -2001,7 +1882,7 @@ describe("collapse/expand subitems", () => {
       name: 'Show 3 subitems, 1 done, for "Alpha"',
     });
     expect(collapsedToggle).toBeInTheDocument();
-    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "is-collapsed");
+    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "folia-collapsed");
     expect(within(alpha).queryByText("first todo")).toBeNull();
     expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
 

@@ -149,14 +149,6 @@ export interface BoardHost {
   bindSearchShortcut(onSlash: (event: KeyboardEvent) => boolean): () => void;
 
   /**
-   * Call back whenever the leaf's placement changes — moved to another window, split, closed
-   * elsewhere. The board cannot see this for itself: its DOM is carried across a move without a
-   * re-render, and a resize is only a proxy for it, silent when the new place happens to be the
-   * same size. Returns the unsubscribe function.
-   */
-  onPlacementChange(cb: () => void): () => void;
-
-  /**
    * Open the dialog the card detail panel is drawn in. `onClosed` runs whenever it closes, whoever
    * closed it — the person (Escape, the backdrop, the host's close button) or the board.
    */
@@ -340,49 +332,6 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
   // or a search box. A boolean rather than the board object so a reload, which builds a new board
   // every time, does not churn everything keyed on this.
   const boardShown = board !== null && error === null;
-
-  // Obsidian's status bar is fixed to the bottom of its window and the workspace runs underneath
-  // it, so the columns and the side detail panel reserve its height to keep their last content out
-  // from behind it. The bar belongs to the board's OWN window, which is why this reads the root's
-  // document rather than the focused window's: that one follows focus, and a pop-out window has no
-  // status bar at all, so a board there reserves nothing. Watching the bar's box is what keeps the
-  // reservation true when its height changes, rather than freezing it at the first board load.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!boardShown || !root) return;
-    let bar: Element | null = null;
-    let barHeight: ResizeObserver | null = null;
-    const apply = () => {
-      const h = bar?.getBoundingClientRect().height ?? 0;
-      root.style.setProperty("--folia-statusbar-clearance", `${h > 0 ? h + 6 : 0}px`);
-    };
-    const resolve = () => {
-      const found = root.ownerDocument.querySelector(".status-bar");
-      if (found !== bar) {
-        barHeight?.disconnect();
-        barHeight = null;
-        bar = found;
-        if (bar) {
-          barHeight = new ResizeObserver(apply);
-          barHeight.observe(bar);
-        }
-      }
-      apply();
-    };
-    resolve();
-    // "Move to new window" carries the board's DOM across without re-rendering it, so React never
-    // hears that the board is somewhere else now. The host says when the leaf has been placed
-    // somewhere new, which is the signal that does not depend on the destination being a different
-    // size from the source; the root's own box is watched too, for the resizes that are not moves.
-    const place = new ResizeObserver(resolve);
-    place.observe(root);
-    const offPlacement = host.onPlacementChange(resolve);
-    return () => {
-      place.disconnect();
-      offPlacement();
-      barHeight?.disconnect();
-    };
-  }, [boardShown, host]);
 
   /**
    * A lane is a view of its rule and never an owner of a card, so filing one into a lane it does

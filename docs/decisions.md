@@ -214,9 +214,7 @@ The drag motion itself is out of that query's reach: dnd-kit writes the sortable
 
 The former 1.5px token was described as lighter than ordinary borders, but ordinary borders were 1px. Keeping that numeric difference would make these outlines heavier, and the dashed outline and unchecked shape already distinguish their roles. A separator drawn with a background fill serves the same purpose as a border, so its element height follows the host hairline too. This deliberately replaces the earlier argument that a different drawing technique requires a separate thickness.
 
-The status-bar clearance is different. Its 32px fallback estimates a runtime measurement until the board measures the host status bar; it remains owned with the `--size-4-8` exception. Grid changes must not change that estimate.
-
-**What would change this:** live evidence that a supported theme's border width makes the markers ambiguous or separators unusable. A runtime measurement changing the status-bar clearance is expected and does not reopen the spacing decision.
+**What would change this:** live evidence that a supported theme's border width makes the markers ambiguous or separators unusable.
 
 ## Check component token dependencies conservatively
 
@@ -452,3 +450,21 @@ The Edit column dialog became a `Modal` built from `Setting` rows, the toast bec
 A network bind address still typed in its field when the settings tab goes away is asked about all the same. Closing the Settings window blurs the field, so that dialog opens in whichever window is left; nothing reaches the network without a yes.
 
 **What would change this:** Obsidian documenting an inline status or callout component a view can place inside itself, or a `Setting`-level message that covers more than an error.
+
+## Rendered descriptions and comments are dressed from the reading-view variables
+
+**Decided 2026-09-30 (#92). The description and comment containers do not wear `markdown-rendered`; `src/theme/detail-panel.css` draws their paragraphs, lists, quotes, code and tables from the variables Obsidian documents for them.**
+
+Obsidian's reading view hangs its prose rules on `.markdown-rendered`, and the developer docs do not publish that class, so the containers stopped wearing it (see "Folia's components do not wear Obsidian's undocumented class names"). Without it, code lost its background, quotes their bar, tables their cells, and lists took the browser's indent. What the docs do publish is the reading view's variables (`--code-background`, `--blockquote-border-*`, `--table-*`, `--p-spacing`, `--list-indent`…), which is what a theme restyles, so the panel's own rules read those and the look comes back. It was compared live against the old one, element by element, for paragraphs, tight, loose, nested and task lists, quotes, callouts, highlights, inline and fenced code (also inside a list item), a heading inside a list item, a four-row table and an embed; an element not in that list may still differ. What `MarkdownRenderer` puts inside, such as callouts and embeds, still carries the host's own classes and styling.
+
+What stays different, by choice or for want of a published value: tables keep the panel's text size rather than the reading view's larger one, as headings already do; a top-level list item is indented by `--list-indent` rather than the host's `3ch`; inline code padding is a size step rather than `0.15em 0.3em`. The code block's copy button is styled through its position (`pre > button`), because its class is not published either; `pnpm theme:check` allows a bare button only inside these two containers. Unlike the reading view's, it is faded rather than removed while the block is not hovered, so a keyboard can still reach it.
+
+**What would change this:** Obsidian publishing `markdown-rendered`, or a class for rendered-Markdown containers, with a compatibility promise.
+
+## The board keeps no clearance for the status bar
+
+**Decided 2026-09-30 (#92). Nothing is reserved at the foot of a column for Obsidian's floating status bar.**
+
+The board used to find the bar by its `.status-bar` class, measure it and pad the columns by its height. The class is not in the developer docs, and neither is anything that says how tall the bar is (`--status-bar-scroll-padding` resolves to nothing on 1.13.7), so the measurement went and nothing replaced it. It does not need replacing: every column ends in its add-card button or its rule line, and that footer plus the board's own padding sits between the last card and the window's edge. Measured live on 1.13.7 with the default theme, the last card of the tallest column ends 44px above the bar in the main area and in a bottom split, 44-56px above it in the right sidebar, and an open add-card composer, the one state with no footer, ends 6px above it. A pop-out window has no bar.
+
+**What would change this:** a bar that reaches a card or the composer's buttons, because a theme or snippet makes it taller (it follows `--status-bar-font-size`, which a theme may raise) or a release moves it. The composer is the first to go, with 6px to spare. A documented variable for the bar's height would be the way back, not the class.

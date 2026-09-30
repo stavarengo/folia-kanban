@@ -44,7 +44,7 @@ describe("the version gate", () => {
     expect(setErrorMessage).toHaveBeenCalledTimes(calls);
   });
 
-  it("makes the destructive action Obsidian's red CTA on 1.13 and only the older red below", () => {
+  it("makes the destructive action Obsidian's red CTA on 1.13 and leaves it plain below", () => {
     const button = () => {
       const b = { setDestructive: vi.fn(), setCta: vi.fn(), buttonEl: { addClass: vi.fn() } };
       b.setDestructive.mockReturnValue(b);
@@ -62,6 +62,6 @@ describe("the version gate", () => {
     markDestructiveAction(older as unknown as ButtonComponent);
     expect(older.setDestructive).not.toHaveBeenCalled();
     expect(older.setCta).not.toHaveBeenCalled();
-    expect(older.buttonEl.addClass).toHaveBeenCalledWith("mod-warning");
+    expect(older.buttonEl.addClass).not.toHaveBeenCalled();
   });
 });

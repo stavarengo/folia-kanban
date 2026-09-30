@@ -31,8 +31,8 @@ import { chromium } from "playwright-core";
 const BOARD = "feature-showcase/Showcase Board.md";
 // Lets theme and panel transitions finish, so axe reads the final colours rather than a blend.
 const SETTLE_MS = 1000;
-const RENDERED_INTERNAL_LINK =
-  ":is(.folia-desc-rendered, .folia-comment-text).markdown-rendered a.internal-link";
+const RENDERED_MARKDOWN = ".folia-desc-rendered, .folia-comment-text";
+const RENDERED_INTERNAL_LINK = `:is(${RENDERED_MARKDOWN}) a.internal-link`;
 const HOST_EXCEPTION =
   'documented host exception (see docs/decisions.md, "Readable text beats the host\'s exact colour")';
 const THEMES = [
@@ -152,7 +152,7 @@ async function measure(scope) {
   // Nothing under the pointer, so no hover colour is measured as the resting one.
   await page.mouse.move(0, 0);
   return page.evaluate(
-    async ({ RENDERED_INTERNAL_LINK, scope }) => {
+    async ({ RENDERED_MARKDOWN, RENDERED_INTERNAL_LINK, scope }) => {
       const modal = document.querySelector(".folia-detail-modal");
       if (scope === "board" && modal) throw new Error("the detail dialog is open over the board");
       if (scope === "detail" && !modal) throw new Error("the detail dialog is not open");
@@ -368,7 +368,7 @@ async function measure(scope) {
           const n = {
             target: node.target.join(" "),
             text: el?.textContent?.trim().slice(0, 40),
-            folia: Boolean(el?.closest(".folia-scope") && !el.closest(".markdown-rendered")),
+            folia: Boolean(el?.closest(".folia-scope") && !el.closest(RENDERED_MARKDOWN)),
             renderedLink: Boolean(el?.matches(RENDERED_INTERNAL_LINK)),
             hostLinkColor: el
               ? hex(rgba(getComputedStyle(el).getPropertyValue("--link-color")))
@@ -418,7 +418,7 @@ async function measure(scope) {
         probe.remove();
       }
     },
-    { RENDERED_INTERNAL_LINK, scope },
+    { RENDERED_MARKDOWN, RENDERED_INTERNAL_LINK, scope },
   );
 }
 

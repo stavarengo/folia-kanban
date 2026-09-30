@@ -136,7 +136,7 @@ export function Icon({ name, className, ...rest }: IconProps): JSX.Element {
     <svg
       // `{...rest}` still wins for every other prop (a caller override is deliberate there), but
       // `className` alone is additive: spreading it after the base class would drop `folia-icon`
-      // whenever a caller passes one (e.g. a state class like `is-collapsed`), and every consumer
+      // whenever a caller passes one (e.g. a state class like `folia-collapsed`), and every consumer
       // relies on `folia-icon` for sizing/alignment as well as any state-scoped CSS selector.
       className={className ? `folia-icon ${className}` : "folia-icon"}
       viewBox="0 0 24 24"

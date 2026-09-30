@@ -83,9 +83,6 @@ import { isBoardFrontmatter } from "./obsidian/viewMode";
 import { markdownTabOutcome } from "./obsidian/boardRedirect";
 import { pathTaken } from "./obsidian/pathTaken";
 
-/** Marks the header button this plugin adds to a board note's Markdown editor. */
-const BOARD_ACTION_CLASS = "folia-open-as-board";
-
 /** Re-point, or drop, a per-tab path record after a rename or delete. */
 function follow<K extends object>(record: WeakMap<K, string>, key: K, op: FileOp): void {
   const current = record.get(key);
@@ -129,6 +126,10 @@ export default class FoliaKanbanPlugin extends Plugin {
   /** Tabs that opened a note the metadata cache had not read yet, asked about again once it has.
    *  Only these: a note that gains `folia-board` while it is open is never swapped. */
   private readonly coldOpens = new WeakMap<WorkspaceLeaf, string>();
+
+  /** The "back to the board" header button each Markdown editor has. `addAction` hands back the
+   *  element and offers no way to remove an action, so this is the only handle for taking it off. */
+  private readonly boardActions = new WeakMap<MarkdownView, HTMLElement>();
 
   private unloaded = false;
 
@@ -359,23 +360,28 @@ export default class FoliaKanbanPlugin extends Plugin {
       const view = leaf.view;
       if (!(view instanceof MarkdownView)) continue;
       const wanted = view.file ? this.isBoard(view.file) : false;
-      const existing = view.containerEl.querySelector(`.view-actions .${BOARD_ACTION_CLASS}`);
-      if (wanted && !existing) {
+      const existing = this.boardActions.get(view);
+      const shown = existing !== undefined && view.containerEl.contains(existing);
+      if (wanted && !shown) {
         const action = view.addAction("layout-grid", "Open as Folia Kanban board", () => {
           // Read the file at click time: one MarkdownView outlives the file it started on.
           const current = view.file;
           if (current) void this.openBoardFrom(leaf, current.path);
         });
-        action.addClass(BOARD_ACTION_CLASS);
+        this.boardActions.set(view, action);
       } else if (!wanted && existing) {
         existing.remove();
+        this.boardActions.delete(view);
       }
     }
   }
 
   private removeMarkdownActions(): void {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      leaf.view.containerEl.querySelector(`.view-actions .${BOARD_ACTION_CLASS}`)?.remove();
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) continue;
+      this.boardActions.get(view)?.remove();
+      this.boardActions.delete(view);
     }
   }
 

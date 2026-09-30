@@ -1022,8 +1022,7 @@ export class VaultRepository implements CardRepository, HoverParent {
   }
 
   renderMarkdown(el: HTMLElement, markdown: string, sourcePath: string): () => void {
-    if (el.empty) el.empty();
-    else el.innerHTML = "";
+    el.empty();
     // A managed Component owns the render's child lifecycle (embeds, post-processors). render is
     // async and APPENDS into its target while running, so render into a detached clone and only
     // commit the result if this run wasn't cancelled. Without the detached target, a stale in-flight
@@ -1048,7 +1047,7 @@ export class VaultRepository implements CardRepository, HoverParent {
       // from this record — dropping it is what makes a torn-down render stop naming a repository
       // whose links are gone, and lets the element release its hold on that repository.
       if (hoverSources.get(el)?.render === c) hoverSources.delete(el);
-      el.innerHTML = "";
+      el.empty();
     };
   }
 

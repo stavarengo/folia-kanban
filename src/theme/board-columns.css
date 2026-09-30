@@ -96,7 +96,6 @@
   flex-direction: column;
   gap: var(--folia-space-md);
   padding: var(--folia-space-md);
-  padding-bottom: var(--folia-statusbar-clearance); /* last card clears the fixed status bar */
   overflow-y: auto;
   min-height: var(--folia-column-body-h-min);
   flex: 1 1 auto;

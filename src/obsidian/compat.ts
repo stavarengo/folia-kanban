@@ -35,12 +35,11 @@ export function setSettingError(setting: Setting, message: string | null): void 
 
 /**
  * Make a button the dialog's destructive action. From 1.13 that is `setDestructive().setCta()`,
- * the classes Obsidian's own delete prompt wears. Below it, only the `mod-warning`
- * class the deprecated `setWarning` adds: the same red without the deprecated call, and no CTA
- * class beside it to compete with that red.
+ * the classes Obsidian's own delete prompt wears. Below it the button stays plain, so on 1.11 and
+ * 1.12 a destructive confirm is not red: the only documented call there, `setWarning`, is
+ * deprecated and the community scan refuses it, and its `mod-warning` class is not published.
  */
 export function markDestructiveAction(button: ButtonComponent): ButtonComponent {
   if (requireApiVersion("1.13.0")) return button.setDestructive().setCta();
-  button.buttonEl.addClass("mod-warning");
   return button;
 }

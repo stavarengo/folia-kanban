@@ -81,7 +81,6 @@ export function fakeDetailModals(doc: Document = document) {
 export function testHost(doc: Document = document): BoardHost {
   return {
     bindSearchShortcut: () => () => {},
-    onPlacementChange: () => () => {},
     openDetailModal: fakeDetailModals(doc).openDetailModal,
   };
 }

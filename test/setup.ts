@@ -34,6 +34,11 @@ if (hasDom) {
       return this.createEl("div", o);
     };
   }
+  if (!Node.prototype.empty) {
+    Node.prototype.empty = function (this: Node) {
+      while (this.firstChild) this.removeChild(this.firstChild);
+    };
+  }
 
   // jsdom has no ResizeObserver and no layout to drive one. The stub records nothing and never
   // fires: the code under test measures once on mount anyway, and a test that wants a resize calls

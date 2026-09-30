@@ -48,10 +48,6 @@ export class KanbanView extends FileView {
       // failed to load, a tab with no board note yet — would silently eat the key.
       return () => registered.forEach((handler) => scope.unregister(handler));
     },
-    onPlacementChange: (cb) => {
-      const ref = this.app.workspace.on("layout-change", cb);
-      return () => this.app.workspace.offref(ref);
-    },
     openDetailModal: (onClosed) => openDetailModal(this.app, onClosed),
   };
 
@@ -67,6 +63,8 @@ export class KanbanView extends FileView {
     // parent so every global hotkey still resolves while a board is focused. It starts empty; the
     // board fills it through `host` for exactly as long as it has a search box.
     this.scope = new Scope(this.app.scope);
+    this.containerEl.addClass("folia-view");
+    this.contentEl.addClass("folia-view-content");
   }
 
   getViewType(): string {

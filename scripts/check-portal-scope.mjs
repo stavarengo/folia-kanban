@@ -7,9 +7,8 @@
 //
 // The rule cuts both ways. A portal whose container IS the board root (`rootRef.current`) never left
 // the scope, so the class there is redundant — and worse than redundant: it re-declares the whole
-// token block below the root, shadowing any value App sets live on the root element
-// (`--folia-statusbar-clearance` today) with the static fallback for everything underneath. So those
-// portals must not carry it.
+// token block below the root, shadowing any value set live on the root element with the static
+// fallback for everything underneath. So those portals must not carry it.
 //
 // Leaving the root costs a second thing, and this check counts it too. Obsidian isolates each
 // `.workspace-leaf` (`contain: strict`, `isolation: isolate`), so a surface that stays inside the

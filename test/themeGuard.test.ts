@@ -377,6 +377,28 @@ describe("theme button contract", () => {
     reject("not a bare button that reaches rendered Markdown");
   });
 
+  it("accepts a rule that styles the rendered Markdown's own button inside its container", () => {
+    edit(
+      "src/theme/detail-panel.css",
+      (s) => s + "\n.folia-desc-rendered pre > button:focus { color: var(--text-normal); }\n",
+    );
+    const result = spawnSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" });
+    expect(result.stderr).not.toContain("not a bare button that reaches rendered Markdown");
+    expect(result.status).toBe(0);
+  });
+
+  it.each([
+    ".folia-scope :not(.folia-desc-rendered) button",
+    ".folia-scope :has(.folia-comment-text) button",
+    ".folia-scope :is(.folia-desc-rendered, .folia-btn) button",
+  ])("rejects a button rule that only names the rendered Markdown containers: %s", (selector) => {
+    edit(
+      "src/theme/detail-panel.css",
+      (s) => s + `\n${selector}:focus { color: var(--text-normal); }\n`,
+    );
+    reject("not a bare button that reaches rendered Markdown");
+  });
+
   it("rejects card-action hover refinements imported before the icon base", () => {
     edit("src/theme/index.css", (s) =>
       s.replace(

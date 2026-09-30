@@ -29,6 +29,6 @@
 }
 /* Unscoped so the same "points right when collapsed" reading also works for the static
    collapse-all/expand-all menu icons (ColumnMenu), which aren't inside `.folia-card-subitems-toggle`. */
-.folia-icon.is-collapsed {
+.folia-icon.folia-collapsed {
   transform: rotate(var(--folia-rotate-collapsed));
 }

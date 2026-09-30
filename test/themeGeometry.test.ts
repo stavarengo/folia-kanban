@@ -118,7 +118,6 @@ describe("composite dimensions", () => {
         `max(var(--folia-hit-min), calc(var(--input-height) - var(--size-4-${step})))`,
       );
     }
-    expect(tokens["--folia-statusbar-clearance"]).toBe("32px");
   });
 
   it("keeps a one-letter priority choice at least as wide as the host button is tall", () => {

@@ -379,7 +379,7 @@ function CardItemInner({
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Icon name="chevron-down" className={subitemsCollapsed ? "is-collapsed" : undefined} />
+          <Icon name="chevron-down" className={subitemsCollapsed ? "folia-collapsed" : undefined} />
           {subitemsCollapsed
             ? `${stats?.checklist ?? 0} subitem${(stats?.checklist ?? 0) === 1 ? "" : "s"}, ${stats?.checklistDone ?? 0} done`
             : "Subitems"}

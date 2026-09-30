@@ -11,8 +11,8 @@
    same tokens there. `pnpm portals:check` (scripts/check-portal-scope.mjs) keeps that pairing
    honest, including the one portal that must NOT carry it: the detail panel is portalled INTO the
    root, where the tokens already inherit, so the class would only re-declare the block a second
-   time below the root — shadowing whatever App sets live on the root element
-   (`--folia-statusbar-clearance`) with the static fallback for everything under that portal.
+   time below the root — shadowing anything set live on the root element with the static
+   fallback for everything under that portal.
 
    Raw design values are allowed HERE and nowhere else in the bundle. */
 
@@ -322,7 +322,6 @@
      the dashed pill around "No color" collapses into a circle. */
   --folia-swatch-color: initial;
   --folia-desc-max-h: calc(var(--folia-viewport-h) - var(--folia-desc-h-max-offset));
-  --folia-statusbar-clearance: 32px;
   --folia-urgency-color: transparent;
   --folia-urgency-tint: transparent;
 }

@@ -60,21 +60,22 @@
   padding: 0 var(--folia-space-md);
 }
 
-/* The view content area has default padding; the board needs the full pane with no inset. */
-.workspace-leaf-content[data-type="folia-kanban-view"] {
+/* The host pads every view's content box; the board needs the whole pane. The host rule weighs two
+   classes and a theme's stylesheet loads after the plugin's, so a theme restating that rule would
+   win a tie. The repeated class outweighs it, as the attribute selector this replaced did. */
+.folia-view .folia-view-content.folia-view-content {
   padding: 0;
-}
-.workspace-leaf-content[data-type="folia-kanban-view"] .view-content {
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
 }
 
+/* The board scrolls its own columns and clips everything else itself. The content box around it
+   scrolls (`overflow: auto`), and in a sidebar through a rule heavier than Folia's, so a board wider
+   than the pane would otherwise scroll there as a whole. */
 .folia-root {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
   background: var(--background-primary);
   position: relative;
 }

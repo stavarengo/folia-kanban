@@ -43,6 +43,30 @@ function subjectNodes(selector) {
   return nodes.slice(lastCombinator + 1);
 }
 
+/** The containers the renderer draws a card's description and comments into. A rule scoped inside
+ *  one of them styles the rendered Markdown's own buttons (a code block's copy button) on purpose,
+ *  because the class the reading view styles them through is not published. */
+const RENDERED_MARKDOWN = new Set(["folia-desc-rendered", "folia-comment-text"]);
+
+/** Whether a compound requires one of those classes: a plain class, or one every branch of an
+ *  `:is()`/`:where()` requires. A class under `:not()` or `:has()` requires nothing of the element. */
+function requiresRenderedMarkdown(node) {
+  if (node.type === "class") return RENDERED_MARKDOWN.has(node.value);
+  if (node.type !== "pseudo" || ![":is", ":where"].includes(node.value.toLowerCase())) return false;
+  return node.nodes.every(
+    (branch) => branch.nodes.length > 0 && branch.nodes.some(requiresRenderedMarkdown),
+  );
+}
+
+function insideRenderedMarkdown(selector) {
+  const nodes = selector.nodes;
+  const ancestors = nodes.slice(
+    0,
+    nodes.findLastIndex((node) => node.type === "combinator"),
+  );
+  return ancestors.some(requiresRenderedMarkdown);
+}
+
 function hasButtonSubject(nodes) {
   return nodes.some((node) => {
     if (node.type === "tag") return node.value.toLowerCase() === "button";
@@ -144,7 +168,8 @@ export async function checkButtons(roots, fail) {
             if (node.type === "decl") declarations.set(node.prop, node.value);
           unconditionalRules.set(selector, declarations);
         }
-        const nodes = subjectNodes(selectorParser().astSync(selector).first);
+        const parsed = selectorParser().astSync(selector).first;
+        const nodes = subjectNodes(parsed);
         const own = nodes.map((node) => node.toString()).join("");
         const classes = [];
         for (const node of nodes) {
@@ -155,7 +180,7 @@ export async function checkButtons(roots, fail) {
           (node) => node.type === "class" && node.value.startsWith("folia-"),
         );
         const where = `${root.source.input.file}:${rule.source.start.line}`;
-        if (hasButtonSubject(nodes) && !hasDirectClass)
+        if (hasButtonSubject(nodes) && !hasDirectClass && !insideRenderedMarkdown(parsed))
           fail(
             where,
             "Select Folia buttons by their own class, not a bare button that reaches rendered Markdown.",

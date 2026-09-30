@@ -210,7 +210,7 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="chevron-down" className="is-collapsed" /> Expand all subitems
+        <Icon name="chevron-down" className="folia-collapsed" /> Expand all subitems
       </button>
 
       <div className="folia-menu-divider" />
