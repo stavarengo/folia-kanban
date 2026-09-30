@@ -79,8 +79,14 @@ export function mountIconButton(
   );
   el.addEventListener(
     "keydown",
-    () => {
+    (e) => {
       click = undefined;
+      // A held key repeats its keydown, and the host presses the button on every one. A native
+      // button presses once for a held Space, and a repeated Delete or Mark done is never meant.
+      if (e.repeat && isPressKey(e)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
     },
     { capture: true },
   );
@@ -113,6 +119,10 @@ export function mountIconButton(
   };
 }
 
+function isPressKey(e: KeyboardEvent): boolean {
+  return e.key === "Enter" || e.key === " ";
+}
+
 /**
  * Before 1.13 the host's icon button is a bare `div` that answers a click only: no tab stop, no
  * Enter or Space. Where the host gave it none, the button gets both here, and loses its tab stop
@@ -126,7 +136,7 @@ function ensureKeyboard(
   if (el.hasAttribute("tabindex")) return { setDisabled: () => {} };
   el.tabIndex = 0;
   el.addEventListener("keydown", (e) => {
-    if ((e.key !== "Enter" && e.key !== " ") || button.disabled) return;
+    if (!isPressKey(e) || button.disabled) return;
     e.preventDefault();
     press();
   });

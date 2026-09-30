@@ -80,6 +80,22 @@ describe("the icon button", () => {
     expect(got.slice(1)).toEqual([undefined, undefined]);
   });
 
+  it.each([true, false])("presses once for a held key (host handles keys: %s)", (keyboard) => {
+    fake.extraButtonShape.keyboard = keyboard;
+    try {
+      const onClick = vi.fn();
+      const button = mountIconButton(container(), onClick);
+      for (const key of ["Enter", " "]) {
+        fireEvent.keyDown(button.el, { key });
+        fireEvent.keyDown(button.el, { key, repeat: true });
+        fireEvent.keyDown(button.el, { key, repeat: true });
+      }
+      expect(onClick).toHaveBeenCalledTimes(2);
+    } finally {
+      fake.extraButtonShape.keyboard = true;
+    }
+  });
+
   it("ignores presses while disabled", () => {
     const onClick = vi.fn();
     const button = mountIconButton(container(), onClick, { middleClick: true });
