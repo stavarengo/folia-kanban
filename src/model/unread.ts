@@ -58,7 +58,7 @@ export function normalizeAuthor(raw: string): string {
 /**
  * Whether a name can sign a comment, and why not when it cannot — the judgement, with the wording
  * left to whoever asked (the same split as `descriptionRefusal`). A leading `@` and surrounding
- * space are forgiven, because `@codex` is the obvious way for a writer to name itself; anything
+ * space are forgiven, because `@assistant` is the obvious way for a writer to name itself; anything
  * else {@link normalizeAuthor} would rewrite is refused rather than silently changed, so a name
  * that signs a comment is the name that was asked for. Control characters are refused too: they
  * are invisible in the note, survive normalization, and could collide with {@link SELF}.

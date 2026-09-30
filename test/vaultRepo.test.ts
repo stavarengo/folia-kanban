@@ -1512,10 +1512,10 @@ describe("the rest of the vault surface", () => {
       () => "Rafa",
     );
 
-    await repo.addComment("basic/Cards/One.md", "from the agent", "Codex");
+    await repo.addComment("basic/Cards/One.md", "from the agent", "Assistant");
 
     const comments = parseBody(app.vault.text("basic/Cards/One.md") ?? "").comments;
-    expect(comments[0]?.author).toBe("Codex");
+    expect(comments[0]?.author).toBe("Assistant");
     expect(isMine(comments[0]?.author ?? null, "Rafa")).toBe(false);
     expect(unreadComments(comments, undefined, "Rafa").kind).toBe("unread");
   });

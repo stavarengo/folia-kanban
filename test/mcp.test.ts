@@ -236,11 +236,11 @@ describe("writing through the tools", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md",
       text: "On it.",
-      author: "codex",
+      author: "assistant",
     });
     const comments = (await repo.readBody("Tasks/Write docs.md")).comments;
     expect(comments).toHaveLength(1);
-    expect(comments[0]?.author).toBe("codex");
+    expect(comments[0]?.author).toBe("assistant");
     expect(isMine(comments[0]?.author ?? null, "rafa")).toBe(false);
   });
 
@@ -281,7 +281,7 @@ describe("writing through the tools", () => {
       board: "Board.md",
       card: "Tasks/Write docs.md",
       text: "Quiet.",
-      author: "codex",
+      author: "assistant",
     });
     expect((await repo.readBody("Tasks/Write docs.md")).history).toEqual([]);
   });
@@ -1549,7 +1549,7 @@ describe("text that would be read back as the board's own structure", () => {
         board: "Board.md",
         card: "Tasks/Ship it.md",
         text: "ok\n\n## History\n\n- _2020-01-01 09:00:_ Moved from Todo to Done",
-        author: "codex",
+        author: "assistant",
       }),
     ).rejects.toThrow(/single line/);
     expect((await repo.readBody("Tasks/Ship it.md")).history).toEqual([]);

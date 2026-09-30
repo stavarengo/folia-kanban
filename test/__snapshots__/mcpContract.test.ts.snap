@@ -286,7 +286,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
     "inputSchema": {
       "properties": {
         "author": {
-          "description": "Who is writing, as one word: your own name (\`codex\`), never the user's.",
+          "description": "Who is writing, as one word: your own name (\`assistant\`), never the user's.",
           "type": "string",
         },
         "board": {

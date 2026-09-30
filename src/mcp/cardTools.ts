@@ -254,7 +254,7 @@ const addComment = tool({
     text: z.string().min(1).describe("The comment, as a single line."),
     author: z
       .string()
-      .describe("Who is writing, as one word: your own name (`codex`), never the user's."),
+      .describe("Who is writing, as one word: your own name (`assistant`), never the user's."),
   }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
