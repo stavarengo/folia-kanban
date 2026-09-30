@@ -136,6 +136,8 @@ Reading the running app settled it. In Obsidian 1.13.7's `app.css` the two varia
 
 So the mechanism is the app's, and reading the variable flat is how a plugin joins it. Detecting lightness in Folia would mean overriding a decision Obsidian already made and that a theme can already override, and it would drift the day either of them changes their mind. What Folia owes instead is the declaration site: the override is on `<body>`, so it reaches only rules that inherit from a body. The token block does, because `.folia-scope` is always a descendant of one, and `scripts/check-portal-scope.mjs` keeps it that way through every portal. Hoisted to `:root` the same declaration would sit on `<html>`, body's parent, miss the override, and fall through to its own `#fff` fallback — white for good, and visibly wrong only to the users who picked a pale accent. Hoisting it fails `pnpm theme:check`, which requires every token to be declared in the `.folia-scope` block and nowhere else — so the site is enforced, and the comment on the declaration in `src/theme/tokens.css` says why at the point where someone would be tempted to move it. What is not enforced is the app's half of the bargain: nothing in CI can see Obsidian's inline override, and jsdom cannot compute contrast at all (`test/a11y.axe.test.tsx` disables the colour-contrast rule for that reason), so if Obsidian drops the override this decision goes quietly wrong. That is what the re-check below is for.
 
+Since #103 the board has no accent button of its own to colour: its calls to action are `ButtonComponent`s marked with `setCta`, so the text on the accent is the app's own rule, and the `--folia-on-accent` token went with the hand-drawn face that read it.
+
 **What would change this:** Obsidian branching between the two variables in CSS, or dropping the inline-body override in favour of something a plugin has to read for itself. The check is one line in the running app — set a pale accent in Settings → Appearance and read `document.body.getAttribute('style')`; if `--text-on-accent` is no longer rewritten there, this decision is stale and the contrast failure is real again.
 
 ## The community-directory action's release mode
@@ -190,6 +192,8 @@ None of those classes is API. They are not in the developer docs, they carry no 
 
 The cost is real and accepted: every control the board draws is dressed by hand, and every hover, focus and disabled state with it. `src/theme/host/variables.json` is what makes that bearable — it is the registry of what Obsidian actually documents, so "is there a variable for this?" is a lookup rather than a memory, and `pnpm theme:check` fails any variable the board reads that is neither documented nor recorded as observed in `src/theme/host/observed.json`.
 
+A component from the API is a different matter (#103). `ButtonComponent`, `ExtraButtonComponent`, `DropdownComponent` and `ProgressBarComponent` put `mod-cta`, `clickable-icon`, `dropdown` or `setting-progress-bar` on the elements they create, and that is the component keeping its own promise, not Folia wearing a class. What the rule still forbids is Folia reading those classes: every rule that dresses a host control selects a Folia class added to its element, never the host's.
+
 **What would change this:** Obsidian documenting a class-name contract for plugins — a published list with a compatibility promise, the way the CSS variables have one. A theme-only convention, or a class that merely appears stable across a few releases, is not that.
 
 ## Dense controls derive from the host input height
@@ -200,6 +204,8 @@ The board keeps smaller actions inside cards and comments, but their height now 
 
 **Reviewed live 2026-09-21** in Obsidian 1.13.7, dark and light. The toolbar, cards, detail panel and edit-column dialog all hold: nothing clips, every control clears the 24px pointer-target minimum, and both schemes read the same. The review did surface that the mini tier never actually derives anything at Obsidian's own defaults, which is worth stating rather than leaving to be rediscovered: at `--input-height: 30px` the two-step reduction gives 22px, below the 24px minimum, so `--folia-hit-sm` resolves to a flat 24px and only starts tracking the host above `--input-height: 32px`. The floor binding is the intended outcome — a pointer target below 24px is not an acceptable thing to derive — and 24px is also what the token was before it became a formula, so this changes no pixels today. It is kept as a `max()` rather than rewritten as a literal because a theme with taller inputs should still get taller mini buttons.
 
+Since #103 the text buttons are Obsidian's own and take the host's `--input-height` whole; the dropdowns are Obsidian's too and keep a property value's height (see "The board's dropdowns are Obsidian's"). The icon buttons are Obsidian's too and stay on the two tiers above through Folia classes on their elements. Their glyph is the host's size, not the tier's (see the next entry).
+
 **What would change this:** live evidence of clipping or poor legibility in a supported desktop theme.
 
 ## Popover icons are the host's extra-small tier
@@ -209,6 +215,8 @@ The board keeps smaller actions inside cards and comments, but their height now 
 A live review read the popover icons as having shrunk from 16px to 14px during the move onto the host icon scale. They had not. Before that move every menu-item icon was written `<Icon name="…" size={14} />` in `ColumnMenu.tsx` and `CardContextMenu.tsx`, and the theme carried no `.folia-icon` width rule, so the SVG attribute governed and those icons rendered at 14px. Deleting the `size` prop and setting `--folia-icon-size: var(--icon-xs)` on the containers reproduced the same 14px through the host variable that defines it. The two-tier reading — lighter icons inside a popover, full-weight icons on the buttons you click on the board — is therefore the pre-existing design, now expressed in Obsidian's own scale instead of in hand-written numbers, and it survives a user changing the host icon scale.
 
 Two icons did change size, both upward and both toward the scale: the "no colour" and "no priority" ✕ went from a hand-written 11px to 14px (both have since become words, see "No value" below), and the card quick actions from 15px to 16px.
+
+The icon buttons have since become Obsidian's `ExtraButtonComponent` (#103), which draws its own glyph at the host's `--icon-size`, 18px at the defaults. The card actions, the detail panel's header actions and ⋯ grew from 16px to that size, and the panel's small row actions grew from 14px. They are left at the host's size on purpose. Folia sets `--icon-size` only on its own `.folia-icon`, so that host-rendered Markdown never inherits Folia's sizes, and resizing a host glyph would mean reaching into the component's SVG. Every icon button in the app draws at this size, so the board now matches them.
 
 **What would change this:** Obsidian redefining `--icon-xs` far from 14px, or live evidence that a popover icon at the extra-small tier is hard to recognise.
 
@@ -240,17 +248,15 @@ This is stricter than browser cycle detection for descendants. [CSS resolves cus
 
 **What would change this:** a necessary component override that the conservative rule rejects despite demonstrably safe selector placement. That would require a narrower check with a regression test, not a claim that inheritance preserves unresolved dependency edges.
 
-## The board's selects carry no dropdown chevron
+## The board's dropdowns are Obsidian's, chevron included
 
-**Decided 2026-09-21. Folia's `<select>` elements take Obsidian's own dropdown face and go without its arrow.**
+**Decided 2026-09-21; rewritten 2026-09-30 (#103). The detail panel's Status and subtask column pickers are `DropdownComponent`s. Folia keeps their type and height, never their side padding.**
 
-Obsidian 1.13.7 dresses every bare `<select>` through `select, .combobox-button, .dropdown`, so background, padding, height, radius, shadow and the focus ring arrive for free once the board stops overriding them. The chevron does not: it is an inline data-URI SVG declared on the `.dropdown` class alone, with a second declaration under `.theme-dark` for the light-on-dark version. `--dropdown-background-position`, `--dropdown-background-size` and `--dropdown-background-blend-mode` describe that image's three background layers and paint nothing without it, so declaring them would be three inert lines.
+This entry used to keep the selects bare and go without the chevron, because the glyph is a data-URI declared on the `.dropdown` class alone and wearing an undocumented class is ruled out (see "Folia's components do not wear Obsidian's undocumented class names" above). `DropdownComponent` puts that class on its own element, which is the component's business, not Folia's, so the chevron, its dark variant and the host's hover and disabled states now arrive with the component. Folia's rules reach the element only through Folia classes it adds (`folia-status-select`, `folia-subtask-column`).
 
-The only way to the glyph is putting `.dropdown` on the element, and wearing an undocumented class is ruled out (see "Folia's components do not wear Obsidian's undocumented class names" above). Drawing a chevron from Folia's own icon set is not available to a `<select>`, whose shadow DOM takes no children. Leaving `appearance` alone and letting the platform draw its native arrow would restore an indicator and lose the app's look.
+What stays the board's is what made the bare selects work in the field grid. Type: the host sets `--font-ui-small`, and beside the panel's text inputs, which all take the metadata input size, 13px reads as a mistake, so the Status picker takes the value's size and height. Padding: `--dropdown-padding` holds `2.4em` at the end, against `0.8em` at the start, for the chevron. That gutter used to be a reason to refuse the variable. Now the chevron is drawn in it, so both pickers keep the host's side padding, and the subtask picker sets only its vertical padding. Focus stays the board's accent outline. The host's 3px `--background-modifier-border-focus` ring, `#555555` on `#333333` and about 1.7:1, is removed on every host control rather than drawn inside it.
 
-This has a visible cost and it is worth naming. The board's selects show no dropdown indicator, which was already true before this decision — the app's own rule sets `appearance: none` on every bare select — but the decision is what keeps it true. `--dropdown-padding` is therefore not adopted either: its end padding is `2.4em` against `0.8em` on the other side, room reserved for the glyph, and holding that space open while drawing nothing in it would advertise the gap. The selects use the board's own symmetric padding and its own type size, so they sit correctly beside the text inputs in the same field grid. Everything else about them is the app's, hover included. Focus is the one exception in the other direction: Obsidian's own ring for a focused select is 3px of `--background-modifier-border-focus`, `#555555` on the select's own `#333333`, which is about 1.7:1, so the board's accent `:focus-visible` outline keeps drawing over it instead of deferring to it.
-
-**What would change this:** Obsidian publishing the dropdown indicator as a variable (an `--dropdown-icon` or equivalent), or the board replacing `<select>` with a button-plus-popover it draws itself, at which point the indicator is Folia's to draw.
+**What would change this:** Obsidian dropping the chevron from `DropdownComponent`, or a picker that needs something a `<select>` cannot hold, which would make it a button with a menu instead.
 
 ## Focus stays the board's accent until Obsidian ships the focus outline
 
@@ -263,16 +269,6 @@ The theme-authoring guide shows both declared on `:root` with system keywords (`
 This is a general shape and not only a focus story: a variable that is right as part of a set can be wrong on its own, and "half of it is still an improvement" is the assumption to check rather than the conclusion to reach.
 
 **What would change this:** Obsidian defining the focus-outline pair in a shipped build, or documenting it on a CSS-variables reference page. Either makes it a registry entry, and then the whole set arrives together and the question reopens with the OS colour on the table.
-
-## The settings-shaped on/off row stays a checkbox
-
-**Decided 2026-09-21. `.folia-field-toggle` keeps a native checkbox; the `--toggle-*` variables are not used.**
-
-Obsidian's toggle is a track with a sliding thumb, and its eleven variables describe exactly that: `--toggle-width`, `--toggle-radius`, `--toggle-border-width`, `--toggle-thumb-width/height/radius/color`, plus a small variant for dense rows. Read live in 1.13.7, the app builds it entirely out of `.checkbox-container` — a wrapper element with `::before` and `::after` pseudo-elements, holding a visually hidden `input` — so the shape exists in the markup, not in the input. A native checkbox cannot wear it: it has no children to make a thumb from, and faking one would mean drawing a whole control by hand to imitate a control the host already draws.
-
-Nothing is lost by waiting. The same build styles every bare `input[type="checkbox"]` from the `--checkbox-*` set, so the row already shows Obsidian's own checkbox, correctly sized, filled and ticked. What is left is the difference between a checkbox and a toggle on a settings-shaped row, which is a markup question rather than a variable one.
-
-**What would change this:** the board adopting the host's `checkbox-container` markup for that row, which is the same decision as whether these panels should be built from Obsidian's `Setting` API at all.
 
 ## A host variable has to describe the object, not sit near it
 
@@ -302,7 +298,7 @@ Phase 1 of the theme work moved the board onto Obsidian's semantic colour variab
 
 The plain warning surfaces beside them did move. The folder notice and the "behind" bar take `--text-warning` as their hue rather than the priority ramp's orange, which is what they were built out of; they still mix, because Obsidian documents no warning background at all.
 
-**The danger and success fills stay on the palette.** `--folia-danger` and `--folia-success` fill the over-limit badge, the urgency tint and the progress bar, and Obsidian publishes no fill for either: the documented pairing for `--background-modifier-error` is `--text-normal`, which makes it a surface text sits on rather than a fill. They stay on the palette's red and green, and separate from `--folia-text-error` and `--folia-text-success`, which are what every foreground reads. One token doing both duties is how a fill ends up painting text.
+**The danger fill stays on the palette.** `--folia-danger` fills the over-limit badge and the urgency tint, and Obsidian publishes no fill for it: the documented pairing for `--background-modifier-error` is `--text-normal`, which makes it a surface text sits on rather than a fill. It stays on the palette's red, and separate from `--folia-text-error`, which is what every foreground reads. The success fill went when the progress bar became Obsidian's (see "The card progress bar is Obsidian's"). One token doing both duties is how a fill ends up painting text.
 
 **The filter chip's "on" state keeps its accent tint.** `--background-modifier-active-hover` is the app's answer for a plain active surface, and `.folia-column-body.folia-is-over` now uses it. The filter chip is not that: an active filter is a statement about what the whole board is currently showing, and the accent tint is the signal. A neutral active background would flatten it into the same grey as a hovered row.
 
@@ -316,9 +312,9 @@ The plain warning surfaces beside them did move. The folder notice and the "behi
 
 **The subitems chevron does not take `--nav-collapse-icon-color`.** It was adopted and then reverted on measurement, which is the useful part. The pair Obsidian publishes for a collapse arrow — the colour and its collapsed variant — are the **same value** in the default theme, `#666666` in dark and `#ababab` in light, so the collapsed state gains no colour from them and the rotation remains the whole signal either way. Worse, they are sidebar colours, tuned against `--background-secondary`; this chevron sits on a card, against `--background-primary`, where `#ababab` on `#ffffff` is about 2.3:1 — under the 3:1 minimum for a non-text indicator. Adopting a variable because its name matches the widget would have made the control harder to see in light mode in exchange for nothing. The chevron keeps its label's colour.
 
-**Icon buttons are dimmer at rest than they were, and that is the point.** `--icon-color` measures the same `#b3b3b3` as the `--text-muted` the buttons used before, and `--icon-color-hover` is that same value again, so the whole hover response now lives in `--icon-opacity` 0.85 → 1 rather than in a colour step from `#b3b3b3` to `#dadada`. The resting icon is therefore slightly dimmer and the hover lands where the old resting state was. That is not a loss to be fixed: it is precisely what Obsidian's own `.clickable-icon` does, so the board's icon buttons now behave like every other icon button in the window, which is the whole point of this phase. Contrast stays above the 3:1 non-text minimum in both modes (about 5.6:1 in dark, 4.6:1 in light).
+**Icon buttons are Obsidian's own now, so their colours and opacity are the host's.** Phase 1 copied Obsidian's icon-button response (`--icon-color` with the hover in `--icon-opacity` 0.85 → 1) onto a button of the board's. Since #103 the button is the host's `ExtraButtonComponent`, and the copy is gone. Only the Mark done and Delete hover colours are the board's.
 
-**Equal-specificity refinements still depend on import order.** `pnpm theme:check` now enforces scoped button face rules and resting property coverage through `scripts/theme-buttons.mjs`. It does not simulate the full cascade between the board's own state rules. `src/theme/index.css` puts card action refinements after the icon-button base, and source-order regression tests protect the known link and icon refinements, including the done/delete hover colours. A guard mutation test reverses the button and card-action imports and requires rejection. A new state interaction still needs a live check. The deleted `buttons:check` did not settle equal-specificity ordering either.
+**Equal-specificity refinements still depend on import order.** `pnpm theme:check` enforces scoped button face rules and resting property coverage through `scripts/theme-buttons.mjs`. It does not simulate the full cascade between the board's own state rules. Source-order regression tests protect the known link refinements. The Mark done and Delete hover colours win over the host's icon button by weight, and the guard fails any later rule of the board's that sets a hover colour on the same buttons. A new state interaction still needs a live check.
 
 **`--folia-font-mono` no longer has `monospace` behind it, and nothing needs to stand behind it.** `--font-monospace` is not in Obsidian's published variable list, so if a build did not define it, `font-family: var(--folia-font-mono)` would be invalid at computed-value time and the filter suggestion key, its one reader, would silently take the interface font. The fallback went because the audit's 02-05 asked for it, and the guard would refuse to put it back anyway: a literal nobody documents is exactly what it no longer accepts. What makes that safe is a check someone made, not a guess: the variable was found declared on `body` in the app bundle of every release from 1.11.4, the manifest's `minAppVersion`, to 1.13.7 that was looked at (the builds and the command are in `src/theme/host/observed.json`; Insider-only builds were not), and `pnpm theme:check` now fails if an observed variable's `oldestChecked` is newer than `minAppVersion`, so lowering the floor, or recording a new undocumented variable seen only on a newer build, fails until someone checks the older one. The guard trusts `oldestChecked` as written; it cannot open a bundle itself. Documented variables have no such check: `host/variables.json` records no version they arrived in.
 
@@ -368,11 +364,11 @@ So `pnpm contrast:live` prints those nodes as this documented exception, and onl
 
 ## Button faces share the host palette without flattening board semantics
 
-**Decided 2026-09-21. Neutral controls use the host interactive fills; links, disclosure controls, chips and swatches keep the shapes and signals that describe their purpose.**
+**Decided 2026-09-21; updated 2026-09-30 (#103). Text and icon buttons are Obsidian's own components and wear its faces. Links, disclosures, chips, swatches and the add tiles keep the shapes and signals that describe their purpose.**
 
-The filter chip keeps Phase 3's pill radius and coloured on-state. Card chips keep their tag geometry and tuned tints, and colour swatches keep the host swatch radius and shadow. Applying the button radius or neutral fill to those would erase distinctions established in earlier phases. Links and disclosure controls remain transparent. Dialog buttons and column-add buttons retain the host raised shadow; the dashed add-column tile stays transparent and flat so its border remains visible.
+Since #103 the board draws no neutral or primary button face of its own. A primary action is a `ButtonComponent` set as the call to action, so it takes the host's accent. The hand-drawn controls that remain are the groups named in "Icon-and-label controls stay hand-drawn" and "In-text links and disclosures stay hand-drawn". The filter chip keeps Phase 3's pill radius and coloured on-state. Card chips keep their tag geometry and tuned tints, and colour swatches keep the host swatch radius and shadow. Applying the button radius or neutral fill to those would erase distinctions established in earlier phases. Links and disclosure controls remain transparent. The column-add button keeps the host raised shadow, and the dashed add-column tile stays transparent and flat so its border remains visible.
 
-The icon-button focus indicator remains the accent outline from Phase 3, with the icon radius preserved. The default host border-focus colour still has the contrast limitation recorded above. There is no toggled icon button, so `--icon-color-active` remains unused; pressed and menu-open icons use `--icon-color-focused`.
+Every control's focus indicator is the board's accent outline from Phase 3. The host's own focus ring is removed from its controls, because its default border-focus colour has the contrast limitation recorded above.
 
 **What would change this:** a change to what these controls represent, or a shipped host focus indicator that meets the earlier decision's conditions.
 
@@ -402,7 +398,7 @@ Suggestions need no signal of Folia's. Every suggesting input, the search box in
 
 Borders must remain distinguishable from the fills they enclose. The dashed add-column tile returns to transparent with no shadow, and filter chips rest on `--background-primary`. Bordered controls retain these fills while hovered or pressed; `--interactive-hover` can equal their border by definition on macOS. Their pointer outline supplies the state change. The add-column editing form keeps its resting appearance under the pointer. Selected colours and rings remain unchanged.
 
-A disabled custom-colour swatch is a read-only sample, so it retains full opacity and its selection ring. Disabled-action styling names Folia classes explicitly and cannot fade host-rendered Markdown buttons. Focus rounding is local to the column title and parent reference, which otherwise have no corner; controls with a radius retain their own.
+A disabled custom-colour swatch is a read-only sample, so it retains full opacity and its selection ring. A disabled button is dimmed by Obsidian, and none of the hand-drawn controls is ever disabled, so the board draws no disabled face of its own. Focus rounding is local to the column title and parent reference, which otherwise have no corner; controls with a radius retain their own.
 
 Mutation tests protect the pointer-outline consumers and pressed width, including their owned token values. These are source contracts, not a contrast or general state-cascade resolver: default-theme and macOS-variable checks in the running app remain the evidence for distinct appearances.
 
@@ -547,3 +543,36 @@ Obsidian bundles Moment and hands it to plugins as `moment` (it is `window.momen
 A folder or file spelled exactly as written always wins, so Linux, where `Cards/` and `cards/` can coexist, keeps meaning what it says. Only the part the value itself wrote is compared ignoring case: the board note's own folder is a real path, so `./Cards` beside `basic/Board.md` never takes a `Basic/cards` next to it. Without an exact match the board used to load empty and then create the folder as written beside the real one, which hid the real cards with no message. Obsidian's own case-insensitive lookup, `getAbstractFileByPathInsensitive`, is not in `obsidian.d.ts` and returns the first hit, so it cannot tell one match from several; the matches are counted over `getAllLoadedFiles()` instead, the way `pathTaken` judges new names. Guessing between several spellings was left out: whichever one it picked, the cards in the others would vanish from the board as silently as before, and creating the folder as written would add one more spelling.
 
 **What would change this:** Obsidian documenting a case-insensitive lookup that reports every match, which would replace the walk over every loaded file.
+||||||| parent of 2da7f29 (docs: record which controls are Obsidian's and which stay the board's)
+
+## A subtask's done tick stays a checkbox
+
+**Decided 2026-09-30 (#103). The tick beside each subtask in the detail panel is a bare `<input type="checkbox">`, not a `ToggleComponent`.**
+
+A subtask is a task line in the card's note, and Obsidian draws a task's tick as a checkbox, in the editor and in reading view. `ToggleComponent` is the settings switch, for turning an option on or off, so it would make the panel's list look unlike the note it edits. No component in the API draws a task tick. The bare checkbox takes its look from Obsidian's rule for every `input[type="checkbox"]`, which sizes, fills and ticks it from the `--checkbox-*` variables. That rule is observed in the app's stylesheet, not documented, and it is the only such dependency this panel keeps. The settings-shaped on/off field this decision once covered is now a toggle in the Edit column dialog, built from `Setting.addToggle` (#87).
+
+**What would change this:** Obsidian documenting a task-checkbox component, or the panel rendering the subtasks through `MarkdownRenderer` as the note itself does.
+
+## Icon-and-label controls stay hand-drawn
+
+**Decided 2026-09-30 (#103). The add-column tile, a column's "Add a card" footer, the toolbar's filter chips and a card's subitems disclosure are `<button>`s the board draws.**
+
+Each shows an icon and a label together. `ButtonComponent.setButtonText` replaces the button's children, and `setIcon` swaps its first child for the icon, so one component can hold one or the other, never both. `ExtraButtonComponent` holds an icon only. The filter chips are also toggles, with `aria-pressed` and a tinted on-state (see "What the board keeps painting itself"), and no component draws a pressed button. The subitems disclosure carries `aria-expanded`, a rotating chevron and a count. `scripts/theme-buttons.mjs` holds the list of classes these controls use and fails any other JSX `<button>`.
+
+**What would change this:** a component that takes an icon and a label, or a pressed state, which would bring the matching group across.
+
+## In-text links and disclosures stay hand-drawn
+
+**Decided 2026-09-30 (#103). A card's "↳ parent" reference, the detail panel's title disclosure and "Why this title?", relation and subcard titles, and "Add a description…" are `<button>`s the board draws as text.**
+
+They sit in running text and must wrap with it. A `ButtonComponent` is a box one input high, and an `ExtraButtonComponent` is an icon. So `.folia-link` in `base.css` still undoes the two rules Obsidian's stylesheet puts on every button: `white-space: nowrap` and `height: var(--input-height)`. It is one of two rules the board keeps against undocumented app CSS, and both reset the host's values rather than reading them. The other is in `host-controls.css`: it removes the grey ring Obsidian's stylesheet draws around a focused control, so the board's accent outline is the only one. `scripts/theme-buttons.mjs` lists these classes beside the icon-and-label ones.
+
+**What would change this:** Obsidian documenting a link-styled button, or its stylesheet no longer shaping bare buttons, which would make the reset inert.
+
+## The card progress bar is Obsidian's
+
+**Decided 2026-09-30 (#103). A card's subtask bar is a `ProgressBarComponent`, and the board keeps only the count beside it and the ARIA on its own wrapper.**
+
+Three things went with the hand-drawn bar. It no longer turns green when every subtask is done: the count beside it still turns success-coloured and shows a tick, so the state keeps a cue that is not colour on a bar. It is no longer a pill: the host's bar is 8px high with a 4px corner, where the board's was 4px and fully rounded. And its fill no longer slides to the new width: the component sets the width directly. The component sets no role, so the board's `.folia-progress` wrapper carries `role="progressbar"` and the values. In the light theme the empty track is faint on a white card, which is the host's choice of colour.
+
+**What would change this:** the component gaining a state for a complete bar, or live evidence that the empty track cannot be seen in a supported theme.
