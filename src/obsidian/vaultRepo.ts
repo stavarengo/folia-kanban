@@ -24,10 +24,18 @@ import type {
   SubItem,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
-import type { ConfirmRequest, PropertyNamesInUse, SearchField, SuggestSource } from "../model/repo";
+import type {
+  ConfirmRequest,
+  MenuAnchor,
+  MenuRow,
+  PropertyNamesInUse,
+  SearchField,
+  SuggestSource,
+} from "../model/repo";
 import type { ColumnPatch } from "../model/columns";
 import { boardNotice, confirmAction, promptTrash } from "./dialogs";
 import { openColumnEditor } from "./columnEditModal";
+import { showMenu } from "./menu";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
 import { parseFrontmatter } from "./frontmatter";
@@ -885,6 +893,10 @@ export class VaultRepository implements CardRepository {
 
   editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void {
     openColumnEditor(this.app, column, onSave);
+  }
+
+  showMenu(rows: readonly MenuRow[], at: MenuAnchor): void {
+    showMenu(rows, at);
   }
 
   async renameCard(path: string, newTitle: string): Promise<string> {

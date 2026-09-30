@@ -92,14 +92,6 @@
       "reason": "a hairline accent outline over the card's own elevation, drawn as a shadow so it adds no layout."
     }
   },
-  "choice-active": {
-    "$value": "0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent)",
-    "cssVar": "--folia-shadow-choice-active",
-    "source": {
-      "owned": true,
-      "reason": "the double ring that marks the chosen priority or column in a menu, cut out of the surface behind it."
-    }
-  },
   "swatch-active": {
     "$value": "0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal)",
     "cssVar": "--folia-shadow-swatch-active",

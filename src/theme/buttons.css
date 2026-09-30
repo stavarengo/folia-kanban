@@ -93,8 +93,7 @@
   transition: opacity var(--folia-dur-fast) ease, background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease;
 }
 .folia-column:hover .folia-column-menu-btn,
-.folia-scope .folia-column-menu-btn:focus-visible,
-.folia-scope .folia-column-menu-btn[aria-expanded="true"] {
+.folia-scope .folia-column-menu-btn:focus-visible {
   opacity: var(--folia-opacity-shown);
 }
 
@@ -102,9 +101,6 @@
 .folia-scope .folia-filter-chip:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-column-add:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-item:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-column:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-prio:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:hover:where(:not(:disabled, :focus-visible)) {
   outline: var(--folia-control-outline);
   outline-offset: calc(-1 * var(--folia-border-width-thick));
@@ -114,9 +110,6 @@
 .folia-scope .folia-filter-chip:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-column-add:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-item:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-prio:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:active:where(:not(:disabled, :focus-visible)) {
   /* Hovered and pressed used to differ by outline width alone — one pixel of line at dpr 1, and
      under `.mod-macos`, where the host fill pair collapses and `--input-shadow` is `none`, the only
@@ -140,8 +133,6 @@
    The pointer cue stays; it takes the tile's own line style so the tile stays a tile. */
 .folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .folia-is-editing)),
-.folia-scope .folia-menu-prio-none:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-menu-prio-none:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:active:where(:not(:disabled, :focus-visible)) {
   outline-style: dashed;
@@ -152,9 +143,6 @@
 .folia-scope .folia-filter-chip:disabled,
 .folia-scope .folia-column-add:disabled,
 .folia-scope .folia-add-column:disabled,
-.folia-scope .folia-menu-item:disabled,
-.folia-scope .folia-menu-prio:disabled,
-.folia-scope .folia-menu-column:disabled,
 .folia-scope .folia-link:disabled,
 .folia-scope .folia-card-subitems-toggle:disabled,
 .folia-scope .folia-desc-empty:disabled {

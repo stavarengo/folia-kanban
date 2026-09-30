@@ -17,7 +17,7 @@ const obsidianRestrictedGlobals = (
 
 const focusedWindowGlobals = ["activeDocument", "activeWindow"];
 const focusedWindowMessage =
-  "This is the focused window's, not necessarily the board's. Use useBoardDocument()/useBoardWindow() (src/ui/context.ts).";
+  "This is the focused window's, not necessarily the board's. Take the document from an element the board rendered (`el.ownerDocument`).";
 
 /** Node's globals: the plugin runs on mobile too, where none of them exist. */
 const nodeGlobals = ["process", "Buffer", "global", "require", "__dirname"];
@@ -73,7 +73,7 @@ function restrictedGlobalRules({ node = false, dom = false } = {}) {
  */
 export const a11yExceptions = [
   {
-    files: ["src/ui/CardDetail.tsx", "src/ui/ColumnMenu.tsx"],
+    files: ["src/ui/CardDetail.tsx"],
     rules: { "jsx-a11y/no-noninteractive-element-interactions": "off" },
   },
   {
@@ -187,11 +187,9 @@ export default [
       "src/obsidian/vaultRepo.ts",
       "src/ui/App.tsx",
       "src/ui/Board.tsx",
-      "src/ui/CardContextMenu.tsx",
       "src/ui/CardDetail.tsx",
       "src/ui/CardItem.tsx",
       "src/ui/Column.tsx",
-      "src/ui/ColumnMenu.tsx",
       "src/ui/Toolbar.tsx",
       "src/ui/cardView.ts",
     ],

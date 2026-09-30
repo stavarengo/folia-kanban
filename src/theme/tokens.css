@@ -53,11 +53,6 @@
 
   /* layout — the sizes the board's own furniture is cut to */
   --folia-col-w: calc(var(--size-4-1) * 75); /* single source for column width + drag-overlay width */
-  --folia-menu-w-min: calc(var(--size-4-1) * 50); /* narrowest a popover may shrink to */
-  --folia-menu-w-max: calc(var(--size-4-1) * 80); /* widest a popover may grow to fit its longest label */
-  --folia-menu-w: calc(var(--size-4-1) * 56);
-  --folia-menu-h-max: calc(var(--size-4-1) * 110);
-  --folia-menu-pad: var(--size-4-3);
   --folia-search-w: calc(var(--size-4-1) * 80);
   --folia-add-column-w: calc(var(--size-4-1) * 55);
   /* Capped at 40% of the panel body, which is a size container (`.folia-detail-body`), so a narrow
@@ -85,9 +80,7 @@
   --folia-comment-edit-h-min: var(--size-4-12);
   --folia-column-body-h-min: var(--size-4-12);
   --folia-viewport-h: 100vh;
-  --folia-viewport-w: 100vw;
   --folia-col-park-margin: 60vw; /* how far a parked column slides out of the row */
-  --folia-menu-rise: var(--size-4-1);
   --folia-action-rise: var(--size-2-1);
   --folia-control-h: var(--input-height);
   --folia-control-pad-x: var(--size-4-3);
@@ -145,7 +138,6 @@
   --folia-ring: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 30%, transparent);
   --folia-ring-soft: 0 0 0 2px color-mix(in oklch, var(--folia-accent) 25%, transparent);
   --folia-shadow-card-selected: 0 0 0 1px var(--folia-accent), var(--folia-shadow-card);
-  --folia-shadow-choice-active: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--folia-accent);
   --folia-shadow-swatch-active: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
   --folia-blur-actions: blur(3px);
 
@@ -277,20 +269,6 @@
   --folia-z-index-raised: 2;
   --folia-z-index-sticky: 30;
 
-  /* z-index — surfaces portalled to <body>. Those leave the leaf and land in the root stacking
-     context, side by side with Obsidian's own notices, menus, tooltips and modals, so they read
-     off the app's `--layer-*` scale instead of a parallel ladder of private numbers that could
-     only tie or win by coincidence. A Folia menu therefore sits exactly where an Obsidian menu
-     sits.
-
-     Reading the scale means accepting what it says: a menu (65) draws over a modal (50), so one
-     opened from a dialog is usable, and under a tooltip (70), so a tooltip over it is legible.
-
-     The fallback is the failure mode, not a second opinion: `z-index` does not inherit, so an
-     unresolved `var()` computes to `auto` and would drop a menu behind the ribbon and the status
-     bar. The numbers repeat what the scale says today and are only ever read if it goes missing. */
-  --folia-z-index-app-menu: var(--layer-menu, 65);
-
   /* opacity. `hidden` and `shown` are the two ends of a fade rather than a shade of anything —
      they are named so the rules that reveal a hover affordance say which end they mean. */
   --folia-opacity-hidden: 0;
@@ -313,11 +291,11 @@
      places that draw one disagree about what that should look like on purpose — the strip recedes
      to a border, the chip to muted text. Give this token a real value and both silently change. */
   --folia-ctx-color: initial;
-  /* The swatch's fill, written inline by the two palette rows because there is one rule and nine
+  /* The swatch's fill, written inline by the palette row because there is one rule and nine
      possible colours. `initial` is the guaranteed-invalid value, so on the "no colour" swatch —
      the same class with nothing written onto it — the declaration that reads this token is thrown
      away entirely and the swatch is left transparent, which is the empty slot it is meant to be.
-     Its face is `.folia-swatch-none`, of equal specificity and LATER in column-menu.css; move it
+     Its face is `.folia-swatch-none`, of equal specificity and LATER in swatches.css; move it
      above and the base rule's thick transparent border, fixed width and zero padding win back, and
      the dashed pill around "No color" collapses into a circle. */
   --folia-swatch-color: initial;

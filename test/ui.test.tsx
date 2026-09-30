@@ -124,7 +124,6 @@ function renderInSecondWindow(repo: FakeRepo, innerHeight: number) {
       settings={DEFAULT_SETTINGS}
       onUpdateSettings={() => {}}
       today="2026-06-13"
-      mountedIn={container}
       host={testHost(doc)}
     />,
     { container, baseElement: doc.body },
@@ -139,7 +138,6 @@ const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
       settings={settings}
       onUpdateSettings={() => {}}
       today="2026-06-13"
-      mountedIn={document.body}
       host={testHost()}
     />,
   );
@@ -162,7 +160,6 @@ function renderStateful(
         settings={settings}
         onUpdateSettings={(patch) => setSettings((s) => applySettingsPatch(s, patch))}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />
     );
@@ -1307,7 +1304,6 @@ describe("detail dialog", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={{ ...testHost(), ...modals }}
       />,
     );
@@ -1431,7 +1427,6 @@ describe("detail dialog", () => {
         settings={{ ...DEFAULT_SETTINGS, addCardFlow: "detail" }}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={{ ...testHost(), openDetailModal: opened }}
       />,
     );
@@ -1454,7 +1449,6 @@ describe("detail dialog", () => {
         settings={{ ...DEFAULT_SETTINGS, addCardFlow: "detail" }}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={{ ...testHost(), openDetailModal: opened }}
       />,
     );
@@ -1938,7 +1932,7 @@ describe("collapse/expand subitems", () => {
     expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
 
     await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
-    await user.click(screen.getByRole("button", { name: "Collapse all subitems" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collapse all subitems" }));
 
     expect(within(todoCol).queryByText("Mid")).toBeNull();
     expect(within(todoCol).queryByText("Leaf")).toBeNull();
@@ -1950,11 +1944,43 @@ describe("collapse/expand subitems", () => {
     ]);
 
     await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
-    await user.click(screen.getByRole("button", { name: "Expand all subitems" }));
+    await user.click(screen.getByRole("menuitem", { name: "Expand all subitems" }));
 
     // Expand-all reaches the grandchild too, not just Root's direct child.
     expect(within(todoCol).getByText("Mid")).toBeInTheDocument();
     expect(within(todoCol).getByText("Leaf")).toBeInTheDocument();
+  });
+
+  it("column menu's collapse-all reaches a card that arrived while the menu was open", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Root.md": {
+        fm: { type: "task", status: "todo" },
+        body: "\n# Root\n\n## Subtasks\n- [ ] [[Leaf]]\n",
+      },
+      "Tasks/Leaf.md": { fm: { type: "task" }, body: "\n# Leaf\n" },
+    });
+    const settingsBox = { current: DEFAULT_SETTINGS };
+    renderStateful(repo, DEFAULT_SETTINGS, settingsBox);
+    await screen.findByText("Root");
+    const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
+    await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
+    const row = screen.getByRole("menuitem", { name: "Collapse all subitems" });
+
+    repo.files.set("Tasks/Late.md", {
+      basename: "Late",
+      fm: { type: "task", status: "todo" },
+      body: "\n# Late\n\n## Subtasks\n- [ ] [[Tail]]\n",
+    });
+    repo.files.set("Tasks/Tail.md", { basename: "Tail", fm: { type: "task" }, body: "\n# Tail\n" });
+    act(() => repo.notify());
+    await within(todoCol).findByText("Tail");
+    await user.click(row);
+
+    expect(Object.keys(settingsBox.current.collapsedCards).sort()).toEqual([
+      "Tasks/Late.md",
+      "Tasks/Root.md",
+    ]);
   });
 
   it("column menu's collapse-all also reaches a card whose only subitem is an inline-todos preview", async () => {
@@ -1964,7 +1990,7 @@ describe("collapse/expand subitems", () => {
     expect(todoCol.querySelectorAll(".folia-card-next-todo")).toHaveLength(2);
 
     await user.click(within(todoCol).getByRole("button", { name: /Column options/ }));
-    await user.click(screen.getByRole("button", { name: "Collapse all subitems" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collapse all subitems" }));
 
     expect(todoCol.querySelectorAll(".folia-card-next-todo")).toHaveLength(0);
   });
@@ -2198,77 +2224,36 @@ describe("pop-out window ownership", () => {
     }
   };
 
-  const findIn = (doc: Document, label: string) =>
-    doc.querySelector<HTMLElement>(`[aria-label="${label}"]`);
-
-  it("opens the column menu in the board's own document, and hands the editor to the host", async () => {
+  // The menu takes its document from the element or event it is anchored to, never from
+  // `activeDocument`, so what the board owes it is an anchor inside the board's own document.
+  it("anchors the column menu under its own button, and hands the editor to the host", async () => {
     const repo = makeRepo();
     render_(repo);
     await screen.findByText("Alpha");
 
     await inOtherFocusedWindow(async (decoy) => {
       const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Column options for Todo" }));
+      const button = screen.getByRole("button", { name: "Column options for Todo" });
+      await user.click(button);
+      expect(repo.menus.at(-1)?.at).toEqual({ below: button });
 
-      const menu = await waitFor(() => {
-        const el = findIn(document, "Column options: Todo");
-        expect(el).not.toBeNull();
-        return el as HTMLElement;
-      });
-      expect(findIn(decoy, "Column options: Todo")).toBeNull();
-      expect(document.body.contains(menu)).toBe(true);
-
-      await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
+      await user.click(
+        within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Edit column/ }),
+      );
       expect(repo.columnEditor?.column.id).toBe("todo");
       expect(decoy.body.childElementCount).toBe(0);
     });
   });
 
-  it("closes the column menu from a click in the board's own document", async () => {
-    render_(makeRepo());
-    await screen.findByText("Alpha");
-
-    await inOtherFocusedWindow(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Column options for Todo" }));
-      await waitFor(() => expect(findIn(document, "Column options: Todo")).not.toBeNull());
-      // The outside-click teardown has to listen on the board's document too: hung off the focused
-      // window's, nothing the user does in the board's own window would ever reach it.
-      fireEvent.mouseDown(document.body);
-      await waitFor(() => expect(findIn(document, "Column options: Todo")).toBeNull());
-    });
-  });
-
-  it("walks the card menu with the arrow keys read from the board's own document", async () => {
-    render_(makeRepo());
-    const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
-
-    await inOtherFocusedWindow(async () => {
-      fireEvent.contextMenu(card, { clientX: 20, clientY: 20 });
-      const menu = await waitFor(() => {
-        const el = findIn(document, "Card actions");
-        expect(el).not.toBeNull();
-        return el as HTMLElement;
-      });
-      const items = Array.from(
-        menu.querySelectorAll<HTMLButtonElement>(".folia-menu-item:not(:disabled)"),
-      );
-      items[0]?.focus();
-      // Arrow navigation finds the current item by asking a document who has focus. Asked of the
-      // focused window's document, the answer is "nobody here", the menu can't place itself in its
-      // own list, and every arrow key lands back on the first item.
-      fireEvent.keyDown(menu, { key: "ArrowDown" });
-      expect(document.activeElement).toBe(items[1]);
-    });
-  });
-
-  it("opens a card's context menu in the board's own document", async () => {
-    render_(makeRepo());
+  it("anchors a card's context menu at the click, in the board's own document", async () => {
+    const repo = makeRepo();
+    render_(repo);
     const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
 
     await inOtherFocusedWindow(async (decoy) => {
       fireEvent.contextMenu(card, { clientX: 20, clientY: 20 });
-      await waitFor(() => expect(findIn(document, "Card actions")).not.toBeNull());
-      expect(findIn(decoy, "Card actions")).toBeNull();
+      const at = repo.menus.at(-1)?.at;
+      expect(at && "event" in at && (at.event.target as Node).ownerDocument).toBe(document);
       expect(decoy.body.childElementCount).toBe(0);
     });
   });
@@ -2295,51 +2280,38 @@ describe("card context menu", () => {
     return { repo, menu: await screen.findByRole("menu") };
   };
 
-  // The card's box as the layout would report it, so an anchored menu has somewhere to land.
-  const placeCard = (card: HTMLElement) =>
-    vi
-      .spyOn(card, "getBoundingClientRect")
-      .mockReturnValue(DOMRect.fromRect({ x: 40, y: 100, width: 200, height: 60 }));
-
   describe("from the keyboard", () => {
-    let hiddenFocus: ReturnType<typeof refuseFocusWhileHidden>;
-    beforeEach(() => {
-      hiddenFocus = refuseFocusWhileHidden();
-    });
-    afterEach(() => hiddenFocus.mockRestore());
-
     const focusCard = async (cardName: string, repo = ctxRepo()) => {
       render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
       const tile = (await screen.findByText(cardName)).closest(".folia-card") as HTMLElement;
-      placeCard(tile);
       const main = tile.querySelector<HTMLElement>(".folia-card-main")!;
       main.focus();
-      return main;
+      return { repo, main };
     };
 
     it.each([
       ["the Menu key", { key: "ContextMenu" }],
       ["Shift+F10", { key: "F10", shiftKey: true }],
     ])("opens the focused card's menu with %s, under the card", async (_, keys) => {
-      const main = await focusCard("First");
+      const { repo, main } = await focusCard("First");
       fireEvent.keyDown(main, keys);
 
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      await waitFor(() => expect(menu.style.left).toBe("40px"));
-      expect(menu.style.top).toBe("160px");
-      expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
+      expect(repo.menus.at(-1)?.at).toEqual({ below: main });
+      expect(
+        within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Open details" }),
+      ).toBeInTheDocument();
     });
 
     it("opens nothing while the card is lifted for a keyboard drag", async () => {
       const user = userEvent.setup();
-      const main = await focusCard("First");
+      const { repo, main } = await focusCard("First");
       await user.keyboard("{ }");
       expect(document.querySelector(".folia-card-overlay")).not.toBeNull();
 
       await user.keyboard("{Shift>}{F10}{/Shift}");
       // Windows follows the Menu key with its own contextmenu on keyup, at the still-focused card.
       fireEvent.contextMenu(main, { clientX: 0, clientY: 0 });
-      expect(screen.queryByRole("menu")).toBeNull();
+      expect(repo.menus).toEqual([]);
       await user.keyboard("{Escape}");
     });
 
@@ -2347,146 +2319,32 @@ describe("card context menu", () => {
       ["F10 without Shift", { key: "F10" }],
       ["Ctrl+Shift+F10", { key: "F10", shiftKey: true, ctrlKey: true }],
     ])("leaves %s alone", async (_, keys) => {
-      const main = await focusCard("First");
+      const { repo, main } = await focusCard("First");
       fireEvent.keyDown(main, keys);
-      expect(screen.queryByRole("menu")).toBeNull();
+      expect(repo.menus).toEqual([]);
     });
 
-    it("keeps the menu where it is when the platform follows the key with its own contextmenu", async () => {
-      const main = await focusCard("First");
+    it("keeps the menu under the card when the platform follows the key with its own contextmenu", async () => {
+      const { repo, main } = await focusCard("First");
       fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      await waitFor(() => expect(menu.style.left).toBe("40px"));
+      // Windows: the contextmenu comes on keyup, at a point on the focused card.
+      fireEvent.keyUp(main, { key: "ContextMenu" });
+      fireEvent.contextMenu(main, { clientX: 60, clientY: 170 });
+      expect(repo.menus.map((m) => m.at)).toEqual([{ below: main }]);
 
-      // Fired at whatever holds focus by then, the menu's first item, and placed on it.
-      fireEvent.contextMenu(document.activeElement!, { clientX: 60, clientY: 170 });
-
-      expect(screen.getAllByRole("menu")).toHaveLength(1);
-      expect(menu.style.left).toBe("40px");
-      expect(menu.style.top).toBe("160px");
+      // Once that has passed, a right-click is a right-click again.
+      await new Promise((r) => setTimeout(r));
+      fireEvent.contextMenu(main, { clientX: 60, clientY: 170 });
+      expect(repo.menus).toHaveLength(2);
+      expect("event" in repo.menus[1]!.at).toBe(true);
     });
 
-    it("gives focus back to the card when the menu is dismissed", async () => {
-      const main = await focusCard("First");
+    it("takes a right-click after the menu key whose keyup never reached the card", async () => {
+      const { repo, main } = await focusCard("First");
       fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      fireEvent.keyDown(menu, { key: "Escape" });
-      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-      expect(document.activeElement).toBe(main);
-    });
-
-    it.each([
-      ["Copy path", "menuitem", /^Copy path$/],
-      ["a priority", "menuitemradio", /^urgent$/],
-    ])(
-      "gives focus back to the card after %s, which has nowhere else to send it",
-      async (_, role, name) => {
-        const main = await focusCard("First");
-        fireEvent.keyDown(main, { key: "ContextMenu" });
-        const menu = await screen.findByRole("menu", { name: "Card actions" });
-        await userEvent.setup().click(within(menu).getByRole(role, { name }));
-        await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-        expect(document.activeElement).toBe(main);
-      },
-    );
-
-    it("gives focus back to the card after Copy path chosen with Enter", async () => {
-      const user = userEvent.setup();
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      within(menu)
-        .getByRole("menuitem", { name: /^Copy path$/ })
-        .focus();
-      await user.keyboard("{Enter}");
-      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-      expect(document.activeElement).toBe(main);
-    });
-
-    it.each([
-      ["Open details", () => screen.getByTestId("card-detail")],
-      ["Override card title", () => screen.getByTestId("card-detail")],
-      ["Add subcard", () => screen.getByTestId("card-detail")],
-      ["Rename", () => screen.getByLabelText("Card title")],
-    ])("hands focus straight to where %s sends it, never through the card", async (name, where) => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      // A later focus() would win anyway; a stop on the card on the way can still scroll or fire
-      // its focus handlers, so the card is not focused at all.
-      let cardFocused = false;
-      main.addEventListener("focus", () => (cardFocused = true));
-      await userEvent
-        .setup()
-        .click(within(menu).getByRole("menuitem", { name: new RegExp(`^${name}$`) }));
-      await waitFor(() => expect(where().contains(document.activeElement)).toBe(true));
-      expect(screen.queryByRole("menu")).toBeNull();
-      expect(cardFocused).toBe(false);
-    });
-
-    it.each([
-      ["Tab", "steps on from the card", { shiftKey: false }],
-      ["Shift+Tab", "lands on the card", { shiftKey: true }],
-    ])("%s from the menu %s and closes it", async (_, __, mods) => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-
-      // The menu is portalled to the end of the body but belongs right after its card. Tab leaves
-      // the step to the browser, which starts from whatever holds focus when it runs (jsdom and
-      // user-event don't model that), so what is checked is that it starts from the card.
-      const notPrevented = fireEvent.keyDown(within(menu).getAllByRole("menuitem")[0]!, {
-        key: "Tab",
-        ...mods,
-      });
-      expect(notPrevented).toBe(!mods.shiftKey);
-      expect(document.activeElement).toBe(main);
-      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    });
-
-    it("keeps the menu open when a label inside it is clicked", async () => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      const menu = await screen.findByRole("menu", { name: "Card actions" });
-      await userEvent.setup().click(within(menu).getByText("Priority"));
-      expect(screen.getByRole("menu", { name: "Card actions" })).toBe(menu);
-      expect(menu.contains(document.activeElement)).toBe(true);
-    });
-
-    it("closes when focus leaves it for nowhere, as when the window loses focus", async () => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      await screen.findByRole("menu", { name: "Card actions" });
-      (document.activeElement as HTMLElement).blur();
-      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    });
-
-    it("closes when focus is moved straight to another card, leaving one menu", async () => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      await screen.findByRole("menu", { name: "Card actions" });
-      const second = (await screen.findByText("Second"))
-        .closest(".folia-card")!
-        .querySelector<HTMLElement>(".folia-card-main")!;
-      act(() => second.focus());
-      fireEvent.keyDown(second, { key: "F10", shiftKey: true });
-      await screen.findByRole("menu", { name: "Card actions" });
-      expect(screen.getAllByRole("menu")).toHaveLength(1);
-    });
-
-    it("leaves one menu open when another card's opens after tabbing away", async () => {
-      const main = await focusCard("First");
-      fireEvent.keyDown(main, { key: "ContextMenu" });
-      await screen.findByRole("menu", { name: "Card actions" });
-      await userEvent.setup().keyboard("{Tab}");
-
-      const second = (await screen.findByText("Second"))
-        .closest(".folia-card")!
-        .querySelector<HTMLElement>(".folia-card-main")!;
-      second.focus();
-      fireEvent.keyDown(second, { key: "F10", shiftKey: true });
-      await screen.findByRole("menu", { name: "Card actions" });
-      expect(screen.getAllByRole("menu")).toHaveLength(1);
+      fireEvent.pointerDown(main, { button: 2 });
+      fireEvent.contextMenu(main, { clientX: 60, clientY: 170 });
+      expect(repo.menus).toHaveLength(2);
     });
 
     it("opens a placed todo's own menu", async () => {
@@ -2496,78 +2354,29 @@ describe("card context menu", () => {
           body: "\n# First\n\n## Subtasks\n- [ ] placed [status:: doing]\n",
         },
       });
-      const main = await focusCard("placed", repo);
+      const { main } = await focusCard("placed", repo);
       fireEvent.keyDown(main, { key: "ContextMenu" });
-      await screen.findByRole("menu", { name: "Todo actions" });
+      const menu = await screen.findByRole("menu");
+      expect(within(menu).getByRole("menuitem", { name: "Remove todo" })).toBeInTheDocument();
     });
   });
 
   it("anchors a contextmenu that reports no position to the card", async () => {
-    render_(ctxRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
-    const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-    placeCard(tile);
-    fireEvent.contextMenu(tile.querySelector(".folia-card-main")!, { clientX: 0, clientY: 0 });
-
-    const menu = await screen.findByRole("menu", { name: "Card actions" });
-    await waitFor(() => expect(menu.style.left).toBe("40px"));
-    expect(menu.style.top).toBe("160px");
-  });
-
-  it.each([
-    ["a priority", "menuitemradio", /^urgent$/],
-    ["Copy path", "menuitem", /^Copy path$/],
-  ])("leaves a right-click's card unfocused after %s, as before", async (_, role, name) => {
-    render_(ctxRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+    const repo = ctxRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
     const main = tile.querySelector<HTMLElement>(".folia-card-main")!;
-    // Chromium focuses the card on the right button's mousedown; jsdom doesn't, so do it here.
-    main.focus();
-    fireEvent.contextMenu(tile.querySelector(".folia-card-title")!, { clientX: 300, clientY: 200 });
-    const menu = await screen.findByRole("menu", { name: "Card actions" });
-
-    // Focus back on the card would pin its hover actions (they show on :focus-within) after the
-    // pointer has left; a mouse user never asked for focus there.
-    await userEvent.setup().click(within(menu).getByRole(role, { name }));
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    expect(document.activeElement).not.toBe(main);
+    fireEvent.contextMenu(main, { clientX: 0, clientY: 0 });
+    expect(repo.menus.at(-1)?.at).toEqual({ below: main });
   });
 
-  it("still gives a right-click's card focus back on Escape", async () => {
-    render_(ctxRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
+  it("opens a right-click's menu at the pointer", async () => {
+    const repo = ctxRepo();
+    render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-    const main = tile.querySelector<HTMLElement>(".folia-card-main")!;
-    main.focus();
     fireEvent.contextMenu(tile.querySelector(".folia-card-title")!, { clientX: 300, clientY: 200 });
-    const menu = await screen.findByRole("menu", { name: "Card actions" });
-    fireEvent.keyDown(menu, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    expect(document.activeElement).toBe(main);
-  });
-
-  it("lets Shift+Tab step on when the menu has no card to hand focus to", async () => {
-    render_(ctxRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
-    const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-    (document.activeElement as HTMLElement | null)?.blur();
-    fireEvent.contextMenu(tile.querySelector(".folia-card-title")!, { clientX: 300, clientY: 200 });
-    const menu = await screen.findByRole("menu", { name: "Card actions" });
-    // Opened with nothing focused, so there is no card to land on: holding Shift+Tab back would
-    // leave focus stuck in the menu.
-    const notPrevented = fireEvent.keyDown(within(menu).getAllByRole("menuitem")[0]!, {
-      key: "Tab",
-      shiftKey: true,
-    });
-    expect(notPrevented).toBe(true);
-  });
-
-  it("still opens a right-click's menu at the pointer", async () => {
-    render_(ctxRepo(), { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
-    const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-    placeCard(tile);
-    fireEvent.contextMenu(tile.querySelector(".folia-card-title")!, { clientX: 300, clientY: 200 });
-
-    const menu = await screen.findByRole("menu", { name: "Card actions" });
-    await waitFor(() => expect(menu.style.left).toBe("300px"));
-    expect(menu.style.top).toBe("200px");
+    const at = repo.menus.at(-1)?.at;
+    expect(at && "event" in at && [at.event.clientX, at.event.clientY]).toEqual([300, 200]);
   });
 
   it("carries the click's modifiers to the repository from every Open-note affordance", async () => {
@@ -2597,22 +2406,17 @@ describe("card context menu", () => {
 
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     const menu = await screen.findByRole("menu");
-    middleClick(within(menu).getByRole("menuitem", { name: /Open note/ }));
-    expect(repo.openedWith[2]).toMatchObject({ button: 1 });
-
-    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
-    const menu2 = await screen.findByRole("menu");
     await user.keyboard("{Control>}");
-    await user.click(within(menu2).getByRole("menuitem", { name: /Open note/ }));
+    await user.click(within(menu).getByRole("menuitem", { name: /Open note/ }));
     await user.keyboard("{/Control}");
-    expect(repo.openedWith[3]).toMatchObject({ ctrlKey: true });
+    expect(repo.openedWith[2]).toMatchObject({ ctrlKey: true });
 
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     await user.keyboard("{Control>}");
     await user.click(within(detail).getByLabelText("Open note"));
     await user.keyboard("{/Control}");
-    expect(repo.openedWith[4]).toMatchObject({ ctrlKey: true });
+    expect(repo.openedWith[3]).toMatchObject({ ctrlKey: true });
   });
 
   it("pans instead of opening when the middle button was dragged, not clicked", async () => {
@@ -2642,18 +2446,6 @@ describe("card context menu", () => {
 
     expect(repo.opened).toEqual(["Tasks/Alpha.md"]);
     expect(repo.openedWith[0]).toMatchObject({ ctrlKey: false, metaKey: false, button: 0 });
-  });
-
-  it("leaves a middle click alone on the menu items that are not a navigation", async () => {
-    // "Open in a new tab" is the only thing a middle click can mean, so an item that changes or
-    // deletes the card must not fire from it — a stray middle click would be irreversible.
-    const { repo, menu } = await openCardMenu("First");
-    middleClick(within(menu).getByRole("menuitem", { name: /Delete card/ }));
-    middleClick(within(menu).getByRole("menuitem", { name: /Mark done/ }));
-
-    expect(repo.files.has("Tasks/First.md")).toBe(true);
-    expect(repo.files.get("Tasks/First.md")?.fm["status"]).toBe("todo");
-    expect(screen.getByRole("menu")).toBe(menu);
   });
 
   it.each([
@@ -2694,52 +2486,12 @@ describe("card context menu", () => {
     expect(within(menu).getByRole("menuitem", { name: /Move down/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Add subcard/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Delete card/ })).toBeInTheDocument();
-    // Change priority group with selectable options (current value highlighted).
-    expect(within(menu).getByRole("group", { name: "Change priority" })).toBeInTheDocument();
+    // Priority rows, the current value checked.
+    expect(within(menu).getByText("Priority")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitemradio", { name: "low" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-  });
-
-  // Chromium will not focus an element under `visibility: hidden`, and jsdom will; without this a
-  // menu that focuses its first item before it is shown looks fine here and traps nobody in the app.
-  const refuseFocusWhileHidden = () => {
-    const focus = HTMLElement.prototype.focus;
-    return vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (
-      this: HTMLElement,
-      options?: FocusOptions,
-    ) {
-      if (this.closest<HTMLElement>('[role="menu"]')?.style.visibility === "hidden") return;
-      focus.call(this, options);
-    });
-  };
-
-  it("hands focus to the first item of a right-click's menu (#73 follow-up)", async () => {
-    const hiddenFocus = refuseFocusWhileHidden();
-    try {
-      const { menu } = await openCardMenu("First");
-      expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
-    } finally {
-      hiddenFocus.mockRestore();
-    }
-  });
-
-  it("hands focus to the first item of a todo's right-click menu (#73 follow-up)", async () => {
-    const hiddenFocus = refuseFocusWhileHidden();
-    try {
-      const repo = ctxRepo();
-      render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
-      const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-      const todoRow = card.querySelector(
-        '.folia-card-next-todo[data-todo-index="1"]',
-      ) as HTMLElement;
-      fireEvent.contextMenu(todoRow);
-      const menu = await screen.findByRole("menu", { name: "Todo actions" });
-      expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
-    } finally {
-      hiddenFocus.mockRestore();
-    }
   });
 
   it("disables Move up at the top of the column and Move down at the bottom", async () => {
@@ -2767,11 +2519,10 @@ describe("card context menu", () => {
 
   it("offers the board's own priority values, not a predefined scale", async () => {
     const { menu } = await openCardMenu("First");
-    const group = within(menu).getByRole("group", { name: "Change priority" });
     // The two values the board's cards actually use, strongest first — and nothing the plugin
     // invented: `high`/`medium` are not on this board, so they are not suggested.
     expect(
-      within(group)
+      within(menu)
         .getAllByRole("menuitemradio")
         .map((b) => b.textContent),
     ).toEqual(["urgent", "low", "No priority"]);
@@ -2956,7 +2707,7 @@ describe("card context menu", () => {
     const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
     const todoRow = card.querySelector('.folia-card-next-todo[data-todo-index="1"]') as HTMLElement;
     fireEvent.contextMenu(todoRow);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     const user = userEvent.setup();
     await user.click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
     // Index 1 is the first undone todo ("real one"); toggling it checks that line.
@@ -2970,7 +2721,7 @@ describe("card context menu", () => {
     const todoRow = card.querySelector('.folia-card-next-todo[data-todo-index="1"]') as HTMLElement;
     fireEvent.contextMenu(todoRow);
     const user = userEvent.setup();
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     await user.click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
     await waitFor(() =>
       expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[ \] real one \[status:: doing\]/),
@@ -2979,7 +2730,7 @@ describe("card context menu", () => {
     const doing = screen.getByText("Doing").closest("section") as HTMLElement;
     const tile = await within(doing).findByText("real one");
     fireEvent.contextMenu(tile);
-    const tileMenu = await screen.findByRole("menu", { name: "Todo actions" });
+    const tileMenu = await screen.findByRole("menu");
     await user.click(within(tileMenu).getByRole("menuitemradio", { name: "With its card" }));
     await waitFor(() =>
       expect(repo.files.get("Tasks/First.md")!.body).toMatch(/- \[ \] real one\n/),
@@ -2997,7 +2748,7 @@ describe("card context menu", () => {
     await screen.findByText("First", { selector: ".folia-card-title" });
     const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
     fireEvent.contextMenu(within(doing).getByText("real one"));
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     // The menu shows what the LINE says, not where the tile happens to render.
     expect(within(menu).getByRole("menuitemradio", { name: "Doing" })).toHaveAttribute(
       "aria-checked",
@@ -3026,7 +2777,7 @@ describe("card context menu", () => {
     repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] real one\n";
 
     fireEvent.contextMenu(within(doing).getByText("real one"));
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
 
     // The box is written; the line is not handed a column nobody put it in.
@@ -3050,7 +2801,7 @@ describe("card context menu", () => {
     // The line claims its card's own column, so it renders inline — but it DOES claim one, and the
     // menu opened from the row has to say so or it would offer to "move" it where it already is.
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="0"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     expect(within(menu).getByRole("menuitemradio", { name: "Doing" })).toHaveAttribute(
       "aria-checked",
       "true",
@@ -3070,7 +2821,7 @@ describe("card context menu", () => {
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="2"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     // "real two" goes away elsewhere — another pane, an agent, a sync pull — and the board catches
     // up while the menu still stands open on the position that line held.
     repo.files.get("Tasks/First.md")!.body =
@@ -3092,7 +2843,7 @@ describe("card context menu", () => {
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="2"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     repo.files.get("Tasks/First.md")!.body =
       "\n# First\n\n## Subtasks\n- [x] done one\n- [ ] real one\n";
     act(() => repo.notify());
@@ -3128,7 +2879,7 @@ describe("card context menu", () => {
     await screen.findByText("First", { selector: ".folia-card-title" });
     const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
     fireEvent.contextMenu(within(doing).getByText("placed"));
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     // Reworded elsewhere while the board sat drawn, so a board that catches up shows the new words.
     repo.files.get("Tasks/First.md")!.body =
       "\n# First\n\n## Subtasks\n- [ ] renamed elsewhere [status:: doing]\n";
@@ -3236,7 +2987,7 @@ describe("card context menu", () => {
       ".folia-card",
     ) as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] beta\n- [ ] gamma\n";
     act(() => repo.notify());
     await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
@@ -3269,7 +3020,7 @@ describe("card context menu", () => {
       ".folia-card",
     ) as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     repo.files.get("Tasks/First.md")!.body =
       "\n# First\n\n## Subtasks\n- [ ] Intro\n- [ ] Review\n- [ ] Review\n";
     act(() => repo.notify());
@@ -3289,7 +3040,7 @@ describe("card context menu", () => {
       ".folia-card",
     ) as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     repo.files.get("Tasks/First.md")!.body =
       "\n# First\n\n## Subtasks\n- [ ] alpha\n- [x] beta\n- [ ] gamma\n";
     const before = repo.files.get("Tasks/First.md")!.body;
@@ -3357,7 +3108,7 @@ describe("card context menu", () => {
       ".folia-card",
     ) as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     const home = within(menu).getByRole("menuitemradio", { name: "With its card" });
     // The whole reason this asks for nothing: the line claimed no column when the menu was raised,
     // so this is the option already chosen, and clicking it says "leave it as I found it".
@@ -3390,7 +3141,7 @@ describe("card context menu", () => {
     await screen.findByText("First", { selector: ".folia-card-title" });
     const doing = document.querySelector('[data-column="doing"]') as HTMLElement;
     fireEvent.contextMenu(within(doing).getByText("placed"));
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     // Reworded under the open menu, and the board catches up — the one the neighbouring silence
     // test leaves out, since it never lets the board reload.
     repo.files.get("Tasks/First.md")!.body =
@@ -3423,7 +3174,7 @@ describe("card context menu", () => {
       ".folia-card",
     ) as HTMLElement;
     fireEvent.contextMenu(card.querySelector('.folia-card-next-todo[data-todo-index="1"]')!);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     repo.files.get("Tasks/First.md")!.body = "\n# First\n\n## Subtasks\n- [ ] alpha\n- [x] beta\n";
     act(() => repo.notify());
     // Ticked elsewhere, so the row leaves the card's outstanding list — the menu stays open on it.
@@ -3502,7 +3253,7 @@ describe("card context menu", () => {
     const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
     const todoRow = card.querySelector('.folia-card-next-todo[data-todo-index="2"]') as HTMLElement;
     fireEvent.contextMenu(todoRow);
-    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    const menu = await screen.findByRole("menu");
     const user = userEvent.setup();
     const before = repo.files.get("Tasks/First.md")!.body;
     repo.answerConfirm = () => false;
@@ -3514,101 +3265,9 @@ describe("card context menu", () => {
 
     repo.answerConfirm = () => true;
     fireEvent.contextMenu(todoRow);
-    const again = await screen.findByRole("menu", { name: "Todo actions" });
+    const again = await screen.findByRole("menu");
     await user.click(within(again).getByRole("menuitem", { name: /Remove todo/ }));
     await waitFor(() => expect(repo.files.get("Tasks/First.md")!.body).not.toContain("real two"));
-  });
-
-  it("arrow keys reach the priority group, skipping the disabled Move up button (#73)", async () => {
-    const hiddenFocus = refuseFocusWhileHidden();
-    try {
-      const { menu } = await openCardMenu("First"); // top of the column: Move up is disabled
-      // Built from the ARIA contract every row already has to carry (checked by the a11y gate),
-      // not from the implementation's own list of CSS classes — the bug this guards against is
-      // exactly a row missing from that list.
-      const rows = Array.from(
-        menu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)'),
-      );
-      // Sanity: the priority group is actually part of what we are about to walk.
-      expect(rows.some((r) => r.classList.contains("folia-menu-prio"))).toBe(true);
-      rows[0]?.focus();
-      for (let i = 1; i < rows.length; i++) {
-        fireEvent.keyDown(menu, { key: "ArrowDown" });
-        expect(document.activeElement).toBe(rows[i]);
-      }
-      // Wraps back to the top instead of stalling on the last row.
-      fireEvent.keyDown(menu, { key: "ArrowDown" });
-      expect(document.activeElement).toBe(rows[0]);
-      expect(within(menu).getByRole("menuitem", { name: /Move up/ })).not.toHaveFocus();
-
-      // ArrowUp walks the same rows backwards, including wrapping past the priority group.
-      for (let i = rows.length - 1; i >= 0; i--) {
-        fireEvent.keyDown(menu, { key: "ArrowUp" });
-        expect(document.activeElement).toBe(rows[i]);
-      }
-    } finally {
-      hiddenFocus.mockRestore();
-    }
-  });
-
-  it("arrow keys reach the move-to-column group in the todo menu (#73)", async () => {
-    const hiddenFocus = refuseFocusWhileHidden();
-    try {
-      const repo = ctxRepo();
-      render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
-      const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-      const todoRow = card.querySelector(
-        '.folia-card-next-todo[data-todo-index="1"]',
-      ) as HTMLElement;
-      fireEvent.contextMenu(todoRow);
-      const menu = await screen.findByRole("menu", { name: "Todo actions" });
-      const rows = Array.from(
-        menu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)'),
-      );
-      expect(rows.some((r) => r.classList.contains("folia-menu-column"))).toBe(true);
-      rows[0]?.focus();
-      for (let i = 1; i < rows.length; i++) {
-        fireEvent.keyDown(menu, { key: "ArrowDown" });
-        expect(document.activeElement).toBe(rows[i]);
-      }
-
-      // ArrowUp walks the same rows backwards, including through the move-to-column group.
-      for (let i = rows.length - 2; i >= 0; i--) {
-        fireEvent.keyDown(menu, { key: "ArrowUp" });
-        expect(document.activeElement).toBe(rows[i]);
-      }
-    } finally {
-      hiddenFocus.mockRestore();
-    }
-  });
-
-  it("arrow keys from the menu container itself (nothing row-level focused) land on the first/last row (#73)", async () => {
-    const { menu } = await openCardMenu("First");
-    // The container itself can hold focus (e.g. after a click on a label or a divider), where
-    // nothing in the row list is the active element.
-    menu.focus();
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(
-      within(menu).getByRole("menuitem", { name: /Open details/ }),
-    );
-
-    menu.focus();
-    fireEvent.keyDown(menu, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(
-      within(menu).getByRole("menuitem", { name: /Delete card/ }),
-    );
-  });
-
-  it("closes on Escape", async () => {
-    const { menu } = await openCardMenu("First");
-    fireEvent.keyDown(menu, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-  });
-
-  it("closes on an outside pointerdown", async () => {
-    await openCardMenu("First");
-    fireEvent.pointerDown(document.body);
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 });
 
@@ -3618,22 +3277,40 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
       name: `Column options for ${columnTitle}`,
     });
     fireEvent.click(trigger);
-    return screen.findByRole("dialog", { name: `Column options: ${columnTitle}` });
+    return screen.findByRole("menu");
   };
 
   it("the column menu's Edit column hands the column to the host's dialog", async () => {
     const repo = makeRepo();
     render_(repo);
     const menu = await openColumnMenu("Todo");
-    await userEvent.setup().click(within(menu).getByRole("button", { name: /Edit column/ }));
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Edit column/ }));
     expect(repo.columnEditor?.column).toEqual(repo.config.columns.find((c) => c.id === "todo"));
+  });
+
+  it("opens Edit column on the column as it reads when picked, not when the menu opened", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const menu = await openColumnMenu("Todo");
+    // Another pane writing the board note, as the fake stores it, not the shared fixture.
+    repo.config = {
+      ...repo.config,
+      columns: repo.config.columns.map((c) =>
+        c.id === "todo" ? { ...c, filter: "area:home" } : c,
+      ),
+    };
+    act(() => repo.notify());
+    // The board's reload is asynchronous; let it land before the row is picked.
+    await new Promise((r) => setTimeout(r, 50));
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Edit column/ }));
+    expect(repo.columnEditor?.column.filter).toBe("area:home");
   });
 
   it("saving the editor persists all fields via setColumns in one write", async () => {
     const repo = makeRepo();
     render_(repo);
     const menu = await openColumnMenu("Todo");
-    await userEvent.setup().click(within(menu).getByRole("button", { name: /Edit column/ }));
+    await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Edit column/ }));
     const { column, save } = repo.columnEditor!;
     const setColumns = vi.spyOn(repo, "setColumns");
 
@@ -3865,7 +3542,6 @@ describe("search filter (single source of truth)", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />,
     );
@@ -3894,7 +3570,6 @@ describe("search filter (single source of truth)", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />,
     );
@@ -3914,7 +3589,6 @@ describe("search filter (single source of truth)", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />,
     );
@@ -3941,7 +3615,6 @@ describe("search filter (single source of truth)", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />,
     );
@@ -3964,7 +3637,6 @@ describe("search filter (single source of truth)", () => {
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
         today="2026-06-13"
-        mountedIn={document.body}
         host={host}
       />,
     );
@@ -4493,8 +4165,8 @@ describe("inline column-title edit (#7)", () => {
     render_(makeRepo());
     await screen.findByText("Alpha");
     await user.click(screen.getByLabelText("Column options for Todo"));
-    // The menu opens (its own Title field appears) and the header title stays a span, not an input.
-    expect(screen.getByLabelText("Rename column")).toBeInTheDocument(); // ColumnMenu's field
+    // The menu opens and the header title stays a span, not an input.
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.queryByLabelText("Rename column Todo")).toBeNull(); // inline editor not armed
   });
 });
@@ -5945,7 +5617,7 @@ describe("the detail panel reports a failed write", () => {
     await screen.findByText("Research");
 
     await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /Delete column/ }));
 
     await waitFor(() => expect(screen.queryByText("Todo")).toBeNull());
     expect(repo.confirms).toMatchObject([{ title: "Delete column", cta: "Delete" }]);
@@ -6071,7 +5743,7 @@ describe("the detail panel reports a failed write", () => {
     await screen.findByText("Alpha", { selector: ".folia-card-title" });
 
     await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /Delete column/ }));
 
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("done"));
   });
@@ -6084,7 +5756,7 @@ describe("the detail panel reports a failed write", () => {
     await screen.findByText("Alpha", { selector: ".folia-card-title" });
 
     await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /Delete column/ }));
 
     await waitFor(() => expect(repo.confirms).toHaveLength(1));
     expect(repo.confirms[0]?.message).toContain('"Todo"');
@@ -7568,6 +7240,45 @@ describe("assigning a card (20260827.03)", () => {
     await waitFor(() => expect("assignee" in repo.files.get("Tasks/Alpha.md")!.fm).toBe(false));
   });
 
+  it("keeps a name that arrived while the card menu was open", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo, named("Rafa"));
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const card = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    const row = within(await screen.findByRole("menu")).getByRole("menuitem", {
+      name: "Assign to me",
+    });
+
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "alex";
+    act(() => repo.notify());
+    await waitFor(() => expect(within(card).getByText("alex")).toBeInTheDocument());
+    await user.click(row);
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toEqual(["alex", "Rafa"]),
+    );
+  });
+
+  it("does not take the card from you when your name arrived while its menu was open", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    render_(repo, named("Rafa"));
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    const card = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
+    fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+    const row = within(await screen.findByRole("menu")).getByRole("menuitem", {
+      name: "Assign to me",
+    });
+
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "Rafa";
+    act(() => repo.notify());
+    await waitFor(() => expect(within(card).getByText("Rafa")).toBeInTheDocument());
+    await user.click(row);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(repo.files.get("Tasks/Alpha.md")!.fm["assignee"]).toBe("Rafa");
+  });
+
   it("adds and removes only the reader on a card two people are already on", async () => {
     const repo = makeRepo();
     repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = ["alex", "ana maria"];
@@ -7829,8 +7540,7 @@ describe("a board read before a change can land after it (20260828.02)", () => {
   });
 });
 
-describe("column colour — what the picker writes and what a legacy note still paints", () => {
-  const user = userEvent.setup();
+describe("column colour — what a board note paints", () => {
   const withColor = (color?: string): BoardConfig => ({
     ...config,
     columns: [
@@ -7842,19 +7552,6 @@ describe("column colour — what the picker writes and what a legacy note still 
     new FakeRepo(withColor(color), {
       "Tasks/Alpha.md": { fm: { type: "task", status: "todo" }, body: "\n# Alpha\n" },
     });
-
-  it("writes the palette NAME into the board note, not a colour value", async () => {
-    // The half of the move to names that touches a user's file. A hex here would mean the note had
-    // silently kept the old format while the UI claimed otherwise.
-    const repo = repoWith();
-    render_(repo);
-    await screen.findByText("Alpha");
-    await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(screen.getByLabelText("Set color blue"));
-    await waitFor(() =>
-      expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBe("blue"),
-    );
-  });
 
   it("paints a stored name through the host variable for it", async () => {
     render_(repoWith("green"));
@@ -7874,32 +7571,6 @@ describe("column colour — what the picker writes and what a legacy note still 
     expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-pink)");
   });
 
-  it("names the no-colour choice in words, pressed while the note stores no colour", async () => {
-    const repo = repoWith("cyan");
-    render_(repo);
-    await screen.findByText("Alpha");
-    await user.click(screen.getByLabelText("Column options for Todo"));
-    const colors = screen.getByRole("group", { name: "Color" });
-    const none = within(colors).getByRole("button", { name: "No color" });
-    expect(none).toHaveAttribute("aria-pressed", "false");
-    await user.click(none);
-    await waitFor(() =>
-      expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBeUndefined(),
-    );
-    await waitFor(() => expect(none).toHaveAttribute("aria-pressed", "true"));
-  });
-
-  it("replaces a legacy hex when one of the eight is picked", async () => {
-    const repo = repoWith("#9aa0a6");
-    render_(repo);
-    await screen.findByText("Alpha");
-    await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(screen.getByLabelText("Set color cyan"));
-    await waitFor(() =>
-      expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBe("cyan"),
-    );
-  });
-
   it("reads a bare CSS colour keyword as the palette name it spells", async () => {
     // The eight names are also CSS colour keywords, so a note that already said `color: red` now
     // paints the theme's red rather than #ff0000. It is the one case where this change alters what
@@ -7911,20 +7582,11 @@ describe("column colour — what the picker writes and what a legacy note still 
     expect(column.style.getPropertyValue("--folia-col-accent")).toBe("var(--color-red)");
   });
 
-  it("paints a hex a board note already carried exactly as written, and shows it as a ninth swatch", async () => {
-    // The compatibility promise: a note written before the palette moved to names loses nothing,
-    // and the colour it carries is visible in the picker rather than absent from it.
+  it("paints a hex a board note already carried exactly as written", async () => {
+    // The compatibility promise: a note written before the palette moved to names loses nothing.
     render_(repoWith("#9aa0a6"));
     await screen.findByText("Alpha");
     const column = document.querySelector('[data-column="todo"]') as HTMLElement;
     expect(column.style.getPropertyValue("--folia-col-accent")).toBe("#9aa0a6");
-
-    await user.click(screen.getByLabelText("Column options for Todo"));
-    const custom = screen.getByLabelText("Custom color #9aa0a6");
-    expect(custom.style.getPropertyValue("--folia-swatch-color")).toBe("#9aa0a6");
-    expect(custom).toBeDisabled();
-    expect(custom.className).toContain("folia-is-active");
-    // ...and none of the eight claims to be the active one while the note carries something else.
-    expect(document.querySelectorAll(".folia-swatch.folia-is-active")).toHaveLength(1);
   });
 });

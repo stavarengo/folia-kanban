@@ -2,15 +2,16 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats } from "../model/types";
+import type { MenuAnchor } from "../model/repo";
 import { sameLine } from "../model/board";
 import type { UnreadState } from "../model/unread";
-import { assigneeValues } from "../model/assignees";
 import { cardChips, cardUrgency, isCompletable, priorityTone, relationChips } from "./cardView";
-import { CardContextMenu, type ContextTarget } from "./CardContextMenu";
+import { cardMenu, todoMenu } from "./menus";
 import {
   useBoardActions,
   useContexts,
   useRelationCounts,
+  useRepo,
   useSettings,
   useSubitemsCollapse,
   useUnreadComments,
@@ -56,12 +57,17 @@ function CardItemInner({
 }: Props) {
   const actions = useBoardActions();
   const contexts = useContexts();
-  const { cardNextTodos } = useSettings();
+  const repo = useRepo();
+  const { cardNextTodos, userName } = useSettings();
   const subitems = useSubitemsCollapse();
-  const [menu, setMenu] = useState<ContextTarget | null>(null);
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // The card as last drawn, for a menu row picked after a reload the open menu outlived.
+  const latest = useRef(card);
+  /** The menu key held since it opened the card menu (see `onContextMenu`). */
+  const menuKey = useRef<string | null>(null);
+  latest.current = card;
   // Two ways a tile is not drag-reorderable: it is nested inside its parent's group, or Column
   // withheld a `dragId` because this tile is not a member of any column bucket right now (a subcard
   // the active filter lifted past a non-matching parent — a drop onto it could not be resolved).
@@ -134,15 +140,15 @@ function CardItemInner({
   const open = () => {
     if (!isDragging) actions.open(notePath);
   };
-  const openMenu = (x: number, y: number, byKeyboard: boolean, todoEl: Element | null) => {
-    // Not while the card is lifted, whichever way the menu was asked for: it would take focus and
-    // act on a card still in flight.
+  const openMenu = (at: MenuAnchor, todoEl: Element | null) => {
+    // Not while the card is lifted, whichever way the menu was asked for: it would act on a card
+    // still in flight.
     if (isDragging) return;
     const rowIndex = todoEl ? Number(todoEl.getAttribute("data-todo-index")) : NaN;
     // Which checklist line the menu is for, read the moment it opens: this tile's own, for a todo
-    // placed in a column, or the surfaced next-todo row a right-click landed on. The menu that
-    // opens outlives board reloads, and a line removed above this one moves every index below
-    // it — so its actions carry the line rather than the place it sat.
+    // placed in a column, or the surfaced next-todo row a right-click landed on. The menu outlives
+    // board reloads, and a line removed above this one moves every index below it — so its rows
+    // carry the line rather than the place it sat.
     const line = todoRef
       ? todoRef.line
       : todoEl && Number.isFinite(rowIndex)
@@ -151,10 +157,16 @@ function CardItemInner({
     // A row the board no longer holds a todo at gets no menu: the card's own would offer to finish
     // the whole card from a click aimed at one line.
     if (todoEl && !line) return;
-    setMenu(
+    repo.showMenu(
       line
-        ? { x, y, byKeyboard, kind: "todo", todoLine: line }
-        : { x, y, byKeyboard, kind: "card" },
+        ? todoMenu(actions, notePath, line)
+        : cardMenu(actions, {
+            card: () => latest.current,
+            isDone: !canComplete,
+            me: userName.trim(),
+            onRename: () => setEditing(latest.current.title),
+          }),
+      at,
     );
   };
   // Right-click opens a context-aware menu. preventDefault stops Obsidian's own context menu;
@@ -162,13 +174,15 @@ function CardItemInner({
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // React bubbles a portal's events through the component tree, so a contextmenu the platform
-    // fires at the focused menu item (the trailing one after the keyboard opened it) lands here.
-    if (!e.currentTarget.contains(e.target as Node)) return;
+    // The key that already opened the menu, followed by the platform's own contextmenu at the
+    // focused card: Windows fires it on keyup, and with a point on the card rather than (0, 0).
+    if (menuKey.current) return;
     // A contextmenu fired from the keyboard can report (0, 0) rather than a point on the card.
     const byKeyboard = e.clientX === 0 && e.clientY === 0;
-    const at = byKeyboard ? anchorBelow(e.currentTarget) : { x: e.clientX, y: e.clientY };
-    openMenu(at.x, at.y, byKeyboard, (e.target as HTMLElement).closest(".folia-card-next-todo"));
+    openMenu(
+      byKeyboard ? { below: cardMain(e.currentTarget) } : { event: e.nativeEvent },
+      (e.target as HTMLElement).closest(".folia-card-next-todo"),
+    );
   };
   // Merge dnd-kit keyboard handling (Space = pick up) with Enter = open and the platform's
   // context-menu keys = the card menu, anchored to the card since there is no pointer to follow.
@@ -179,8 +193,8 @@ function CardItemInner({
     ) {
       e.preventDefault();
       e.stopPropagation();
-      const at = anchorBelow(e.currentTarget);
-      openMenu(at.x, at.y, true, null);
+      menuKey.current = e.key;
+      openMenu({ below: e.currentTarget as HTMLElement }, null);
       return;
     }
     if (e.key === "Enter") {
@@ -189,6 +203,12 @@ function CardItemInner({
       return;
     }
     (listeners as { onKeyDown?: (e: KeyboardEvent) => void } | undefined)?.onKeyDown?.(e);
+  };
+  // The contextmenu a keyup brings is dispatched right after it, so the key stays remembered
+  // until the next task and no longer.
+  const onKeyUp = (e: KeyboardEvent) => {
+    if (e.key !== menuKey.current) return;
+    e.currentTarget.ownerDocument.defaultView?.setTimeout(() => (menuKey.current = null));
   };
 
   // #12 inline title edit. Entered via the right-click menu's "Rename" (a single title click can't
@@ -242,6 +262,9 @@ function CardItemInner({
       data-context={card.context ?? undefined}
       data-urgency={urgency ?? undefined}
       onContextMenu={onContextMenu}
+      // A right-click starts with a press; the contextmenu a key brings does not. The keyup may
+      // never reach the card either (the OS-drawn menu takes it), so the press also forgets the key.
+      onPointerDownCapture={() => (menuKey.current = null)}
     >
       {/* #14 context grouping: a left accent strip, shown only when the context defines a color
           (inset past the priority bar so the two left-edge cues don't overlap). */}
@@ -255,6 +278,7 @@ function CardItemInner({
         {...(draggable ? listeners : {})}
         onClick={open}
         onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
         // Unread comments are folded into the tile's OWN accessible name: everything inside this
         // element is a descendant of a `role="button"`, so a label on the badge itself is never
         // announced. The name is the only place a screen reader can hear that a card has something
@@ -458,39 +482,13 @@ function CardItemInner({
           </button>
         </div>
       )}
-
-      {menu &&
-        (() => {
-          const edges = actions.columnEdges(card.path);
-          return (
-            <CardContextMenu
-              target={menu}
-              card={card}
-              path={notePath}
-              // The line's OWN words, not where the tile renders: a checked line sits in the done
-              // column whatever it claims, and the menu must not offer to "move" it to the column
-              // it is already showing while quietly rewriting the line to something else. Off the
-              // same reading every action in this menu is aimed at, so the column it marks and the
-              // column it would replace can never be two different lines' answers.
-              todoColumn={menu.kind === "todo" ? (menu.todoLine.status ?? "") : ""}
-              priority={typeof fm.priority === "string" ? fm.priority : ""}
-              assignees={assigneeValues(card)}
-              isDone={!canComplete}
-              canMoveUp={edges.canMoveUp}
-              canMoveDown={edges.canMoveDown}
-              onRename={() => setEditing(card.title)}
-              onClose={() => setMenu(null)}
-            />
-          );
-        })()}
     </div>
   );
 }
 
-/** The point just under the card's bottom-left corner, where a menu opened without a pointer goes. */
-function anchorBelow(el: Element): { x: number; y: number } {
-  const r = (el.closest(".folia-card") ?? el).getBoundingClientRect();
-  return { x: r.left, y: r.bottom };
+/** The card's focusable face, which a menu opened without a pointer sits under and returns to. */
+function cardMain(el: Element): HTMLElement {
+  return (el.querySelector(".folia-card-main") ?? el) as HTMLElement;
 }
 
 /**

@@ -68,6 +68,29 @@ export interface ConfirmRequest {
   cta: string;
 }
 
+/** A row of the host's menu that does something when picked. */
+interface MenuAction {
+  title: string;
+  /** A Lucide icon id, the set the host's own menus draw from. */
+  icon?: string;
+  /** Present on a row that is one of a set of choices: whether it is the current one. */
+  checked?: boolean;
+  disabled?: boolean;
+  /** Drawn as the host draws a destructive row. */
+  warning?: boolean;
+  onClick(evt: MouseEvent | KeyboardEvent): void;
+}
+
+/** One line of a host menu: an action, a heading over the rows after it, or a separator. */
+export type MenuRow = MenuAction | { label: string } | "separator";
+
+/**
+ * Where a host menu opens: at the pointer that asked for it, or under an element when there is no
+ * pointer to follow. Under an element, focus goes back to that element when the menu closes and
+ * nothing else took it.
+ */
+export type MenuAnchor = { event: MouseEvent } | { below: HTMLElement };
+
 /** Frontmatter keys already in use, split by where the notes carrying them live. */
 export interface PropertyNamesInUse {
   /** Keys used by notes inside this board's card folder, alphabetically. */
@@ -298,6 +321,9 @@ export interface CardRepository {
    * saves; closing the dialog any other way saves nothing.
    */
   editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void;
+
+  /** Show the host's own menu of `rows` at `at`. It closes on a pick or a dismiss. */
+  showMenu(rows: readonly MenuRow[], at: MenuAnchor): void;
 
   /** Subscribe to external changes; returns an unsubscribe function. */
   onChange(cb: () => void): () => void;

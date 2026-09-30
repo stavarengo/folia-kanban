@@ -349,7 +349,7 @@ The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/m
 | Scroll horizontally across columns | Hold **Shift** and drag the board background |
 | Card menu (open, mark done, assign it to yourself, priority, move up/down, copy the card's path, add subcard, delete) | Right-click a card, or focus it and press the Menu key or **Shift+F10** |
 | Toggle or remove a surfaced checklist item | Right-click it on the card |
-| Column menu (rename, recolour, WIP limit, reorder, delete) | The column's `⋯` button |
+| Column menu (edit its title, colour and WIP limit, reorder, collapse or expand subitems, delete) | The column's `⋯` button |
 | Swap the tab between the board and the Markdown editor | The button in the tab header |
 
 ### Copying a card's path

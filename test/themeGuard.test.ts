@@ -199,8 +199,9 @@ describe("theme guard dependency parsing", () => {
     it.each(functions)(`rejects a ${scheme}/component cycle with a %s() scheme edge`, (fn) => {
       setSchemeShadow(scheme, `${fn}(--folia-accent)`);
       edit(
-        "src/theme/column-menu.css",
-        (s) => s + "\n.folia-menu.folia-menu { --folia-accent: var(--folia-shadow-card); }\n",
+        "src/theme/swatches.css",
+        (s) =>
+          s + "\n.folia-swatches.folia-swatches { --folia-accent: var(--folia-shadow-card); }\n",
       );
       reject(`through the ${scheme} token map`);
     });
@@ -208,8 +209,9 @@ describe("theme guard dependency parsing", () => {
     it.each(functions)(`rejects a ${scheme}/component cycle with a %s() component edge`, (fn) => {
       setSchemeShadow(scheme, "var(--folia-accent)");
       edit(
-        "src/theme/column-menu.css",
-        (s) => s + `\n.folia-menu.folia-menu { --folia-accent: ${fn}(--folia-shadow-card); }\n`,
+        "src/theme/swatches.css",
+        (s) =>
+          s + `\n.folia-swatches.folia-swatches { --folia-accent: ${fn}(--folia-shadow-card); }\n`,
       );
       reject(`through the ${scheme} token map`);
     });
@@ -218,8 +220,8 @@ describe("theme guard dependency parsing", () => {
   it("accepts a component reference when no scheme leads back to the overridden token", () => {
     setSchemeShadow("light", "var(--folia-card-bg)");
     edit(
-      "src/theme/column-menu.css",
-      (s) => s + "\n.folia-menu.folia-menu { --folia-accent: var(--folia-shadow-card); }\n",
+      "src/theme/swatches.css",
+      (s) => s + "\n.folia-swatches.folia-swatches { --folia-accent: var(--folia-shadow-card); }\n",
     );
     expect(execFileSync(process.execPath, [guard], { cwd: fixture, encoding: "utf8" })).toContain(
       "check-theme: OK",
@@ -365,7 +367,13 @@ describe("theme button contract", () => {
   });
 
   it("checks face rules for runtime class families", () => {
-    edit("src/theme/chips.css", (s) => s + "\n.folia-chip-new { background: transparent; }\n");
+    edit(
+      "src/ui/Toolbar.tsx",
+      (s) =>
+        s +
+        '\nexport const Toned = (t: string) => <button className={"folia-btn folia-tone-" + t} />;\n',
+    );
+    edit("src/theme/chips.css", (s) => s + "\n.folia-tone-new { background: transparent; }\n");
     reject("needs .folia-scope");
   });
 
@@ -449,26 +457,11 @@ describe("theme button contract", () => {
     reject("needs a scoped resting rule for background, color, box-shadow");
   });
 
-  it.each(["prio-1", "prio-2", "prio-3", "prio-4", "muted"])(
-    "requires the dynamic priority face %s",
-    (tone) => {
-      edit("src/theme/chips.css", (s) =>
-        s.replace(new RegExp(`\\.folia-scope \\.folia-chip-${tone} \\{[^}]*\\}`), ""),
-      );
-      reject("needs a scoped resting rule for background, color");
-    },
-  );
-
-  it("requires a newly declared tone to have a face", () => {
-    edit("src/ui/cardView.ts", (s) => s.replace('| "muted";', '| "muted" | "new-tone";'));
-    reject("needs a scoped resting rule for background, color");
-  });
-
-  it.each(["hover", "active"])("requires the priority %s outline consumer", (state) => {
+  it.each(["hover", "active"])("requires the filter chip %s outline consumer", (state) => {
     edit("src/theme/buttons.css", (s) =>
-      s.replace(`.folia-menu-prio:${state}:`, `.folia-menu-prio-none:${state}:`),
+      s.replace(`.folia-filter-chip:${state}:`, `.folia-swatch-none:${state}:`),
     );
-    reject("Button signal .folia-scope .folia-menu-prio");
+    reject("Button signal .folia-scope .folia-filter-chip");
   });
 
   it("requires the pressed ring to sit deeper than the hover ring", () => {
@@ -496,15 +489,5 @@ describe("theme guard forced-colours focus", () => {
   it("rejects a focus rule that removes the outline", () => {
     edit("src/theme/base.css", (s) => s + "\n.folia-new-field:focus {\n  outline: none;\n}\n");
     reject("`.folia-new-field:focus` removes the outline on focus");
-  });
-
-  it("rejects an exemption whose rule no longer removes the outline", () => {
-    edit("src/theme/column-menu.css", (s) =>
-      s.replace(
-        ".folia-menu-field input:focus {\n  outline: none;",
-        ".folia-menu-field input:focus {",
-      ),
-    );
-    reject("exempts `.folia-menu-field input:focus`, which no longer removes an outline");
   });
 });

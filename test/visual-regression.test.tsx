@@ -57,7 +57,6 @@ const render_ = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
       settings={settings}
       onUpdateSettings={() => {}}
       today="2026-06-13"
-      mountedIn={document.body}
       host={testHost()}
     />,
   );

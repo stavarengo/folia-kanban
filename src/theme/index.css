@@ -3,8 +3,7 @@
 @import "./base.css";
 @import "./toolbar.css";
 @import "./board-columns.css";
-@import "./column-menu.css";
-@import "./card-context-menu.css";
+@import "./swatches.css";
 @import "./add-column.css";
 @import "./cards.css";
 @import "./subcard-groups.css";

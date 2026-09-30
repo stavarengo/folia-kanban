@@ -283,11 +283,9 @@ export interface BoardActions {
 
   /** Column management (persists to the board note frontmatter). */
   renameColumn(id: string, title: string): void;
-  setColumnColor(id: string, color: string | null): void;
-  setColumnLimit(id: string, limit: number | null): void;
   /**
    * Patch any subset of a column's editable fields in one write (#8). The "Edit column" dialog
-   * builds the full patch; renameColumn/setColumnColor/setColumnLimit remain for the inline menu.
+   * builds the full patch; renameColumn remains for the header's inline title edit.
    * Routes through the same `setColumns` byte-stable path.
    */
   updateColumn(id: string, patch: ColumnPatch): void;
@@ -310,36 +308,9 @@ export function useBoardActions(): BoardActions {
 /** A ref to the board's root element, provided by App. */
 export const BoardRootContext = createContext<RefObject<HTMLElement | null> | null>(null);
 
-/**
- * The element the host mounts the board in, provided by App. Obsidian can host a leaf in a pop-out
- * window, and the host's "active document" is whichever window has focus — which is not necessarily
- * the one the board is in. Every surface that leaves the React tree (a portal to a body) or reaches
- * past it (a document listener, `document.activeElement`, viewport geometry) has to resolve the
- * board's OWN document instead, and the element the board lives in is the one thing that knows it.
- *
- * The element rather than its document: "Move to new window" carries it to another document, so
- * the document is asked of it on every render rather than kept. A surface already open when the
- * board moves keeps the document it rendered with until it renders again.
- */
-export const BoardMountContext = createContext<HTMLElement | null>(null);
-
 /** The board's root element once it is mounted, for measurements that resolve against its box. */
 export function useBoardRootRef(): RefObject<HTMLElement | null> {
   const ref = useContext(BoardRootContext);
   if (!ref) throw new Error("BoardRootContext is missing a provider");
   return ref;
-}
-
-/** The document the board is rendered in — the portal target and listener host for its surfaces. */
-export function useBoardDocument(): Document {
-  const el = useContext(BoardMountContext);
-  if (!el) throw new Error("BoardMountContext is missing a provider");
-  return el.ownerDocument;
-}
-
-/** The window the board is rendered in, whose viewport its fixed-position surfaces are clamped to. */
-export function useBoardWindow(): Window {
-  const win = useBoardDocument().defaultView;
-  if (!win) throw new Error("The board's document has no window");
-  return win;
 }

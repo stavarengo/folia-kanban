@@ -16,8 +16,9 @@
 //
 // What it deliberately does not police, so the gaps are chosen rather than discovered:
 //
-//   - Whether a fallback can ever fire. `var(--layer-menu, 65)` is an ALIAS of --layer-menu whose
-//     fallback is declared in the metadata, so the relationship is recorded either way and the
+//   - Whether a fallback can ever fire.
+//     `var(--background-modifier-border-hover, var(--background-modifier-border))` is an ALIAS of
+//     --background-modifier-border-hover whose fallback is declared in the metadata, so the relationship is recorded either way and the
 //     fallback cannot turn an alias into an owned value by being there. What the guard asks of it
 //     is that the CSS and the metadata say the same thing, that it carries a reason, that it agrees
 //     with a documented default that is a single value, and that it is not there at all where the
@@ -953,39 +954,22 @@ await checkButtons(componentRoots, fail);
 // transparent outline draws nothing until that mode repaints it in a system colour, which
 // `outline: none` never is, so none is refused on a focus selector. The declaration is what is
 // read, not whether it wins the cascade.
-const FOCUS_OUTLINE_EXEMPT = new Map([
-  [".folia-menu-field input:focus", "leaves with the column menu's inline field (#89)"],
-]);
 const FOCUS = /:focus(?:-visible)?(?![\w-])/;
 const noOutline = (rule) =>
   rule.nodes.some(
     (n) => n.type === "decl" && /^outline(-style)?$/i.test(n.prop) && /^(none|0)$/i.test(n.value),
   );
-const stripped = new Map();
 for (const root of componentRoots) {
   root.walkRules((rule) => {
     if (rule.parent.type !== "root" || !noOutline(rule)) return;
     for (const s of rule.selectors.map((s) => s.replace(/\s+/g, " ").trim())) {
-      if (FOCUS.test(s.replace(/:not\([^)]*\)/g, ""))) {
-        stripped.set(s, `${relative(".", root.source.input.from)}:${rule.source.start.line}`);
-      }
+      if (!FOCUS.test(s.replace(/:not\([^)]*\)/g, ""))) continue;
+      fail(
+        `${relative(".", root.source.input.from)}:${rule.source.start.line}`,
+        `\`${s}\` removes the outline on focus. Forced-colours mode drops the box-shadow and flattens the border that replace it, so the field would show no focus at all. Write \`outline: var(--folia-focus-ring-w) solid transparent\` instead: it draws nothing itself and is repainted in a system colour when colours are forced.`,
+      );
     }
   });
-}
-for (const [selector, where] of stripped) {
-  if (FOCUS_OUTLINE_EXEMPT.has(selector)) continue;
-  fail(
-    where,
-    `\`${selector}\` removes the outline on focus. Forced-colours mode drops the box-shadow and flattens the border that replace it, so the field would show no focus at all. Write \`outline: var(--folia-focus-ring-w) solid transparent\` instead: it draws nothing itself and is repainted in a system colour when colours are forced.`,
-  );
-}
-for (const selector of FOCUS_OUTLINE_EXEMPT.keys()) {
-  if (!stripped.has(selector)) {
-    fail(
-      "scripts/check-theme.mjs",
-      `rule H exempts \`${selector}\`, which no longer removes an outline on focus. Drop the exemption.`,
-    );
-  }
 }
 
 // ------------------------------------------------------------------------ report

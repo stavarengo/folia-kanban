@@ -8,45 +8,6 @@
       "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
     }
   },
-  "menu-width-min": {
-    "$value": "calc(var(--size-4-1) * 50)",
-    "cssVar": "--folia-menu-w-min",
-    "source": {
-      "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
-    }
-  },
-  "menu-width-max": {
-    "$value": "calc(var(--size-4-1) * 80)",
-    "cssVar": "--folia-menu-w-max",
-    "source": {
-      "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
-    }
-  },
-  "menu-width": {
-    "$value": "calc(var(--size-4-1) * 56)",
-    "cssVar": "--folia-menu-w",
-    "source": {
-      "owned": true,
-      "reason": "Board layout dimension expressed in host grid units; no single documented spacing rung spans this component."
-    }
-  },
-  "menu-height-max": {
-    "$value": "calc(var(--size-4-1) * 110)",
-    "cssVar": "--folia-menu-h-max",
-    "source": {
-      "owned": true,
-      "reason": "How tall an action menu may grow before it scrolls. The host's --popover-max-height belongs to the file-preview card (its siblings are --popover-width 450px, --popover-height 400px and the --popover-pdf-* pair) and is 95vh, which is a ceiling for a floating preview rather than a size for a compact menu; see docs/decisions.md."
-    }
-  },
-  "menu-padding": {
-    "$value": "var(--size-4-3)",
-    "cssVar": "--folia-menu-pad",
-    "source": {
-      "alias": "--size-4-3"
-    }
-  },
   "search-width": {
     "$value": "calc(var(--size-4-1) * 80)",
     "cssVar": "--folia-search-w",
@@ -148,27 +109,12 @@
       "reason": "the viewport itself, which nothing in a theme can name; the caps measured against it read it from here."
     }
   },
-  "viewport-width": {
-    "$value": "100vw",
-    "cssVar": "--folia-viewport-w",
-    "source": {
-      "owned": true,
-      "reason": "the viewport itself, which nothing in a theme can name; the caps measured against it read it from here."
-    }
-  },
   "column-park-margin": {
     "$value": "60vw",
     "cssVar": "--folia-col-park-margin",
     "source": {
       "owned": true,
       "reason": "how far a parked column slides out of the row, leaving a strip of it on screen; a product behaviour with no host equivalent."
-    }
-  },
-  "menu-rise": {
-    "$value": "var(--size-4-1)",
-    "cssVar": "--folia-menu-rise",
-    "source": {
-      "alias": "--size-4-1"
     }
   },
   "action-rise": {

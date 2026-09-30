@@ -43,7 +43,6 @@ import {
   RepoContext,
   MatchContextContext,
   SettingsContext,
-  BoardMountContext,
   BoardRootContext,
   unreadStateOf,
   type BoardActions,
@@ -204,11 +203,9 @@ interface Props {
   today?: string;
   /** The leaf hosting this board. See {@link BoardHost}. */
   host: BoardHost;
-  /** The element the board is mounted in; its document is the board's own. */
-  mountedIn: HTMLElement;
 }
 
-export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }: Props) {
+export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
   const [board, setBoard] = useState<BoardModel | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Add-card flows: which column is in CREATE mode, plus a flag to focus the description of a
@@ -795,31 +792,6 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
           b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)),
         );
       },
-      setColumnColor: (id, color) => {
-        const b = boardRef.current;
-        if (!b) return;
-        void setColumnsAndReload(
-          b.config.columns.map((c) => {
-            if (c.id !== id) return c;
-            const rest = { ...c };
-            delete rest.color;
-            return color != null ? { ...rest, color } : rest;
-          }),
-        );
-      },
-      setColumnLimit: (id, limit) => {
-        const b = boardRef.current;
-        if (!b) return;
-        const lim = limit == null || limit <= 0 ? undefined : Math.floor(limit);
-        void setColumnsAndReload(
-          b.config.columns.map((c) => {
-            if (c.id !== id) return c;
-            const rest = { ...c };
-            delete rest.limit;
-            return lim !== undefined ? { ...rest, limit: lim } : rest;
-          }),
-        );
-      },
       updateColumn: (id, patch) => {
         const b = boardRef.current;
         if (!b) return;
@@ -1088,42 +1060,40 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
           <ContextsContext.Provider value={stableContexts}>
             <RelationCountsContext.Provider value={relationCountsValue}>
               <MatchContextContext.Provider value={matchCtx}>
-                <BoardMountContext.Provider value={mountedIn}>
-                  <BoardRootContext.Provider value={rootRef}>
-                    <div className="folia-root folia-scope" ref={rootRef}>
-                      <Toolbar
-                        ref={searchRef}
-                        query={query}
-                        onChange={setQuery}
-                        matchCount={counts.match}
-                        totalCount={counts.total}
-                        canFilterMine={settings.userName.trim() !== ""}
-                      />
-                      {board.cardFolderWarning && (
-                        <div className="folia-card-folder-notice" role="status">
-                          {board.cardFolderWarning}
-                        </div>
-                      )}
-                      <div className="folia-main" role="region" aria-label="Board">
-                        <Board
-                          board={board}
-                          today={todayValue}
-                          selectedPath={selected}
-                          wipLimits={wipLimits}
-                          filter={filter}
-                          doneColumnId={doneColumnId}
-                          onMove={(card, overId) => void onMove(card, overId)}
-                          onAddCard={onAddCard}
-                        />
+                <BoardRootContext.Provider value={rootRef}>
+                  <div className="folia-root folia-scope" ref={rootRef}>
+                    <Toolbar
+                      ref={searchRef}
+                      query={query}
+                      onChange={setQuery}
+                      matchCount={counts.match}
+                      totalCount={counts.total}
+                      canFilterMine={settings.userName.trim() !== ""}
+                    />
+                    {board.cardFolderWarning && (
+                      <div className="folia-card-folder-notice" role="status">
+                        {board.cardFolderWarning}
                       </div>
-                      {panelShown && (
-                        <DetailDialog host={host} onClosed={closeDetail}>
-                          {detail}
-                        </DetailDialog>
-                      )}
+                    )}
+                    <div className="folia-main" role="region" aria-label="Board">
+                      <Board
+                        board={board}
+                        today={todayValue}
+                        selectedPath={selected}
+                        wipLimits={wipLimits}
+                        filter={filter}
+                        doneColumnId={doneColumnId}
+                        onMove={(card, overId) => void onMove(card, overId)}
+                        onAddCard={onAddCard}
+                      />
                     </div>
-                  </BoardRootContext.Provider>
-                </BoardMountContext.Provider>
+                    {panelShown && (
+                      <DetailDialog host={host} onClosed={closeDetail}>
+                        {detail}
+                      </DetailDialog>
+                    )}
+                  </div>
+                </BoardRootContext.Provider>
               </MatchContextContext.Provider>
             </RelationCountsContext.Provider>
           </ContextsContext.Provider>

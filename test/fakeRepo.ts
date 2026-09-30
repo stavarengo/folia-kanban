@@ -5,6 +5,8 @@
 import type {
   CardRepository,
   ConfirmRequest,
+  MenuAnchor,
+  MenuRow,
   PropertyNamesInUse,
   SearchField,
   SuggestSource,
@@ -556,6 +558,43 @@ export class FakeRepo implements CardRepository {
   columnEditor: { column: ColumnDef; save: (patch: ColumnPatch) => void } | null = null;
   editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void {
     this.columnEditor = { column, save: onSave };
+  }
+
+  /** Every menu the board asked for, in order. */
+  menus: { rows: readonly MenuRow[]; at: MenuAnchor }[] = [];
+  /**
+   * Records the menu and draws a bare stand-in for it (`role="menu"`, one button per action,
+   * `menuitemradio` with `aria-checked` for a choice) in the anchor's document, so a test picks a
+   * row the way a person would. A pick or a newer menu removes it.
+   */
+  showMenu(rows: readonly MenuRow[], at: MenuAnchor): void {
+    this.menus.push({ rows, at });
+    const doc = "event" in at ? (at.event.target as Node).ownerDocument! : at.below.ownerDocument;
+    doc.querySelector("[data-fake-menu]")?.remove();
+    const menu = doc.body.appendChild(doc.createElement("div"));
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("data-fake-menu", "");
+    for (const row of rows) {
+      if (row === "separator") {
+        menu.appendChild(doc.createElement("hr"));
+      } else if ("label" in row) {
+        menu.appendChild(doc.createElement("div")).textContent = row.label;
+      } else {
+        const b = menu.appendChild(doc.createElement("button"));
+        b.textContent = row.title;
+        b.disabled = !!row.disabled;
+        if (row.warning) b.setAttribute("data-warning", "");
+        if (row.checked === undefined) b.setAttribute("role", "menuitem");
+        else {
+          b.setAttribute("role", "menuitemradio");
+          b.setAttribute("aria-checked", String(row.checked));
+        }
+        b.addEventListener("click", (evt) => {
+          menu.remove();
+          row.onClick(evt);
+        });
+      }
+    }
   }
 
   /** test helper: simulate an external change */

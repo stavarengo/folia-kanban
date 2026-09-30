@@ -6,30 +6,21 @@ import ts from "typescript";
 
 // Unknown expressions cannot supply the stable base class a button needs. Conditional branches
 // stay separate so a styled branch cannot hide an unstyled one.
-function classValues(node, literalReturns) {
+function classValues(node) {
   if (!node) return [""];
   if (ts.isStringLiteralLike(node)) return [node.text];
-  if (ts.isJsxExpression(node)) return classValues(node.expression, literalReturns);
-  if (ts.isParenthesizedExpression(node)) return classValues(node.expression, literalReturns);
+  if (ts.isJsxExpression(node)) return classValues(node.expression);
+  if (ts.isParenthesizedExpression(node)) return classValues(node.expression);
   if (ts.isConditionalExpression(node)) {
-    return [
-      ...classValues(node.whenTrue, literalReturns),
-      ...classValues(node.whenFalse, literalReturns),
-    ];
+    return [...classValues(node.whenTrue), ...classValues(node.whenFalse)];
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-    return classValues(node.left, literalReturns).flatMap((a) =>
-      classValues(node.right, literalReturns).map((b) => a + b),
-    );
+    return classValues(node.left).flatMap((a) => classValues(node.right).map((b) => a + b));
   }
-  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression))
-    return literalReturns.get(node.expression.text) ?? ["?"];
   if (ts.isTemplateExpression(node)) {
     return node.templateSpans.reduce(
       (values, span) =>
-        values.flatMap((a) =>
-          classValues(span.expression, literalReturns).map((b) => a + b + span.literal.text),
-        ),
+        values.flatMap((a) => classValues(span.expression).map((b) => a + b + span.literal.text)),
       [node.head.text],
     );
   }
@@ -77,36 +68,6 @@ function hasButtonSubject(nodes) {
 }
 
 export async function checkButtons(roots, fail) {
-  // This declared finite return type supplies the dynamic priority face. Typecheck enforces the
-  // function's implementation; the guard checks every tone, including the muted fallback.
-  const cardView = ts.createSourceFile(
-    "cardView.ts",
-    await readFile("src/ui/cardView.ts", "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
-  const toneType = cardView.statements.find(
-    (node) => ts.isTypeAliasDeclaration(node) && node.name.text === "ChipTone",
-  )?.type;
-  const priorityReturn = cardView.statements.find(
-    (node) => ts.isFunctionDeclaration(node) && node.name?.text === "priorityTone",
-  )?.type;
-  const tones = toneType && ts.isUnionTypeNode(toneType) ? toneType.types : [];
-  const literalReturns = new Map();
-  if (
-    priorityReturn?.getText(cardView) !== "ChipTone" ||
-    !tones.length ||
-    tones.some((node) => !ts.isLiteralTypeNode(node) || !ts.isStringLiteral(node.literal))
-  )
-    fail(
-      "src/ui/cardView.ts",
-      "priorityTone must declare the finite ChipTone string union for button face coverage.",
-    );
-  else
-    literalReturns.set(
-      "priorityTone",
-      tones.map((node) => node.literal.text),
-    );
   const buttons = [];
   const families = new Set();
   for (const file of (await readdir("src/ui", { recursive: true })).filter((f) =>
@@ -128,10 +89,10 @@ export async function checkButtons(roots, fail) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText(source) === "className",
         );
-        for (const value of classValues(attr?.initializer, new Map()))
+        for (const value of classValues(attr?.initializer))
           for (const part of value.split(/\s+/))
             if (/^folia-[\w-]+\?$/.test(part)) families.add(part.slice(0, -1));
-        for (const value of classValues(attr?.initializer, literalReturns)) {
+        for (const value of classValues(attr?.initializer)) {
           const classes = value.split(/\s+/).filter((c) => /^folia-[\w-]+$/.test(c));
           const where = `${path}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
           if (!classes.length)
@@ -218,15 +179,7 @@ export async function checkButtons(roots, fail) {
     if (unconditionalRules.get(selector)?.get(property) !== value)
       fail("src/theme", `Button signal ${selector} needs ${property}: ${value}.`);
   };
-  const pointerClasses = [
-    "folia-btn",
-    "folia-filter-chip",
-    "folia-add-column",
-    "folia-column-add",
-    "folia-menu-item",
-    "folia-menu-column",
-    "folia-menu-prio",
-  ];
+  const pointerClasses = ["folia-btn", "folia-filter-chip", "folia-add-column", "folia-column-add"];
   for (const name of pointerClasses) {
     for (const state of ["hover", "active"]) {
       const excluded =

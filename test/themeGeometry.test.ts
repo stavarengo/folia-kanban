@@ -17,7 +17,6 @@ const declarations = (selector: string) => {
 
 describe("icon geometry contract", () => {
   it.each([
-    ".folia-scope .folia-menu-item",
     ".folia-scope .folia-chip",
     ".folia-scope .folia-filter-chip",
     ".folia-scope .folia-mini",
@@ -119,27 +118,15 @@ describe("composite dimensions", () => {
       );
     }
   });
-
-  it("keeps a one-letter priority choice at least as wide as the host button is tall", () => {
-    expect(declarations(".folia-scope .folia-menu-prio")).toMatchObject({
-      "min-width": "var(--input-height)",
-      "border-radius": "var(--folia-r-pill)",
-    });
-  });
 });
 
 describe("the no-value choice", () => {
-  // A priority off the board's scale is already a grey filled pill, so the choice that removes the
-  // value is the one drawn empty: no fill, a dashed edge that stays visible on a light menu.
-  it.each([".folia-scope .folia-menu-prio-none", ".folia-scope .folia-swatch-none"])(
-    "is an empty slot, never a filled pill: %s",
-    (selector) => {
-      expect(declarations(selector)).toMatchObject({
-        background: "transparent",
-        border: "var(--folia-border-width) dashed var(--text-faint)",
-      });
-    },
-  );
+  it("is an empty slot, never a filled swatch", () => {
+    expect(declarations(".folia-scope .folia-swatch-none")).toMatchObject({
+      background: "transparent",
+      border: "var(--folia-border-width) dashed var(--text-faint)",
+    });
+  });
 
   it("drops the swatch's inset hairline, which would draw a solid line inside the dashed edge", () => {
     expect(declarations(".folia-scope .folia-swatch-none")["box-shadow"]).toBe("none");

@@ -1,5 +1,5 @@
 {
-  "$description": "Stacking rungs: the board's own, and the two anchored on Obsidian's --layer-* scale.",
+  "$description": "Stacking rungs inside the board.",
   "base": {
     "$value": "1",
     "cssVar": "--folia-z-index-base",
@@ -22,17 +22,6 @@
     "source": {
       "owned": true,
       "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
-    }
-  },
-  "app-menu": {
-    "$value": "var(--layer-menu, 65)",
-    "cssVar": "--folia-z-index-app-menu",
-    "source": {
-      "alias": "--layer-menu",
-      "fallback": {
-        "value": "65",
-        "reason": "z-index does not inherit, so an unresolved var() computes to `auto` and would drop the surface behind the ribbon. The fallback is the failure mode, not a second opinion."
-      }
     }
   }
 }

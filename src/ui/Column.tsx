@@ -10,7 +10,7 @@ import {
   type DragReloc,
 } from "../model/board";
 import { CardItem } from "./CardItem";
-import { ColumnMenu } from "./ColumnMenu";
+import { columnMenu } from "./menus";
 import { Icon } from "./icons";
 import { useReducedMotion } from "./useReducedMotion";
 import {
@@ -181,8 +181,6 @@ export function Column({
   const subitems = useSubitemsCollapse();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // Inline title edit (#7). A click on the title (no meaningful drag movement) enters edit mode;
   // the ≥5px movement threshold that distinguishes drag from click is the dnd sensor's own
@@ -337,6 +335,30 @@ export function Column({
     if (Object.keys(liftedParentOf).length > 0) paths = [...paths, ...Object.keys(liftedParentOf)];
   }
   const liftedPaths = new Set(Object.keys(liftedParentOf));
+
+  // Rooted in `paths`, not in the raw status bucket: the roots are the tiles actually
+  // rendered here right now (after the lane rule and the global search filter), so the
+  // command starts from what the user can see. From each root it takes the whole family,
+  // not just the top-level tile: an "expand all" that stopped there would leave a
+  // grandchild collapsed from an earlier individual toggle still hidden. Those
+  // descendants are deliberately NOT narrowed to what the filter currently paints:
+  // this is a bulk state operation on the cards of this column, and the state outlives the
+  // filter. Skipping a hidden descendant would leave exactly the grandchild this walk
+  // exists to reach still collapsed once the filter clears, and would do it asymmetrically
+  // — collapse-all has no such problem, expand-all does. Filtered only to cards that
+  // actually have a toggle (subcard children OR an inline-todos preview) — a card with
+  // neither has no state to change, so giving it an override would just be a wasted
+  // `data.json` entry nothing ever reads.
+  const setSubitems = (collapsed: boolean) =>
+    subitems.setMany(
+      subtreePaths(board, paths).filter((p) => hasNestedSubitems(board, settings.cardNextTodos, p)),
+      collapsed,
+    );
+  // The column and its cards as last drawn, for a menu row picked after a reload the open menu
+  // outlived: "Edit column…" saves every field, so an older reading would put back what the reload
+  // brought in, and the bulk collapse would miss a card that arrived with it.
+  const latest = useRef({ column, setSubitems });
+  latest.current = { column, setSubitems };
 
   // A card's subitems toggle is only worth showing when expanding it would actually reveal
   // something — under an active filter that means at least one immediate child still matches
@@ -518,62 +540,33 @@ export function Column({
           {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
         <button
-          ref={menuBtnRef}
           className="folia-icon-btn folia-column-menu-btn"
           aria-label={`Column options for ${column.title}`}
-          aria-haspopup="dialog"
-          aria-expanded={menuOpen}
+          aria-haspopup="menu"
           // Keep the menu button out of the header's drag/edit gesture (§4.5): swallow the
-          // pointerdown so the column sortable never arms, and toggle the menu on click.
+          // pointerdown so the column sortable never arms.
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            setMenuOpen((o) => !o);
+            // Under the button whichever way it was pressed: Enter and Space report no pointer.
+            repo.showMenu(
+              columnMenu(actions, {
+                column,
+                isFirst,
+                isLast,
+                onEdit: () =>
+                  repo.editColumn(latest.current.column, (patch) =>
+                    actions.updateColumn(column.id, patch),
+                  ),
+                onCollapseAll: () => latest.current.setSubitems(true),
+                onExpandAll: () => latest.current.setSubitems(false),
+              }),
+              { below: e.currentTarget },
+            );
           }}
         >
           <Icon name="more" />
         </button>
-        {menuOpen && (
-          <ColumnMenu
-            column={column}
-            isFirst={isFirst}
-            isLast={isLast}
-            triggerRef={menuBtnRef}
-            onClose={() => setMenuOpen(false)}
-            onEdit={() =>
-              repo.editColumn(column, (patch) => actions.updateColumn(column.id, patch))
-            }
-            // Rooted in `paths`, not in the raw status bucket: the roots are the tiles actually
-            // rendered here right now (after the lane rule and the global search filter), so the
-            // command starts from what the user can see. From each root it takes the whole family,
-            // not just the top-level tile: an "expand all" that stopped there would leave a
-            // grandchild collapsed from an earlier individual toggle still hidden. Those
-            // descendants are deliberately NOT narrowed to what the filter currently paints:
-            // this is a bulk state operation on the cards of this column, and the state outlives the
-            // filter. Skipping a hidden descendant would leave exactly the grandchild this walk
-            // exists to reach still collapsed once the filter clears, and would do it asymmetrically
-            // — collapse-all has no such problem, expand-all does. Filtered only to cards that
-            // actually have a toggle (subcard children OR an inline-todos preview) — a card with
-            // neither has no state to change, so giving it an override would just be a wasted
-            // `data.json` entry nothing ever reads.
-            onCollapseAll={() =>
-              subitems.setMany(
-                subtreePaths(board, paths).filter((p) =>
-                  hasNestedSubitems(board, settings.cardNextTodos, p),
-                ),
-                true,
-              )
-            }
-            onExpandAll={() =>
-              subitems.setMany(
-                subtreePaths(board, paths).filter((p) =>
-                  hasNestedSubitems(board, settings.cardNextTodos, p),
-                ),
-                false,
-              )
-            }
-          />
-        )}
       </header>
       {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
           card dropped anywhere on the column still reports over.id === column.id. `isOver` comes

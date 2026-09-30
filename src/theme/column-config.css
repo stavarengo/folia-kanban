@@ -40,13 +40,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .folia-scope *,
-  .folia-menu {
+  .folia-scope * {
     transition-duration: var(--folia-dur-none);
-  }
-  /* No positional slide/scale for motion-sensitive users — these surfaces just appear. */
-  .folia-menu {
-    animation: none;
   }
   /* The drag overlays still lift (their shadow/outline mark the grab), but without the scale/tilt tween. */
   .folia-card-overlay,

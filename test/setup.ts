@@ -25,6 +25,8 @@ if (hasDom) {
       const info = typeof o === "string" ? { cls: o } : (o ?? {});
       if (info.cls) el.className = Array.isArray(info.cls) ? info.cls.join(" ") : info.cls;
       if (typeof info.text === "string") el.textContent = info.text;
+      for (const [name, value] of Object.entries(info.attr ?? {}))
+        if (value !== null && value !== false) el.setAttribute(name, String(value));
       this.appendChild(el);
       return el;
     };
@@ -32,6 +34,17 @@ if (hasDom) {
   if (!HTMLElement.prototype.createDiv) {
     HTMLElement.prototype.createDiv = function (this: HTMLElement, o?: DomElementInfo | string) {
       return this.createEl("div", o);
+    };
+  }
+  if (!HTMLElement.prototype.setAttr) {
+    HTMLElement.prototype.setAttr = function (this: HTMLElement, name: string, value: unknown) {
+      if (value === null) this.removeAttribute(name);
+      else this.setAttribute(name, String(value));
+    };
+  }
+  if (!HTMLElement.prototype.toggle) {
+    HTMLElement.prototype.toggle = function (this: HTMLElement, show: boolean) {
+      this.style.display = show ? "" : "none";
     };
   }
   if (!Node.prototype.empty) {
