@@ -3285,6 +3285,32 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     return screen.findByRole("menu");
   };
 
+  // The host's icon button hands a key press's callback no event (only a pointer click carries
+  // one), so the menu has to anchor off the element the wrapper keeps live instead — this is the
+  // path that misses if that wiring breaks.
+  it("opens the column menu from the keyboard, anchored to its own button", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const user = userEvent.setup();
+    const trigger = await screen.findByRole("button", { name: "Column options for Todo" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(repo.menus.at(-1)?.at).toEqual({ below: trigger });
+    await screen.findByRole("menu");
+  });
+
+  it("presses the column menu button with Space without arming the column drag", async () => {
+    const repo = makeRepo();
+    render_(repo);
+    const user = userEvent.setup();
+    const trigger = await screen.findByRole("button", { name: "Column options for Todo" });
+    trigger.focus();
+    await user.keyboard("{ }");
+    expect(repo.menus.at(-1)?.at).toEqual({ below: trigger });
+    const column = trigger.closest(".folia-column") as HTMLElement;
+    expect(column).not.toHaveClass("folia-is-dragging");
+  });
+
   it("the column menu's Edit column hands the column to the host's dialog", async () => {
     const repo = makeRepo();
     render_(repo);

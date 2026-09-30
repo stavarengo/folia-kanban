@@ -12,6 +12,7 @@ import {
 import { CardItem } from "./CardItem";
 import { columnMenu } from "./menus";
 import { Icon } from "./icons";
+import { HostButton, HostIconButton } from "./hostControls";
 import { useReducedMotion } from "./useReducedMotion";
 import {
   useBoardActions,
@@ -191,6 +192,9 @@ export function Column({
   const [titleDraft, setTitleDraft] = useState(column.title);
   const justDragged = useRef(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // The menu button's element, kept live by HostIconButton: a keyboard press hands `onClick` no
+  // event to anchor the menu to, so the anchor is read off this instead.
+  const menuBtnRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (isDragging) justDragged.current = true;
@@ -539,15 +543,17 @@ export function Column({
           {overLimit && <Icon name="alert" />}
           {wipLimit != null ? `${count}/${wipLimit}` : count}
         </span>
-        <button
+        <HostIconButton
           className="folia-icon-btn folia-column-menu-btn"
-          aria-label={`Column options for ${column.title}`}
-          aria-haspopup="menu"
+          icon="ellipsis"
+          label={`Column options for ${column.title}`}
+          ariaHaspopup="menu"
           // Keep the menu button out of the header's drag/edit gesture (§4.5): swallow the
           // pointerdown so the column sortable never arms.
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
+          stopPropagation={["pointerdown", "click"]}
+          elRef={menuBtnRef}
+          onClick={() => {
+            if (!menuBtnRef.current) return;
             // Under the button whichever way it was pressed: Enter and Space report no pointer.
             repo.showMenu(
               columnMenu(actions, {
@@ -561,12 +567,10 @@ export function Column({
                 onCollapseAll: () => latest.current.setSubitems(true),
                 onExpandAll: () => latest.current.setSubitems(false),
               }),
-              { below: e.currentTarget },
+              { below: menuBtnRef.current },
             );
           }}
-        >
-          <Icon name="more" />
-        </button>
+        />
       </header>
       {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
           card dropped anywhere on the column still reports over.id === column.id. `isOver` comes
@@ -655,22 +659,21 @@ export function Column({
               </p>
             )}
             <div className="folia-row-actions">
-              <button
+              <HostButton
                 className="folia-btn folia-btn-primary"
-                onMouseDown={(e) => e.preventDefault()}
+                cta
+                text="Add card"
+                keepFocus
                 onClick={() => submit(false)}
-              >
-                Add card
-              </button>
-              <button
+              />
+              <HostButton
                 className="folia-btn"
+                text="Cancel"
                 onClick={() => {
                   setAdding(false);
                   setTitle("");
                 }}
-              >
-                Cancel
-              </button>
+              />
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { Icon, type IconName } from "./icons";
 import { useRepo } from "./context";
+import { HostButton } from "./hostControls";
 
 import { hasToken, toggleToken, type FilterKey } from "../model/filter";
 import type { SearchField, Suggestion } from "../model/repo";
@@ -179,9 +180,7 @@ export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function To
           <span>
             {matchCount} of {totalCount}
           </span>
-          <button className="folia-btn" onClick={() => onChange("")}>
-            Clear
-          </button>
+          <HostButton className="folia-btn" text="Clear" onClick={() => onChange("")} />
         </div>
       )}
     </div>
