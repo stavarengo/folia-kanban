@@ -1,4 +1,4 @@
-import type { App, HoverParent, HoverPopover } from "obsidian";
+import type { App } from "obsidian";
 import {
   Component,
   FileSystemAdapter,
@@ -30,7 +30,6 @@ import { boardNotice, confirmAction, promptTrash } from "./dialogs";
 import { openColumnEditor } from "./columnEditModal";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
-import { VIEW_TYPE_KANBAN } from "../viewType";
 import { parseFrontmatter } from "./frontmatter";
 import { attachSuggest, mountSearch } from "./inputSuggest";
 import { pathTaken } from "./pathTaken";
@@ -130,39 +129,13 @@ interface ResolvedBoardConfig extends BoardConfig {
   cardFolderExisting: string[];
 }
 
-/**
- * Who a rendered markdown container's link hovers belong to right now: the repository that last
- * rendered into it, and the note its links resolve against. Keyed by the container, so one listener
- * per container is enough however many times its content is re-rendered, and weak so an unmounted
- * panel takes its entry with it.
- *
- * The owner is looked up rather than captured, because the container outlives the repository: the
- * board note being renamed rebuilds the repository while React keeps the very same element, and a
- * listener closed over the old one would hand Page preview a dead board and a stale path.
- */
-const hoverSources = new WeakMap<
-  HTMLElement,
-  { render: object; app: App; repo: VaultRepository; sourcePath: string }
->();
-
-/** Containers already listening. Separate from `hoverSources`, which a cleanup empties. */
-const hoverListening = new WeakSet<HTMLElement>();
-
-export class VaultRepository implements CardRepository, HoverParent {
+export class VaultRepository implements CardRepository {
   private recentWrites = new Map<string, number>();
   /**
    * Where the last load found this board's cards (`<cardFolder>/`), so `onChange` can tell a
    * metadata-cache catch-up that concerns this board from one anywhere else in the vault.
    */
   private cardFolderPrefix: string | null = null;
-
-  /**
-   * Page preview parks the popover it opened for this board here (the `HoverParent` contract), so
-   * a second hover replaces the first instead of stacking previews over each other. A repository is
-   * not a `Component`, so it cannot unload the popover — checked live and it does not have to: the
-   * popover closes itself when its link goes, whether the panel closed or the board's tab did.
-   */
-  hoverPopover: HoverPopover | null = null;
 
   constructor(
     private app: App,
@@ -987,40 +960,6 @@ export class VaultRepository implements CardRepository, HoverParent {
     return true;
   }
 
-  /**
-   * Give the container's rendered internal links the hover preview every other link in Obsidian
-   * has. Page preview stays silent until the view is a registered source (`src/main.ts`) AND the
-   * view tells it about the link, which is what the event below does.
-   *
-   * The listener is bound to the container once and outlives the individual renders, because the
-   * container does: re-registering per render would stack a second listener onto the same element
-   * whenever a caller re-renders without running the previous cleanup, and every hover would then
-   * fire twice. `hoverSources` carries who the container answers for, refreshed on every render and
-   * dropped by the cleanup, so a hover after teardown says nothing.
-   */
-  private watchForLinkHovers(el: HTMLElement, sourcePath: string, render: object): void {
-    hoverSources.set(el, { render, app: this.app, repo: this, sourcePath });
-    if (hoverListening.has(el)) return;
-    hoverListening.add(el);
-    el.addEventListener("mouseover", (event: MouseEvent) => {
-      // `closest`, because the pointer may be over a `<code>` or an `<em>` nested inside the
-      // anchor; `data-href`, because that is where Obsidian keeps the link as written.
-      const link = (event.target as HTMLElement | null)?.closest("a.internal-link");
-      if (!(link instanceof HTMLElement)) return;
-      const linktext = link.getAttribute("data-href");
-      const owner = hoverSources.get(el);
-      if (!linktext || !owner) return;
-      owner.app.workspace.trigger("hover-link", {
-        event,
-        source: VIEW_TYPE_KANBAN,
-        hoverParent: owner.repo,
-        targetEl: link,
-        linktext,
-        sourcePath: owner.sourcePath,
-      });
-    });
-  }
-
   renderMarkdown(el: HTMLElement, markdown: string, sourcePath: string): () => void {
     el.empty();
     // A managed Component owns the render's child lifecycle (embeds, post-processors). render is
@@ -1030,9 +969,6 @@ export class VaultRepository implements CardRepository, HoverParent {
     let cancelled = false;
     const c = new Component();
     c.load();
-    // `c` doubles as this render's identity: the cleanup below must only retire the record while it
-    // is still this render's, never a later one's.
-    this.watchForLinkHovers(el, sourcePath, c);
     const tmp = el.cloneNode(false) as HTMLElement;
     void MarkdownRenderer.render(this.app, markdown, tmp, sourcePath, c)
       .then(() => {
@@ -1043,10 +979,6 @@ export class VaultRepository implements CardRepository, HoverParent {
     return () => {
       cancelled = true;
       c.unload();
-      // The listener stays (the container may render again into the same element), but it answers
-      // from this record — dropping it is what makes a torn-down render stop naming a repository
-      // whose links are gone, and lets the element release its hold on that repository.
-      if (hoverSources.get(el)?.render === c) hoverSources.delete(el);
       el.empty();
     };
   }

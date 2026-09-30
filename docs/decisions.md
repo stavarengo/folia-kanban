@@ -483,3 +483,11 @@ What stays different, by choice or for want of a published value: tables keep th
 The board used to find the bar by its `.status-bar` class, measure it and pad the columns by its height. The class is not in the developer docs, and neither is anything that says how tall the bar is (`--status-bar-scroll-padding` resolves to nothing on 1.13.7), so the measurement went and nothing replaced it. It does not need replacing: every column ends in its add-card button or its rule line, and that footer plus the board's own padding sits between the last card and the window's edge. Measured live on 1.13.7 with the default theme, the last card of the tallest column ends 44px above the bar in the main area and in a bottom split, 44-56px above it in the right sidebar, and an open add-card composer, the one state with no footer, ends 6px above it. A pop-out window has no bar.
 
 **What would change this:** a bar that reaches a card or the composer's buttons, because a theme or snippet makes it taller (it follows `--status-bar-font-size`, which a theme may raise) or a release moves it. The composer is the first to go, with 6px to spare. A documented variable for the bar's height would be the way back, not the class.
+
+## Links in the detail panel show no page preview
+
+**Decided 2026-09-30 (#101). Hovering a link in a card's description or comments shows no page preview, and Folia is not in Page preview's list of sources.**
+
+The preview fired the workspace `hover-link` event for links it found by the undocumented `internal-link` class and their `data-href`. The developer docs do show a plugin view firing that event, in the sample code of the "Build a Bases view" guide, but `obsidian.d.ts` types neither the event nor its payload. Since #88 the panel is an Obsidian dialog: a page preview sits on `--layer-popover` (30), under the dialog's `--layer-modal` (50), and it was reported opening behind the dialog's backdrop (#101). Lifting it would mean styling the undocumented `.hover-popover`. A popped-out board never showed it either (#81).
+
+**What would change this:** a documented way to open a page preview above a modal, together with a typed `hover-link` event or another documented way for a view to ask for a preview of a link it rendered.

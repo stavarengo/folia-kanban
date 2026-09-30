@@ -100,7 +100,7 @@ Ordered by what the gap costs today. Items marked **bug** are wrong behaviour a 
 12. **02-25** (trade-off) — **bug.** Folia's z-index ladder shares the numeric space with Obsidian's `--layer-*` scale, with five exact collisions. Confirmed live: Obsidian's tooltip (layer 70) paints over an open Folia menu (60). *Fixed on 2026-09-10 for the body-portalled surfaces, which now read the `--layer-*` scale; the in-board rungs are still Folia's own. The audit's own reading, above, is left as it stood.*
 13. **04-15** (trade-off) — **bug.** The checklist parser accepts only `[ ]`, `[x]` and `[X]`, so a card using any other checkbox character loses its subtask state. *Fixed on 2026-09-09; the audit's own reading, above, is left as it stood.*
 14. **02-10** (trade-off) — the raw-value audit's pixel detector is `\d{2,}px`, so every single-digit px value passes unseen, and the waiver retired on "nothing remains to migrate" was signed off against that overstated coverage.
-15. **05-03** (clear win) — **bug.** The detail panel's rendered links have no hover preview, because the view is never registered as a hover-link source. *Fixed on 2026-09-10; the audit's own reading, above, is left as it stood.*
+15. **05-03** (clear win) — **bug.** The detail panel's rendered links have no hover preview, because the view is never registered as a hover-link source. *Fixed on 2026-09-10, removed on 2026-09-30 (#101, see `docs/decisions.md`); the audit's own reading, above, is left as it stood.*
 
 ## Governance findings
 

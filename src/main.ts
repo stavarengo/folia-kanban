@@ -173,14 +173,6 @@ export default class FoliaKanbanPlugin extends Plugin {
     );
 
     this.addRibbonIcon("layout-grid", "Open Folia Kanban board", () => void this.activateView());
-    // Half of a hover preview. The other half is the `hover-link` event the detail panel's rendered
-    // markdown fires (src/obsidian/vaultRepo.ts); neither half does anything without the other, and
-    // both must name the same source or Page preview's own on/off setting stops governing ours.
-    // `defaultMod: false` is what Obsidian registers for its own Reading view, and the panel shows
-    // rendered markdown — so a plain hover previews there, as it does in a rendered note. Every
-    // other source asks for the Mod key; a reader who wants that here can say so in Page preview's
-    // settings, where this registration is what puts Folia in the list.
-    this.registerHoverLinkSource(VIEW_TYPE_KANBAN, { display: "Folia Kanban", defaultMod: false });
     this.addCommand({
       id: "folia-open-kanban-board",
       name: OPEN_BOARD_COMMAND_NAME,
