@@ -4,21 +4,11 @@ import type { JSX, SVGProps } from "react";
 
 export type IconName =
   | "plus"
-  | "type"
-  | "close"
-  | "external-link"
-  | "copy"
-  | "trash"
-  | "pencil"
   | "check"
-  | "check-circle"
   | "git-branch"
   | "message"
-  | "arrow-right"
-  | "arrow-left"
   | "calendar"
   | "alert"
-  | "more"
   | "inbox"
   | "ban"
   | "octagon-alert"
@@ -28,41 +18,7 @@ export type IconName =
 
 const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M5 12h14M12 5v14" />,
-  type: <path d="M4 7V4h16v3M9 20h6M12 4v16" />,
-  copy: (
-    <>
-      <rect x="8" y="8" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </>
-  ),
-  close: <path d="M18 6 6 18M6 6l12 12" />,
-  "external-link": (
-    <>
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </>
-  ),
-  trash: (
-    <>
-      <path d="M3 6h18" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M10 11v6M14 11v6" />
-    </>
-  ),
-  pencil: (
-    <>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </>
-  ),
   check: <path d="M20 6 9 17l-5-5" />,
-  "check-circle": (
-    <>
-      <path d="M21.5 11.5a9.5 9.5 0 1 1-5.6-8.2" />
-      <path d="m9 11 3 3L22 4" />
-    </>
-  ),
   "git-branch": (
     <>
       <path d="M6 3v12" />
@@ -72,8 +28,6 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
-  "arrow-right": <path d="M5 12h14M12 5l7 7-7 7" />,
-  "arrow-left": <path d="M19 12H5M12 19l-7-7 7-7" />,
   calendar: (
     <>
       <path d="M8 2v4M16 2v4" />
@@ -85,13 +39,6 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
       <path d="M12 9v4M12 17h.01" />
-    </>
-  ),
-  more: (
-    <>
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="19" cy="12" r="1" />
-      <circle cx="5" cy="12" r="1" />
     </>
   ),
   ban: (
