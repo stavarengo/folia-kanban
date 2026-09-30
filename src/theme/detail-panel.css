@@ -265,7 +265,7 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.folia-scope .folia-title-value.is-expanded .folia-title-value-text {
+.folia-scope .folia-title-value.folia-is-expanded .folia-title-value-text {
   display: block;
   -webkit-line-clamp: none;
   overflow: visible;
@@ -295,7 +295,7 @@
   padding-left: var(--folia-space-md);
   border-left: var(--folia-border-width-thick) solid var(--folia-border);
 }
-.folia-title-step.is-winner {
+.folia-title-step.folia-is-winner {
   border-left-color: var(--folia-accent);
 }
 .folia-title-step-source {

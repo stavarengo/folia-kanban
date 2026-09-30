@@ -231,7 +231,7 @@ export async function checkButtons(roots, fail) {
     for (const state of ["hover", "active"]) {
       const excluded =
         name === "folia-add-column"
-          ? ":disabled, :focus-visible, .is-editing"
+          ? ":disabled, :focus-visible, .folia-is-editing"
           : ":disabled, :focus-visible";
       const selector = `.folia-scope .${name}:${state}:where(:not(${excluded}))`;
       requireSignal(selector, "outline", "var(--folia-control-outline)");

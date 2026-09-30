@@ -66,7 +66,7 @@ class ColumnEditModal extends Modal {
     labelBy(row, swatches);
     const swatch = (label: string, color: string, pressed: boolean) => {
       const b = swatches.createEl("button", {
-        cls: "folia-swatch" + (pressed ? " is-active" : ""),
+        cls: "folia-swatch" + (pressed ? " folia-is-active" : ""),
         attr: { type: "button", "aria-label": label, "aria-pressed": String(pressed) },
       });
       b.style.setProperty("--folia-swatch-color", color);
@@ -86,7 +86,7 @@ class ColumnEditModal extends Modal {
       // "No colour" is the choice a column never given a colour is making. The board paints such a
       // column from `autoColor`, a colour nobody picked, so the ring goes where the stored value is.
       const none = swatches.createEl("button", {
-        cls: "folia-swatch folia-swatch-none" + (d.color ? "" : " is-active"),
+        cls: "folia-swatch folia-swatch-none" + (d.color ? "" : " folia-is-active"),
         text: "No color",
         attr: { type: "button", "aria-pressed": String(!d.color) },
       });

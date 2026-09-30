@@ -231,8 +231,8 @@ function CardItemInner({
         (nested ? " folia-card--nested" : "") +
         (parentPath ? " folia-card--subitem" : "") +
         (todoRef ? " folia-card--todo" : "") +
-        (selected ? " is-selected" : "") +
-        (isDragging ? " is-dragging" : "") +
+        (selected ? " folia-is-selected" : "") +
+        (isDragging ? " folia-is-dragging" : "") +
         (card.context ? " folia-card--has-context" : "")
       }
       data-testid="card"
@@ -298,7 +298,7 @@ function CardItemInner({
         )}
         {stats && stats.checklist > 0 && (
           <div
-            className={"folia-progress" + (allDone ? " is-complete" : "")}
+            className={"folia-progress" + (allDone ? " folia-is-complete" : "")}
             title={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
             aria-label={`${stats.checklistDone} of ${stats.checklist} subtasks done`}
           >
@@ -379,7 +379,10 @@ function CardItemInner({
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Icon name="chevron-down" className={subitemsCollapsed ? "folia-collapsed" : undefined} />
+          <Icon
+            name="chevron-down"
+            className={subitemsCollapsed ? "folia-is-collapsed" : undefined}
+          />
           {subitemsCollapsed
             ? `${stats?.checklist ?? 0} subitem${(stats?.checklist ?? 0) === 1 ? "" : "s"}, ${stats?.checklistDone ?? 0} done`
             : "Subitems"}

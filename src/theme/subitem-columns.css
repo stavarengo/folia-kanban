@@ -55,7 +55,7 @@
 }
 
 /* Column drag overlay (#1 fix) — the lifted ghost the cursor carries while reordering a column. The
-   source column dims in place (`.folia-column.is-dragging`) to read as the drop slot; this header-only
+   source column dims in place (`.folia-column.folia-is-dragging`) to read as the drop slot; this header-only
    ghost (rendered by the DragOverlay) is what actually follows the pointer, mirroring the card lift. */
 .folia-column-overlay {
   width: var(--folia-col-w);

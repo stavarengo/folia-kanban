@@ -1882,7 +1882,7 @@ describe("collapse/expand subitems", () => {
       name: 'Show 3 subitems, 1 done, for "Alpha"',
     });
     expect(collapsedToggle).toBeInTheDocument();
-    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "folia-collapsed");
+    expect(collapsedToggle.querySelector("svg")).toHaveClass("folia-icon", "folia-is-collapsed");
     expect(within(alpha).queryByText("first todo")).toBeNull();
     expect(alphaTree.querySelector(".folia-subcard-group")).toBeNull();
 
@@ -2029,18 +2029,18 @@ describe("collapse/expand subitems", () => {
 
 describe("board pan-scroll", () => {
   // jsdom has no layout, so board.scrollLeft always reads back 0 — we can only assert the
-  // is-pan-scrolling class lifecycle here. The click-hijack suppression and actual scroll offset
+  // folia-is-pan-scrolling class lifecycle here. The click-hijack suppression and actual scroll offset
   // need the live test-vault verification (compat-clicks / pointer capture aren't simulated in jsdom).
 
-  it("toggles is-pan-scrolling on a shift pan and clears it on pointerup", async () => {
+  it("toggles folia-is-pan-scrolling on a shift pan and clears it on pointerup", async () => {
     render_(makeRepo());
     await screen.findByText("Alpha");
     const board = document.querySelector(".folia-board") as HTMLElement;
     dispatchPointer(board, "pointerdown", { shiftKey: true, button: 0, clientX: 100 });
-    expect(board).toHaveClass("is-pan-scrolling");
+    expect(board).toHaveClass("folia-is-pan-scrolling");
     dispatchPointer(board, "pointermove", { clientX: 60 });
     dispatchPointer(board, "pointerup", { clientX: 60 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(board).not.toHaveClass("folia-is-pan-scrolling");
   });
 
   it("defaults to shift-pan mode and ignores a plain left-press (cards stay clickable)", async () => {
@@ -2050,7 +2050,7 @@ describe("board pan-scroll", () => {
     expect(board).toHaveAttribute("data-pan", "shift");
     // A plain left-press must NOT pan in shift mode — it's reserved for card drag / clicks.
     dispatchPointer(board, "pointerdown", { button: 0, clientX: 100 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(board).not.toHaveClass("folia-is-pan-scrolling");
     dispatchPointer(board, "pointerup", { clientX: 100 });
   });
 
@@ -2062,9 +2062,9 @@ describe("board pan-scroll", () => {
     // is the movement, and the click suppression below reads that, not where the press landed.
     for (const from of [board, card, within(card).getByLabelText('Open note for "Alpha"')]) {
       dispatchPointer(from, "pointerdown", { button: 1, clientX: 100 });
-      expect(board).toHaveClass("is-pan-scrolling");
+      expect(board).toHaveClass("folia-is-pan-scrolling");
       dispatchPointer(from, "pointerup", { clientX: 100 });
-      expect(board).not.toHaveClass("is-pan-scrolling");
+      expect(board).not.toHaveClass("folia-is-pan-scrolling");
     }
   });
 
@@ -2076,15 +2076,15 @@ describe("board pan-scroll", () => {
 
     // Plain left-press on the bare board background → pans.
     dispatchPointer(board, "pointerdown", { button: 0, clientX: 100 });
-    expect(board).toHaveClass("is-pan-scrolling");
+    expect(board).toHaveClass("folia-is-pan-scrolling");
     dispatchPointer(board, "pointerup", { clientX: 100 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(board).not.toHaveClass("folia-is-pan-scrolling");
 
     // Plain left-press whose target sits inside a column (a card) must NOT pan — that gesture belongs
     // to the card (drag/click). The handler reads the real event target, so dispatch from the card.
     const card = screen.getByText("Alpha").closest(".folia-card") as HTMLElement;
     dispatchPointer(card, "pointerdown", { button: 0, clientX: 100 });
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(board).not.toHaveClass("folia-is-pan-scrolling");
     dispatchPointer(card, "pointerup", { clientX: 100 });
   });
 });
@@ -2623,12 +2623,12 @@ describe("card context menu", () => {
     const board = document.querySelector(".folia-board") as HTMLElement;
 
     dispatchPointer(openNote, "pointerdown", { button: 1, clientX: 300 });
-    expect(board).toHaveClass("is-pan-scrolling");
+    expect(board).toHaveClass("folia-is-pan-scrolling");
     dispatchPointer(board, "pointermove", { clientX: 200 });
     dispatchPointer(board, "pointerup", { clientX: 200 });
     fireEvent(openNote, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
 
-    expect(board).not.toHaveClass("is-pan-scrolling");
+    expect(board).not.toHaveClass("folia-is-pan-scrolling");
     expect(repo.opened).toEqual([]);
   });
 
@@ -3832,8 +3832,8 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     );
     render_(repo);
     const rabbit = (await screen.findByText("Rabbit")).closest("section") as HTMLElement;
-    expect(rabbit).toHaveClass("is-faded");
-    expect(rabbit).toHaveClass("is-parked");
+    expect(rabbit).toHaveClass("folia-is-faded");
+    expect(rabbit).toHaveClass("folia-is-parked");
     expect(rabbit.style.getPropertyValue("--folia-col-opacity")).toBe("0.4");
     expect(rabbit.style.getPropertyValue("--folia-col-hover-opacity")).toBe("0.8");
   });
@@ -7060,7 +7060,7 @@ describe("the panel names the file, names the override, and explains the title (
     const steps = [...detail.querySelectorAll(".folia-title-step")].map((li) => ({
       source: li.querySelector(".folia-title-step-source")?.textContent,
       value: li.querySelector(".folia-title-step-value")?.textContent,
-      winner: li.classList.contains("is-winner"),
+      winner: li.classList.contains("folia-is-winner"),
     }));
     expect(steps).toEqual([
       { source: "Override card title", value: "not set", winner: false },
@@ -7311,11 +7311,13 @@ describe("a title far wider than the panel (20260827.02)", () => {
     expect(rule(".folia-title-value-text")).toContain("white-space: normal");
 
     await user.click(value);
-    expect(value).toHaveClass("is-expanded");
+    expect(value).toHaveClass("folia-is-expanded");
     expect(value).toHaveAttribute("aria-expanded", "true");
     // Expanding undoes every part of the clamp, the base rule's `overflow: hidden` included, so
     // no future change to the collapsed rule can leave the open state half-clipped.
-    const openRule = rule(".folia-scope .folia-title-value.is-expanded .folia-title-value-text");
+    const openRule = rule(
+      ".folia-scope .folia-title-value.folia-is-expanded .folia-title-value-text",
+    );
     expect(openRule).toContain("-webkit-line-clamp: none");
     expect(openRule).toContain("overflow: visible");
   });
@@ -7921,8 +7923,8 @@ describe("column colour — what the picker writes and what a legacy note still 
     const custom = screen.getByLabelText("Custom color #9aa0a6");
     expect(custom.style.getPropertyValue("--folia-swatch-color")).toBe("#9aa0a6");
     expect(custom).toBeDisabled();
-    expect(custom.className).toContain("is-active");
+    expect(custom.className).toContain("folia-is-active");
     // ...and none of the eight claims to be the active one while the note carries something else.
-    expect(document.querySelectorAll(".folia-swatch.is-active")).toHaveLength(1);
+    expect(document.querySelectorAll(".folia-swatch.folia-is-active")).toHaveLength(1);
   });
 });

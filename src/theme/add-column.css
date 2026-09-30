@@ -16,18 +16,18 @@
   transition: background var(--folia-dur-fast) ease, color var(--folia-dur-fast) ease, border-color var(--folia-dur-fast) ease;
   box-shadow: none;
 }
-.folia-scope .folia-add-column:hover:where(:not(:disabled, .is-editing)) {
+.folia-scope .folia-add-column:hover:where(:not(:disabled, .folia-is-editing)) {
   color: var(--text-normal);
   border-color: var(--folia-border-strong);
 }
-.folia-scope .folia-add-column.is-editing {
+.folia-scope .folia-add-column.folia-is-editing {
   flex-direction: column;
   align-items: stretch;
   gap: var(--folia-space-md);
   cursor: var(--folia-cursor-inert);
   border-style: solid;
 }
-.folia-scope .folia-add-column.is-editing input {
+.folia-scope .folia-add-column.folia-is-editing input {
   font: inherit;
   padding: var(--folia-space-sm-plus) var(--folia-space-md-plus);
   border: var(--folia-border-width) solid var(--folia-border);
@@ -35,7 +35,7 @@
   background: var(--folia-field-bg);
   color: var(--text-normal);
 }
-.folia-scope .folia-add-column.is-editing input:focus {
+.folia-scope .folia-add-column.folia-is-editing input:focus {
   outline: var(--folia-focus-ring-w) solid transparent;
   border-color: var(--folia-accent);
   box-shadow: var(--folia-ring);

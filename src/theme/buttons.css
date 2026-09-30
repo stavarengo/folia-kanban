@@ -100,7 +100,7 @@
 
 .folia-scope .folia-btn:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-filter-chip:hover:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-column-add:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-item:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:hover:where(:not(:disabled, :focus-visible)),
@@ -112,7 +112,7 @@
 
 .folia-scope .folia-btn:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-filter-chip:active:where(:not(:disabled, :focus-visible)),
-.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-column-add:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-item:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-column:active:where(:not(:disabled, :focus-visible)),
@@ -138,8 +138,8 @@
 /* The tile's dashed border is the "nothing here yet" affordance, and a solid line drawn 2px inside
    it overwhelms it: at the moment the pointer arrives the tile reads as an ordinary bordered button.
    The pointer cue stays; it takes the tile's own line style so the tile stays a tile. */
-.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .is-editing)),
-.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .is-editing)),
+.folia-scope .folia-add-column:hover:where(:not(:disabled, :focus-visible, .folia-is-editing)),
+.folia-scope .folia-add-column:active:where(:not(:disabled, :focus-visible, .folia-is-editing)),
 .folia-scope .folia-menu-prio-none:hover:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-menu-prio-none:active:where(:not(:disabled, :focus-visible)),
 .folia-scope .folia-swatch-none:hover:where(:not(:disabled, :focus-visible)),

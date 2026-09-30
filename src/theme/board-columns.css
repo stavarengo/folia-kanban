@@ -11,7 +11,7 @@
   height: 100%;
   scrollbar-width: thin;
 }
-.folia-board.is-pan-scrolling {
+.folia-board.folia-is-pan-scrolling {
   cursor: var(--folia-cursor-grabbing);
   user-select: none;
 }
@@ -21,7 +21,7 @@
 .folia-board[data-pan="empty"] {
   cursor: var(--folia-cursor-grab);
 }
-.folia-board[data-pan="empty"].is-pan-scrolling {
+.folia-board[data-pan="empty"].folia-is-pan-scrolling {
   cursor: var(--folia-cursor-grabbing);
 }
 
@@ -79,15 +79,15 @@
 }
 /* A danger tint behind the normal text colour, not white on the palette red, which is 3.5:1 in dark
    and 4.2:1 in light: small text needs 4.5:1. The column's red edge and header tint say the rest. */
-.folia-scope .folia-column-count.is-over-limit {
+.folia-scope .folia-column-count.folia-is-over-limit {
   color: var(--text-normal);
   background: color-mix(in oklch, var(--folia-danger) 22%, transparent);
 }
 /* These two mix into opaque colours and stay in srgb — see src/theme/README.md. */
-.folia-column.is-over-limit {
+.folia-column.folia-is-over-limit {
   border-color: color-mix(in srgb, var(--folia-danger) 50%, var(--folia-border));
 }
-.folia-column.is-over-limit .folia-column-header {
+.folia-column.folia-is-over-limit .folia-column-header {
   background: color-mix(in srgb, var(--folia-danger) 8%, var(--folia-col-header-bg));
 }
 
@@ -102,7 +102,7 @@
   scrollbar-width: thin;
   transition: background var(--folia-dur-fast) ease;
 }
-.folia-column-body.is-over {
+.folia-column-body.folia-is-over {
   background: var(--folia-drop-target-bg);
 }
 .folia-column-empty {
@@ -119,7 +119,7 @@
   border: var(--folia-border-width) dashed var(--folia-border);
   border-radius: var(--folia-r);
 }
-.folia-column-empty.is-filtered {
+.folia-column-empty.folia-is-filtered {
   border: none;
   padding: var(--folia-gap) var(--folia-space-md);
   font-style: italic;

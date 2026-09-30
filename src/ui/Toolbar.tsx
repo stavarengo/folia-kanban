@@ -149,7 +149,7 @@ export const Toolbar = forwardRef<Pick<HTMLElement, "focus">, Props>(function To
   };
   const chip = (key: FilterKey, value: string, icon: IconName, label: string) => (
     <button
-      className={"folia-filter-chip" + (hasToken(query, key, value) ? " is-on" : "")}
+      className={"folia-filter-chip" + (hasToken(query, key, value) ? " folia-is-on" : "")}
       aria-pressed={hasToken(query, key, value)}
       onClick={() => toggle(key, value)}
     >

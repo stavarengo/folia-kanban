@@ -215,7 +215,7 @@ export function Board({
       panning = true;
       startX = e.clientX;
       startScroll = board.scrollLeft;
-      board.classList.add("is-pan-scrolling");
+      board.classList.add("folia-is-pan-scrolling");
       // Capture keeps move/up events flowing to the board even if the pointer leaves it. Guard the
       // call: a pointer can be absent in odd states (e.g. already released), and a throw here would
       // abort the gesture mid-pan.
@@ -242,7 +242,7 @@ export function Board({
     const end = (e: PointerEvent) => {
       if (!panning) return;
       panning = false;
-      board.classList.remove("is-pan-scrolling");
+      board.classList.remove("folia-is-pan-scrolling");
       if (board.hasPointerCapture(e.pointerId)) board.releasePointerCapture(e.pointerId);
     };
     // Capture phase fires before the event bubbles to React's delegated root container, so this blocks

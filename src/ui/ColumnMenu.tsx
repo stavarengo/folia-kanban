@@ -133,7 +133,9 @@ export function ColumnMenu({
           {COLUMN_COLORS.map((c) => (
             <button
               key={c}
-              className={"folia-swatch" + (columnColorName(column.color) === c ? " is-active" : "")}
+              className={
+                "folia-swatch" + (columnColorName(column.color) === c ? " folia-is-active" : "")
+              }
               style={{ ["--folia-swatch-color" as string]: columnAccent(c) }}
               aria-label={`Set color ${c}`}
               aria-pressed={columnColorName(column.color) === c}
@@ -142,7 +144,7 @@ export function ColumnMenu({
           ))}
           {customColor ? (
             <button
-              className="folia-swatch is-active"
+              className="folia-swatch folia-is-active"
               style={{ ["--folia-swatch-color" as string]: customColor }}
               aria-label={`Custom color ${customColor}`}
               title={`Custom color ${customColor}`}
@@ -154,7 +156,7 @@ export function ColumnMenu({
               that state is painted from `autoColor`, derived from its id rather than chosen, so
               ringing whichever of the eight it resolves to would claim a pick nobody made. */}
           <button
-            className={"folia-swatch folia-swatch-none" + (column.color ? "" : " is-active")}
+            className={"folia-swatch folia-swatch-none" + (column.color ? "" : " folia-is-active")}
             aria-pressed={!column.color}
             onClick={() => a.setColumnColor(column.id, null)}
           >
@@ -210,7 +212,7 @@ export function ColumnMenu({
           onClose();
         }}
       >
-        <Icon name="chevron-down" className="folia-collapsed" /> Expand all subitems
+        <Icon name="chevron-down" className="folia-is-collapsed" /> Expand all subitems
       </button>
 
       <div className="folia-menu-divider" />

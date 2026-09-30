@@ -24,17 +24,17 @@
 .folia-column {
   transition: opacity var(--folia-dur) var(--folia-ease), margin var(--folia-dur) var(--folia-ease);
 }
-.folia-column.is-faded {
+.folia-column.folia-is-faded {
   opacity: var(--folia-col-opacity);
 }
-.folia-column.is-faded:hover:not(.is-dragging),
-.folia-column.is-faded:focus-within:not(.is-dragging) {
+.folia-column.folia-is-faded:hover:not(.folia-is-dragging),
+.folia-column.folia-is-faded:focus-within:not(.folia-is-dragging) {
   opacity: var(--folia-col-hover-opacity);
 }
 /* #10 — parked: shove the column to the far right with a large left margin so a rabbit-hole
    column hides off-screen. Flex `order` moves it visually last without reordering the board's
    logical column array (which still drives Move-left/right + dnd). */
-.folia-column.is-parked {
+.folia-column.folia-is-parked {
   order: 1;
   margin-left: var(--folia-col-park-margin);
 }

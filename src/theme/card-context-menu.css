@@ -38,7 +38,7 @@
   cursor: var(--folia-cursor-control);
   text-transform: capitalize;
 }
-.folia-scope .folia-menu-prio.is-active {
+.folia-scope .folia-menu-prio.folia-is-active {
   box-shadow: var(--folia-shadow-choice-active);
 }
 /* Removing the priority is written out as "No priority" rather than drawn as a lone ✕, which read
@@ -73,7 +73,7 @@
   color: var(--text-muted);
   cursor: var(--folia-cursor-control);
 }
-.folia-scope .folia-menu-column.is-active {
+.folia-scope .folia-menu-column.folia-is-active {
   color: var(--text-normal);
   box-shadow: var(--folia-shadow-choice-active);
 }

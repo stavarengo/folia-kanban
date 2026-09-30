@@ -646,7 +646,7 @@ function TitleFields({
               button's inner display — belt and braces for older engines, not a fix for this
               one. */}
           <button
-            className={"folia-link folia-title-value" + (expanded ? " is-expanded" : "")}
+            className={"folia-link folia-title-value" + (expanded ? " folia-is-expanded" : "")}
             title={shown}
             aria-expanded={expanded}
             aria-label={expanded ? "Show less of the title" : "Show the whole title"}
@@ -671,7 +671,7 @@ function TitleFields({
           {resolved.trace.map((step) => (
             <li
               key={step.source}
-              className={"folia-title-step" + (step.outcome === "won" ? " is-winner" : "")}
+              className={"folia-title-step" + (step.outcome === "won" ? " folia-is-winner" : "")}
             >
               <span className="folia-title-step-source">{TITLE_SOURCE_LABEL[step.source]}</span>
               <span className="folia-title-step-value">

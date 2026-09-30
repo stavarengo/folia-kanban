@@ -433,10 +433,10 @@ export function Column({
       ref={setNodeRef}
       className={
         "folia-column" +
-        (overLimit ? " is-over-limit" : "") +
-        (faded ? " is-faded" : "") +
-        (parked ? " is-parked" : "") +
-        (isDragging ? " is-dragging" : "")
+        (overLimit ? " folia-is-over-limit" : "") +
+        (faded ? " folia-is-faded" : "") +
+        (parked ? " folia-is-parked" : "") +
+        (isDragging ? " folia-is-dragging" : "")
       }
       data-testid="column"
       data-column={column.id}
@@ -497,7 +497,7 @@ export function Column({
           </span>
         )}
         <span
-          className={"folia-column-count" + (overLimit ? " is-over-limit" : "")}
+          className={"folia-column-count" + (overLimit ? " folia-is-over-limit" : "")}
           role="img"
           title={
             overLimit
@@ -578,7 +578,7 @@ export function Column({
       {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
           card dropped anywhere on the column still reports over.id === column.id. `isOver` comes
           from useSortable and still drives the body drop highlight. */}
-      <div className={"folia-column-body" + (isOver ? " is-over" : "")}>
+      <div className={"folia-column-body" + (isOver ? " folia-is-over" : "")}>
         <SortableContext items={orderedDragIds} strategy={verticalListSortingStrategy}>
           {groups.map((g) => (
             <div key={g.key || "_"} className="folia-card-group" data-group={g.key || undefined}>
@@ -627,7 +627,7 @@ export function Column({
           // left for a search, which the rule line does not explain.
           (takesAdds || globalFiltering) &&
           (filtering ? (
-            <div className="folia-column-empty is-filtered">
+            <div className="folia-column-empty folia-is-filtered">
               <span>No matches</span>
             </div>
           ) : (

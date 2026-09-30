@@ -24,7 +24,7 @@ export function AddColumn() {
   }
 
   return (
-    <div className="folia-add-column is-editing">
+    <div className="folia-add-column folia-is-editing">
       <input
         autoFocus
         value={title}

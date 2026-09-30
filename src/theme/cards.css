@@ -56,23 +56,23 @@
   border-color: var(--folia-border-strong);
   box-shadow: var(--folia-shadow-card-hover);
 }
-.folia-card.is-selected {
+.folia-card.folia-is-selected {
   border-color: var(--folia-accent);
   box-shadow: var(--folia-shadow-card-selected);
 }
 /* The dragged card stays in flow as a quiet "slot" — the lifted copy lives in the DragOverlay. We
    hollow the source out (drop its content, shadow and own border) and leave only a dashed accent
    outline, so the gap reads as "this is where it'll land" rather than a half-faded duplicate. */
-.folia-card.is-dragging {
+.folia-card.folia-is-dragging {
   opacity: var(--folia-opacity-shown);
   background: color-mix(in oklch, var(--folia-accent) 7%, transparent);
   border-color: transparent;
   box-shadow: none;
 }
-.folia-card.is-dragging > * {
+.folia-card.folia-is-dragging > * {
   opacity: var(--folia-opacity-hidden);
 }
-.folia-card.is-dragging::after {
+.folia-card.folia-is-dragging::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -80,7 +80,7 @@
   border-radius: var(--folia-r-lg);
 }
 /* The priority strip would otherwise still show on the hollowed slot. */
-.folia-card.is-dragging::before {
+.folia-card.folia-is-dragging::before {
   background: transparent;
 }
 

@@ -227,7 +227,7 @@ export function CardContextMenu({
             {a.columns.map((c) => (
               <button
                 key={c.id}
-                className={"folia-menu-column" + (c.id === todoColumn ? " is-active" : "")}
+                className={"folia-menu-column" + (c.id === todoColumn ? " folia-is-active" : "")}
                 role="menuitemradio"
                 aria-checked={c.id === todoColumn}
                 onClick={() => {
@@ -240,7 +240,7 @@ export function CardContextMenu({
               </button>
             ))}
             <button
-              className={"folia-menu-column" + (todoColumn === "" ? " is-active" : "")}
+              className={"folia-menu-column" + (todoColumn === "" ? " folia-is-active" : "")}
               role="menuitemradio"
               aria-checked={todoColumn === ""}
               title="Show it inside its card again"
@@ -285,7 +285,7 @@ export function CardContextMenu({
                 className={
                   "folia-menu-prio folia-chip-" +
                   priorityTone(p, a.priorityScale) +
-                  (samePriority(p, priority) ? " is-active" : "")
+                  (samePriority(p, priority) ? " folia-is-active" : "")
                 }
                 role="menuitemradio"
                 aria-checked={samePriority(p, priority)}
@@ -301,7 +301,7 @@ export function CardContextMenu({
             <button
               className={
                 "folia-menu-prio folia-menu-prio-none" +
-                (samePriority(priority, "") ? " is-active" : "")
+                (samePriority(priority, "") ? " folia-is-active" : "")
               }
               role="menuitemradio"
               // Whitespace-only reads as absent here too, the way every other priority path treats it.

@@ -12,15 +12,15 @@
 }
 /* The column being dragged: dim + lift it out of the row so the gap reads as the drop slot.
    A faded column (#10 `--folia-col-opacity` < 1, e.g. parked) must still read as "dragging", so
-   this rule sets a visible opacity. The faded-hover rule above is scoped `:not(.is-dragging)`, so
-   mid-drag only `.is-faded` and `.is-dragging` match (equal specificity) and this later rule wins —
+   this rule sets a visible opacity. The faded-hover rule above is scoped `:not(.folia-is-dragging)`, so
+   mid-drag only `.folia-is-faded` and `.folia-is-dragging` match (equal specificity) and this later rule wins —
    a parked+faded column never goes invisible mid-drag. */
-.folia-column.is-dragging {
+.folia-column.folia-is-dragging {
   opacity: var(--folia-opacity-subtle);
   cursor: var(--folia-cursor-grabbing);
   z-index: var(--folia-z-index-raised);
 }
-.folia-column.is-dragging .folia-column-title {
+.folia-column.folia-is-dragging .folia-column-title {
   cursor: var(--folia-cursor-grabbing);
 }
 /* Inline rename input — sits in the title's slot, inheriting its weight/size so the swap is seamless. */

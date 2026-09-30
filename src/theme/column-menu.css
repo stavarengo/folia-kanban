@@ -82,7 +82,7 @@
 .folia-scope .folia-swatch:hover:where(:not(:disabled, .folia-swatch-none)) {
   transform: scale(1.1);
 }
-.folia-scope .folia-swatch.is-active {
+.folia-scope .folia-swatch.folia-is-active {
   /* two-tone ring readable over any swatch fill, in either theme */
   box-shadow: var(--folia-shadow-swatch-active);
 }

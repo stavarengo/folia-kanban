@@ -17,7 +17,7 @@
   background: var(--folia-accent);
   transition: width var(--folia-dur) var(--folia-ease);
 }
-.folia-progress.is-complete .folia-progress-fill {
+.folia-progress.folia-is-complete .folia-progress-fill {
   background: var(--folia-success);
 }
 .folia-progress-label {
@@ -30,7 +30,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
-.folia-progress.is-complete .folia-progress-label {
+.folia-progress.folia-is-complete .folia-progress-label {
   --folia-icon-size: var(--icon-xs);
   --folia-icon-stroke: var(--icon-xs-stroke-width);
   color: var(--folia-text-success);

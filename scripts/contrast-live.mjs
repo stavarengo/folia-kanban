@@ -352,7 +352,7 @@ async function measure(scope) {
       // A column the board note fades (`opacity` below 1) is exempt only while it is faded: not
       // hovered and not holding focus. Its revealed state is measured separately, and counts.
       const isFaded = (el) => {
-        const column = el.closest(".folia-column.is-faded");
+        const column = el.closest(".folia-column.folia-is-faded");
         return Boolean(
           column &&
           Number(getComputedStyle(column).opacity) < 1 &&
@@ -395,7 +395,7 @@ async function measure(scope) {
         const revealed = [];
         let revealedChecked = 0;
         for (const column of include.flatMap((root) => [
-          ...root.querySelectorAll(".folia-column.is-faded"),
+          ...root.querySelectorAll(".folia-column.folia-is-faded"),
         ])) {
           const hoverOpacity = getComputedStyle(column).getPropertyValue(
             "--folia-col-hover-opacity",
