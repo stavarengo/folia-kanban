@@ -11,10 +11,15 @@ import {
 } from "../model/board";
 import { CardItem } from "./CardItem";
 import { ColumnMenu } from "./ColumnMenu";
-import { ColumnEditModal } from "./ColumnEditModal";
 import { Icon } from "./icons";
 import { useReducedMotion } from "./useReducedMotion";
-import { useBoardActions, useMatchContext, useSettings, useSubitemsCollapse } from "./context";
+import {
+  useBoardActions,
+  useMatchContext,
+  useRepo,
+  useSettings,
+  useSubitemsCollapse,
+} from "./context";
 import {
   isEmptyFilter,
   matchCard,
@@ -172,12 +177,11 @@ export function Column({
   } = useSortable({ id: column.id, ...(reducedMotion ? { transition: null } : {}) });
   const settings = useSettings();
   const actions = useBoardActions();
+  const repo = useRepo();
   const subitems = useSubitemsCollapse();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  // colcfg #8 — the full "Edit column" modal (distinct from the #7 inline title `editing` below).
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   // Inline title edit (#7). A click on the title (no meaningful drag movement) enters edit mode;
@@ -536,7 +540,9 @@ export function Column({
             isLast={isLast}
             triggerRef={menuBtnRef}
             onClose={() => setMenuOpen(false)}
-            onEdit={() => setEditModalOpen(true)}
+            onEdit={() =>
+              repo.editColumn(column, (patch) => actions.updateColumn(column.id, patch))
+            }
             // Rooted in `paths`, not in the raw status bucket: the roots are the tiles actually
             // rendered here right now (after the lane rule and the global search filter), so the
             // command starts from what the user can see. From each root it takes the whole family,
@@ -691,7 +697,6 @@ export function Column({
             Cards matching <code>{column.filter}</code> appear here
           </p>
         ))}
-      {editModalOpen && <ColumnEditModal column={column} onClose={() => setEditModalOpen(false)} />}
     </section>
   );
 }

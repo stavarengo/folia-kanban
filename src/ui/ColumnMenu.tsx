@@ -21,8 +21,8 @@ interface Props {
   isLast: boolean;
   triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
-  /** Open the full "Edit column" modal (#8). The menu closes first so its outside-click teardown
-   *  doesn't race the modal — the modal's open-state lives in the parent Column, not here. */
+  /** Open the full "Edit column" dialog (#8). The menu closes first, so focus is not handed back to
+   *  its trigger under the dialog. */
   onEdit: () => void;
   /** Collapse every card's subitems (inline-todos preview + subcard group), recursively, for every
    *  card currently rendered in this column. */
@@ -51,7 +51,6 @@ export function ColumnMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [name, setName] = useState(column.title);
   const [wip, setWip] = useState(column.limit != null ? String(column.limit) : "");
-  const [confirmDel, setConfirmDel] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   /* A colour a board note carries that is not one of the eight — a hex written before the palette
      moved to names. It is shown as a ninth swatch so the column's own colour is visible in the row
@@ -237,29 +236,15 @@ export function ColumnMenu({
       </button>
 
       <div className="folia-menu-divider" />
-      {!confirmDel ? (
-        <button className="folia-menu-item folia-menu-danger" onClick={() => setConfirmDel(true)}>
-          <Icon name="trash" /> Delete column
-        </button>
-      ) : (
-        <div className="folia-menu-confirm" role="alertdialog" aria-label="Confirm delete column">
-          <span>Delete “{column.title}”? Its cards move to a neighbouring column.</span>
-          <div className="folia-row-actions">
-            <button
-              className="folia-btn folia-btn-danger"
-              onClick={() => {
-                a.deleteColumn(column.id);
-                onClose();
-              }}
-            >
-              Delete
-            </button>
-            <button className="folia-btn" autoFocus onClick={() => setConfirmDel(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <button
+        className="folia-menu-item folia-menu-danger"
+        onClick={() => {
+          onClose();
+          a.deleteColumn(column.id);
+        }}
+      >
+        <Icon name="trash" /> Delete column
+      </button>
     </div>,
     doc.body,
   );

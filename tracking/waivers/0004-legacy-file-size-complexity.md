@@ -35,7 +35,6 @@ src/ui/CardItem.tsx     CardItemInner() 274 lines, complexity 50
 src/ui/Column.tsx       Column() 322 lines, complexity 33
 src/ui/Board.tsx        Board() 229 lines, complexity 11
 src/ui/Toolbar.tsx      Toolbar() 165 lines, complexity 12
-src/ui/ColumnEditModal.tsx  ColumnEditModal() 214 lines
 src/ui/ColumnMenu.tsx   ColumnMenu() 164 lines
 src/ui/CardContextMenu.tsx  CardContextMenu() 162 lines
 src/main.ts             SettingTab.display() 124 lines

@@ -16,14 +16,6 @@
       "reason": "Obsidian publishes no animation durations at all, so every duration the board uses is its own."
     }
   },
-  "toast": {
-    "$value": "220ms",
-    "cssVar": "--folia-dur-toast",
-    "source": {
-      "owned": true,
-      "reason": "the completion toast's entrance, slower than the board's base so the celebration registers."
-    }
-  },
   "none": {
     "$value": "0.01ms",
     "cssVar": "--folia-dur-none",

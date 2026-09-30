@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  columnDraft,
+  columnPatch,
   normalizeColumns,
   serializeColumns,
   DEFAULT_COLUMNS,
@@ -191,7 +193,7 @@ describe("round-trip: normalize(serialize(x)) is identity on the def shape", () 
 });
 
 describe("updateColumn write path is byte-stable (#8 — the modal patch must not leak defaults)", () => {
-  // The exact patch ColumnEditModal.save() builds for a NO-OP save on a plain {id,title} column.
+  // The patch the "Edit column" dialog built for a NO-OP save on a plain {id,title} column.
   // FakeRepo.setColumns doesn't round-trip through serialize, so this guards the real risk: the
   // editor sneaking an all-defaults patch that serializeColumns would still emit (invariant 5).
   const noopPatch: ColumnDef = {
@@ -281,5 +283,57 @@ describe("column colours — a name resolves, anything else is passed through", 
   it("keeps a stored hex through a read and a write of the frontmatter", () => {
     const raw = [{ id: "parked", title: "Parked", color: "#9aa0a6" }];
     expect(serializeColumns(normalizeColumns(raw))).toEqual(raw);
+  });
+});
+
+describe("the Edit column dialog's draft and patch", () => {
+  /** What a save does to a column: the patch merged on, as `updateColumn` merges it. */
+  const saved = (c: ColumnDef, edit: (d: ReturnType<typeof columnDraft>) => void = () => {}) => {
+    const draft = columnDraft(c);
+    edit(draft);
+    const patch = columnPatch(draft);
+    return patch && normalizeColumns(serializeColumns([{ ...c, ...patch } as ColumnDef]))[0];
+  };
+
+  it.each<ColumnDef>([
+    { id: "todo", title: "Todo" },
+    { id: "research", title: "Research", color: "#9aa0a6", limit: 3, opacity: 0.5 },
+    { id: "later", title: "Later", opacity: 0.4, hoverOpacity: 0.85, parked: true, sort: "due" },
+  ])("writes back exactly what an untouched column holds: %o", (c) => {
+    expect(saved(c)).toEqual(c);
+  });
+
+  it("leaves reveal-on-hover unset until someone sets it, however the opacity moves", () => {
+    expect(saved({ id: "todo", title: "Todo" }, (d) => (d.opacity = 0.5))).toEqual({
+      id: "todo",
+      title: "Todo",
+      opacity: 0.5,
+    });
+    expect(
+      saved({ id: "todo", title: "Todo" }, (d) => {
+        d.opacity = 0.5;
+        d.hoverOpacity = 0.8;
+      }),
+    ).toEqual({ id: "todo", title: "Todo", opacity: 0.5, hoverOpacity: 0.8 });
+  });
+
+  it("keeps a legacy hex across an unrelated edit", () => {
+    expect(
+      saved({ id: "todo", title: "Todo", color: "#9aa0a6" }, (d) => (d.title = "Backlog")),
+    ).toEqual({ id: "todo", title: "Backlog", color: "#9aa0a6" });
+  });
+
+  it("clears the limit and the filter when their fields are emptied", () => {
+    const c: ColumnDef = { id: "todo", title: "Todo", limit: 3, filter: "area:home" };
+    expect(
+      saved(c, (d) => {
+        d.limit = "";
+        d.filter = "  ";
+      }),
+    ).toEqual({ id: "todo", title: "Todo" });
+  });
+
+  it("refuses a blank title", () => {
+    expect(columnPatch({ ...columnDraft({ id: "todo", title: "Todo" }), title: "   " })).toBeNull();
   });
 });

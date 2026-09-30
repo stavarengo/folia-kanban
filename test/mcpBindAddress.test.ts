@@ -11,6 +11,7 @@ import {
   normalizeBindAddress,
   originAllowed,
 } from "../src/bindAddress";
+import { splitHeldPatch } from "../src/settingsLayout";
 
 describe("what counts as a bind address", () => {
   it("takes loopback, the wildcards and an ordinary interface address", () => {
@@ -172,5 +173,28 @@ describe("which origins a bind lets in", () => {
     expect(originAllowed("http://[0:0:0:0:0:0:0:1]:5173", "::1")).toBe(true);
     expect(originAllowed("http://[fe80::1]:5173", "fe80:0:0:0:0:0:0:1")).toBe(true);
     expect(originAllowed("http://[fe80::2]:5173", "fe80::1")).toBe(false);
+  });
+});
+
+describe("which held setting waits on a confirm", () => {
+  it.each(["0.0.0.0", "::", "192.168.1.5"])("holds back %s for a confirm", (address) => {
+    expect(splitHeldPatch({ mcpBindAddress: address, mcpPort: 27200 })).toEqual({
+      now: { mcpPort: 27200 },
+      confirm: address,
+    });
+  });
+
+  it.each(["127.0.0.1", "::1"])("writes a loopback address %s at once", (address) => {
+    expect(splitHeldPatch({ mcpBindAddress: address })).toEqual({
+      now: { mcpBindAddress: address },
+      confirm: null,
+    });
+  });
+
+  it("asks nothing of a patch that leaves the address alone", () => {
+    expect(splitHeldPatch({ userName: "Rafa" })).toEqual({
+      now: { userName: "Rafa" },
+      confirm: null,
+    });
   });
 });

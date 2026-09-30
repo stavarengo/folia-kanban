@@ -55,6 +55,11 @@ export class TFolder extends TAbstractFile {
   children: TAbstractFile[] = [];
 }
 
+/** The adapter's dialogs extend and build these; no suite here opens one, so they only exist. */
+export class Modal {}
+export class Setting {}
+export class Notice {}
+
 export class Component {
   loaded = false;
   load(): void {
@@ -388,6 +393,11 @@ export class FakeVault extends Events {
     return this.texts.get(path);
   }
 
+  getFileByPath(path: string): TFile | null {
+    const f = this.getAbstractFileByPath(path);
+    return f instanceof TFile ? f : null;
+  }
+
   getAbstractFileByPath(path: string): TAbstractFile | null {
     return this.nodes.get(path) ?? null;
   }
@@ -614,6 +624,15 @@ export class FakeFileManager {
   async trashFile(file: TAbstractFile): Promise<void> {
     this.vault.trashed.push(file.path);
     this.vault.remove(file);
+  }
+
+  /** What the person answers the delete prompt, and whether the prompt trashes the file itself
+   *  (Obsidian 1.13.7 does; the typings do not say). */
+  deletePrompt = { answer: true, trashesItself: true };
+
+  async promptForDeletion(file: TAbstractFile): Promise<boolean> {
+    if (this.deletePrompt.answer && this.deletePrompt.trashesItself) await this.trashFile(file);
+    return this.deletePrompt.answer;
   }
 }
 

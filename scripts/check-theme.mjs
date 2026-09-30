@@ -955,7 +955,6 @@ await checkButtons(componentRoots, fail);
 // read, not whether it wins the cascade.
 const FOCUS_OUTLINE_EXEMPT = new Map([
   [".folia-menu-field input:focus", "leaves with the column menu's inline field (#89)"],
-  [".folia-field input:focus", "leaves with the column config dialog (#87)"],
 ]);
 const FOCUS = /:focus(?:-visible)?(?![\w-])/;
 const noOutline = (rule) =>

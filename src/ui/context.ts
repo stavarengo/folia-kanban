@@ -12,13 +12,7 @@ import {
   type SettingsPatch,
 } from "../settings";
 import type { MatchContext } from "../model/filter";
-
-/**
- * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
- * CLEAR that field (the column editor sets a cleared color/limit/filter/hover to `undefined`).
- * `applyColumnPatch` in App.tsx merges this onto the current def and drops the cleared keys.
- */
-export type ColumnPatch = { [K in keyof ColumnDef]?: ColumnDef[K] | undefined };
+import type { ColumnPatch } from "../model/columns";
 
 export const RepoContext = createContext<CardRepository | null>(null);
 
@@ -169,8 +163,8 @@ export interface BoardActions {
   /** Open the card's detail panel with its "Override card title" field focused (the `title:` key). */
   editTitleOverride(path: string): void;
   /**
-   * Show a failed write the way every board mutation's failure is shown (the error toast). For the
-   * writes the detail panel makes itself, which otherwise have no path to that toast.
+   * Show a failed write the way every board mutation's failure is shown (an error notice). For the
+   * writes the detail panel makes itself, which otherwise have no path to that notice.
    */
   reportError(e: unknown): void;
   /**
@@ -184,8 +178,11 @@ export interface BoardActions {
    * checklist line standing in a column of its own, that tile is the reading the move is held to.
    */
   complete(card: Card): void;
-  /** Trash the card's note (after confirmation in the UI). */
-  remove(path: string): void;
+  /**
+   * Ask, then trash the card's note. The asking lives here, not in the surface the person started
+   * from, so every surface gets it. Resolves true when the note is gone, false when it stays.
+   */
+  remove(path: string): Promise<boolean>;
   /**
    * Open the underlying note in an Obsidian tab. Hand on the click that asked for it (React's
    * `nativeEvent`) so the host can honour the modifier keys — a new tab, a split, a new window.
@@ -194,7 +191,7 @@ export interface BoardActions {
    */
   openNote(path: string, evt?: MouseEvent): void;
   /**
-   * Put one representation of a card's file path on the clipboard and say so in a toast. Which
+   * Put one representation of a card's file path on the clipboard and say so in a notice. Which
    * representation is useful depends on where it will be pasted, hence the four forms: the
    * device's filesystem path (`absolute`, unavailable on a vault that is not a folder on disk),
    * the vault path (`vault`), the path as seen from the board note's own folder (`board`, the one
@@ -239,8 +236,12 @@ export interface BoardActions {
    * against it, so a position that has since been given to another line is refused by the note.
    */
   toggleTodo(path: string, line: TodoLine, done: boolean): void;
-  /** Delete one checklist line of a card, named by `line` the same way {@link toggleTodo} is. */
-  removeTodo(path: string, line: TodoLine): void;
+  /**
+   * Ask, then delete one checklist line of a card, named by `line` the same way
+   * {@link toggleTodo} is — which is the reading the person confirmed, however long they took.
+   * Resolves once the board has reloaded; a failure is reported here, not thrown.
+   */
+  removeTodo(path: string, line: TodoLine): Promise<void>;
   /**
    * Send one checklist line of `path` to a column of its own, or back to its card's column with
    * `null`. The one way a todo changes column outside a drag — a plain todo is not a tile until it
@@ -285,7 +286,7 @@ export interface BoardActions {
   setColumnColor(id: string, color: string | null): void;
   setColumnLimit(id: string, limit: number | null): void;
   /**
-   * Patch any subset of a column's editable fields in one write (#8). The "Edit column" modal
+   * Patch any subset of a column's editable fields in one write (#8). The "Edit column" dialog
    * builds the full patch; renameColumn/setColumnColor/setColumnLimit remain for the inline menu.
    * Routes through the same `setColumns` byte-stable path.
    */
@@ -293,6 +294,7 @@ export interface BoardActions {
   moveColumn(id: string, dir: -1 | 1): void;
   /** Reorder columns by dropping column `activeId` onto the slot held by `overId` (header drag). */
   reorderColumns(activeId: string, overId: string): void;
+  /** Ask, then delete the column, moving its cards to the nearest plain column. */
   deleteColumn(id: string): void;
   addColumn(title: string): void;
 }

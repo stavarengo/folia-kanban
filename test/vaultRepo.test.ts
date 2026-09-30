@@ -1497,6 +1497,37 @@ describe("telling our own writes apart from someone else's (onChange)", () => {
     off();
   });
 
+  it.each([true, false])(
+    "trashes a confirmed card exactly once, whether or not the prompt trashes it (prompt trashes: %s)",
+    async (trashesItself) => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+      app.fileManager.deletePrompt = { answer: true, trashesItself };
+
+      expect(await repo.promptDeleteCard("basic/Cards/One.md")).toBe(true);
+
+      expect(app.vault.trashed).toEqual(["basic/Cards/One.md"]);
+      expect(app.vault.getFileByPath("basic/Cards/One.md")).toBeNull();
+    },
+  );
+
+  // Nothing was written, so the change arriving next is somebody else's and must reach the board.
+  it("keeps a card the person declined to delete, and does not claim its next change", async () => {
+    const { app, repo } = setup();
+    const file = app.vault.addFile("basic/Cards/One.md", card("status: todo"));
+    app.fileManager.deletePrompt = { answer: false, trashesItself: true };
+    const reload = vi.fn();
+    const off = repo.onChange(reload);
+
+    expect(await repo.promptDeleteCard("basic/Cards/One.md")).toBe(false);
+    app.vault.emitEvent("modify", file);
+    vi.advanceTimersByTime(150);
+
+    expect(app.vault.trashed).toEqual([]);
+    expect(reload).toHaveBeenCalledTimes(1);
+    off();
+  });
+
   // A refused write touched nothing, so it must not claim the note either: the change that made it
   // refuse is exactly the one the board has to draw.
   it("keeps swallowing nothing after a write it refused", async () => {

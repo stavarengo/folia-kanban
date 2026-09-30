@@ -198,7 +198,7 @@ function useFreeTextSuggest(
  * One editable custom-frontmatter row: local draft committed on blur/Enter, remove button. The
  * value keeps its YAML type through an edit (`editScalar`); text that cannot hold it stays in the
  * field, unwritten, with the reason under it. A row that goes away still holding refused text — the
- * dialog closing, another card opening — says so in the board's toast instead, since the reason
+ * dialog closing, another card opening — says so in a notice instead, since the reason
  * under it goes too. Refused text is dropped when the value's type changes underneath (the way out
  * the refusal names does that): it was typed against a type that is no longer there.
  */
@@ -993,7 +993,6 @@ export function CardDetail({
   const [newTodo, setNewTodo] = useState("");
   const [newSubcard, setNewSubcard] = useState("");
   const [newComment, setNewComment] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [newProp, setNewProp] = useState({ key: "", val: "" });
   // Height the rendered preview occupied right before flipping to the raw editor, so the textarea
   // adopts it (min-height) and the panel doesn't jump on preview↔edit toggle. Null = no carry-over.
@@ -1032,7 +1031,7 @@ export function CardDetail({
         if (stillHere()) setNamesInUse(names);
       })
       // A vault that cannot answer costs the field the vault's half of the list and nothing else:
-      // Folia's own keys are known here and are still offered. Nothing worth a toast.
+      // Folia's own keys are known here and are still offered. Nothing worth a notice.
       .catch(() => {});
   }, [repo, isCreate]);
   const suggestLists = useMemo(
@@ -1352,7 +1351,7 @@ export function CardDetail({
   }, [focusSeq]);
 
   // Every write the panel makes goes through here, and a failure is reported the way every other
-  // board mutation's is (the toast), instead of leaving the panel looking as if nothing happened.
+  // board mutation's is (a notice), instead of leaving the panel looking as if nothing happened.
   // The body is re-read and the board reloaded either way, since a write can fail halfway.
   const mutate = async (fn: () => Promise<unknown>): Promise<boolean> => {
     try {
@@ -1565,32 +1564,18 @@ export function CardDetail({
               className="folia-icon-btn folia-action-delete"
               aria-label="Delete card"
               title="Delete card"
-              onClick={() => setConfirmDelete(true)}
+              onClick={() => {
+                // Set before asking: the panel unmounts as the note goes, before the answer is in.
+                deleting.current = true;
+                void actions.remove(path).then((gone) => {
+                  if (!gone) deleting.current = false;
+                });
+              }}
             >
               <Icon name="trash" />
             </button>
           </div>
         </div>
-
-        {confirmDelete && (
-          <div className="folia-detail-confirm" role="alertdialog" aria-label="Confirm delete">
-            <span>Delete this card? The note moves to trash.</span>
-            <div className="folia-row-actions">
-              <button
-                className="folia-btn folia-btn-danger"
-                onClick={() => {
-                  deleting.current = true;
-                  actions.remove(path);
-                }}
-              >
-                Delete
-              </button>
-              <button className="folia-btn" autoFocus onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="folia-detail-body">
           <TitleFields
@@ -1968,7 +1953,15 @@ export function CardDetail({
                     className="folia-icon-btn folia-mini"
                     aria-label="Remove"
                     title="Remove"
-                    onClick={() => void mutate(() => repo.removeSubtask(path, s))}
+                    // A todo asks first, as it does from the tile and the menu; a subcard's line
+                    // only unlinks the note, which stays where it is.
+                    // The todo action reports its own failure and reloads the board, so only the
+                    // panel's own reading is left to refresh.
+                    onClick={() =>
+                      isTodoLine(s)
+                        ? void actions.removeTodo(path, s).then(reload)
+                        : void mutate(() => repo.removeSubtask(path, s))
+                    }
                   >
                     <Icon name="close" />
                   </button>

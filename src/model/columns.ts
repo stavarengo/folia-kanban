@@ -27,6 +27,67 @@ export const COLUMN_DEFAULTS = {
   parked: false,
 } as const;
 
+/**
+ * A column edit patch. Unlike `Partial<ColumnDef>`, each key may be explicitly `undefined` to
+ * CLEAR that field (the column editor sets a cleared color/limit/filter/hover to `undefined`).
+ * `applyColumnPatch` in App.tsx merges this onto the current def and drops the cleared keys.
+ */
+export type ColumnPatch = { [K in keyof ColumnDef]?: ColumnDef[K] | undefined };
+
+/** What the "Edit column" dialog holds while it is open, in the shape its controls hold it. */
+export interface ColumnDraft {
+  title: string;
+  color: string | undefined;
+  /** As typed; "" is no limit. */
+  limit: string;
+  filter: string;
+  group: ColumnGroup;
+  sort: ColumnSort;
+  /** 0.1–1. */
+  opacity: number;
+  /** 0–1, or undefined while nobody has set it: a column then reveals to full on hover, and a save
+   *  must not write the slider's resting position into a note that never asked for one. */
+  hoverOpacity: number | undefined;
+  parked: boolean;
+}
+
+export function columnDraft(c: ColumnDef): ColumnDraft {
+  return {
+    title: c.title,
+    color: c.color,
+    limit: c.limit != null ? String(c.limit) : "",
+    filter: c.filter ?? "",
+    group: c.group ?? "none",
+    sort: c.sort ?? "manual",
+    opacity: typeof c.opacity === "number" ? c.opacity : 1,
+    hoverOpacity: typeof c.hoverOpacity === "number" ? c.hoverOpacity : undefined,
+    parked: c.parked === true,
+  };
+}
+
+/**
+ * The one patch a save writes. `null` for a blank title, which the dialog refuses and stays open
+ * over. Default-valued and blank fields are pruned by `serializeColumns` on the way to the note.
+ */
+export function columnPatch(d: ColumnDraft): ColumnPatch | null {
+  const title = d.title.trim();
+  if (!title) return null;
+  const limit =
+    d.limit.trim() === "" ? undefined : Math.max(0, Math.floor(Number(d.limit) || 0)) || undefined;
+  const hover = d.hoverOpacity === undefined ? undefined : Math.min(1, Math.max(0, d.hoverOpacity));
+  return {
+    title,
+    color: d.color,
+    limit,
+    filter: d.filter.trim() || undefined,
+    group: d.group,
+    sort: d.sort,
+    opacity: Math.min(1, Math.max(0, d.opacity)),
+    hoverOpacity: Number.isFinite(hover) ? hover : undefined,
+    parked: d.parked,
+  };
+}
+
 const GROUPS: readonly ColumnGroup[] = ["none", "due"];
 const SORTS: readonly ColumnSort[] = ["manual", "priority", "due"];
 

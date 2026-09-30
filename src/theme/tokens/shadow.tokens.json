@@ -116,14 +116,6 @@
       "reason": "the blur behind a card's floating hover actions; Obsidian publishes no blur values."
     }
   },
-  "blur-scrim": {
-    "$value": "blur(2px)",
-    "cssVar": "--folia-blur-scrim",
-    "source": {
-      "owned": true,
-      "reason": "the blur behind a dialog's dimming layer; Obsidian publishes no blur values."
-    }
-  },
   "link-unresolved-filter": {
     "$value": "var(--link-unresolved-filter)",
     "cssVar": "--folia-link-unresolved-filter",

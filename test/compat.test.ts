@@ -1,4 +1,4 @@
-import type { PluginSettingTab, Setting } from "obsidian";
+import type { ButtonComponent, PluginSettingTab, Setting } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const app = vi.hoisted(() => ({ version: "1.13.0" }));
@@ -6,7 +6,8 @@ vi.mock("obsidian", () => ({
   requireApiVersion: (v: string) => v.localeCompare(app.version, undefined, { numeric: true }) <= 0,
 }));
 
-const { refreshDeclarativeSettingTab, setSettingError } = await import("../src/obsidian/compat");
+const { markDestructiveAction, refreshDeclarativeSettingTab, setSettingError } =
+  await import("../src/obsidian/compat");
 
 const fakeTab = () => ({ update: vi.fn(), refreshDomState: vi.fn() });
 const asTab = (t: ReturnType<typeof fakeTab>) => t as unknown as PluginSettingTab;
@@ -41,5 +42,26 @@ describe("the version gate", () => {
     const setErrorMessage = vi.fn();
     setSettingError({ setErrorMessage } as unknown as Setting, "Not a port");
     expect(setErrorMessage).toHaveBeenCalledTimes(calls);
+  });
+
+  it("makes the destructive action Obsidian's red CTA on 1.13 and only the older red below", () => {
+    const button = () => {
+      const b = { setDestructive: vi.fn(), setCta: vi.fn(), buttonEl: { addClass: vi.fn() } };
+      b.setDestructive.mockReturnValue(b);
+      b.setCta.mockReturnValue(b);
+      return b;
+    };
+    const recent = button();
+    markDestructiveAction(recent as unknown as ButtonComponent);
+    expect(recent.setDestructive).toHaveBeenCalledTimes(1);
+    expect(recent.setCta).toHaveBeenCalledTimes(1);
+    expect(recent.buttonEl.addClass).not.toHaveBeenCalled();
+
+    app.version = "1.11.4";
+    const older = button();
+    markDestructiveAction(older as unknown as ButtonComponent);
+    expect(older.setDestructive).not.toHaveBeenCalled();
+    expect(older.setCta).not.toHaveBeenCalled();
+    expect(older.buttonEl.addClass).toHaveBeenCalledWith("mod-warning");
   });
 });

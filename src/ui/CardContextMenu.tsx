@@ -218,7 +218,7 @@ export function CardContextMenu({
       {target.kind === "todo" ? (
         <>
           {item("Mark done", "check-circle", () => a.toggleTodo(path, target.todoLine, true))}
-          {item("Remove todo", "trash", () => a.removeTodo(path, target.todoLine), {
+          {item("Remove todo", "trash", () => void a.removeTodo(path, target.todoLine), {
             danger: true,
           })}
           <div className="folia-menu-divider" />
@@ -333,7 +333,7 @@ export function CardContextMenu({
 
           <div className="folia-menu-divider" />
           {item("Add subcard", "git-branch", () => a.addSubcard(path), { movesFocus: true })}
-          {item("Delete card", "trash", () => a.remove(path), { danger: true })}
+          {item("Delete card", "trash", () => void a.remove(path), { danger: true })}
         </>
       )}
     </div>,

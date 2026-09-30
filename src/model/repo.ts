@@ -14,12 +14,13 @@ import type {
   SubtaskRef,
 } from "./types";
 import type { CardMutation } from "./board";
+import type { ColumnPatch } from "./columns";
 import type { FileOp } from "./pathOps";
 
 /**
  * A write that was refused because the note no longer reads the way the caller described it: the
  * line at that index is not the one it meant, so nothing was written at all. Reaches the person as
- * a toast and an agent as a tool failure, both of which say the same thing — read again, then act.
+ * a notice and an agent as a tool failure, both of which say the same thing — read again, then act.
  */
 export class StaleLineError extends Error {}
 
@@ -58,6 +59,13 @@ export function staleLine(
   return new StaleLineError(
     `${where} no longer reads "${at.text}", so that write was refused — the note changed since it was read. Read it again and repeat the edit on what is there now.`,
   );
+}
+
+/** What a confirm dialog says: its title, the consequence in a sentence, and the button's verb. */
+export interface ConfirmRequest {
+  title: string;
+  message: string;
+  cta: string;
 }
 
 /** Frontmatter keys already in use, split by where the notes carrying them live. */
@@ -188,8 +196,13 @@ export interface CardRepository {
   createCard(title: string, status: string): Promise<string>;
   /** Create a child card and link it from the parent's checklist. Returns child path. */
   addSubcard(parentPath: string, title: string): Promise<string>;
-  /** Move a card's note to the trash. */
+  /** Move a card's note to the trash, without asking: for callers that have no one to ask (MCP). */
   deleteCard(path: string): Promise<void>;
+  /**
+   * Ask the person whether to trash a card's note, the way the file explorer asks (which honours
+   * their "Confirm file deletion" setting), and trash it on a yes. True when the note is gone.
+   */
+  promptDeleteCard(path: string): Promise<boolean>;
   /**
    * Retitle a card by writing to whichever source its title currently comes from (see
    * `Card.titleSource`): the `title` frontmatter key, the heading line, or the `.md` file name.
@@ -273,6 +286,18 @@ export interface CardRepository {
 
   /** Mount the host's search field (Obsidian's `SearchComponent`, clear button included). */
   mountSearch(container: HTMLElement, onChange: (value: string) => void): SearchField;
+
+  /** Tell the person something in the host's own notice, an error staying up longer. */
+  showNotice(message: string, tone: "success" | "error"): void;
+
+  /** Ask the person to confirm a destructive action in the host's dialog. True on confirm. */
+  confirm(request: ConfirmRequest): Promise<boolean>;
+
+  /**
+   * Open the host's "Edit column" dialog on `column`. `onSave` gets the patch when the person
+   * saves; closing the dialog any other way saves nothing.
+   */
+  editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void;
 
   /** Subscribe to external changes; returns an unsubscribe function. */
   onChange(cb: () => void): () => void;

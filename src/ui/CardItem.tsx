@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card, CardStats, TodoLine } from "../model/types";
+import type { Card, CardStats } from "../model/types";
 import { sameLine } from "../model/board";
 import type { UnreadState } from "../model/unread";
 import { assigneeValues } from "../model/assignees";
@@ -58,12 +58,6 @@ function CardItemInner({
   const contexts = useContexts();
   const { cardNextTodos } = useSettings();
   const subitems = useSubitemsCollapse();
-  const [confirming, setConfirming] = useState(false);
-  // For a placed todo: the checklist line its "Remove todo?" was raised on. The confirm outlives a
-  // board reload the same way the context menu does, and this tile is named by the position of that
-  // line — so a line taken away above it leaves the tile standing, drawn from whatever slid into
-  // the position, while the confirm, its label and the removal all stay about what was clicked.
-  const [confirmingLine, setConfirmingLine] = useState<TodoLine | null>(null);
   const [menu, setMenu] = useState<ContextTarget | null>(null);
   // #12 inline title edit: when set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
@@ -129,7 +123,7 @@ function CardItemInner({
   const subitemsCollapsed = hasNestedSubitems && subitems.isCollapsed(card.path);
   // Hide the hover-action cluster while renaming: focus-within would otherwise reveal it over the
   // full-width title <input> (which has no right gutter), letting buttons cover the caret/text.
-  const showActions = !confirming && editing == null;
+  const showActions = editing == null;
   const canComplete = isCompletable(card, actions.doneColumnId);
 
   // An inline todo has no note of its own: its checklist line lives in its parent, so every action
@@ -451,46 +445,14 @@ function CardItemInner({
             title={todoRef ? "Remove todo" : "Delete card"}
             onClick={(e) => {
               e.stopPropagation();
-              setConfirmingLine(todoRef ? todoRef.line : null);
-              setConfirming(true);
+              // The line as this tile reads it now: the removal stays about what was clicked, even
+              // when the note moves on while the confirm is open.
+              if (todoRef) void actions.removeTodo(notePath, todoRef.line);
+              else void actions.remove(card.path);
             }}
           >
             <Icon name="trash" />
           </button>
-        </div>
-      )}
-
-      {confirming && (
-        <div
-          className="folia-card-confirm"
-          role="alertdialog"
-          aria-label={
-            confirmingLine ? `Remove todo ${confirmingLine.text}?` : `Delete ${card.title}?`
-          }
-        >
-          <span>{confirmingLine ? "Remove todo?" : "Delete card?"}</span>
-          <div className="folia-row-actions">
-            <button
-              className="folia-btn folia-btn-danger"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirmingLine) actions.removeTodo(notePath, confirmingLine);
-                else actions.remove(card.path);
-              }}
-            >
-              {confirmingLine ? "Remove" : "Delete"}
-            </button>
-            <button
-              className="folia-btn"
-              autoFocus
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirming(false);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
 

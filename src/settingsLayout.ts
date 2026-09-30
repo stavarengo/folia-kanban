@@ -1,4 +1,4 @@
-import { MCP_DEFAULT_BIND_ADDRESS } from "./bindAddress";
+import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./bindAddress";
 import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "./settings";
 
 // The settings tab as data: what it offers, in what order, under which headings, worded how, and
@@ -274,7 +274,40 @@ export const MCP_TOKEN_REGENERATE = {
   replacedButDown:
     "New token generated, but the server did not come back up on it. Check the port and bind-address settings.",
   missing: "Turn agent access on first — the token is generated then.",
+  confirm: {
+    title: "Replace the agent token?",
+    message:
+      "Every client configured with the current token stops being able to reach this vault until you paste the new one into it.",
+    cta: "Replace token",
+  },
 } as const;
+
+/**
+ * Which part of what the settings tab holds is written at once, and the network address that has
+ * to be confirmed first. Moving the server onto a network is the one commit that asks, and the
+ * rest of the patch does not wait on the answer.
+ */
+export function splitHeldPatch(patch: Partial<KanbanSettings>): {
+  now: Partial<KanbanSettings>;
+  confirm: string | null;
+} {
+  const { mcpBindAddress: address, ...rest } = patch;
+  if (address === undefined || isLoopbackBindAddress(address)) return { now: patch, confirm: null };
+  return { now: rest, confirm: address };
+}
+
+/** What is asked before the server moves off this computer onto a network address. */
+export function bindAddressConfirm(address: string): {
+  title: string;
+  message: string;
+  cta: string;
+} {
+  return {
+    title: "Open agent access to the network?",
+    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault.`,
+    cta: `Listen on ${address}`,
+  };
+}
 
 /**
  * The heading the version row sits under, and the row's own label.

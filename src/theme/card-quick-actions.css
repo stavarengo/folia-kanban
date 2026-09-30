@@ -24,20 +24,3 @@
 .folia-scope .folia-action-done:hover:where(:not(:disabled)) { color: var(--folia-text-success); }
 .folia-scope .folia-action-delete:hover:where(:not(:disabled)) { color: var(--folia-text-error); }
 
-.folia-card-confirm {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--folia-space-md);
-  padding: var(--folia-gap);
-  text-align: center;
-  font-size: var(--folia-font-size-sm);
-  color: var(--text-normal);
-  background: color-mix(in oklch, var(--folia-card-bg) 92%, transparent);
-  backdrop-filter: var(--folia-blur-scrim);
-  border-radius: var(--folia-r-lg);
-  z-index: var(--folia-z-index-raised);
-}

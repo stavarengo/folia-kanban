@@ -46,8 +46,8 @@
 
    Type: the app's rule sets `--font-ui-small`, and in the detail panel a select is a property value
    beside text inputs that all take the metadata input size, where 13px against the panel's own
-   reads as a mistake rather than as citizenship. In the edit-column dialog the two already agree,
-   so this only ever has something to do in the panel. Padding: `--dropdown-padding` holds 2.4em at
+   reads as a mistake rather than as citizenship. The panel is the only place the board draws a
+   select of its own. Padding: `--dropdown-padding` holds 2.4em at
    the end for the chevron `.dropdown` paints, and the board does not wear that class (see
    docs/decisions.md), so adopting it would open a gutter with nothing in it.
 
@@ -55,8 +55,7 @@
    `--background-modifier-border-focus`, which is `#555555` on `#333333` — around 1.7:1, under what
    an indicator needs — so `.folia-scope :focus-visible` keeps drawing the board's accent outline
    over it rather than deferring. */
-.folia-fields select,
-.folia-field select {
+.folia-fields select {
   font: inherit;
   padding: 0 var(--folia-space-md);
 }
@@ -84,32 +83,6 @@
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
-}
-
-/* completion celebration */
-.folia-toast {
-  position: absolute;
-  bottom: var(--folia-toast-bottom);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: var(--folia-space-md);
-  padding: var(--folia-space-md-plus) var(--folia-space-xl);
-  border-radius: var(--folia-r-pill);
-  color: var(--folia-on-fill);
-  font-size: var(--folia-font-size-md);
-  font-weight: var(--folia-font-weight-semibold);
-  box-shadow: var(--folia-shadow-overlay);
-  z-index: var(--folia-z-index-toast);
-  pointer-events: none;
-  animation: folia-toast-in var(--folia-dur-toast) var(--folia-ease);
-}
-.folia-toast-success { background: var(--folia-success); }
-.folia-toast-error { background: var(--folia-danger); }
-@keyframes folia-toast-in {
-  from { opacity: var(--folia-opacity-hidden); transform: translate(-50%, var(--folia-toast-rise)) scale(0.94); }
-  to { opacity: var(--folia-opacity-shown); transform: translate(-50%, 0) scale(1); }
 }
 
 .folia-loading,

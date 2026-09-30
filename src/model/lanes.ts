@@ -81,7 +81,7 @@ export function laneVerdict(
 }
 
 /**
- * The one sentence a toast and a tool error both say about a card a lane will not draw. Written
+ * The one sentence a notice and a tool error both say about a card a lane will not draw. Written
  * once because a person dragging a card and an agent calling `move_card` are owed the same
  * explanation; each caller adds its own next step.
  */

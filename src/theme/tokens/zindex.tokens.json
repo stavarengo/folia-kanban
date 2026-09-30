@@ -24,14 +24,6 @@
       "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
     }
   },
-  "toast": {
-    "$value": "50",
-    "cssVar": "--folia-z-index-toast",
-    "source": {
-      "owned": true,
-      "reason": "an in-board rung; the workspace leaf is its own stacking context, so these numbers are only ever compared with each other."
-    }
-  },
   "app-menu": {
     "$value": "var(--layer-menu, 65)",
     "cssVar": "--folia-z-index-app-menu",
@@ -40,17 +32,6 @@
       "fallback": {
         "value": "65",
         "reason": "z-index does not inherit, so an unresolved var() computes to `auto` and would drop the surface behind the ribbon. The fallback is the failure mode, not a second opinion."
-      }
-    }
-  },
-  "app-modal": {
-    "$value": "var(--layer-modal, 50)",
-    "cssVar": "--folia-z-index-app-modal",
-    "source": {
-      "alias": "--layer-modal",
-      "fallback": {
-        "value": "50",
-        "reason": "the same failure mode as zindex.app-menu: an unresolved var() would compute to `auto` and drop the dialog behind the app chrome."
       }
     }
   }

@@ -73,7 +73,7 @@ function restrictedGlobalRules({ node = false, dom = false } = {}) {
  */
 export const a11yExceptions = [
   {
-    files: ["src/ui/CardDetail.tsx", "src/ui/ColumnEditModal.tsx", "src/ui/ColumnMenu.tsx"],
+    files: ["src/ui/CardDetail.tsx", "src/ui/ColumnMenu.tsx"],
     rules: { "jsx-a11y/no-noninteractive-element-interactions": "off" },
   },
   {
@@ -191,7 +191,6 @@ export default [
       "src/ui/CardDetail.tsx",
       "src/ui/CardItem.tsx",
       "src/ui/Column.tsx",
-      "src/ui/ColumnEditModal.tsx",
       "src/ui/ColumnMenu.tsx",
       "src/ui/Toolbar.tsx",
       "src/ui/cardView.ts",
@@ -309,7 +308,10 @@ export default [
     // the preset spread so it wins the rule's options for src.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
-      "obsidianmd/ui/sentence-case": ["error", { brands: ["Folia", "Kanban"] }],
+      // "WIP" rides along for the same reason: it is how every kanban tool spells the column
+      // limit, and neither `ignoreWords` (skipped for a label's first word) nor `acronyms` (which
+      // would replace the rule's whole default list) keeps "WIP limit" as written.
+      "obsidianmd/ui/sentence-case": ["error", { brands: ["Folia", "Kanban", "WIP"] }],
     },
   },
   {

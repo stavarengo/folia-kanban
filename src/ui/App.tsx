@@ -33,6 +33,7 @@ import {
 import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
 import { DEFAULT_PRIORITIES } from "../model/priorities";
 import type { CardRepository } from "../model/repo";
+import type { ColumnPatch } from "../model/columns";
 import { isCollapsedIn, seenMarkerFor, type BoardSettings, type SettingsPatch } from "../settings";
 import { baseName, parentFolder, relativeToFolder, remapPath } from "../model/pathOps";
 import {
@@ -46,7 +47,6 @@ import {
   BoardRootContext,
   unreadStateOf,
   type BoardActions,
-  type ColumnPatch,
   type PinnedSeen,
   type CopyPathForm,
 } from "./context";
@@ -54,7 +54,6 @@ import {
 import { Board } from "./Board";
 import { CardDetail, DetailDialogContext } from "./CardDetail";
 import { Toolbar } from "./Toolbar";
-import { Icon } from "./icons";
 import { useToday } from "./useToday";
 import { matchCard, parseFilter, type MatchContext } from "../model/filter";
 import { boardPriorities } from "./cardView";
@@ -247,30 +246,21 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
   const [query, setQuery] = useState("");
-  const [toast, setToast] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const searchRef = useRef<Pick<HTMLElement, "focus">>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const toastTimer = useRef<number | null>(null);
   const todayValue = useToday(today);
   const settingsValue = useMemo(
     () => ({ settings, update: onUpdateSettings }),
     [settings, onUpdateSettings],
   );
 
-  const showToast = useCallback((text: string, tone: "success" | "error" = "success") => {
-    setToast({ text, tone });
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), tone === "error" ? 4000 : 2200);
-  }, []);
-  const reportError = useCallback(
-    (e: unknown) => showToast(e instanceof Error ? e.message : String(e), "error"),
-    [showToast],
+  const notify = useCallback(
+    (text: string, tone: "success" | "error" = "success") => repo.showNotice(text, tone),
+    [repo],
   );
-  useEffect(
-    () => () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    },
-    [],
+  const reportError = useCallback(
+    (e: unknown) => notify(e instanceof Error ? e.message : String(e), "error"),
+    [notify],
   );
   // Latest board for stable callbacks — lets the actions object stay referentially stable
   // across single-card edits so memoized cards don't all re-render.
@@ -406,10 +396,10 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
       if (!b || !ctx) return false;
       const why = laneRefusal(b, columnId, card, ctx);
       if (why === null) return false;
-      showToast(`${why} Nothing was changed.`, "error");
+      notify(`${why} Nothing was changed.`, "error");
       return true;
     },
-    [showToast],
+    [notify],
   );
 
   const onMove = useCallback(
@@ -628,20 +618,21 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
         if (!doneColumnId) return;
         void moveTo(card, doneColumnId)
           .then((moved) => {
-            if (moved) showToast(`${card.title} — done!`);
+            if (moved) notify(`${card.title} — done!`);
           })
           .catch(reportError);
       },
-      remove: (path) => {
-        void (async () => {
-          try {
-            await repo.deleteCard(path);
+      remove: async (path) => {
+        let gone = false;
+        try {
+          gone = await repo.promptDeleteCard(path);
+          if (gone)
             // Prune the per-path plugin data this card owned — its collapse-state override
             // (§ collapse) and its comments-seen marker (§ unread). Left behind, either would
             // silently hand its state to an unrelated card someone later creates at this same
             // path. Built from the settings at write time, not this render's snapshot, so another
             // view's write landing in between is not undone. Only once the file is actually gone:
-            // a delete that failed leaves the card, and it must keep what it had.
+            // a delete that failed or was cancelled leaves the card, and it must keep what it had.
             onUpdateSettings((s) => {
               const prune: Partial<BoardSettings> = {};
               if (s.collapsedCards[path] !== undefined)
@@ -650,13 +641,12 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
                 prune.commentsSeen = withoutKey(s.commentsSeen, path);
               return prune;
             });
-          } catch (e) {
-            reportError(e);
-          } finally {
-            setSelected((cur) => (cur === path ? null : cur));
-            await load();
-          }
-        })();
+        } catch (e) {
+          reportError(e);
+        }
+        if (gone) setSelected((cur) => (cur === path ? null : cur));
+        await load();
+        return gone;
       },
       openNote: (path, evt) => void repo.openCard(path, evt),
       copyPath: (path, form) => {
@@ -664,20 +654,20 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
         if (text === null) {
           // Only the filesystem form can be missing, and only where the vault has no filesystem
           // path at all (mobile). Say that instead of copying something the person did not ask for.
-          showToast("This vault has no filesystem path on this device", "error");
+          notify("This vault has no filesystem path on this device", "error");
           return;
         }
         // Not `navigator.clipboard?.writeText(…)`: where the API is missing, optional chaining
         // short-circuits the whole chain and the click would do nothing at all, silently.
         const clipboard = navigator.clipboard;
         if (!clipboard) {
-          showToast("This device gives the plugin no clipboard access", "error");
+          notify("This device gives the plugin no clipboard access", "error");
           return;
         }
         void clipboard
           .writeText(text)
-          .then(() => showToast(`Copied ${text}`))
-          .catch(() => showToast("Could not write to the clipboard", "error"));
+          .then(() => notify(`Copied ${text}`))
+          .catch(() => notify("Could not write to the clipboard", "error"));
       },
       markCommentsSeen: (path, marker) =>
         onUpdateSettings((s) => {
@@ -771,7 +761,7 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
               ...(ctx ? { ctx } : {}),
             });
             if (refused !== null) {
-              showToast(`${refused} The box is ticked; its column is unchanged.`, "error");
+              notify(`${refused} The box is ticked; its column is unchanged.`, "error");
             }
           } catch (e) {
             reportError(e);
@@ -827,17 +817,22 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
           }
         })();
       },
-      removeTodo: (path, line) => {
-        void (async () => {
-          try {
-            // The note refuses the delete when the position no longer holds that line.
-            await repo.removeSubtask(path, line);
-          } catch (e) {
-            reportError(e);
-          } finally {
-            await load();
-          }
-        })();
+      removeTodo: async (path, line) => {
+        try {
+          const ok = await repo.confirm({
+            title: "Remove todo",
+            message: `Remove "${line.text}" from the note's checklist?`,
+            cta: "Remove",
+          });
+          if (!ok) return;
+          // The line as it read when the person asked, not as it reads now: the note refuses the
+          // delete when the position no longer holds that line, however long they took.
+          await repo.removeSubtask(path, line);
+        } catch (e) {
+          reportError(e);
+        } finally {
+          await load();
+        }
       },
       doneColumnId,
       columns: board?.config.columns ?? EMPTY_COLUMNS,
@@ -907,38 +902,35 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
         void setColumnsAndReload(next);
       },
       deleteColumn: (id) => {
-        const b = boardRef.current;
-        if (!b) return;
-        const cols = b.config.columns;
-        if (cols.length <= 1) return; // keep at least one column
-        const idx = cols.findIndex((c) => c.id === id);
-        if (idx < 0) return;
-        // A lane owns no card — it draws by its rule — so rehoming into one would set a `status`
-        // the lane may refuse, and the cards would surface in the fallback column with nothing said.
-        // The nearest column that is not a lane is the only honest neighbour.
-        const neighbor =
-          [...cols.slice(0, idx)].reverse().find((c) => !c.filter) ??
-          cols.slice(idx + 1).find((c) => !c.filter);
-        const orphans = b.columns[id] ?? [];
-        // An empty column needs no home for anything and just goes. A column with cards and no
-        // plain column left to take them cannot be deleted without stranding them, and says so
-        // rather than doing nothing.
-        if (!neighbor && orphans.length > 0) {
-          showToast(
-            `"${cols[idx]?.title ?? id}" still holds cards, and every other column is filled by a rule rather than by status — there is nowhere to move them. Move them yourself first, or add a plain column.`,
-            "error",
-          );
+        // Refused before asking, so nobody confirms a delete that cannot happen, and worked out
+        // again after: the board may have reloaded while the dialog was open.
+        const asked = boardRef.current && columnDeletePlan(boardRef.current, id);
+        if (!asked) return;
+        if ("refusal" in asked) {
+          notify(asked.refusal, "error");
           return;
         }
         void (async () => {
+          const ok = await repo.confirm({
+            title: "Delete column",
+            message: `Delete "${asked.title}"? Its cards move to a neighbouring column.`,
+            cta: "Delete",
+          });
+          const b = boardRef.current;
+          const plan = ok && b ? columnDeletePlan(b, id) : null;
+          if (!b || !plan) return;
+          if ("refusal" in plan) {
+            notify(plan.refusal, "error");
+            return;
+          }
           // Reassign this column's items to a neighbour so none are orphaned — cards through their
           // frontmatter, placed inline todos through their own checklist line.
           // One that cannot be rehomed does not stop the others, but it is not swallowed either:
           // the column is about to go, and an item left claiming it would be stranded quietly.
           let stranded: unknown;
-          for (const p of orphans) {
-            if (!neighbor) break;
-            const mut = reassignColumn(b, p, neighbor.id);
+          for (const p of plan.orphans) {
+            if (!plan.neighbor) break;
+            const mut = reassignColumn(b, p, plan.neighbor);
             if (!mut) continue;
             try {
               await repo.applyMove(mut);
@@ -948,7 +940,7 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
           }
           if (stranded !== undefined) reportError(stranded);
           try {
-            await repo.setColumns(cols.filter((c) => c.id !== id));
+            await repo.setColumns(b.config.columns.filter((c) => c.id !== id));
           } finally {
             await load();
           }
@@ -980,7 +972,7 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
       load,
       setColumnsAndReload,
       setPriorityAndReload,
-      showToast,
+      notify,
       reportError,
       refusedByLane,
       board?.config.columns,
@@ -1100,13 +1092,6 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
     setFocusTitleOverride(false);
   };
 
-  const toastEl = toast && (
-    <div className={"folia-toast folia-toast-" + toast.tone} role="status" aria-live="polite">
-      <Icon name={toast.tone === "error" ? "alert" : "check-circle"} />
-      {toast.text}
-    </div>
-  );
-
   // Both branches share `openId` as their key on purpose: the create form and the card it creates
   // are one panel the user never sees close, so they must be one mounted component.
   const detail = detailOpen ? (
@@ -1182,15 +1167,10 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
                           onAddCard={onAddCard}
                         />
                       </div>
-                      {/* The dialog covers the board, so while it is open the toast goes up with it:
-                          a refusal from the panel said under the backdrop is not said at all. */}
-                      {panelShown ? (
+                      {panelShown && (
                         <DetailDialog host={host} onClosed={closeDetail}>
                           {detail}
-                          {toastEl}
                         </DetailDialog>
-                      ) : (
-                        toastEl
                       )}
                     </div>
                   </BoardRootContext.Provider>
@@ -1202,6 +1182,35 @@ export function App({ repo, settings, onUpdateSettings, today, host, mountedIn }
       </RepoContext.Provider>
     </SettingsContext.Provider>
   );
+}
+
+/**
+ * What deleting a column means on this board: where its cards go, or why it cannot go. `null` for
+ * a column that is not there, or the last one, which is kept.
+ */
+function columnDeletePlan(
+  b: BoardModel,
+  id: string,
+): { title: string; neighbor: string | undefined; orphans: string[] } | { refusal: string } | null {
+  const cols = b.config.columns;
+  const idx = cols.findIndex((c) => c.id === id);
+  const col = cols[idx];
+  if (!col || cols.length <= 1) return null;
+  // A lane owns no card — it draws by its rule — so rehoming into one would set a `status` the
+  // lane may refuse, and the cards would surface in the fallback column with nothing said. The
+  // nearest column that is not a lane is the only honest neighbour.
+  const neighbor =
+    [...cols.slice(0, idx)].reverse().find((c) => !c.filter) ??
+    cols.slice(idx + 1).find((c) => !c.filter);
+  const orphans = b.columns[id] ?? [];
+  // An empty column needs no home for anything and just goes. A column with cards and no plain
+  // column left to take them cannot be deleted without stranding them, and says so rather than
+  // doing nothing.
+  if (!neighbor && orphans.length > 0)
+    return {
+      refusal: `"${col.title}" still holds cards, and every other column is filled by a rule rather than by status — there is nowhere to move them. Move them yourself first, or add a plain column.`,
+    };
+  return { title: col.title, neighbor: neighbor?.id, orphans };
 }
 
 /** A copy of a path-keyed map without one entry. */

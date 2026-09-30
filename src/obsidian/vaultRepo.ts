@@ -24,7 +24,10 @@ import type {
   SubItem,
 } from "../model/types";
 import type { CardMutation } from "../model/board";
-import type { PropertyNamesInUse, SearchField, SuggestSource } from "../model/repo";
+import type { ConfirmRequest, PropertyNamesInUse, SearchField, SuggestSource } from "../model/repo";
+import type { ColumnPatch } from "../model/columns";
+import { boardNotice, confirmAction, promptTrash } from "./dialogs";
+import { openColumnEditor } from "./columnEditModal";
 import { staleLine } from "../model/repo";
 import { isBoardFrontmatter } from "./viewMode";
 import { VIEW_TYPE_KANBAN } from "../viewType";
@@ -889,6 +892,26 @@ export class VaultRepository implements CardRepository, HoverParent {
   async deleteCard(path: string): Promise<void> {
     this.markWrite(path);
     await this.app.fileManager.trashFile(this.file(path));
+  }
+
+  async promptDeleteCard(path: string): Promise<boolean> {
+    this.markWrite(path);
+    const gone = await promptTrash(this.app, this.file(path));
+    // Nothing was written, so a change arriving now is somebody else's and must reload the board.
+    if (!gone) this.recentWrites.delete(path);
+    return gone;
+  }
+
+  showNotice(message: string, tone: "success" | "error"): void {
+    boardNotice(message, tone);
+  }
+
+  confirm(request: ConfirmRequest): Promise<boolean> {
+    return confirmAction(this.app, request);
+  }
+
+  editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void {
+    openColumnEditor(this.app, column, onSave);
   }
 
   async renameCard(path: string, newTitle: string): Promise<string> {

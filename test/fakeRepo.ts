@@ -4,10 +4,12 @@
 
 import type {
   CardRepository,
+  ConfirmRequest,
   PropertyNamesInUse,
   SearchField,
   SuggestSource,
 } from "../src/model/repo";
+import type { ColumnPatch } from "../src/model/columns";
 import { staleLine } from "../src/model/repo";
 import { vaultLinktext } from "../src/model/links";
 import type { FileOp } from "../src/model/pathOps";
@@ -524,6 +526,36 @@ export class FakeRepo implements CardRepository {
   onFileOp(cb: (op: FileOp) => void): () => void {
     this.fileOpListeners.add(cb);
     return () => this.fileOpListeners.delete(cb);
+  }
+
+  /** Every notice the board raised, in order. */
+  notices: { message: string; tone: "success" | "error" }[] = [];
+  showNotice(message: string, tone: "success" | "error"): void {
+    this.notices.push({ message, tone });
+  }
+
+  /** Every confirm the board asked for, in order; `answerConfirm` decides each answer. */
+  confirms: ConfirmRequest[] = [];
+  answerConfirm: (request: ConfirmRequest) => boolean | Promise<boolean> = () => true;
+  async confirm(request: ConfirmRequest): Promise<boolean> {
+    this.confirms.push(request);
+    return this.answerConfirm(request);
+  }
+
+  /** Every card the board asked to delete through the prompt; `answerDelete` decides each. */
+  deletePrompts: string[] = [];
+  answerDelete: (path: string) => boolean | Promise<boolean> = () => true;
+  async promptDeleteCard(path: string): Promise<boolean> {
+    this.deletePrompts.push(path);
+    if (!(await this.answerDelete(path))) return false;
+    await this.deleteCard(path);
+    return true;
+  }
+
+  /** The column the "Edit column" dialog was last opened on, and what saving it calls. */
+  columnEditor: { column: ColumnDef; save: (patch: ColumnPatch) => void } | null = null;
+  editColumn(column: ColumnDef, onSave: (patch: ColumnPatch) => void): void {
+    this.columnEditor = { column, save: onSave };
   }
 
   /** test helper: simulate an external change */

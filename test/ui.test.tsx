@@ -11,6 +11,7 @@ import { applySettingsPatch, type BoardSettings } from "../src/settings";
 import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
 import { SettingsContext, useSettings } from "../src/ui/context";
 import { BLOCKS, normalizeRelationTypes } from "../src/model/relationships";
+import { columnDraft, columnPatch } from "../src/model/columns";
 
 const config: BoardConfig = {
   path: "Board.md",
@@ -178,6 +179,16 @@ function renderStateful(
   }
   const host = testHost();
   return render(<Stateful />);
+}
+
+/** The board told the person this in a notice. A string is the whole message; a pattern, part of it. */
+async function expectNotice(
+  repo: FakeRepo,
+  text: string | RegExp,
+  tone: "success" | "error" = "error",
+): Promise<void> {
+  const message = typeof text === "string" ? text : expect.stringMatching(text);
+  await waitFor(() => expect(repo.notices).toContainEqual({ message, tone }));
 }
 
 /**
@@ -828,9 +839,7 @@ describe("card detail", () => {
 
     await user.selectOptions(within(detail).getByLabelText("Column for real one"), "done");
 
-    expect(await screen.findByText(/now claims no column of its own/)).toHaveClass(
-      "folia-toast-error",
-    );
+    await expectNotice(repo, /now claims no column of its own/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -1086,7 +1095,7 @@ describe("card detail", () => {
     await user.type(estimate, "abc");
     await user.click(within(detail).getByText("Beta"));
     await screen.findByRole("heading", { name: "Beta" });
-    expect(await screen.findByText(/“estimate” was not saved\./)).toBeInTheDocument();
+    await expectNotice(repo, /“estimate” was not saved\./);
     expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
   });
 
@@ -1132,6 +1141,56 @@ describe("card detail", () => {
     expect(estimate).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("asks before the panel removes a todo, and unlinks a subcard's line without asking", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.answerConfirm = () => false;
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const row = (text: string) =>
+      within(detail).getByLabelText(`Toggle ${text}`).closest("li") as HTMLElement;
+
+    await user.click(within(row("first todo")).getByLabelText("Remove"));
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+    expect(repo.confirms[0]?.message).toContain('"first todo"');
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("- [ ] first todo");
+
+    repo.answerConfirm = () => true;
+    await user.click(within(row("first todo")).getByLabelText("Remove"));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).not.toContain("first todo"));
+    await waitFor(() => expect(within(detail).queryByLabelText("Toggle first todo")).toBeNull());
+
+    const beta = within(detail).getByRole("button", { name: "Beta" }).closest("li") as HTMLElement;
+    await user.click(within(beta).getByLabelText("Remove"));
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).not.toContain("[[Beta]]"));
+    expect(repo.confirms).toHaveLength(2);
+    expect(repo.files.has("Tasks/Beta.md")).toBe(true);
+  });
+
+  it("refuses a panel removal whose line moved while the confirm was open", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    let answer!: (yes: boolean) => void;
+    repo.answerConfirm = () => new Promise((settle) => (answer = settle));
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const row = within(detail).getByLabelText("Toggle first todo").closest("li") as HTMLElement;
+    await user.click(within(row).getByLabelText("Remove"));
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+
+    // A line lands above it meanwhile, so the position the panel read now holds another todo.
+    const e = repo.files.get("Tasks/Alpha.md")!;
+    e.body = e.body.replace("- [ ] first todo", "- [ ] slid in\n- [ ] first todo");
+    act(() => repo.notify());
+    const before = e.body;
+    act(() => answer(true));
+
+    await expectNotice(repo, /no longer reads "first todo"/);
+    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
+  });
+
   it("does not report refused text on a card the user deleted", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
@@ -1143,9 +1202,9 @@ describe("card detail", () => {
     await user.clear(estimate);
     await user.type(estimate, "abc{Enter}");
     await user.click(within(detail).getByLabelText("Delete card"));
-    await user.click(within(detail).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
-    expect(screen.queryByText(/was not saved/)).toBeNull();
+    expect(repo.deletePrompts).toEqual(["Tasks/Alpha.md"]);
+    expect(repo.notices).toEqual([]);
   });
 
   it("does not report refused text for a property the user removed", async () => {
@@ -1416,9 +1475,7 @@ describe("detail dialog", () => {
     await user.type(estimate, "abc");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
-    expect(
-      await screen.findByText(/“estimate” was not saved\. This property holds a number\./),
-    ).toBeInTheDocument();
+    await expectNotice(repo, /“estimate” was not saved\. This property holds a number\./);
     expect(repo.files.get("Tasks/Alpha.md")!.fm["estimate"]).toBe(3);
   });
 
@@ -1574,11 +1631,11 @@ describe("detail dialog", () => {
     expect(screen.getByLabelText("New card title")).toHaveValue("half typed");
   });
 
-  it("says what it has to say inside the dialog, not under its backdrop", async () => {
-    const { user, detail, dialog } = await open();
+  it("says what it has to say in a notice, which the app draws above the dialog", async () => {
+    const repo = makeRepo();
+    const { user, detail } = await open(repo);
     await user.click(within(detail).getByLabelText("Mark done"));
-    const toast = await screen.findByText(/done!/);
-    expect(dialog.contentEl.contains(toast)).toBe(true);
+    await expectNotice(repo, "Alpha — done!", "success");
   });
 
   it("closes the dialog when the board goes away", async () => {
@@ -2069,7 +2126,6 @@ describe("collapse/expand subitems", () => {
 
     const alpha = within(todoCol).getByText("Alpha").closest(".folia-card") as HTMLElement;
     await user.click(within(alpha).getByRole("button", { name: /Delete "Alpha"/ }));
-    await user.click(within(alpha).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(repo.files.has("Tasks/Alpha.md")).toBe(false));
 
     // Recreate a card at the exact same path and confirm it starts at the board default
@@ -2264,8 +2320,9 @@ describe("pop-out window ownership", () => {
   const findIn = (doc: Document, label: string) =>
     doc.querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
-  it("opens the column menu and its editor modal in the board's own document", async () => {
-    render_(makeRepo());
+  it("opens the column menu in the board's own document, and hands the editor to the host", async () => {
+    const repo = makeRepo();
+    render_(repo);
     await screen.findByText("Alpha");
 
     await inOtherFocusedWindow(async (decoy) => {
@@ -2281,8 +2338,7 @@ describe("pop-out window ownership", () => {
       expect(document.body.contains(menu)).toBe(true);
 
       await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
-      await waitFor(() => expect(findIn(document, "Edit column: Todo")).not.toBeNull());
-      expect(findIn(decoy, "Edit column: Todo")).toBeNull();
+      expect(repo.columnEditor?.column.id).toBe("todo");
       expect(decoy.body.childElementCount).toBe(0);
     });
   });
@@ -2719,6 +2775,34 @@ describe("card context menu", () => {
     expect(screen.getByRole("menu")).toBe(menu);
   });
 
+  it.each([
+    [true, false],
+    [false, true],
+  ])(
+    "asks before the menu's Delete card trashes the note (confirmed: %s)",
+    async (confirmed, kept) => {
+      const repo = ctxRepo();
+      repo.answerDelete = () => confirmed;
+      const settings = { current: DEFAULT_SETTINGS };
+      renderStateful(
+        repo,
+        { ...DEFAULT_SETTINGS, collapsedCards: { "Tasks/First.md": true } },
+        settings,
+      );
+      const card = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
+      fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
+      const menu = await screen.findByRole("menu");
+
+      await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Delete card/ }));
+
+      await waitFor(() => expect(repo.deletePrompts).toEqual(["Tasks/First.md"]));
+      await waitFor(() => expect(repo.files.has("Tasks/First.md")).toBe(kept));
+      // A cancelled delete leaves the card everything it had, its per-card state included.
+      await waitFor(() => expect(screen.queryByText("First") !== null).toBe(kept));
+      expect(settings.current.collapsedCards["Tasks/First.md"]).toBe(kept ? true : undefined);
+    },
+  );
+
   it("opens a card menu with the expected items on right-click", async () => {
     const { menu } = await openCardMenu("First");
     expect(within(menu).getByRole("menuitem", { name: /Open details/ })).toBeInTheDocument();
@@ -2970,10 +3054,6 @@ describe("card context menu", () => {
     expect(open).not.toHaveClass("folia-card--no-complete");
     expect(within(finished).queryByLabelText('Mark "Finished" done')).toBeNull();
     expect(finished).toHaveClass("folia-card--no-complete");
-
-    await userEvent.setup().click(within(open).getByLabelText('Delete "Open"'));
-    expect(within(open).queryByLabelText('Mark "Open" done')).toBeNull();
-    expect(open).not.toHaveClass("folia-card--no-complete");
   });
 
   it("marks every card on a board with no done column", async () => {
@@ -3119,7 +3199,7 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
 
-    expect(await screen.findByText(/no longer reads "real two"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "real two"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3141,7 +3221,7 @@ describe("card context menu", () => {
       .setup()
       .click(within(menu).getByRole("menuitemradio", { name: "With its card" }));
 
-    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer draws the todo/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3179,7 +3259,7 @@ describe("card context menu", () => {
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
     expect(writes).toBe(0);
     // Not the absence of one message but of every one: a success toast would be just as wrong.
-    expect(document.querySelector(".folia-toast")).toBeNull();
+    expect(repo.notices).toEqual([]);
   });
 
   // The detail panel's own way into the same silence. A rename reaches the board as two events —
@@ -3208,7 +3288,7 @@ describe("card context menu", () => {
 
     await user.selectOptions(await within(detail).findByLabelText("Column for real one"), "doing");
 
-    expect(await screen.findByText(/no longer draws the todo/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer draws the todo/);
     expect(repo.files.get("Tasks/Renamed.md")!.body).toBe(before);
   });
 
@@ -3248,7 +3328,7 @@ describe("card context menu", () => {
       "research",
     );
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")!.body).toBe(before);
     const done = document.querySelector('[data-column="done"]') as HTMLElement;
     await within(done).findByText("Alpha");
@@ -3289,7 +3369,7 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "beta"/);
     // Neither line is ticked: not gamma, which nobody clicked, and not beta, which has moved.
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
@@ -3317,9 +3397,7 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Mark done/ }));
 
-    expect(await screen.findByText(/no longer the same one of the lines reading that/)).toHaveClass(
-      "folia-toast-error",
-    );
+    await expectNotice(repo, /no longer the same one of the lines reading that/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3337,7 +3415,7 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
 
-    expect(await screen.findByText(/its box is ticked now/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /its box is ticked now/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3348,7 +3426,9 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitem", { name: /Remove todo/ }));
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+    expect(repo.confirms[0]?.message).toContain('"beta"');
+    await expectNotice(repo, /no longer reads "beta"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3359,7 +3439,7 @@ describe("card context menu", () => {
 
     await userEvent.setup().click(within(menu).getByRole("menuitemradio", { name: "Doing" }));
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "beta"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3414,7 +3494,7 @@ describe("card context menu", () => {
     await within(doing).findByText("beta");
     expect(writes.n).toBe(0);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
-    expect(document.querySelector(".folia-toast")).toBeNull();
+    expect(repo.notices).toEqual([]);
   });
 
   it("stays quiet when a reworded todo is sent to the column it still claims", async () => {
@@ -3443,7 +3523,7 @@ describe("card context menu", () => {
     await within(doing).findByText("renamed elsewhere");
     expect(writes.n).toBe(0);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
-    expect(document.querySelector(".folia-toast")).toBeNull();
+    expect(repo.notices).toEqual([]);
   });
 
   // Coming home says where a todo shows and never whether the work is over, so a box ticked under
@@ -3477,7 +3557,7 @@ describe("card context menu", () => {
     await waitFor(() => expect(within(card).queryByText("beta")).toBeNull());
     expect(writes.n).toBe(0);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
-    expect(document.querySelector(".folia-toast")).toBeNull();
+    expect(repo.notices).toEqual([]);
   });
 
   // The same shift reaches the tile's own "Remove todo?", which is not a menu but outlives a reload
@@ -3491,23 +3571,25 @@ describe("card context menu", () => {
         body: "\n# First\n\n## Subtasks\n- [ ] alpha\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n",
       },
     });
+    // The person takes their time over the confirm, and the note moves on meanwhile.
+    let answer!: (yes: boolean) => void;
+    repo.answerConfirm = () => new Promise((settle) => (answer = settle));
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 3 });
     const user = userEvent.setup();
     const tile = (await screen.findByText("beta")).closest(".folia-card") as HTMLElement;
     await user.click(within(tile).getByLabelText('Remove todo "beta"'));
-    const confirm = await screen.findByRole("alertdialog", { name: "Remove todo beta?" });
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+    expect(repo.confirms[0]?.message).toContain('"beta"');
     repo.files.get("Tasks/First.md")!.body =
       "\n# First\n\n## Subtasks\n- [ ] beta [status:: doing]\n- [ ] gamma [status:: doing]\n";
     act(() => repo.notify());
     await waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
     const before = repo.files.get("Tasks/First.md")!.body;
-    // The tile it stands on now draws gamma, but the confirm is still about the line it was raised
-    // on — so the dialog, the removal and the refusal below all name the same line.
-    expect(confirm).toHaveAccessibleName("Remove todo beta?");
 
-    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+    // The tile it stood on now draws gamma, but the confirm was about beta, and so is the removal.
+    act(() => answer(true));
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "beta"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3529,7 +3611,7 @@ describe("card context menu", () => {
 
     await user.click(within(tile).getByLabelText('Mark "beta" done'));
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "beta"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -3541,7 +3623,18 @@ describe("card context menu", () => {
     fireEvent.contextMenu(todoRow);
     const menu = await screen.findByRole("menu", { name: "Todo actions" });
     const user = userEvent.setup();
+    const before = repo.files.get("Tasks/First.md")!.body;
+    repo.answerConfirm = () => false;
     await user.click(within(menu).getByRole("menuitem", { name: /Remove todo/ }));
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+    expect(repo.confirms[0]).toMatchObject({ title: "Remove todo", cta: "Remove" });
+    expect(repo.confirms[0]?.message).toContain('"real two"');
+    expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
+
+    repo.answerConfirm = () => true;
+    fireEvent.contextMenu(todoRow);
+    const again = await screen.findByRole("menu", { name: "Todo actions" });
+    await user.click(within(again).getByRole("menuitem", { name: /Remove todo/ }));
     await waitFor(() => expect(repo.files.get("Tasks/First.md")!.body).not.toContain("real two"));
   });
 
@@ -3647,43 +3740,38 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
     return screen.findByRole("dialog", { name: `Column options: ${columnTitle}` });
   };
 
-  it("the column menu has an Edit column entry that opens the full editor modal", async () => {
-    render_(makeRepo());
+  it("the column menu's Edit column hands the column to the host's dialog", async () => {
+    const repo = makeRepo();
+    render_(repo);
     const menu = await openColumnMenu("Todo");
-    const user = userEvent.setup();
-    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
-    const modal = await screen.findByRole("dialog", { name: "Edit column: Todo" });
-    // Every editable ColumnDef property is present.
-    expect(within(modal).getByLabelText("Column title")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("WIP limit")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("Filter rule")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("Group by")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("Sort by")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("Opacity")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("Park aside")).toBeInTheDocument();
+    await userEvent.setup().click(within(menu).getByRole("button", { name: /Edit column/ }));
+    expect(repo.columnEditor?.column).toEqual(repo.config.columns.find((c) => c.id === "todo"));
   });
 
   it("saving the editor persists all fields via setColumns in one write", async () => {
     const repo = makeRepo();
     render_(repo);
     const menu = await openColumnMenu("Todo");
-    const user = userEvent.setup();
-    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
-    const modal = await screen.findByRole("dialog", { name: "Edit column: Todo" });
+    await userEvent.setup().click(within(menu).getByRole("button", { name: /Edit column/ }));
+    const { column, save } = repo.columnEditor!;
+    const setColumns = vi.spyOn(repo, "setColumns");
 
-    const title = within(modal).getByLabelText("Column title") as HTMLInputElement;
-    await user.clear(title);
-    await user.type(title, "Backlog");
-    await user.type(within(modal).getByLabelText("Filter rule"), "area:home");
-    await user.selectOptions(within(modal).getByLabelText("Group by"), "due");
-    await user.selectOptions(within(modal).getByLabelText("Sort by"), "priority");
-    fireEvent.change(within(modal).getByLabelText("Opacity"), { target: { value: "0.5" } });
-    await user.click(within(modal).getByLabelText("Park aside"));
-    await user.click(within(modal).getByRole("button", { name: "Save" }));
+    act(() =>
+      save(
+        columnPatch({
+          ...columnDraft(column),
+          title: "Backlog",
+          filter: "area:home",
+          group: "due",
+          sort: "priority",
+          opacity: 0.5,
+          parked: true,
+        })!,
+      ),
+    );
 
-    await waitFor(() => {
-      const col = repo.config.columns.find((c) => c.id === "todo")!;
-      expect(col).toMatchObject({
+    await waitFor(() =>
+      expect(repo.config.columns.find((c) => c.id === "todo")).toMatchObject({
         id: "todo",
         title: "Backlog",
         filter: "area:home",
@@ -3691,26 +3779,9 @@ describe("column config (#1 filter, #6 group/sort, #8 edit modal, #10 opacity/pa
         sort: "priority",
         opacity: 0.5,
         parked: true,
-      });
-    });
-    // The modal closes after saving.
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Edit column: Backlog" })).toBeNull(),
+      }),
     );
-  });
-
-  it("an empty title is rejected (the editor stays open, no write)", async () => {
-    const repo = makeRepo();
-    render_(repo);
-    const menu = await openColumnMenu("Doing");
-    const user = userEvent.setup();
-    await user.click(within(menu).getByRole("button", { name: /Edit column/ }));
-    const modal = await screen.findByRole("dialog", { name: "Edit column: Doing" });
-    await user.clear(within(modal).getByLabelText("Column title"));
-    await user.click(within(modal).getByRole("button", { name: "Save" }));
-    // Still open; title unchanged in the repo.
-    expect(screen.getByRole("dialog", { name: "Edit column: Doing" })).toBeInTheDocument();
-    expect(repo.config.columns.find((c) => c.id === "doing")!.title).toBe("Doing");
+    expect(setColumns).toHaveBeenCalledTimes(1);
   });
 
   it("#1 a column filter rule shows only matching cards (ANDs with nothing here)", async () => {
@@ -4715,7 +4786,7 @@ describe("cross-column make-room (live relocation gap)", () => {
     await waitFor(() => expect(cardsIn("Todo")).not.toContain("Tasks/Alpha.md"));
     await user.keyboard("{ }"); // drop it
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
     // Back where it started, not left behind in the gap.
     await waitFor(() => expect(cardsIn("Todo")).toContain("Tasks/Alpha.md"));
@@ -4817,7 +4888,7 @@ describe("cross-column make-room (live relocation gap)", () => {
 
     await user.keyboard("{ }");
 
-    expect(await screen.findByText(/no longer reads "beta"/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /no longer reads "beta"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 
@@ -4860,9 +4931,7 @@ describe("cross-column make-room (live relocation gap)", () => {
 
     await user.keyboard("{ }");
 
-    expect(
-      await screen.findByText(/now claims "todo" where this write replaces "doing"/),
-    ).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /now claims "todo" where this write replaces "doing"/);
     expect(repo.files.get("Tasks/First.md")!.body).toBe(before);
   });
 });
@@ -5477,11 +5546,9 @@ describe("unread comments", () => {
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     await user.click(within(detail).getByRole("button", { name: "Delete card" }));
-    const dialog = await within(detail).findByRole("alertdialog", { name: "Confirm delete" });
-    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
-    // The card is still there, and so is what the reader had read on it.
-    expect(await screen.findByText("Alpha")).toBeInTheDocument();
+    await expectNotice(repo, "locked");
+    // The card is still there, its panel still open on it, and so is what the reader had read on it.
+    expect(screen.getByTestId("card-detail")).toBeInTheDocument();
     expect(box.current.commentsSeen["Tasks/Alpha.md"]).toBe("2026-06-13 09:00#1");
   });
 
@@ -5861,7 +5928,7 @@ describe("the detail panel reports a failed write", () => {
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("Add a subcard"), "Child{Enter}");
-    expect(await screen.findByText("disk is full")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "disk is full");
   });
 
   /** Todo · Research (a lane on `area:research`) · Done, holding one card that fails the rule. */
@@ -5918,7 +5985,7 @@ describe("the detail panel reports a failed write", () => {
 
     await user.selectOptions(within(detail).getByLabelText("Status"), "research");
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
   });
 
@@ -5949,7 +6016,7 @@ describe("the detail panel reports a failed write", () => {
       "research",
     );
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Kid.md")?.fm["status"]).toBeUndefined();
   });
 
@@ -5972,7 +6039,7 @@ describe("the detail panel reports a failed write", () => {
 
     await user.click(screen.getByLabelText('Mark "Alpha" done'));
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(screen.queryByText(/— done!/)).toBeNull();
     expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
   });
@@ -5998,9 +6065,9 @@ describe("the detail panel reports a failed write", () => {
 
     await user.click(screen.getByLabelText("Column options for Todo"));
     await user.click(await screen.findByRole("button", { name: /Delete column/ }));
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(screen.queryByText("Todo")).toBeNull());
+    expect(repo.confirms).toMatchObject([{ title: "Delete column", cta: "Delete" }]);
   });
 
   it("refuses to give a checklist line a column a lane would not draw it in", async () => {
@@ -6033,7 +6100,7 @@ describe("the detail panel reports a failed write", () => {
       "research",
     );
 
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Alpha.md")?.body).toBe(before);
   });
 
@@ -6072,7 +6139,7 @@ describe("the detail panel reports a failed write", () => {
 
     // The lane's rule is the word "Alpha", which Beta does not match — judged on Beta, not on the
     // tile the board still has at index 0.
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.get("Tasks/Card.md")!.body).toBe(before);
   });
 
@@ -6124,9 +6191,24 @@ describe("the detail panel reports a failed write", () => {
 
     await user.click(screen.getByLabelText("Column options for Todo"));
     await user.click(await screen.findByRole("button", { name: /Delete column/ }));
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("done"));
+  });
+
+  it("keeps the column and its cards when the delete is cancelled", async () => {
+    const user = userEvent.setup();
+    const repo = lanedRepo();
+    repo.answerConfirm = () => false;
+    render_(repo);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+
+    await user.click(screen.getByLabelText("Column options for Todo"));
+    await user.click(await screen.findByRole("button", { name: /Delete column/ }));
+
+    await waitFor(() => expect(repo.confirms).toHaveLength(1));
+    expect(repo.confirms[0]?.message).toContain('"Todo"');
+    expect(repo.config.columns.some((c) => c.id === "todo")).toBe(true);
+    expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
   });
 
   it("adds a card to a lane already carrying what the lane's rule names, so the lane draws it", async () => {
@@ -6200,7 +6282,7 @@ describe("the detail panel reports a failed write", () => {
 
     await user.click(screen.getByLabelText("Add card to Plans"));
     await user.type(screen.getByLabelText("New card title"), "Groceries{Enter}");
-    expect(await screen.findByText(/does not match it/)).toHaveClass("folia-toast-error");
+    await expectNotice(repo, /does not match it/);
     expect(repo.files.has("Tasks/Groceries.md")).toBe(false);
     // The composer stays open with what was typed, so the title can be fixed rather than retyped.
     const title = screen.getByLabelText("New card title");
@@ -6249,7 +6331,7 @@ describe("the detail panel reports a failed write", () => {
     const detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("New card title"), "Doomed");
     await user.click(within(detail).getByRole("button", { name: "Create" }));
-    expect(await screen.findByText("folder is read-only")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "folder is read-only");
     expect(within(detail).getByLabelText("New card title")).toHaveValue("Doomed");
     expect(within(detail).getByRole("button", { name: "Create" })).toBeEnabled();
   });
@@ -6366,7 +6448,7 @@ describe("the detail panel keeps its drafts when a write fails or the note moves
     await user.click(await within(detail).findByLabelText("Edit description"));
     await user.type(within(detail).getByLabelText("Edit description"), " kept");
     await user.click(within(detail).getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("note is locked")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "note is locked");
     expect(within(detail).getByLabelText("Edit description")).toHaveValue("Desc A kept");
     expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("Desc A");
   });
@@ -6427,7 +6509,7 @@ describe("the detail panel hands text back when a small write fails", () => {
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("Write a comment"), "long thought{Enter}");
-    expect(await screen.findByText("cannot write")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "cannot write");
     await waitFor(() =>
       expect(within(detail).getByLabelText("Write a comment")).toHaveValue("long thought"),
     );
@@ -6579,7 +6661,7 @@ describe("the detail panel's reads and field writes stay with their card", () =>
     const field = within(detail).getByLabelText("Value of area");
     await user.clear(field);
     await user.type(field, "garden{Enter}");
-    expect(await screen.findByText("frontmatter locked")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "frontmatter locked");
     expect(within(detail).getByLabelText("Value of area")).toHaveValue("garden");
   });
 });
@@ -6631,7 +6713,7 @@ describe("work started on one card does not reach the card opened next", () => {
     await user.click(within(detail).getByRole("button", { name: "Beta" }));
     await screen.findByRole("heading", { name: "Beta" });
     fail();
-    expect(await screen.findByText("too late")).toHaveClass("folia-toast-error");
+    await expectNotice(repo, "too late");
     expect(within(detail).getByLabelText("Add a todo")).toHaveValue("");
   });
 
@@ -6838,9 +6920,9 @@ describe("copy a card's path", () => {
   };
 
   it("copies the file's path on this device", async () => {
-    await copy(/^Copy path$/);
+    const repo = await copy(/^Copy path$/);
     expect(written).toEqual(["/vault/Tasks/First.md"]);
-    expect(await screen.findByText("Copied /vault/Tasks/First.md")).toBeInTheDocument();
+    await expectNotice(repo, "Copied /vault/Tasks/First.md", "success");
   });
 
   it("copies the vault path", async () => {
@@ -6863,19 +6945,15 @@ describe("copy a card's path", () => {
     repo.vaultBasePath = null;
     await copy(/^Copy path$/, repo);
     expect(written).toEqual([]);
-    expect(
-      await screen.findByText("This vault has no filesystem path on this device"),
-    ).toBeInTheDocument();
+    await expectNotice(repo, "This vault has no filesystem path on this device");
   });
 
   it("says so when the device gives the plugin no clipboard at all", async () => {
     const saved = Object.getOwnPropertyDescriptor(navigator, "clipboard")!;
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
     try {
-      await copy(/relative to vault/);
-      expect(
-        await screen.findByText("This device gives the plugin no clipboard access"),
-      ).toBeInTheDocument();
+      const repo = await copy(/relative to vault/);
+      await expectNotice(repo, "This device gives the plugin no clipboard access");
     } finally {
       Object.defineProperty(navigator, "clipboard", saved);
     }
@@ -6883,12 +6961,13 @@ describe("copy a card's path", () => {
 
   it("reports a clipboard the browser refused", async () => {
     failNext = true;
+    let repo: FakeRepo;
     try {
-      await copy(/relative to vault/);
+      repo = await copy(/relative to vault/);
     } finally {
       failNext = false;
     }
-    expect(await screen.findByText("Could not write to the clipboard")).toBeInTheDocument();
+    await expectNotice(repo, "Could not write to the clipboard");
   });
 });
 
@@ -7925,14 +8004,6 @@ describe("column colour — what the picker writes and what a legacy note still 
       expect(repo.config.columns.find((c) => c.id === "todo")?.color).toBeUndefined(),
     );
     await waitFor(() => expect(none).toHaveAttribute("aria-pressed", "true"));
-
-    await user.click(screen.getByText("Edit column…"));
-    const dialog = await screen.findByRole("dialog", { name: /Edit column/ });
-    expect(
-      within(within(dialog).getByRole("group", { name: "Color" })).getByRole("button", {
-        name: "No color",
-      }),
-    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("replaces a legacy hex when one of the eight is picked", async () => {
@@ -7972,28 +8043,5 @@ describe("column colour — what the picker writes and what a legacy note still 
     expect(custom.className).toContain("is-active");
     // ...and none of the eight claims to be the active one while the note carries something else.
     expect(document.querySelectorAll(".folia-swatch.is-active")).toHaveLength(1);
-  });
-
-  it("shows the ninth swatch in the edit dialog too, and keeps the hex across an unrelated edit", async () => {
-    // The dialog has its own draft state and its own save path, so the compatibility promise has to
-    // hold there separately: renaming a column must not quietly drop the colour it was carrying.
-    const repo = repoWith("#9aa0a6");
-    render_(repo);
-    await screen.findByText("Alpha");
-    await user.click(screen.getByLabelText("Column options for Todo"));
-    await user.click(screen.getByText("Edit column…"));
-    const custom = await screen.findByLabelText("Custom color #9aa0a6");
-    expect(custom).toBeDisabled();
-    expect(custom).toHaveAttribute("aria-pressed", "true");
-
-    const title = screen.getByLabelText("Column title");
-    await user.clear(title);
-    await user.type(title, "Backlog");
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => {
-      const col = repo.config.columns.find((c) => c.id === "todo");
-      expect(col?.title).toBe("Backlog");
-      expect(col?.color).toBe("#9aa0a6");
-    });
   });
 });

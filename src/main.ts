@@ -10,6 +10,7 @@ import {
   TFile,
   TFolder,
   View,
+  type TextComponent,
   type WorkspaceLeaf,
   type App,
 } from "obsidian";
@@ -56,7 +57,9 @@ import {
   SETTING_GROUPS,
   TAB_REDRAW_KEYS,
   VERSION_SETTING_NAME,
+  bindAddressConfirm,
   isRowDisabled,
+  splitHeldPatch,
   type EditableSettingKey,
 } from "./settingsLayout";
 import {
@@ -74,6 +77,7 @@ import {
   type McpState,
 } from "./obsidian/mcpService";
 import { refreshDeclarativeSettingTab, setSettingError } from "./obsidian/compat";
+import { confirmAction } from "./obsidian/dialogs";
 import { stamp } from "./model/dates";
 import { isBoardFrontmatter } from "./obsidian/viewMode";
 import { markdownTabOutcome } from "./obsidian/boardRedirect";
@@ -971,6 +975,9 @@ class KanbanSettingTab extends PluginSettingTab {
    */
   private pendingMcpFields: Partial<KanbanSettings> = {};
 
+  /** The bind-address input as last drawn, so a refused confirm can put the stored value back. */
+  private bindAddressInput: TextComponent | null = null;
+
   /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
@@ -982,7 +989,7 @@ class KanbanSettingTab extends PluginSettingTab {
       this.plugin.manifest.version,
       {
         copy: () => void this.plugin.copyMcpToken(),
-        regenerate: () => void this.plugin.regenerateMcpToken(),
+        regenerate: () => void this.replaceToken(),
         renderHeldField: (key, setting) => {
           this.renderHeldField(key, setting);
         },
@@ -1062,8 +1069,28 @@ class KanbanSettingTab extends PluginSettingTab {
    * value the server is not on, which is the failure these two rows were rebuilt to end.
    */
   private commitHeldFields(): void {
-    const patch = this.heldPatch();
-    if (Object.keys(patch).length > 0) void this.plugin.updateSettings(patch);
+    const { now, confirm } = splitHeldPatch(this.heldPatch());
+    if (confirm !== null) void this.confirmBindAddress(confirm);
+    if (Object.keys(now).length > 0) void this.plugin.updateSettings(now);
+  }
+
+  /** The address a confirm is open for. Closing the Settings window both hides the tab and blurs
+   *  the field, in either order, and the second commit must not raise a second dialog. */
+  private askingBindAddress: string | null = null;
+
+  private async confirmBindAddress(address: string): Promise<void> {
+    if (this.askingBindAddress === address) return;
+    this.askingBindAddress = address;
+    try {
+      if (await confirmAction(this.app, bindAddressConfirm(address))) {
+        await this.plugin.updateSettings({ mcpBindAddress: address });
+        return;
+      }
+      // The field shows what is really stored, not the address that was just declined.
+      this.bindAddressInput?.setValue(this.plugin.settings.mcpBindAddress);
+    } finally {
+      this.askingBindAddress = null;
+    }
   }
 
   /** Everything the text fields are holding that differs from what is stored, taken out of their
@@ -1088,6 +1115,7 @@ class KanbanSettingTab extends PluginSettingTab {
   private renderHeldField(key: HeldFieldKey, setting: Setting): void {
     const disabled = isRowDisabled(key, this.plugin.settings);
     setting.setDisabled(disabled).addText((t) => {
+      if (key === "mcpBindAddress") this.bindAddressInput = t;
       // Deliberately not `type="number"` for the port, tempting as it is. A number input sanitises
       // what it cannot parse away to the empty string, so the field could neither show back what
       // was typed nor say why it was refused — the same silence this whole change is about. The
@@ -1243,6 +1271,17 @@ class KanbanSettingTab extends PluginSettingTab {
         .addButton((b) => b.setButtonText(copy.button).setDisabled(off).onClick(onClick));
     };
     row(MCP_TOKEN_COPY, () => void this.plugin.copyMcpToken());
-    row(MCP_TOKEN_REGENERATE, () => void this.plugin.regenerateMcpToken());
+    row(MCP_TOKEN_REGENERATE, () => void this.replaceToken());
+  }
+
+  /** Replacing locks every configured client out, so it asks first; with nothing to replace yet,
+   *  the plugin's own notice says why nothing happens. */
+  private async replaceToken(): Promise<void> {
+    if (
+      this.plugin.settings.mcpEnabled &&
+      !(await confirmAction(this.app, MCP_TOKEN_REGENERATE.confirm))
+    )
+      return;
+    await this.plugin.regenerateMcpToken();
   }
 }
