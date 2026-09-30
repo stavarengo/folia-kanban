@@ -99,6 +99,27 @@ export function parseFrontMatterEntry(
   return match === undefined ? null : (frontmatter[match] ?? null);
 }
 
+/**
+ * Obsidian's own `parseFrontMatterTags`, as 1.13.7 ships it (and 1.10.6 and 1.12.7 alike): the
+ * first key matching `tags` in any case; a string is one value, a list keeps its strings; each is
+ * trimmed, one that is empty or holds a space is dropped, and the rest gain a leading `#`.
+ */
+export function parseFrontMatterTags(frontmatter: Record<string, unknown> | null): string[] | null {
+  const value = parseFrontMatterEntry(frontmatter, /^tags$/i);
+  if (!value) return null;
+  const raw =
+    typeof value === "string"
+      ? [value.trim()]
+      : Array.isArray(value)
+        ? value.filter((t): t is string => typeof t === "string").map((t) => t.trim())
+        : null;
+  return (
+    raw
+      ?.filter((t) => t !== "" && !t.includes(" "))
+      .map((t) => (t.startsWith("#") ? t : "#" + t)) ?? null
+  );
+}
+
 /** Obsidian's own `normalizePath`: tidy separators only — `.` and `..` are left for callers. */
 export function normalizePath(path: string): string {
   const tidied = path

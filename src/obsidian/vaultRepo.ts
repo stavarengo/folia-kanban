@@ -10,6 +10,7 @@ import {
   debounce,
   normalizePath,
   parseFrontMatterEntry,
+  parseFrontMatterTags,
 } from "obsidian";
 import type {
   Board,
@@ -388,6 +389,8 @@ export class VaultRepository implements CardRepository {
         subItems,
         stats: cardStats(text),
         ...(bodyTags.length > 0 ? { bodyTags } : {}),
+        // Always set, even empty: an absent field makes the model read `tags` as written.
+        frontmatterTags: (parseFrontMatterTags(fm) ?? []).map((t) => t.replace(/^#/, "")),
       });
     }
     // buildBoard derives each card's `context` from its path; carry the configs alongside.

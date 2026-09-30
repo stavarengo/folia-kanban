@@ -13,6 +13,7 @@ import { planDrop } from "../src/model/board";
 import { DataCorruptionError } from "../src/model/schemas";
 import { parseBody } from "../src/model/card";
 import { isMine, unreadComments } from "../src/model/unread";
+import { tagValues } from "../src/model/tags";
 import {
   AbstractInputSuggest,
   CapacitorAdapter,
@@ -75,6 +76,30 @@ describe("the fake this suite runs against", () => {
     for (const name of MIRRORED.metadataCache) expect(app.metadataCache).toHaveProperty(name);
     for (const name of MIRRORED.fileManager) expect(app.fileManager).toHaveProperty(name);
     expect(Vault).toHaveProperty("recurseChildren");
+  });
+});
+
+describe("a card's frontmatter tags", () => {
+  async function tagsOf(frontmatter: string): Promise<string[]> {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/One.md", card(frontmatter));
+    return tagValues((await repo.loadBoard()).cards["basic/Cards/One.md"]!);
+  }
+
+  it("are the ones Obsidian reads, whatever the key's case, trimmed and without the #", async () => {
+    expect(await tagsOf("status: todo\nTags: [urgent]")).toEqual(["urgent"]);
+    expect(await tagsOf('status: todo\ntags: " urgent "')).toEqual(["urgent"]);
+    expect(await tagsOf('status: todo\ntags: ["#red", blue]')).toEqual(["red", "blue"]);
+  });
+
+  it("leave out a value Obsidian does not count as a tag, written as a string or in a list", async () => {
+    expect(await tagsOf('status: todo\ntags: "a, b"')).toEqual([]);
+    expect(await tagsOf("status: todo\ntags: a b")).toEqual([]);
+    expect(await tagsOf('status: todo\ntags: ["my tag", ok]')).toEqual(["ok"]);
+  });
+
+  it("still come after the card's area, which Obsidian does not read", async () => {
+    expect(await tagsOf("status: todo\narea: ops\ntags: a b")).toEqual(["ops"]);
   });
 });
 
