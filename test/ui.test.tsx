@@ -2154,6 +2154,25 @@ describe("drag overlay portal", () => {
     await user.keyboard("{Escape}"); // drop the drag so the test leaves no active overlay
   });
 
+  it("draws the ghost's chips as the tile draws them, so a long one is cut short there too", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "Maximiliana Wolfeschlegelsteinhausen";
+    render_(repo);
+    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const chipsOf = (el: Element) =>
+      [...el.querySelectorAll(".folia-chip")].map((chip) => chip.innerHTML);
+    const tileChips = chipsOf(main);
+    main.focus();
+    await user.keyboard("{ }");
+
+    const overlay = document.querySelector(".folia-card-overlay") as HTMLElement;
+    expect(tileChips).toContainEqual(expect.stringContaining("Maximiliana"));
+    expect(chipsOf(overlay)).toEqual(tileChips);
+
+    await user.keyboard("{Escape}");
+  });
+
   it("gives the ghost the same title reservation as the card it lifts", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
@@ -2584,7 +2603,7 @@ describe("card context menu", () => {
       const card = (await screen.findByText(name)).closest(".folia-card") as HTMLElement;
       return {
         strip: card.getAttribute("data-prio"),
-        chip: within(card).getByLabelText("Priority").className,
+        chip: within(card).getByLabelText(/^Priority /).className,
       };
     };
     expect(await tone("First")).toEqual({
@@ -4093,7 +4112,7 @@ describe("context grouping marker (#14)", () => {
     expect(a.style.getPropertyValue("--folia-ctx-color")).toBe("rgb(91, 141, 239)");
     expect(a.querySelector(".folia-card-context-strip")).not.toBeNull();
     // The label chip shows the short label and names the context in its tooltip.
-    const chip = within(a).getByText("client");
+    const chip = within(a).getByText("client").closest(".folia-chip");
     expect(chip).toHaveClass("folia-chip-context");
     expect(chip).toHaveAttribute("aria-label", "Context: Acme Corp");
   });
@@ -4558,8 +4577,12 @@ describe("blocking relationships", () => {
   it("marks the blocked card and the blocker with distinct chips", async () => {
     render_(blockRepo());
     await screen.findByText("Blocker");
-    expect(within(cardOf("Waiting")).getByText("Blocked")).toHaveClass("folia-chip-danger");
-    expect(within(cardOf("Blocker")).getByText("Blocks 1")).toHaveClass("folia-chip-accent");
+    expect(within(cardOf("Waiting")).getByText("Blocked").closest(".folia-chip")).toHaveClass(
+      "folia-chip-danger",
+    );
+    expect(within(cardOf("Blocker")).getByText("Blocks 1").closest(".folia-chip")).toHaveClass(
+      "folia-chip-accent",
+    );
     // A card in neither direction stays clean.
     expect(within(cardOf("Loose")).queryByText("Blocked")).toBeNull();
   });
@@ -5318,8 +5341,12 @@ describe("relationship types beyond blocks", () => {
   it("marks both ends with the type's own words, and a done end does not fade a plain link", async () => {
     render_(typedRepo());
     await screen.findByText("Outcome");
-    expect(within(cardOf("Outcome")).getByText("A result of 1")).toHaveClass("folia-chip-muted");
-    expect(within(cardOf("Cause")).getByText("Results in 1")).toHaveClass("folia-chip-muted");
+    expect(within(cardOf("Outcome")).getByText("A result of 1").closest(".folia-chip")).toHaveClass(
+      "folia-chip-muted",
+    );
+    expect(within(cardOf("Cause")).getByText("Results in 1").closest(".folia-chip")).toHaveClass(
+      "folia-chip-muted",
+    );
     expect(within(cardOf("Loose")).queryByText(/result/)).toBeNull();
   });
 
