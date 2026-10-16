@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.3](https://github.com/stavarengo/folia-kanban/compare/0.6.2...0.6.3) (2026-10-16)
+
+### Features
+
+* hang the card quick actions outside the card's left edge ([#142](https://github.com/stavarengo/folia-kanban/issues/142)) ([7be3a09](https://github.com/stavarengo/folia-kanban/commit/7be3a09fad42fb1da725088459c59dafea445813))
+
+### Documentation
+
+* say which display variables a bridged Obsidian launch needs ([d34392b](https://github.com/stavarengo/folia-kanban/commit/d34392b01cac202b5fbab96dfb943db8100aa324))
+
 ## [0.6.2](https://github.com/stavarengo/folia-kanban/compare/0.6.1...0.6.2) (2026-10-16)
 
 ### Features
