@@ -23,6 +23,15 @@
   white-space: nowrap;
   color: var(--text-muted);
   background: var(--background-modifier-hover);
+  /* A chip's text is whatever the note holds, and a name or tag can be wider than the card. The
+     chip stops at the row's edge and its label ends in an ellipsis; the tooltip carries the value. */
+  max-width: 100%;
+  min-width: 0;
+}
+.folia-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Chip text is mixed toward --text-normal so it keeps the hue but stays legible (WCAG AA) in
    BOTH light and dark themes; a same-hue border defines the edge on the low-opacity tint. That

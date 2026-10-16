@@ -432,12 +432,14 @@ export function cardChips(
   const fm = card.frontmatter;
   const chips: CardChip[] = [];
 
+  // Every tooltip that labels a value repeats it: a chip too long for its card is cut short, and
+  // the tooltip is where the rest of it can still be read.
   if (typeof fm.priority === "string" && fm.priority) {
     chips.push({
       key: "prio",
       label: fm.priority,
       tone: priorityTone(fm.priority, scale),
-      tooltip: "Priority",
+      tooltip: "Priority " + fm.priority,
     });
   }
   // The body tags come last, and say so: they are the ones the detail panel's `tags` property
@@ -448,7 +450,7 @@ export function cardChips(
       key: "tag-" + i,
       label: tag,
       tone: "muted",
-      tooltip: i < fmTagCount ? "Tag" : "Tag (written in the note's body)",
+      tooltip: i < fmTagCount ? "Tag " + tag : `Tag ${tag} (written in the note's body)`,
     });
   }
   for (const [i, name] of assigneeValues(card).entries()) {

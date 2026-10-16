@@ -129,6 +129,21 @@ describe("composite dimensions", () => {
   });
 });
 
+describe("card chips", () => {
+  it("stay inside the card and cut a long label short with an ellipsis", () => {
+    expect(declarations(".folia-scope .folia-chip")).toMatchObject({
+      "max-width": "100%",
+      "min-width": "0",
+      "white-space": "nowrap",
+    });
+    expect(declarations(".folia-chip-label")).toMatchObject({
+      "min-width": "0",
+      overflow: "hidden",
+      "text-overflow": "ellipsis",
+    });
+  });
+});
+
 describe("the no-value choice", () => {
   it("is an empty slot, never a filled swatch", () => {
     expect(declarations(".folia-scope .folia-swatch-none")).toMatchObject({

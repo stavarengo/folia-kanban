@@ -27,13 +27,13 @@ export function CardChips({
           className="folia-chip folia-chip-context"
           aria-label={`Context: ${ctx?.name ?? card.context}`}
         >
-          {ctxLabel}
+          <span className="folia-chip-label">{ctxLabel}</span>
         </span>
       )}
       {chips.map((c) => (
         <span key={c.key} className={`folia-chip folia-chip-${c.tone}`} aria-label={c.tooltip}>
           {c.icon && <Icon name={c.icon} />}
-          {c.label}
+          <span className="folia-chip-label">{c.label}</span>
         </span>
       ))}
     </div>

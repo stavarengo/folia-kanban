@@ -4,6 +4,7 @@ import type { Card, ColumnDef } from "../model/types";
 import { columnAccent } from "./columnColors";
 import { useBoardActions } from "./context";
 import { cardChips, isCompletable, priorityTone } from "./cardView";
+import { CardChips } from "./CardTileParts";
 
 /**
  * The lifted ghost that follows the pointer during a drag.
@@ -115,15 +116,7 @@ function CardGhost({
     >
       <div className="folia-card-main">
         <div className="folia-card-title">{card.title}</div>
-        {chips.length > 0 ? (
-          <div className="folia-chips">
-            {chips.map((c) => (
-              <span key={c.key} className={`folia-chip folia-chip-${c.tone}`}>
-                {c.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
+        <CardChips card={card} ctx={undefined} chips={chips} />
       </div>
     </div>
   );

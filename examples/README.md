@@ -75,13 +75,14 @@ Open any of them: the panel has one editable list per type (**Blocks**, **A resu
 
 **A note written under its own headings** — `Decide the export format.md` keeps its whole body under `## Question` and `## Answer`, the shape an issue-style note (or an agent) tends to produce. Open it: the Description box shows all of it, headings and all, because a card's description is everything between the title and the first section the plugin owns (`## Subtasks`, `## Comments`, `## History`). Edit the description and save, and that structure comes back unchanged.
 
-**Who is working on what** — three cards carry an `assignee`, which is a plain frontmatter key like any other:
+**Who is working on what** — four cards carry an `assignee`, which is a plain frontmatter key like any other:
 
 | Card file | `assignee` | What you see |
 | --- | --- | --- |
 | `Plan the v1.0 launch.md` | `alex` | an **alex** chip on the tile, next to its priority and due chips |
 | `Decide the export format.md` | `ana maria` | a name with a space in it, which is what makes `assignee:"ana maria"` need its quotes |
 | `Review PR - accessibility.md` | a YAML list of both | two chips: the board reads a list although its own field writes one name |
+| `Triage community feedback.md` | `Maximiliana Wolfeschlegelsteinhausen-Bergerdorff` | a name wider than the card: the chip stops at the card's edge and ends in an ellipsis, and hovering it shows the whole name |
 
 Set Settings → **Comments and history** → *Your name* to `alex` (the same setting the unread markers use, and who this vault pretends you are) and a **Mine** chip appears in the toolbar — the token `assignee:me`. Open any card and the panel's **Assignee** field suggests the names already on the board and takes any other one you type; beside it, **Assign to me** puts your name on the card in one click and turns into **Unassign me**. The same button is in a card's right-click menu. Empty the field and the key is removed from the note, not left sitting there blank. Try the button on `Review PR - accessibility`, the card that already names both `alex` and `ana maria`: as `alex` you are on it, so the button reads **Unassign me** and pressing it takes only your name off, leaving `ana maria` where she was — press it again to rejoin. Typing over the field instead replaces the whole list with the one name you typed.
 
