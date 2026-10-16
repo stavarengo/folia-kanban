@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.2](https://github.com/stavarengo/folia-kanban/compare/0.6.1...0.6.2) (2026-10-16)
+
+### Features
+
+* put the folder menu's board entry beside New note as "New Folia board" ([#140](https://github.com/stavarengo/folia-kanban/issues/140)) ([2bcb977](https://github.com/stavarengo/folia-kanban/commit/2bcb977bdef07ad79102f24ffe2abe25fdd4512d))
+
+### Bug Fixes
+
+* keep long card chips inside the card ([#141](https://github.com/stavarengo/folia-kanban/issues/141)) ([ea47092](https://github.com/stavarengo/folia-kanban/commit/ea4709224f9d57dc00063348644d4c644eaf999f))
+
+### Documentation
+
+* use a neutral name in the comment-author example ([#136](https://github.com/stavarengo/folia-kanban/issues/136)) ([1f8026d](https://github.com/stavarengo/folia-kanban/commit/1f8026d1933a130500637227a041b7a4d6d0e6e5))
+
 ## [0.6.1](https://github.com/stavarengo/folia-kanban/compare/0.6.0...0.6.1) (2026-09-30)
 
 ### Bug Fixes
