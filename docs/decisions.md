@@ -474,7 +474,7 @@ What left with it:
 
 No row of the board's own menus is given a section. `MenuItem.setSection` is documented, but the only section ids its documentation points to are the ones Obsidian's own menus carry, which it does not document. So the board's rows stay in the order the board adds them, split by separators.
 
-The rows Folia adds to Obsidian's own menus do take a section (2026-10-16, after leaving them out in #107). Without one, a row lands in a group of its own near the bottom, between "Reveal in Finder" and the Rename and Delete rows, far from the rows it reads like. So each row borrows the id of the group it belongs with, as read live from `menu.items[*].section` in Obsidian 1.13.7:
+The rows Folia adds to Obsidian's own menus do take a section (2026-10-16, #140, after leaving them out in #107). Without one, a row lands in a group of its own near the bottom, between "Reveal in Finder" and the Rename and Delete rows, far from the rows it reads like. So each row borrows the id of the group it belongs with, as read live from `menu.items[*].section` in Obsidian 1.13.7:
 
 - **New Folia board**, in a folder's menu, joins `action-primary`, beside New note, New folder, New canvas and New base. Other plugins' "New …" rows sit in that group too.
 - **Convert to Folia board** joins `action` in the file explorer, tab header and "More options" menus. That group holds the actions on the whole file: Duplicate, Move file to and Merge entire file with, and Rename in a tab's menus.
