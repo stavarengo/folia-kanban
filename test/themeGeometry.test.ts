@@ -95,9 +95,12 @@ describe("composite dimensions", () => {
       "calc(var(--folia-hit-md) + 2 * var(--size-2-1) + 2 * var(--border-width))",
     );
     // The bar's width less the column's border and body padding that already sit left of a card.
-    expect(declarations(".folia-board")["padding-left"]).toBe(
+    expect(declarations(".folia-scope")["--folia-board-pad-left"]).toBe(
       "calc(var(--folia-card-actions-w) - var(--border-width) - var(--size-4-2))",
     );
+    // The toolbar's first control lines up with the leftmost column.
+    expect(declarations(".folia-board")["padding-left"]).toBe("var(--folia-board-pad-left)");
+    expect(declarations(".folia-toolbar")["padding-left"]).toBe("var(--folia-board-pad-left)");
     expect(declarations(".folia-card-title")).not.toHaveProperty("padding-right");
   });
 

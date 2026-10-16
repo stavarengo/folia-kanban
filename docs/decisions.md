@@ -284,7 +284,7 @@ Until #94 every value went through a `--folia-*` layer of 149 tokens: 76 aliases
 A value stays named when at least one of these holds: several rules must move together, a guard pins it, it differs by scheme, or it carries a measured contrast reason. A value one rule needs is written where it is used: the card action bar's `blur(3px)`, the drag tilt, cursors, the reduced-motion duration, the tracking on the property keys and section headings, the `999px` pill end. The named ones, each with its reason in `tokens.css`:
 
 - **Motion**: two durations and one curve (see "Motion is two durations and one curve").
-- **Pointer targets**: the 24px floor, the icon and mini tiers built on it (see "Dense controls derive from the host input height"), and the width of a card's action bar, which the board leaves room for before its leftmost column.
+- **Pointer targets**: the 24px floor, the icon and mini tiers built on it (see "Dense controls derive from the host input height"), and the width of a card's action bar, which the board leaves room for before its leftmost column and the toolbar matches so its first control lines up with that column.
 - **Layout**: the column width, shared with the drag overlay that stands in for a column, and the detail panel's property gutter, which every row lines up on.
 - **Lines that carry a state**: the 2px thick border and the 1px pointer outline (pinned by the button guard, see "Host button fills cannot be the only interaction signal"), the 2px focus outline, the 3px cue strip that priority, urgency and a column's accent share, and the accent ring on a field being edited. A theme may zero its border widths, which is why none of these reads `--border-width`.
 - **Elevation**: four shadows (see "Elevation is the board's own").

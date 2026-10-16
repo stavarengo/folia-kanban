@@ -26,6 +26,10 @@
      from it rather than from its content so that only its height can overflow when it looks for room,
      and the board leaves it before the first column. */
   --folia-card-actions-w: calc(var(--folia-hit-md) + 2 * var(--size-2-1) + 2 * var(--border-width));
+  /* The board's left padding, which fits that bar beside the leftmost column's cards past the
+     column's border and body padding. The toolbar keeps the same, so its first control lines up
+     with that column. Physical left: the bar is on the left in a right-to-left layout too. */
+  --folia-board-pad-left: calc(var(--folia-card-actions-w) - var(--border-width) - var(--size-4-2));
 
   /* layout */
   --folia-col-w: calc(var(--size-4-1) * 75); /* a column, and the drag overlay that stands in for one */
