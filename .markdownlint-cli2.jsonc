@@ -15,6 +15,7 @@
   },
   "globs": ["**/*.md"],
   "ignores": [
+    ".git",
     "node_modules",
     "dist",
     "coverage",
