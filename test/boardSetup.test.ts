@@ -53,13 +53,15 @@ function setUp(settings: Partial<KanbanSettings> = {}, boards: string[] = []) {
 }
 
 describe("board setup rows in Obsidian's menus", () => {
-  it("puts a folder's row beside Obsidian's New note, worded like it", () => {
+  // These read the section id each row is given; the placement those ids produce was checked in
+  // Obsidian itself (docs/decisions.md), which a recording menu cannot show.
+  it("gives a folder's row the section id of Obsidian's New note rows", () => {
     expect(setUp().open("file-menu", new TFolder("Projects"))).toEqual([
       { title: "New Folia board", icon: "layout-grid", section: "action-primary" },
     ]);
   });
 
-  it("puts a note's row with the file actions in the file menu, and in no group in the editor", () => {
+  it("gives a note's row the file actions' section id in the file menu, and none in the editor", () => {
     const note = new TFile("Projects/Plan.md");
     const row = { title: "Convert to Folia board", icon: "layout-grid" };
     expect(setUp().open("file-menu", note)).toEqual([{ ...row, section: "action" }]);
