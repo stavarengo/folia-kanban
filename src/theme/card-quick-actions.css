@@ -1,27 +1,44 @@
 /* ------------------------------------------------------------------ card quick actions + confirm */
+/* A vertical bar hung outside the card's left edge, so nothing inside the card is given up for it.
+   Fixed, so the column body's scroll clip does not cut it; `.folia-column-content` is what it is
+   placed in and clipped by. Where the column has no room for it below the card's top, it rises
+   from the card's bottom instead. A Chromium without `anchor-scope` (before 131: an Obsidian
+   installer older than the app it runs) keeps the bar inside the card's top-right corner. */
 .folia-card-actions {
   position: absolute;
   top: var(--size-2-3);
   right: var(--size-2-3);
   display: flex;
+  flex-direction: column;
   gap: var(--size-2-1);
   padding: var(--size-2-1);
+  border: var(--border-width) solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   background: color-mix(in oklch, var(--background-primary) 88%, transparent);
   backdrop-filter: blur(3px);
   box-shadow: var(--folia-shadow-pop);
   opacity: 0;
-  transform: translateY(calc(-1 * var(--size-2-1)));
+  transform: translateX(var(--size-2-1));
   transition: opacity var(--folia-dur-fast) ease, transform var(--folia-dur-fast) var(--folia-ease);
   pointer-events: none;
 }
-.folia-card:hover .folia-card-actions,
-.folia-card:focus-within .folia-card-actions {
+@supports (anchor-scope: --folia-card) {
+  .folia-card-actions {
+    position: fixed;
+    position-anchor: --folia-card;
+    top: anchor(top);
+    left: calc(anchor(left) - var(--folia-card-actions-w));
+    right: anchor(left);
+    position-try-fallbacks: flip-block;
+  }
+}
+/* Not on a drag's hollow slot, which keeps focus while its card is lifted. */
+.folia-card:not(.folia-is-dragging):hover .folia-card-actions,
+.folia-card:not(.folia-is-dragging):focus-within .folia-card-actions {
   opacity: 1;
   transform: none;
   pointer-events: auto;
 }
-/* The host's icon button, held to the step the card title's clearance is counted in. */
 .folia-scope .folia-card-action {
   display: grid;
   place-items: center;

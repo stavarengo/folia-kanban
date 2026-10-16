@@ -3,7 +3,7 @@ import { DragOverlay, defaultDropAnimationSideEffects } from "@dnd-kit/core";
 import type { Card, ColumnDef } from "../model/types";
 import { columnAccent } from "./columnColors";
 import { useBoardActions } from "./context";
-import { cardChips, isCompletable, priorityTone } from "./cardView";
+import { cardChips, priorityTone } from "./cardView";
 import { CardChips } from "./CardTileParts";
 
 /**
@@ -104,10 +104,7 @@ function CardGhost({
   const chips = cardChips(card, today, doneColumnId, actions.priorityScale);
   return (
     <div
-      className={
-        "folia-card folia-card-overlay" +
-        (isCompletable(card, doneColumnId) ? "" : " folia-card--no-complete")
-      }
+      className="folia-card folia-card-overlay"
       data-prio={
         typeof priority === "string" && priority
           ? priorityTone(priority, actions.priorityScale)

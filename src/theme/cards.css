@@ -6,6 +6,8 @@
   border-radius: var(--radius-l);
   box-shadow: var(--folia-shadow-card);
   transition: box-shadow var(--folia-dur) var(--folia-ease), border-color var(--folia-dur-fast) ease;
+  anchor-name: --folia-card;
+  anchor-scope: --folia-card;
 }
 .folia-card::before {
   content: "";
@@ -112,24 +114,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  /* Reserve the hover cluster even while hidden so revealing it cannot reflow the title. The
-     cluster's reach is measured from the card's edge, so what the title reserves is that less the
-     side padding the card has already put between the two. Subtracted here rather than in the
-     token because `--folia-card-pad-x` is narrower on a nested card, and a custom property
-     substitutes its own var()s where it is declared. */
-  padding-right: calc(var(--folia-card-actions-reach) - var(--folia-card-pad-x));
-}
-/* A card that cannot be marked done renders no "mark done" button, so its cluster is one step
-   narrower. Keyed to the same condition CardItem renders that button on, not to the button itself,
-   so hiding the cluster while confirming or renaming cannot reflow the title. */
-.folia-card--no-complete .folia-card-title {
-  padding-right: calc(
-    var(--folia-card-actions-reach) - var(--folia-card-action-step) - var(--folia-card-pad-x)
-  );
 }
 
 /* #12 inline title edit — the <input> that replaces the title in place. Inherits the title's
-   metrics so swapping in/out doesn't shift the card; keeps the same right gutter as the title. */
+   metrics so swapping in/out doesn't shift the card. */
 .folia-card-title-input {
   font: inherit;
   font-size: var(--font-ui-small);

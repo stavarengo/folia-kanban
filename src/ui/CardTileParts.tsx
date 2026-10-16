@@ -160,7 +160,7 @@ export function ParentRef({
   );
 }
 
-/** The hover-action cluster: done, open the note, delete. */
+/** The action bar beside a hovered card: done, open the note, delete. */
 export function CardActions({
   card,
   notePath,

@@ -4,6 +4,10 @@
   align-items: flex-start;
   gap: var(--size-4-2);
   padding: var(--size-4-3);
+  /* Room for a card's action bar in the leftmost column: the bar hangs outside the card's left edge,
+     past the column's border and body padding, and the board clips anything beyond it. Physical
+     left, since the bar is on the left in a right-to-left layout too. */
+  padding-left: calc(var(--folia-card-actions-w) - var(--border-width) - var(--size-4-2));
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1 1 auto;
@@ -35,7 +39,7 @@
   border: var(--border-width) solid var(--background-modifier-border);
   border-top: var(--folia-cue-thickness) solid var(--folia-col-accent);
   border-radius: var(--radius-l);
-  overflow: hidden;
+  /* No clip: a card's action bar hangs past the column's edge. The header rounds its own corners. */
 }
 
 .folia-column-header {
@@ -44,6 +48,11 @@
   gap: var(--size-4-2);
   padding: var(--size-4-2) var(--size-4-3);
   background: var(--background-secondary-alt);
+  /* The column's inner curve, inside its side and top borders. */
+  border-start-start-radius: calc(var(--radius-l) - var(--border-width))
+    max(0px, calc(var(--radius-l) - var(--folia-cue-thickness)));
+  border-start-end-radius: calc(var(--radius-l) - var(--border-width))
+    max(0px, calc(var(--radius-l) - var(--folia-cue-thickness)));
   position: relative;
 }
 .folia-column-dot {
@@ -89,6 +98,23 @@
 }
 .folia-column.folia-is-over-limit .folia-column-header {
   background: color-mix(in srgb, var(--color-red) 8%, var(--background-secondary-alt));
+}
+
+/* The fixed containing block of every card's action bar, which is how the bar escapes the body's
+   scroll clip. It clips only vertically: a card scrolled under the header does not raise its bar
+   over the header and toolbar, and the bar still hangs out past the column's left edge. */
+.folia-column-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  contain: layout;
+  overflow: visible clip;
+}
+/* Above the column the bar hangs over, which in a right-to-left board comes later and paints later. */
+.folia-column-content:hover,
+.folia-column-content:focus-within {
+  z-index: 1;
 }
 
 .folia-column-body {

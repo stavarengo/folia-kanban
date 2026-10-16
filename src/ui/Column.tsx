@@ -108,27 +108,32 @@ export function Column({
           isLast={isLast}
         />
       </ColumnHeader>
-      {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
-          card dropped anywhere on the column still reports over.id === column.id. `isOver` comes
-          from useSortable and still drives the body drop highlight. */}
-      <div className={"folia-column-body" + (sortable.isOver ? " folia-is-over" : "")}>
-        <ColumnCards
-          cards={cards}
-          board={board}
-          today={today}
-          selectedPath={selectedPath}
-          filter={filter}
-        />
-        {cards.paths.length === 0 &&
-          !composer.adding &&
-          // An empty lane that names its rule below already says why it is empty; "No matches" is
-          // left for a search, which the rule line does not explain.
-          (cards.takesAdds || cards.globalFiltering) && <EmptyColumn filtering={cards.filtering} />}
-        {composer.adding && <CardComposer composer={composer} fillNote={cards.fillNote} />}
+      {/* What a card's action bar is placed in and cut off by (card-quick-actions.css). */}
+      <div className="folia-column-content">
+        {/* No ref here: the section root is the sortable/droppable node (its id === column.id), so a
+            card dropped anywhere on the column still reports over.id === column.id. `isOver` comes
+            from useSortable and still drives the body drop highlight. */}
+        <div className={"folia-column-body" + (sortable.isOver ? " folia-is-over" : "")}>
+          <ColumnCards
+            cards={cards}
+            board={board}
+            today={today}
+            selectedPath={selectedPath}
+            filter={filter}
+          />
+          {cards.paths.length === 0 &&
+            !composer.adding &&
+            // An empty lane that names its rule below already says why it is empty; "No matches" is
+            // left for a search, which the rule line does not explain.
+            (cards.takesAdds || cards.globalFiltering) && (
+              <EmptyColumn filtering={cards.filtering} />
+            )}
+          {composer.adding && <CardComposer composer={composer} fillNote={cards.fillNote} />}
+        </div>
+        {!composer.adding && (
+          <ColumnFooter column={column} takesAdds={cards.takesAdds} onAdd={composer.start} />
+        )}
       </div>
-      {!composer.adding && (
-        <ColumnFooter column={column} takesAdds={cards.takesAdds} onAdd={composer.start} />
-      )}
     </section>
   );
 }
