@@ -206,7 +206,7 @@ Two limits worth knowing. There is no roster: the names on offer are whoever the
 
 ## Set up a board
 
-The quickest way is to let the plugin write the note for you. **Create board** in the command palette makes a new note that is already a board — properties in place, at the top of the file, with its own `Cards` folder beside it, ready for the first card. Right-clicking a folder in the file explorer offers **Create Folia board here**, which does the same thing inside that folder.
+The quickest way is to let the plugin write the note for you. **Create board** in the command palette makes a new note that is already a board — properties in place, at the top of the file, with its own `Cards` folder beside it, ready for the first card. Right-clicking a folder in the file explorer offers **New Folia board**, next to New note and New folder, which does the same thing inside that folder.
 
 Already have a note you want to run as a board? **Convert this note into a board** in the command palette adds the properties to the note you are on, and **Convert to Folia board** does the same from a note's own menu — the file explorer, the tab header, or the right-click menu inside the editor. The body of the note is untouched and your own properties keep their values: only `folia-board`, a `card-folder` and a `columns` list are added, and only where the note does not already have one, so converting a note twice changes nothing the second time. Obsidian writes the properties block itself, the same as when you edit a property in its own properties editor, so that block — and only that block — comes back in Obsidian's formatting rather than character-for-character as you typed it. Either way the board opens as soon as it is made, in the note's own tab when it already has one. Hold Ctrl or Cmd on either menu entry to choose where instead: a new tab, add Alt for a split and Alt+Shift for a new window.
 
@@ -314,7 +314,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
   - **Open board notes as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
   - **Horizontal drag** — `shift` (Shift+drag pans from anywhere, including over cards) or `empty` (plain drag pans, but only from empty board space). Middle-button drag always pans.
   - **Board setup in the command palette** — whether **Create board** and **Convert this note into a board** are offered in the command palette.
-  - **Board setup in the file menu** — whether a folder's menu offers **Create Folia board here**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
+  - **Board setup in the file menu** — whether a folder's menu offers **New Folia board**, and a note's menu offers **Convert to Folia board** (the file explorer, a tab header, "More options").
   - **Board setup in the editor menu** — whether the right-click menu inside a note offers **Convert to Folia board**.
 - **Cards on the board**
   - **Next todos shown** — how many upcoming unchecked todos to surface on each card (0 = none).
