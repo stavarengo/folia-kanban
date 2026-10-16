@@ -72,25 +72,36 @@ describe("composite dimensions", () => {
     );
   });
 
-  it("reserves a card title's clearance from the cluster's own step, one step less without Mark done", () => {
-    const tokens = declarations(".folia-scope");
+  it("hangs the action bar outside the card's left edge, with room for it before the first column", () => {
     const flat = (value: string | undefined) => value?.replace(/\s+/g, " ");
-    expect(declarations(".folia-card-actions")).toMatchObject({
-      top: "var(--size-2-3)",
-      right: "var(--size-2-3)",
-      gap: "var(--size-2-1)",
-      padding: "var(--size-2-1)",
+    expect(declarations(".folia-card")).toMatchObject({
+      "anchor-name": "--folia-card",
+      "anchor-scope": "--folia-card",
     });
-    expect(tokens["--folia-card-action-step"]).toBe("calc(var(--folia-hit-md) + var(--size-2-1))");
-    expect(flat(tokens["--folia-card-actions-reach"])).toBe(
-      "calc(var(--size-2-3) + 2 * var(--size-2-1) + 3 * var(--folia-card-action-step))",
+    expect(declarations(".folia-card-actions")).toMatchObject({
+      position: "fixed",
+      "position-anchor": "--folia-card",
+      top: "anchor(top)",
+      left: "calc(anchor(left) - var(--folia-card-actions-w))",
+      right: "anchor(left)",
+      "position-try-fallbacks": "flip-block",
+      "flex-direction": "column",
+      padding: "var(--size-2-1)",
+      border: "var(--border-width) solid var(--background-modifier-border)",
+    });
+    expect(declarations(".folia-scope .folia-card-action")["width"]).toBe("var(--folia-hit-md)");
+    // One button inside the bar's padding and border.
+    expect(flat(declarations(".folia-scope")["--folia-card-actions-w"])).toBe(
+      "calc(var(--folia-hit-md) + 2 * var(--size-2-1) + 2 * var(--border-width))",
     );
-    expect(declarations(".folia-card-title")["padding-right"]).toBe(
-      "calc(var(--folia-card-actions-reach) - var(--folia-card-pad-x))",
+    // The bar's width less the column's border and body padding that already sit left of a card.
+    expect(declarations(".folia-scope")["--folia-board-pad-left"]).toBe(
+      "calc(var(--folia-card-actions-w) - var(--border-width) - var(--size-4-2))",
     );
-    expect(flat(declarations(".folia-card--no-complete .folia-card-title")["padding-right"])).toBe(
-      "calc( var(--folia-card-actions-reach) - var(--folia-card-action-step) - var(--folia-card-pad-x) )",
-    );
+    // The toolbar's first control lines up with the leftmost column.
+    expect(declarations(".folia-board")["padding-left"]).toBe("var(--folia-board-pad-left)");
+    expect(declarations(".folia-toolbar")["padding-left"]).toBe("var(--folia-board-pad-left)");
+    expect(declarations(".folia-card-title")).not.toHaveProperty("padding-right");
   });
 
   it("keeps pointer targets above their fixed floor", () => {

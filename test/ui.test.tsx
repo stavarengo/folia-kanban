@@ -2172,29 +2172,6 @@ describe("drag overlay portal", () => {
 
     await user.keyboard("{Escape}");
   });
-
-  it("gives the ghost the same title reservation as the card it lifts", async () => {
-    const user = userEvent.setup();
-    const repo = new FakeRepo(config, {
-      "Tasks/Open.md": { fm: { type: "task", status: "todo" }, body: "\n# Open\n" },
-      "Tasks/Finished.md": { fm: { type: "task", status: "done" }, body: "\n# Finished\n" },
-    });
-    render_(repo);
-    for (const [title, marked] of [
-      ["Open", false],
-      ["Finished", true],
-    ] as const) {
-      const main = (await screen.findByText(title, { selector: ".folia-card-title" })).closest(
-        ".folia-card-main",
-      ) as HTMLElement;
-      main.focus();
-      await user.keyboard("{ }");
-      const overlay = document.querySelector(".folia-card-overlay") as HTMLElement;
-      expect(overlay.classList.contains("folia-card--no-complete")).toBe(marked);
-      await user.keyboard("{Escape}");
-      await waitFor(() => expect(document.querySelector(".folia-card-overlay")).toBeNull());
-    }
-  });
 });
 
 describe("reduced-motion drag", () => {
@@ -2694,40 +2671,6 @@ describe("card context menu", () => {
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByRole("menuitem", { name: /Mark done/ })).toBeNull();
-  });
-
-  // The title reserves room for the hover cluster, which is one button narrower on a card with
-  // no Mark done. The marker follows that condition, not the rendered button, so hiding the cluster
-  // while a delete is being confirmed cannot change what the title reserves.
-  it("marks a card whose cluster has no Mark done, and only that card", async () => {
-    const repo = new FakeRepo(config, {
-      "Tasks/Open.md": { fm: { type: "task", status: "todo" }, body: "\n# Open\n" },
-      "Tasks/Finished.md": { fm: { type: "task", status: "done" }, body: "\n# Finished\n" },
-    });
-    render_(repo);
-    const tile = async (title: string) =>
-      (await screen.findByText(title, { selector: ".folia-card-title" })).closest(
-        ".folia-card",
-      ) as HTMLElement;
-    const open = await tile("Open");
-    const finished = await tile("Finished");
-    expect(within(open).getByLabelText('Mark "Open" done')).toBeInTheDocument();
-    expect(open).not.toHaveClass("folia-card--no-complete");
-    expect(within(finished).queryByLabelText('Mark "Finished" done')).toBeNull();
-    expect(finished).toHaveClass("folia-card--no-complete");
-  });
-
-  it("marks every card on a board with no done column", async () => {
-    const repo = new FakeRepo(
-      { ...config, columns: config.columns.filter((c) => c.id !== "done") },
-      { "Tasks/Open.md": { fm: { type: "task", status: "todo" }, body: "\n# Open\n" } },
-    );
-    render_(repo);
-    const open = (await screen.findByText("Open", { selector: ".folia-card-title" })).closest(
-      ".folia-card",
-    ) as HTMLElement;
-    expect(within(open).queryByLabelText('Mark "Open" done')).toBeNull();
-    expect(open).toHaveClass("folia-card--no-complete");
   });
 
   it("opens a todo-scoped menu on a next-todo row and toggles by its data-todo-index", async () => {

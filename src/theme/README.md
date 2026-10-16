@@ -32,7 +32,7 @@ The elevation shadows are the only values that differ by scheme: `tokens.css` de
 
 Icon containers set the `--folia-icon-size` and `--folia-icon-stroke` channels from the host icon scale. Only `.folia-icon` maps them onto the documented `--icon-size` and `--icon-stroke` shorthands, so host-rendered Markdown does not inherit Folia's defaults. `Icon` is a slot the host draws its own Lucide icon into (`setIcon`), and the host's `svg-icon` rule sizes and strokes that icon from those two shorthands, so the slot sets no size of its own and has no numeric size prop.
 
-`test/themeGeometry.test.ts` checks the compact-container icon size and stroke pairs, the sums the card's hover cluster and the drag overlay are built from, the hit-size floor, the drop animation's copy of the easing curve, and that every column colour is on the allowlist and in the floor. These source contracts complement the DOM snapshots; they do not replace live layout checks.
+`test/themeGeometry.test.ts` checks the compact-container icon size and stroke pairs, where the card's action bar hangs and the room the board leaves for it, the sums the drag overlay is built from, the hit-size floor, the drop animation's copy of the easing curve, and that every column colour is on the allowlist and in the floor. These source contracts complement the DOM snapshots; they do not replace live layout checks.
 
 ## Focus in forced-colours mode
 

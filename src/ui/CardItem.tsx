@@ -90,7 +90,6 @@ function CardItemInner({
       style={tileStyle(sortable.style, view.ctx)}
       className={tileClassName(card, {
         draggable,
-        canComplete: view.canComplete,
         nested,
         parentPath,
         selected,
@@ -124,8 +123,8 @@ function CardItemInner({
           assistive tech — the same reason the action cluster below lives out here. */}
       {parentPath && <ParentRef parentPath={parentPath} parentTitle={parentTitle} />}
 
-      {/* Hidden while renaming: focus-within would otherwise reveal it over the full-width title
-          <input> (which has no right gutter), letting buttons cover the caret/text. */}
+      {/* Hidden while renaming: the rename commits on blur, without waiting, so an action clicked out
+          of the title <input> would race it and act on the card's old path. */}
       {title.editing == null && (
         <CardActions card={card} notePath={events.notePath} canComplete={view.canComplete} />
       )}
@@ -299,7 +298,6 @@ function tileClassName(
   card: Card,
   t: {
     draggable: boolean;
-    canComplete: boolean;
     nested: boolean;
     parentPath: string | undefined;
     selected: boolean;
@@ -309,7 +307,6 @@ function tileClassName(
   return (
     "folia-card" +
     (t.draggable ? "" : " folia-card--static") +
-    (t.canComplete ? "" : " folia-card--no-complete") +
     (t.nested ? " folia-card--nested" : "") +
     (t.parentPath ? " folia-card--subitem" : "") +
     (card.todoRef ? " folia-card--todo" : "") +
