@@ -47,12 +47,12 @@ export class BoardSetup {
     });
     plugin.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) =>
-        this.addBoardSetupMenuItems(menu, file, this.settings().boardSetupFileMenu),
+        this.addBoardSetupMenuItems(menu, file, this.settings().boardSetupFileMenu, "action"),
       ),
     );
     plugin.registerEvent(
       this.app.workspace.on("editor-menu", (menu, _editor, info: MarkdownFileInfo) =>
-        this.addBoardSetupMenuItems(menu, info.file, this.settings().boardSetupEditorMenu),
+        this.addBoardSetupMenuItems(menu, info.file, this.settings().boardSetupEditorMenu, null),
       ),
     );
   }
@@ -62,25 +62,36 @@ export class BoardSetup {
     return file instanceof TFile && file.extension === "md" && !this.tabs.isBoard(file);
   }
 
-  private addBoardSetupMenuItems(menu: Menu, target: TAbstractFile | null, enabled: boolean): void {
+  /** Each row joins the group of Obsidian's own rows it reads like, by the section id those rows
+   *  carry (docs/decisions.md, "The card, todo and column menus are Obsidian's `Menu`"). The editor
+   *  menu gives the note row none: its `action` group holds only rows about the heading under the
+   *  cursor. */
+  private addBoardSetupMenuItems(
+    menu: Menu,
+    target: TAbstractFile | null,
+    enabled: boolean,
+    convertSection: string | null,
+  ): void {
     if (!enabled) return;
     if (target instanceof TFolder) {
       menu.addItem((item) =>
         item
-          .setTitle("Create Folia board here")
+          .setTitle("New Folia board")
           .setIcon("layout-grid")
+          .setSection("action-primary")
           .onClick((evt) => void this.createBoard(target, Keymap.isModEvent(evt))),
       );
       return;
     }
     if (this.canConvert(target)) {
       const file = target;
-      menu.addItem((item) =>
+      menu.addItem((item) => {
         item
           .setTitle("Convert to Folia board")
           .setIcon("layout-grid")
-          .onClick((evt) => void this.convertToBoard(file, Keymap.isModEvent(evt))),
-      );
+          .onClick((evt) => void this.convertToBoard(file, Keymap.isModEvent(evt)));
+        if (convertSection) item.setSection(convertSection);
+      });
     }
   }
 

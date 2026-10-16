@@ -472,13 +472,21 @@ What left with it:
 - **A middle click on "Open note" no longer opens a new tab from the menu.** A modifier click still does, and the card's own Open note button keeps the middle click.
 - **The ⋯ button no longer stays lit while its menu is open.** The port says nothing about the menu closing to the caller, and the button carries no open state.
 
-No row is given a section, and neither are the rows Folia adds to Obsidian's file, folder and editor menus, "Create Folia board here" and "Convert to Folia board" (#107). `MenuItem.setSection` is documented, but the only section ids its documentation points to are the ones Obsidian's own menus carry in the DOM, which it does not document. So the board's rows stay in the order the board adds them, split by separators, and the board-setup rows land in the unsectioned tail of Obsidian's menus.
+No row of the board's own menus is given a section. `MenuItem.setSection` is documented, but the only section ids its documentation points to are the ones Obsidian's own menus carry, which it does not document. So the board's rows stay in the order the board adds them, split by separators.
+
+The rows Folia adds to Obsidian's own menus do take a section (2026-10-16, #140, after leaving them out in #107). Without one, a row lands in a group of its own near the bottom, between "Reveal in Finder" and the Rename and Delete rows, far from the rows it reads like. So each row borrows the id of the group it belongs with, as read live from `menu.items[*].section` in Obsidian 1.13.7:
+
+- **New Folia board**, in a folder's menu, joins `action-primary`, beside New note, New folder, New canvas and New base. Other plugins' "New …" rows sit in that group too.
+- **Convert to Folia board** joins `action` in the file explorer, tab header and "More options" menus. That group holds the actions on the whole file: Duplicate, Move file to and Merge entire file with, and Rename in a tab's menus.
+- In the editor's right-click menu, **Convert to Folia board** keeps no section. There `action` holds only rows about the heading under the cursor, such as "Rename this heading...", and a convert row among them would read as converting the heading.
+
+An id Obsidian does not know puts the row at the very bottom of the menu, below Delete. If Obsidian renames these ids, the rows still show and still work, only lower down.
 
 A menu opened from the keyboard sits under the element it came from, and when it closes with focus on nothing, focus goes back to that element. The menu never takes focus: it reads its arrows, Enter and Escape off the window while focus stays on the card. Any other key still reaches the card, where Space would lift it under the open menu, and a Tab to another card followed by Enter would spend the Enter on the first card's highlighted row. So the menu closes on any key it does not take and when focus moves on to another element, and opening a menu closes the board's one still showing. On Windows the Menu key is followed by the platform's own contextmenu on keyup, at a point on the focused card; the card ignores that one, so the menu stays under the card. These rules live once, in the adapter (`src/obsidian/menu.ts`) and the card, rather than in each menu.
 
 With Settings → Appearance → **Native menus** on, which is Obsidian's default on macOS, the same `Menu` is drawn by the operating system. It then has no icons and no red destructive row, "Priority" and "Move to" show as greyed-out rows, and the checkmarks are the system's. The OS menu holds the keyboard while it is open, so the stray-key rule never fires there, and it can take the window's focus, which is why only focus moving to another element, not focus leaving for nowhere, closes the menu. Checked on Linux 2026-09-30: the rows, the checkmarks, a pick, dismissing with focus returned under a keyboard anchor, and a modified Open note reaching the repository as a modified click.
 
-**What would change this:** Obsidian documenting submenus or its menu section ids, or a menu that needs something a row cannot hold, which belongs in a dialog instead.
+**What would change this:** Obsidian documenting submenus or its menu section ids, or a menu that needs something a row cannot hold, which belongs in a dialog instead. A board-setup row showing up below Delete means Obsidian renamed the id it borrows, and the new one has to be read live again.
 
 ## A lane offers to add a card only where the card can be given what its rule asks for
 
