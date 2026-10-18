@@ -1,0 +1,47 @@
+%%{init: {"theme": "dark", "flowchart": {"nodeSpacing": 40, "rankSpacing": 55, "curve": "basis"}}}%%
+flowchart TB
+  classDef note fill:#1e293b,stroke:#94a3b8,color:#f1f5f9
+  classDef plugin fill:#134e4a,stroke:#2dd4bf,color:#f1f5f9
+  classDef ext fill:#78350f,stroke:#fbbf24,color:#f1f5f9
+  classDef mod fill:#4c1d95,stroke:#c4b5fd,color:#f1f5f9
+  classDef grp fill:#0b1020,stroke:#475569,color:#cbd5e1
+
+  subgraph folia["Folia Kanban plugin, in Obsidian"]
+    direction LR
+    move["Status write made by the plugin<br/>(board UI, or MCP move_card)"]:::plugin
+    chip["Tile chip<br/>Agent in 10s · Cancel · Now"]:::plugin
+    launch["Launcher<br/>runs the command setting in the column's cwd<br/>card context as env and {{placeholders}}<br/>fire and forget"]:::plugin
+    mcp["MCP server (already exists)<br/>http://&lt;bind&gt;:&lt;port&gt;/mcp"]:::plugin
+    move -- "enters an agent column,<br/>no agent-run yet" --> chip
+    chip -- "delay over, or Now" --> launch
+  end
+
+  subgraph outside["Outside the plugin"]
+    direction LR
+    cmd["The command<br/>default: tmux new-window … claude …<br/>or any wrapper around Claude Code"]:::ext
+    agent["Claude Code session"]:::ext
+    subgraph mod["Folia Mod, shipped in the plugin folder"]
+      direction TB
+      stop["Hook: card left the column?<br/>then end the session gracefully"]:::mod
+      status["Status line: board · card · column"]:::mod
+      mcpjson[".mcp.json reading<br/>${FOLIA_MCP_URL} and ${FOLIA_MCP_TOKEN}"]:::mod
+    end
+    cmd --> agent
+    agent -- "--plugin-dir and --settings" --> mod
+  end
+
+  subgraph vault["Vault: plain Markdown"]
+    direction LR
+    board["Board note<br/>columns: - id: doing, agent: {cwd, model, effort, args}<br/>agent: {board-wide defaults}"]:::note
+    card["Card note<br/>status · assignee · agent-run: {id, started}<br/>Comments · Subtasks · History"]:::note
+  end
+
+  launch -- "starts" --> cmd
+  launch -- "writes agent-run" --> card
+  agent -- "assign, comment, tick subtasks,<br/>move where it belongs,<br/>clear agent-run when stopping" --> mcp
+  mcp --> card
+  stop -. "reads status" .-> card
+  card -. "status leaves the column:<br/>plugin clears agent-run" .-> move
+  board -. "configures" .-> launch
+
+  class folia,outside,vault,mod grp
