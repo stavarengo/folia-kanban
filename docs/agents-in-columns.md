@@ -61,7 +61,7 @@ agent-run: { id: 3f9a1c2b, started: "2026-10-19 14:05", column: review }
 The marker means "a session was handed this card". It goes when:
 
 - the card leaves `column`, by anyone's hand, on any computer that has the vault open with the plugin;
-- the agent stops without moving the card and clears it itself, with `update_card` and `properties: {"agent-run": null}`, as the default prompt asks it to;
+- the agent stops without moving the card and clears it itself, with `update_card` and `properties: {"agent-run": null}`, as the default prompt asks it to, which also ends its session at its next tool call;
 - the command fails before the agent starts (it exits non-zero), together with a notice saying why.
 
 A marker written without a `column` (by hand, or by an older build) is kept when Obsidian starts, and goes the next time the card moves out of the column it was in. A session you close by hand leaves its marker until the card is moved out; moving it back in then starts a new one.
@@ -107,7 +107,26 @@ The agent token is not a placeholder. It reaches the command only as `FOLIA_MCP_
 
 `FOLIA_EXPORTS` holds one `export NAME='…'` line per variable above, quoted so `eval "$FOLIA_EXPORTS"` gives back every value exactly. The token is not in it. It is for a command that hands the context to a shell of its own, as the default does.
 
-`FOLIA_MOD_DIR` names a folder nothing creates yet; it is where a later release ships the Claude Code side of this feature. Until then, a session reaches the board only if you registered agent access with Claude Code yourself, as [Connecting a client](mcp.md#connecting-a-client) shows, and for every folder a column runs in. `claude mcp add` registers a server for the folder you run it in unless you add `--scope user`, which registers it for all of them. A session that cannot reach the board still starts, and the plugin cannot tell: its card keeps the marker until it is moved out.
+## The Folia Mod
+
+Before each launch the plugin writes a small Claude Code plugin, the Folia Mod, into `FOLIA_MOD_DIR`, rewriting only the files that changed. If it cannot be written, no agent starts and a notice says why. The default command loads it with `--plugin-dir "$FOLIA_MOD_DIR" --settings "$FOLIA_MOD_DIR/session.json"`, and the session gets the following with nothing for you to set up.
+
+**The board.** The mod adds agent access as the MCP server `folia-kanban` (`plugin:folia-mod:folia-kanban` in `/mcp`). It reads the URL and the token from `FOLIA_MCP_URL` and `FOLIA_MCP_TOKEN` when the session starts, so the token is never written into the mod. The board's tools run without asking, the way a teammate updates a card without asking you first. To keep one from running, deny it in your own Claude Code settings, which win over the mod: `"permissions": {"deny": ["mcp__plugin_folia-mod_folia-kanban__move_card"]}`.
+
+**A stop once the card is no longer the session's.** Before every tool call the mod reads the card's file, and it refuses the call and ends the session's turn, with the reason in its window, when:
+
+- the card has left the column;
+- its `agent-run` names another run, because the card went out and back in and a new session has it;
+- its `agent-run` is gone, because the agent cleared it as its last step or someone removed it;
+- the card is nowhere to be found.
+
+The session is not killed. It waits at its prompt, and anything you ask of it there stops the same way at its first tool call. Nothing is pushed into it either, so a session that is thinking, or waiting for you, sees the stop only when it next reaches for a tool. A card renamed while its agent works is found again in its folder by its run marker, unless a new note has taken its old name, which ends the session. A value the mod cannot read for certain, such as a block scalar, is no reason to stop, and the mod checks a stop twice, a second apart, so a note caught while something writes it does not end a session.
+
+**A status line** naming the board, the card and the column, such as `Launch Board · Write the notes · review`. It keeps the name the card had at launch.
+
+Since a session stops at its first tool call after the card leaves the column, the default prompt asks the agent to write its closing comment first and move the card last. A prompt of your own should ask the same.
+
+**If you registered agent access with Claude Code yourself**, for your own sessions or because an earlier version of this page asked you to, that registration takes the mod's place in agent sessions too. Claude Code keeps one server per URL and lets yours win. Its tools then ask before every call, in a window nobody may be watching, and after **Replace the token** it leaves every agent session without the board at all. Remove it if you only had it for agents: `claude mcp remove folia-kanban --scope user`, and the same without `--scope user` in any folder you registered it in. To keep it for your own sessions, register it only in folders no agent column runs in, or allow its tools in your own settings and register it again whenever you replace the token.
 
 ## The default command
 
@@ -127,7 +146,7 @@ Flatpak and Snap builds of Obsidian run sandboxed and cannot reach the computer'
 
 ## Writing your own command
 
-Anything `/bin/sh` can run. The command's exit code is what the plugin reads: 0 means "handed off", anything else clears the marker and shows a notice (exit 127 adds a hint about the `PATH`). Keep it short-lived and let it hand the session to something that outlives it, the way the default hands it to tmux.
+Anything `/bin/sh` can run. The command's exit code is what the plugin reads: 0 means "handed off", anything else clears the marker and shows a notice (exit 127 adds a hint about the `PATH`). Keep it short-lived and let it hand the session to something that outlives it, the way the default hands it to tmux. To give a Claude Code session the [Folia Mod](#the-folia-mod), pass `claude` the same `--plugin-dir "$FOLIA_MOD_DIR" --settings "$FOLIA_MOD_DIR/session.json"` the default does; without them the session has no way to the board unless you registered it yourself.
 
 The token is in the command's environment only. Anything you write to a file, a log or another process's command line leaves that boundary.
 
@@ -135,7 +154,7 @@ The token is in the command's environment only. Anything you write to a file, a 
 
 A launch runs a command as you, on this computer, with arguments taken from the board note: `agent.args` and `cwd` in a board note, and the command in `data.json`, can run anything you can. That is the same trust you already give a synced vault's plugin code: anyone who can write your vault can change what it runs.
 
-Agent access adds no way to change what runs: `update_card` refuses the `columns` and `agent` keys on any note it reaches, another board's note in this board's card folder included, and a card's own `agent:` carries only a model name and an effort. That is a limit on the MCP tools, not on the session a launch starts. The session runs as you, in the column's `cwd` (the vault's folder by default), with its own file and shell tools: it can edit a board note's `agent:` or the plugin's `data.json` like any program you run, and the next launch would run what it wrote. What stops it is the prompt and the agent's own permission prompts, so treat text on a card that someone else wrote as input to a program running as you. One agent can also clear another run's `agent-run` through `update_card`, after which the next move into the column starts a second agent on that card.
+Agent access adds no way to change what runs: `update_card` refuses the `columns` and `agent` keys on any note it reaches, another board's note in this board's card folder included, and a card's own `agent:` carries only a model name and an effort. That is a limit on the MCP tools, not on the session a launch starts. The session runs as you, in the column's `cwd` (the vault's folder by default), with its own file and shell tools: it can edit a board note's `agent:` or the plugin's `data.json` like any program you run, and the next launch would run what it wrote. What stops it is the prompt and the agent's own permission prompts for those tools (the board's tools run unprompted, see [The Folia Mod](#the-folia-mod)), so treat text on a card that someone else wrote as input to a program running as you. One agent can also clear another run's `agent-run` through `update_card`, after which the next move into the column starts a second agent on that card.
 
 What agent access does add is a way to start one. Anything holding the token can `move_card` a card into an agent column, and a session then starts on this computer, reads that card and works on it. On the default loopback bind that is software already running as you; once the server listens on a network, it is any machine there with the token.
 

@@ -28,6 +28,7 @@ import { MCP_PATH } from "./mcpHttpServer";
 import type { McpEndpoint } from "./mcpService";
 import type { NoteWriter } from "./noteWriter";
 import { parseFrontmatter } from "./frontmatter";
+import { FOLIA_MOD_FOLDER } from "./foliaMod";
 
 /** A launch asked for: the card, the column it must still stand in, and how far it has got. */
 export interface LaunchRequest {
@@ -58,6 +59,8 @@ export interface LaunchDeps {
   vaultPath: () => string | null;
   /** The plugin's folder, as a vault path (`manifest.dir`). */
   pluginDir: string;
+  /** Write the Folia Mod into this vault path, leaving files that already say the same alone. */
+  installMod: (dir: string) => Promise<void>;
   newRunId: () => string;
 }
 
@@ -193,7 +196,7 @@ function contextFor(
     effort: agent.effort ?? "",
     args: agent.args ?? [],
     mcpUrl: url,
-    modDir: `${vaultPath}/${host.deps.pluginDir}/folia-mod`,
+    modDir: `${vaultPath}/${host.deps.pluginDir}/${FOLIA_MOD_FOLDER}`,
     runId: request.runId ?? "",
   };
 }
@@ -263,7 +266,22 @@ async function prepare(
     return null;
   }
   const folder = await workingFolder(deps, agent, file.basename);
-  return folder && { file, agent, endpoint, url, ...folder };
+  if (!folder || !host.isCurrent(request) || !(await installMod(deps, file.basename))) return null;
+  return { file, agent, endpoint, url, ...folder };
+}
+
+/** Put the Folia Mod in place for the session, or tell the user why it could not be. */
+async function installMod(deps: LaunchDeps, title: string): Promise<boolean> {
+  const dir = `${deps.pluginDir}/${FOLIA_MOD_FOLDER}`;
+  try {
+    await deps.installMod(dir);
+    return true;
+  } catch (e) {
+    deps.notify(
+      `Folia Kanban: no agent was started for "${title}": the Folia Mod could not be written to ${dir}. ${String(e)}`,
+    );
+    return false;
+  }
 }
 
 /** Fill both templates and start the command, in the same synchronous step as the last look. */

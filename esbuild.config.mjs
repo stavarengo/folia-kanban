@@ -1,7 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { builtinModules as builtins } from "node:module";
+import { resolve } from "node:path";
 
 const prod = process.argv[2] === "production";
 
@@ -16,6 +17,23 @@ const copyPluginAssets = {
       await mkdir(outDir, { recursive: true });
       await Promise.all(assets.map(({ src, dest }) => copyFile(src, `${outDir}/${dest}`)));
     });
+  },
+};
+
+// `import text from "./file?raw"` is the file's text, as Vite reads it in the tests. The Folia Mod's
+// scripts reach the vault this way, inside main.js (see src/obsidian/foliaMod.ts).
+const rawText = {
+  name: "raw-text",
+  setup(build) {
+    build.onResolve({ filter: /\?raw$/ }, (args) => ({
+      path: resolve(args.resolveDir, args.path.slice(0, -"?raw".length)),
+      namespace: "raw-text",
+    }));
+    build.onLoad({ filter: /.*/, namespace: "raw-text" }, async (args) => ({
+      contents: await readFile(args.path, "utf8"),
+      loader: "text",
+      watchFiles: [args.path],
+    }));
   },
 };
 
@@ -59,7 +77,7 @@ const context = await esbuild.context({
   treeShaking: true,
   outfile: `${outDir}/main.js`,
   minify: prod,
-  plugins: [copyPluginAssets],
+  plugins: [rawText, copyPluginAssets],
 });
 
 if (prod) {

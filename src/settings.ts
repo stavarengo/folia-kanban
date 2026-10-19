@@ -131,7 +131,7 @@ export const DEFAULT_AGENT_COMMAND = [
   '  eval "$env" || exit 1',
   '  cd "$FOLIA_CWD" || exit 1',
   '  eval "set -- $FOLIA_ARGS"',
-  '  exec claude --name "$FOLIA_CARD_SLUG" ${FOLIA_MODEL:+--model "$FOLIA_MODEL"} ${FOLIA_EFFORT:+--effort "$FOLIA_EFFORT"} "$@" -- "$FOLIA_PROMPT"\' "$buffer" "$tmux_bin" ||',
+  '  exec claude --name "$FOLIA_CARD_SLUG" --plugin-dir "$FOLIA_MOD_DIR" --settings "$FOLIA_MOD_DIR/session.json" ${FOLIA_MODEL:+--model "$FOLIA_MODEL"} ${FOLIA_EFFORT:+--effort "$FOLIA_EFFORT"} "$@" -- "$FOLIA_PROMPT"\' "$buffer" "$tmux_bin" ||',
   '  { t delete-buffer -b "$buffer" 2>/dev/null; exit 1; }',
 ].join("\n");
 
@@ -143,8 +143,8 @@ export const DEFAULT_AGENT_PROMPT = [
   "- Comment with add_comment, signed with your own name, when you start and at each milestone.",
   "- Tick subtasks with set_subtask_done as you finish them.",
   "- Never edit the card's file, or any other card file, directly. Every change goes through the MCP tools.",
-  "- When you are done, move the card with move_card to the column where it belongs.",
-  '- If you stop without moving it, say why in a comment, then clear your run marker: update_card with properties: {"agent-run": null}.',
+  "- This session stops at its next tool call once the card leaves {{column}}, whoever moves it. So when you are done, write your closing comment first, then move the card with move_card to the column where it belongs, as your very last action.",
+  '- If you stop without moving it, say why in a comment, then clear your run marker as your very last action, which ends this session too: update_card with properties: {"agent-run": null}.',
 ].join("\n");
 
 /** The range the wait before a launch is held to, in seconds. */

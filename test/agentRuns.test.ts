@@ -68,6 +68,10 @@ function harness(frontmatter = "status: todo") {
   let nextTimer = 1;
   let beforeStat: (() => Promise<void> | void) | null = null;
   let spawnImpl: ((req: SpawnRequest, onFailure: (why: string) => void) => void) | null = null;
+  const installed: string[] = [];
+  let installMod = async (dir: string): Promise<void> => {
+    installed.push(dir);
+  };
 
   // The board note's read can be held. Only the eligibility check and the launch read it, so a
   // held read stops one of those at a known point and nothing else.
@@ -96,6 +100,7 @@ function harness(frontmatter = "status: todo") {
     homedir: () => "/home/me",
     vaultPath: () => "/vault",
     pluginDir: ".obsidian/plugins/folia-kanban",
+    installMod: (dir) => installMod(dir),
     newRunId: () => `run${++runIds}`,
     platform: "linux",
     now: () => clock,
@@ -128,6 +133,10 @@ function harness(frontmatter = "status: todo") {
     failures,
     notices,
     timers,
+    installed,
+    onInstallMod(fn: (dir: string) => Promise<void>) {
+      installMod = fn;
+    },
     get notified() {
       return notified;
     },
@@ -381,6 +390,34 @@ describe("launching", () => {
     expect(req.env["FOLIA_PROMPT"]).toContain(`The card is ${ONE} on the board Board.md`);
     expect(h.fm()["agent-run"]).toMatchObject({ id: "run1", column: "review" });
     expect(h.app.vault.text(ONE)).toMatch(/Agent launch requested \(run run1\)/);
+    expect(h.runs.pending(ONE)).toBeNull();
+  });
+
+  it("puts the Folia Mod in the plugin's folder before the command starts", async () => {
+    const h = harness();
+    h.onSpawn((req) => {
+      expect(h.installed).toEqual([".obsidian/plugins/folia-kanban/folia-mod"]);
+      h.spawned.push(req);
+    });
+    await h.move("review");
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(1);
+  });
+
+  it("starts nothing, claims nothing and says why when the Folia Mod cannot be written", async () => {
+    const h = harness();
+    h.onInstallMod(async () => {
+      throw new Error("EACCES: permission denied");
+    });
+    await h.move("review");
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    expect(h.notices).toEqual([
+      'Folia Kanban: no agent was started for "One": the Folia Mod could not be written to .obsidian/plugins/folia-kanban/folia-mod. Error: EACCES: permission denied',
+    ]);
     expect(h.runs.pending(ONE)).toBeNull();
   });
 

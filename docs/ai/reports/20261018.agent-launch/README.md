@@ -29,7 +29,7 @@ A card dropped into a column that carries `agent:` starts an AI agent that works
 
 ## What the Claude Code docs say about the mod
 
-- A plugin directory cannot set `statusLine`; only `agent` and `subagentStatusLine` are honoured from a plugin's settings. The status line goes through `--settings '{"statusLine":{"type":"command","command":"<absolute path to the mod's script>"}}'`, which the default command template passes. Source: code.claude.com/docs/en/statusline, plugins/manifest-reference.
+- A plugin directory cannot set `statusLine`; only `agent` and `subagentStatusLine` are honoured from a plugin's settings. The status line goes through `--settings`, which the default command template passes. As built (#145) that is a settings file the mod ships, `--settings "$FOLIA_MOD_DIR/session.json"`, holding the `statusLine` entry. Source: code.claude.com/docs/en/statusline, plugins/manifest-reference.
 - A plugin's `.mcp.json` at the plugin root expands `${VAR}` in `url` and `headers`, so `"Authorization": "Bearer ${FOLIA_MCP_TOKEN}"` works and no `--mcp-config` is needed. Always set `"type": "http"`. Do not give the variable one of the credential names Claude Code blanks out in remote server config, such as `NPM_TOKEN`; the MCP docs list them. Source: docs/en/mcp#plugin-provided-mcp-servers.
 - A `PreToolUse` or `PostToolUse` hook returning `{"continue": false, "stopReason": "…"}` stops Claude without killing the process. `${CLAUDE_PLUGIN_ROOT}` resolves inside a plugin's `hooks/hooks.json`. Source: docs/en/hooks#json-output.
 
