@@ -99,7 +99,7 @@ describe("the Folia Mod's files", () => {
     const plugin = parsed(".claude-plugin/plugin.json") as { name: string };
     expect(parsed("session.json")).toEqual({
       statusLine: { type: "command", command: 'sh "$FOLIA_MOD_DIR/scripts/status-line.sh"' },
-      permissions: { allow: [`mcp__plugin_${plugin.name}_folia-kanban`] },
+      permissions: { allow: [`mcp__plugin_${plugin.name}_folia-kanban`, "mcp__folia-kanban"] },
     });
     expect(FOLIA_MOD_FILES).toHaveProperty(["scripts/status-line.sh"]);
   });
@@ -312,13 +312,38 @@ describe("the scripts", () => {
     expect(stopReason(hook("One.md", "review"))).toMatch(/another session/);
   });
 
-  it("keeps following the renamed card when a new note takes its old name", () => {
-    card("Renamed.md", ONE);
+  it("takes the note at the launch path for the card whenever there is one", () => {
+    // A copy of the card keeps its marker; the agent's own clear, on the card, still ends it.
+    card("One 1.md", ONE);
     card("One.md", "---\nstatus: review\n---\n");
-    expect(hook("One.md", "review")).toBe("");
-    card("Renamed.md", ONE.replace('"review"', "done"));
-    card("One.md", "---\nstatus: review\n---\n");
-    expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
+    expect(stopReason(hook("One.md", "review"))).toMatch(
+      /no longer carries this session's run marker/,
+    );
+  });
+
+  it.each([
+    ["3-review", "3-review", ""],
+    ["4-done", "3-review", "now in 4-done"],
+  ])("reads the plain %s as text, not as a number", (value, column, reason) => {
+    card("One.md", `---\nstatus: ${value}\nagent-run: { id: abc123 }\n---\n`);
+    const out = hook("One.md", column);
+    if (reason) expect(stopReason(out)).toContain(reason);
+    else expect(out).toBe("");
+  });
+
+  it("never stops a session because awk itself failed", () => {
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "awk"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    card("One.md", ONE);
+    const out = run("stop-hook.sh", {
+      PATH: `${bin}:${process.env["PATH"] ?? "/usr/bin:/bin"}`,
+      FOLIA_CARD_FILE: join(cards, "One.md"),
+      FOLIA_CARD: "Cards/One.md",
+      FOLIA_COLUMN: "review",
+      FOLIA_RUN_ID: "abc123",
+    });
+    expect(out).toBe("");
   });
 
   it("keeps the stop reason valid JSON whatever the names hold", () => {

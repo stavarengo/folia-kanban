@@ -1,16 +1,17 @@
 # A PreToolUse hook: before each tool call, read the card this session was started for and end the
 # session when the card is no longer its to work on. Pull only: the card file is the whole channel.
 #
-# The card is the note at the launch path, or the note in the same folder that carries this run's
-# id in `agent-run` when that one does not (a rename). The session goes on while the card's
+# The card is the note at the launch path, or, once nothing is there (a rename), the note in the
+# same folder that carries this run's id in `agent-run`. The session goes on while the card's
 # `status` names the agent column and the card carries this run's marker. Every way a card stops
 # being a session's takes the marker away (the board clears it when the card leaves the column, the
-# agent clears it as its last step when it stops without moving the card), so a card nowhere
-# carrying this run's marker ends the session too. A value written in YAML this cannot read is no
-# reason to stop, and a stop is decided twice, a moment apart, so a note caught halfway through
-# being written does not end a session.
+# agent clears it as its last step when it stops without moving the card), so a card that no
+# longer carries this run's marker ends the session too. A value written in YAML this cannot read
+# is no reason to stop, and a stop is decided twice, a moment apart, so a note caught halfway
+# through being written does not end a session.
 
 cat >/dev/null
+awk 'BEGIN { exit 0 }' </dev/null || exit 0
 
 card_file=${FOLIA_CARD_FILE-}
 [ -n "$card_file" ] || exit 0
@@ -64,7 +65,8 @@ frontmatter() {
       lower = tolower(v)
       if (lower == "true" || lower == "false") return lower
       if (lower == "null" || v == "~") return ""
-      if (v ~ /^[-+]?[.0-9]/ && v !~ /^(0|[1-9][0-9]*)$/) unreadable = 1
+      # A number YAML would read and the board would print differently (`2.50`, `0x1f`, `1e3`).
+      if (v !~ /^(0|[1-9][0-9]*)$/ && (v ~ /^[-+]?(\.[0-9]|[0-9])[0-9_]*(\.[0-9_]*)?([eE][-+]?[0-9]+)?$/ || v ~ /^[-+]?0[xXoObB][0-9a-fA-F_]+$/ || lower ~ /^[-+]?\.(inf|nan)$/)) unreadable = 1
       plain = 1
       return v
     }
@@ -134,45 +136,39 @@ left() {
   [ "$status" != "$column" ]
 }
 
-left_reason() {
-  if [ -n "$status" ]; then
-    echo "the card \"$card_name\" left the column $column; it is now in $status."
-  else
-    echo "the card \"$card_name\" left the column $column and has no status now."
-  fi
-}
-
-# Why the session has to stop, or nothing when it may go on. The note at the launch path is read
-# first: when it has left the column the session stops, even if a copy of it elsewhere still
-# carries the marker. Otherwise the card is that note when it carries this run's marker, or the
-# note in the same folder that does (a rename).
+# Why the session has to stop, or nothing when it may go on. The note at the launch path is the
+# card whenever it is there; the rest of the folder is looked through only when it is not, for the
+# note carrying this run's marker (a rename). An `awk` that fails is no reason to stop.
 verdict() {
-  line=""
   if [ -f "$card_file" ]; then
-    line=$(frontmatter "$card_file")
+    line=$(frontmatter "$card_file") || return 0
     # Readable, with a block still being written or none at all: no status.
     [ -n "$line" ] || line="$card_file$tab$tab$tab"
-    fields "$line"
-    if left; then
-      left_reason
-      return
+  elif [ -n "$run_id" ]; then
+    set -- "${card_file%/*}"/*.md
+    line=""
+    if [ -e "$1" ]; then
+      line=$(frontmatter "$@" | awk -F '\t' -v run="$run_id" '$3 == run { print; exit }') || return 0
     fi
-    [ -n "$run_id" ] || return 0
-    [ "$id" != "$run_id" ] || return 0
-    case $flag in *m*) return 0 ;; esac
-  elif [ -z "$run_id" ]; then
-    echo "the card \"$card_name\" is gone or was moved away."
-    return
-  fi
-  mine=$(frontmatter "${card_file%/*}"/*.md | awk -F '\t' -v run="$run_id" '$3 == run { print; exit }')
-  if [ -n "$mine" ]; then
-    fields "$mine"
-    if left; then left_reason; fi
-    return 0
+  else
+    line=""
   fi
   if [ -z "$line" ]; then
     echo "the card \"$card_name\" is gone or was moved away."
-  elif [ -n "$id" ]; then
+    return
+  fi
+  fields "$line"
+  if left; then
+    if [ -n "$status" ]; then
+      echo "the card \"$card_name\" left the column $column; it is now in $status."
+    else
+      echo "the card \"$card_name\" left the column $column and has no status now."
+    fi
+    return
+  fi
+  [ -n "$run_id" ] && [ "$id" != "$run_id" ] || return 0
+  case $flag in *m*) return 0 ;; esac
+  if [ -n "$id" ]; then
     echo "the card \"$card_name\" went out of the column $column and back in, and another session now works on it."
   else
     echo "the card \"$card_name\" no longer carries this session's run marker (agent-run)."

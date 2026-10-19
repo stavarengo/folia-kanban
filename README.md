@@ -339,7 +339,7 @@ claude mcp add --scope user --transport http folia-kanban http://127.0.0.1:27125
   --header "Authorization: Bearer PASTE_YOUR_TOKEN_HERE"
 ```
 
-The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/mcp.md).
+Sessions an [agent column](#agents-in-columns) starts need none of this; a registration of your own takes the place of theirs, so keep its token current. The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/mcp.md).
 
 ## Agents in columns
 

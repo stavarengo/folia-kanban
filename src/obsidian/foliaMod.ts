@@ -51,10 +51,12 @@ export const FOLIA_MOD_FILES: Readonly<Record<string, string>> = {
     },
   }),
   // What a plugin cannot set for itself, passed with `--settings`. `$FOLIA_MOD_DIR` is expanded
-  // by the shell the status line runs in, so no path has to be written into JSON.
+  // by the shell the status line runs in, so no path has to be written into JSON. The board's
+  // tools run unprompted under the mod's server name, and under the bare name docs/mcp.md has
+  // people register it with by hand: Claude Code keeps one server per URL and lets that one win.
   "session.json": json({
     statusLine: { type: "command", command: 'sh "$FOLIA_MOD_DIR/scripts/status-line.sh"' },
-    permissions: { allow: [`mcp__plugin_${PLUGIN_NAME}_${SERVER_NAME}`] },
+    permissions: { allow: [`mcp__plugin_${PLUGIN_NAME}_${SERVER_NAME}`, `mcp__${SERVER_NAME}`] },
   }),
   "scripts/stop-hook.sh": stopHook,
   "scripts/status-line.sh": statusLine,
