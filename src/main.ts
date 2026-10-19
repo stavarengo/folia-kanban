@@ -389,6 +389,19 @@ export default class FoliaKanbanPlugin extends Plugin {
     return key in this.stored;
   }
 
+  /** Take settings out of what is kept, so each answers with its default again — the default as
+   *  this build or any later one ships it. Nothing is written when none of them was set. */
+  async resetSettings(keys: (keyof KanbanSettings)[]): Promise<void> {
+    const set = keys.filter((key) => key in this.stored);
+    if (set.length === 0) return;
+    const next: StoredSettings = { ...this.stored };
+    for (const key of set) delete next[key];
+    this.stored = next;
+    this.settings = resolveSettings(this.stored);
+    this.refreshViews();
+    await this.saveSettings();
+  }
+
   private applyToStored(patch: Partial<KanbanSettings>): boolean {
     if (Object.keys(patch).length === 0) return false;
     this.stored = { ...this.stored, ...patch };

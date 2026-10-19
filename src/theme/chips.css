@@ -51,3 +51,35 @@
 .folia-scope .folia-chip-warn { color: color-mix(in srgb, var(--color-orange) 50%, var(--text-normal)); background: color-mix(in oklch, var(--color-orange) 20%, transparent); border-color: color-mix(in oklch, var(--color-orange) 32%, transparent); }
 .folia-scope .folia-chip-accent { color: color-mix(in srgb, var(--interactive-accent) 55%, var(--text-normal)); background: color-mix(in oklch, var(--interactive-accent) 18%, transparent); border-color: color-mix(in oklch, var(--interactive-accent) 32%, transparent); }
 .folia-scope .folia-chip-muted { color: var(--text-muted); background: var(--background-modifier-hover); }
+
+/* ------------------------------------------------------------ agent launch */
+/* The countdown a card shows between entering an agent column and its agent starting. It sits
+   under the card's face, outside it, so it lines up with the face's own padding; Cancel and Now are
+   in-text links, the way the board draws every small action that belongs to a sentence. */
+.folia-scope .folia-agent-pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--size-4-1);
+  margin: calc(-1 * var(--size-4-1)) 0 0;
+  padding: 0 var(--folia-card-pad-x) var(--size-4-2);
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+
+/* The settings tab is the host's, outside the board's scope. A template row stacks its text area
+   under the description at full width: a shell command squeezed into the control column wraps
+   every line and stops reading as one. */
+.folia-setting-template.setting-item {
+  flex-wrap: wrap;
+}
+.folia-setting-template .setting-item-control {
+  flex: 1 1 100%;
+}
+.folia-setting-template textarea {
+  width: 100%;
+  /* The same stack inline code in a card uses, for the same reason (see detail-panel.css). */
+  font-family:
+    var(--font-monospace-theme), SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono",
+    "Liberation Mono", Menlo, Monaco, Consolas, "Source Code Pro", monospace;
+}

@@ -17,7 +17,13 @@ import {
   type EditableSettingKey,
   type RowControlSpec,
 } from "../settingsLayout";
-import { MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "../settings";
+import {
+  AGENT_DELAY_MAX,
+  DEFAULT_SETTINGS,
+  MCP_PORT_MAX,
+  MCP_PORT_MIN,
+  type KanbanSettings,
+} from "../settings";
 
 type ToggleKey = (typeof TOGGLE_SETTING_KEYS)[number];
 
@@ -33,8 +39,30 @@ export interface SettingTabActions {
   renderHeldField: (key: HeldFieldKey, setting: Setting) => void;
 }
 
-/** The two fields that are held while they are being typed into rather than written through. */
-export type HeldFieldKey = "mcpPort" | "mcpBindAddress";
+/** The fields that are held while they are being typed into rather than written through. */
+export type HeldFieldKey = "mcpPort" | "mcpBindAddress" | TemplateKey;
+
+/** The two templates, drawn as text areas: a command or a prompt is many lines, and every
+ *  keystroke written through would be a half-written command a launch could pick up. */
+export type TemplateKey = "agentCommand" | "agentPrompt";
+
+export const isTemplateKey = (key: string): key is TemplateKey =>
+  key === "agentCommand" || key === "agentPrompt";
+
+/**
+ * What leaving a template field means: `"reset"` for a field emptied or put back to the default,
+ * which takes the stored value out so a release that improves the default reaches this install;
+ * the patch for a value of the user's own; `null` when there is nothing to write.
+ */
+export function templateFieldOutcome(
+  key: TemplateKey,
+  typed: string,
+  settings: KanbanSettings,
+  alreadySet: boolean,
+): Partial<KanbanSettings> | "reset" | null {
+  if (typed.trim() === "" || typed === DEFAULT_SETTINGS[key]) return alreadySet ? "reset" : null;
+  return typed === settings[key] ? null : { [key]: typed };
+}
 
 /** What the bind-address field says when what is in it is not an address. */
 export const MCP_BIND_ADDRESS_INVALID =
@@ -45,7 +73,7 @@ export const MCP_BIND_ADDRESS_INVALID =
 export const MCP_PORT_INVALID = `Not a port. Use a number between ${MCP_PORT_MIN} and ${MCP_PORT_MAX}.`;
 
 /** What a field says about a value it refused, when the refusal is worth naming. */
-const HELD_FIELD_INVALID: Record<HeldFieldKey, string> = {
+const HELD_FIELD_INVALID: Record<Exclude<HeldFieldKey, TemplateKey>, string> = {
   mcpPort: MCP_PORT_INVALID,
   mcpBindAddress: MCP_BIND_ADDRESS_INVALID,
 };
@@ -84,7 +112,7 @@ export interface HeldFieldOutcome {
  * deliberately put there.
  */
 export function heldFieldOutcome(
-  key: HeldFieldKey,
+  key: Exclude<HeldFieldKey, TemplateKey>,
   typed: string,
   settings: KanbanSettings,
   alreadySet: boolean,
@@ -136,6 +164,7 @@ export function settingsPatchFor(key: string, value: unknown): Partial<KanbanSet
   if (isToggleKey(key)) return typeof value === "boolean" ? { [key]: value } : null;
   if (key === "userName") return typeof value === "string" ? { userName: value.trim() } : null;
   if (key === "mcpBindAddress") return bindAddressPatchFor(value);
+  if (isTemplateKey(key)) return typeof value === "string" ? { [key]: value } : null;
   return numberPatchFor(key, value) ?? dropdownPatchFor(key, value);
 }
 
@@ -154,6 +183,7 @@ function bindAddressPatchFor(value: unknown): Partial<KanbanSettings> | null {
 const NUMBER_RANGES = {
   cardNextTodos: [0, CARD_NEXT_TODOS_MAX],
   mcpPort: [MCP_PORT_MIN, MCP_PORT_MAX],
+  agentDelay: [0, AGENT_DELAY_MAX],
 } as const satisfies Partial<Record<EditableSettingKey, readonly [number, number]>>;
 
 /** The patch a numeric setting's new value means, or `null` when `key` is not one, or not a number. */

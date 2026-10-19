@@ -1,7 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_AGENT_COMMAND,
+  DEFAULT_AGENT_PROMPT,
   DEFAULT_SETTINGS,
   adoptExternalSettings,
   SETTINGS_FORMAT,
@@ -571,5 +574,54 @@ describe("the plugin reacts to an external settings change", () => {
 
   it("writes back only what this instance decided, never a copy of what it just read", () => {
     expect(adopt).toContain("if (write) void this.saveSettings();");
+  });
+});
+
+describe("the agents-in-columns settings", () => {
+  it("start from the default command, the default prompt and a ten-second wait", () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      agentCommand: DEFAULT_AGENT_COMMAND,
+      agentPrompt: DEFAULT_AGENT_PROMPT,
+      agentDelay: 10,
+    });
+    // Sparse: an install that never edits them keeps following whatever a release ships.
+    expect(hydrateSettings(null, NOW).stored).not.toHaveProperty("agentCommand");
+  });
+
+  // The default command is a shell script, so a typo in it is a launch that never starts.
+  it("ships a default command the shell can parse, that never names the user's own tmux", () => {
+    expect(() => execFileSync("/bin/sh", ["-n", "-c", DEFAULT_AGENT_COMMAND])).not.toThrow();
+    for (const line of DEFAULT_AGENT_COMMAND.split("\n").filter((l) => /\btmux\b|\bt /.test(l)))
+      expect(line, line).not.toMatch(/(^|[;|&(]\s*)tmux\s/);
+    expect(DEFAULT_AGENT_COMMAND).not.toMatch(/--plugin-dir|--settings/);
+    expect(DEFAULT_AGENT_COMMAND).not.toMatch(/\{\{/);
+  });
+
+  it.each([
+    [{ agentCommand: 42 }, "agentCommand"],
+    [{ agentPrompt: null }, "agentPrompt"],
+    [{ agentDelay: 61 }, "agentDelay"],
+    [{ agentDelay: -1 }, "agentDelay"],
+    [{ agentDelay: 2.5 }, "agentDelay"],
+    [{ agentDelay: "10" }, "agentDelay"],
+  ] as const)("drops %o at load and when a synced file brings it", (bad, key) => {
+    const loaded = hydrateSettings({ ...onDisk({ commentsBaseline: NOW }), ...bad }, NOW);
+    expect(loaded.stored).not.toHaveProperty(key);
+    expect(loaded.needsSave).toBe(true);
+    const adopted = adoptExternalSettings(
+      { ...onDisk({ commentsBaseline: NOW }), ...bad },
+      { commentsBaseline: NOW },
+      NOW,
+    );
+    expect(adopted.stored).not.toHaveProperty(key);
+    expect(adopted.settings[key]).toEqual(DEFAULT_SETTINGS[key]);
+  });
+
+  it("keeps values that are values, an empty template and a zero wait included", () => {
+    const { stored } = hydrateSettings(
+      { ...onDisk({ commentsBaseline: NOW }), agentCommand: "", agentPrompt: "go", agentDelay: 0 },
+      NOW,
+    );
+    expect(stored).toMatchObject({ agentCommand: "", agentPrompt: "go", agentDelay: 0 });
   });
 });
