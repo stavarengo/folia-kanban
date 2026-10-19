@@ -144,7 +144,7 @@ export const DEFAULT_AGENT_PROMPT = [
   "- Tick subtasks with set_subtask_done as you finish them.",
   "- Never edit the card's file, or any other card file, directly. Every change goes through the MCP tools.",
   "- This session stops at its next tool call once the card leaves {{column}}, whoever moves it. So when you are done, write your closing comment first, then move the card with move_card to the column where it belongs, as your very last action.",
-  '- If you stop without moving it, say why in a comment, then clear your run marker: update_card with properties: {"agent-run": null}.',
+  '- If you stop without moving it, say why in a comment, then clear your run marker as your very last action, which ends this session too: update_card with properties: {"agent-run": null}.',
 ].join("\n");
 
 /** The range the wait before a launch is held to, in seconds. */

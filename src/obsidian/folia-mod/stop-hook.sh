@@ -1,11 +1,13 @@
 # A PreToolUse hook: before each tool call, read the card this session was started for and end the
 # session when the card is no longer its to work on. Pull only: the card file is the whole channel.
 #
-# The card is the note that carries this run's id in `agent-run` (found in the folder it was
-# launched from, so a rename is followed), or else the note it was last seen at, or the note at
-# the path it was launched with. It is the session's while its `status` names the agent column
-# and its marker, when it has one, names this run. A value written in YAML this cannot read is no reason to stop, and a stop is decided
-# twice, a moment apart, so a note caught halfway through being written does not end a session.
+# The card is the note in its folder that carries this run's id in `agent-run`, so a rename is
+# followed. It is the session's while that note's `status` names the agent column. Every way a
+# card stops being the session's takes the marker away (the board clears it when the card leaves
+# the column, and the agent clears it as its last step when it stops without moving the card), so
+# a card nowhere carrying this run's marker ends the session too. A value written in YAML this
+# cannot read is no reason to stop, and a stop is decided twice, a moment apart, so a note caught
+# halfway through being written does not end a session.
 
 cat >/dev/null
 
@@ -103,37 +105,29 @@ frontmatter() {
   ' "$@" 2>/dev/null
 }
 
-# Where this run's card was last seen carrying its marker, so a card renamed and then moved out
-# of the column (which takes the marker away) is not mistaken for a new note at its old path.
-seen_at=""
-case $run_id in
-  "" | *[!A-Za-z0-9]*) ;;
-  *) seen_at="${TMPDIR:-/tmp}/folia-mod-run-$run_id" ;;
-esac
-
-# The card as it stands: a frontmatter line as above, or nothing when it is nowhere to be found.
+# The card as it stands: the note in the card's folder that carries this run's marker, looking at
+# the launch path first and in the rest of the folder only when that note is not it (a rename), or
+# else the note at the launch path, or nothing when there is none.
 card() {
   line=""
-  [ -f "$card_file" ] && line=$(frontmatter "$card_file")
-  # The usual case, and the only one that reads a single file: the card where it was, still ours.
-  case $line in *"$tab$run_id$tab"*) [ -n "$run_id" ] && printf '%s\n' "$line" && return ;; esac
+  if [ -f "$card_file" ]; then
+    line=$(frontmatter "$card_file")
+    # Readable, with a block still being written or none at all: no status.
+    [ -n "$line" ] || line="$card_file$tab$tab$tab"
+  fi
   if [ -n "$run_id" ]; then
+    case $line in *"$tab$run_id$tab"*)
+      printf '%s\n' "$line"
+      return
+      ;;
+    esac
     mine=$(frontmatter "${card_file%/*}"/*.md | awk -F '\t' -v run="$run_id" '$3 == run { print; exit }')
     if [ -n "$mine" ]; then
-      [ -z "$seen_at" ] || printf '%s\n' "${mine%%"$tab"*}" >"$seen_at" 2>/dev/null
       printf '%s\n' "$mine"
       return
     fi
   fi
-  path=$card_file
-  if [ -n "$seen_at" ] && [ -f "$seen_at" ]; then
-    read -r path <"$seen_at" || path=$card_file
-  fi
-  [ -f "$path" ] || return 0
-  [ "$path" = "$card_file" ] || line=$(frontmatter "$path")
-  # Readable, with a block still being written or none at all: no status.
-  [ -n "$line" ] || line="$path$tab$tab$tab"
-  printf '%s\n' "$line"
+  [ -z "$line" ] || printf '%s\n' "$line"
 }
 
 # Why the session has to stop, or nothing when it may go on.
@@ -156,8 +150,11 @@ verdict() {
     fi
     return
   fi
-  if [ -n "$id" ] && [ -n "$run_id" ] && [ "$id" != "$run_id" ]; then
+  [ -n "$run_id" ] && [ "$id" != "$run_id" ] || return 0
+  if [ -n "$id" ]; then
     echo "the card \"$card_name\" went out of the column $column and back in, and another session now works on it."
+  else
+    echo "the card \"$card_name\" no longer carries this session's run marker (agent-run)."
   fi
 }
 

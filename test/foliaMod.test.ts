@@ -128,7 +128,7 @@ describe("the scripts", () => {
   function run(script: string, env: Record<string, string>): string {
     return execFileSync("/bin/sh", [join(root, "mod", "scripts", script)], {
       input: '{"hook_event_name":"PreToolUse","tool_name":"Bash"}',
-      env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", TMPDIR: root, ...env },
+      env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", ...env },
       encoding: "utf8",
     });
   }
@@ -185,9 +185,11 @@ describe("the scripts", () => {
     expect(stopReason(hook("One.md", "review"))).toMatch(/another session now works on it/);
   });
 
-  it("goes on once its own marker is cleared, which the agent does when it stops", () => {
+  it("stops once the card no longer carries its marker, which the agent clears as its last step", () => {
     card("One.md", "---\nstatus: review\n---\n");
-    expect(hook("One.md", "review")).toBe("");
+    expect(stopReason(hook("One.md", "review"))).toBe(
+      'Folia: the card "One" no longer carries this session\'s run marker (agent-run). This session stops here.',
+    );
   });
 
   it.each([
@@ -210,7 +212,7 @@ describe("the scripts", () => {
   });
 
   it("reads only the frontmatter block, never a status line in the body", () => {
-    card("One.md", "---\nstatus: review\n---\nstatus: done\n");
+    card("One.md", "---\nstatus: review\nagent-run: { id: abc123 }\n---\nstatus: done\n");
     expect(hook("One.md", "review")).toBe("");
   });
 
@@ -222,13 +224,14 @@ describe("the scripts", () => {
     expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
   });
 
-  it("does not take a new note at the old name for the renamed card once its marker is cleared", () => {
-    card("Renamed.md", ONE);
-    card("One.md", "---\nstatus: review\n---\n");
-    expect(hook("One.md", "review")).toBe("");
-    // Moved out: the board clears the marker, so only the remembered path still leads to it.
+  it("does not take a new note at the old name for the renamed card once it has left", () => {
+    // Renamed, a new note given the old name, and moved out, all between two tool calls: the
+    // board clears the marker on the way out, so no note carries this run any more.
     card("Renamed.md", "---\nstatus: done\n---\n");
-    expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
+    card("One.md", "---\nstatus: review\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(
+      /no longer carries this session's run marker/,
+    );
   });
 
   it("reads a marker block with blank lines and comments in it", () => {
