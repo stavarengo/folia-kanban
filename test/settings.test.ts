@@ -594,6 +594,8 @@ describe("the agents-in-columns settings", () => {
     for (const line of DEFAULT_AGENT_COMMAND.split("\n").filter((l) => /\btmux\b|\bt /.test(l)))
       expect(line, line).not.toMatch(/(^|[;|&(]\s*)tmux\s/);
     expect(DEFAULT_AGENT_COMMAND).not.toMatch(/--plugin-dir|--settings/);
+    // The user's tmux.conf, and the plugins it loads, are kept out of the plugin's own server.
+    expect(DEFAULT_AGENT_COMMAND).toContain("-L folia -f /dev/null new-session -d -s agents");
     expect(DEFAULT_AGENT_COMMAND).not.toMatch(/\{\{/);
   });
 

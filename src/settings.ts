@@ -98,6 +98,10 @@ export interface KanbanSettings {
  * window for the card in the `agents` session of a tmux server the plugin owns (`tmux -L folia`),
  * so the session has a terminal, outlives Obsidian and never lands on the user's own tmux server.
  *
+ * The server starts with `-f /dev/null`: the user's `~/.tmux.conf` is for their own server, and
+ * a plugin it loads (tmux-resurrect, tmux-continuum) would otherwise restore their sessions into this
+ * one, or save this one over theirs, through plain `tmux` calls that reach whichever server runs them.
+ *
  * No value goes on tmux's own command line, where an argument ending in `;` is a command separator
  * however it was quoted: the context, the token and the repaired `PATH` travel in a paste buffer
  * read from stdin, which the window reads, deletes and `eval`s. The window's first tmux calls use
@@ -109,7 +113,7 @@ export const DEFAULT_AGENT_COMMAND = [
   'command -v claude >/dev/null || { echo "claude not found on PATH" >&2; exit 127; }',
   't() { "$tmux_bin" -L folia "$@"; }',
   "t has-session -t =agents 2>/dev/null ||",
-  '  (for v in $(env | sed -n \'s/^\\(FOLIA_[A-Z_]*\\)=.*/\\1/p\'); do unset "$v"; done; exec "$tmux_bin" -L folia new-session -d -s agents 2>/dev/null) ||',
+  '  (for v in $(env | sed -n \'s/^\\(FOLIA_[A-Z_]*\\)=.*/\\1/p\'); do unset "$v"; done; exec "$tmux_bin" -L folia -f /dev/null new-session -d -s agents 2>/dev/null) ||',
   "  t has-session -t =agents || exit 1",
   't set-option -g remain-on-exit failed || { echo "this tmux cannot keep failed windows (remain-on-exit failed)" >&2; exit 1; }',
   'buffer="folia-$FOLIA_RUN_ID"',
