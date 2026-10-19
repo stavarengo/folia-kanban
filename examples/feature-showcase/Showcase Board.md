@@ -10,6 +10,8 @@ priorities:
 relations:
   - key: a-result-of
     inverse: results-in
+agent:
+  effort: medium
 columns:
   - todo
   - id: next
@@ -24,6 +26,8 @@ columns:
     title: In Review
     color: purple
     group: due
+    agent:
+      model: sonnet
   - id: focus
     title: ⭐ A-priority lane
     color: red

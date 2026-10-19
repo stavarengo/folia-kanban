@@ -2,6 +2,9 @@
 status: review
 priority: A
 tags: review
+agent-run:
+  id: 2b8d04f1
+  started: 2026-10-18 15:02
 ---
 
 # Review PR - filter lanes
