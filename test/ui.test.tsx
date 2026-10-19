@@ -5,7 +5,7 @@ import { act, cleanup, render, screen, within, waitFor, fireEvent } from "@testi
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
-import { fakeDetailModals, testHost } from "./fakeHost";
+import { fakeDetailModals, fakeLaunches, testHost } from "./fakeHost";
 import type { BoardConfig } from "../src/model/types";
 import { applySettingsPatch, type BoardSettings } from "../src/settings";
 import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
@@ -64,6 +64,7 @@ function fakeHost() {
     },
     bound: () => onSlash !== null,
     ...fakeDetailModals(),
+    agents: fakeLaunches().agents,
   };
 }
 
@@ -1200,6 +1201,8 @@ describe("property names suggest themselves (20260827.08)", () => {
       "created",
       "tags",
       "context",
+      "agent",
+      "agent-run",
       "blocks",
       "blocked-by",
       "energy",

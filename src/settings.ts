@@ -81,7 +81,67 @@ export interface KanbanSettings {
    * in this vault. See `docs/mcp.md`.
    */
   mcpBindAddress: string;
+  /**
+   * The shell command a card entering an agent column starts, run by `/bin/sh -c` in the column's
+   * `cwd`, detached from Obsidian. `{{name}}` placeholders become shell words; the same context
+   * arrives as `FOLIA_*` variables, the token only as `FOLIA_MCP_TOKEN`. See `docs/agents.md`.
+   */
+  agentCommand: string;
+  /** The prompt handed to that command as `{{prompt}}` and `FOLIA_PROMPT`, placeholders filled. */
+  agentPrompt: string;
+  /** Seconds a launch waits, with Cancel and Now on the tile, before it starts. 0 starts at once. */
+  agentDelay: number;
 }
+
+/**
+ * The command a card entering an agent column runs unless the user wrote their own. It opens a
+ * window for the card in the `agents` session of a tmux server the plugin owns (`tmux -L folia`),
+ * so the session has a terminal, outlives Obsidian and never lands on the user's own tmux server.
+ *
+ * No value goes on tmux's own command line, where an argument ending in `;` is a command separator
+ * however it was quoted: the context, the token and the repaired `PATH` travel in a paste buffer
+ * read from stdin, which the window reads, deletes and `eval`s. The window's first tmux calls use
+ * the absolute path found here, because a server started earlier may have a `PATH` without tmux.
+ */
+export const DEFAULT_AGENT_COMMAND = [
+  'PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"',
+  'tmux_bin=$(command -v tmux) || { echo "tmux not found on PATH" >&2; exit 127; }',
+  'command -v claude >/dev/null || { echo "claude not found on PATH" >&2; exit 127; }',
+  't() { "$tmux_bin" -L folia "$@"; }',
+  "t has-session -t =agents 2>/dev/null ||",
+  '  (for v in $(env | sed -n \'s/^\\(FOLIA_[A-Z_]*\\)=.*/\\1/p\'); do unset "$v"; done; exec "$tmux_bin" -L folia new-session -d -s agents 2>/dev/null) ||',
+  "  t has-session -t =agents || exit 1",
+  't set-option -g remain-on-exit failed || { echo "this tmux cannot keep failed windows (remain-on-exit failed)" >&2; exit 1; }',
+  'buffer="folia-$FOLIA_RUN_ID"',
+  "{ printf '%s\\n' \"$FOLIA_EXPORTS\"",
+  '  printf "export PATH=\'%s\'\\n" "$(printf %s "$PATH" | sed "s/\'/\'\\\\\\\\\'\'/g")"',
+  '  printf "export FOLIA_MCP_TOKEN=\'%s\'\\n" "$FOLIA_MCP_TOKEN"',
+  '} | t load-buffer -b "$buffer" - || exit 1',
+  '(sleep 30; t delete-buffer -b "$buffer") >/dev/null 2>&1 &',
+  't new-window -d -t =agents: -n "$FOLIA_CARD_SLUG" -- /bin/sh -c \'',
+  '  env=$("$1" -L folia show-buffer -b "$0") || { echo "Folia: no context for this run" >&2; exit 1; }',
+  '  "$1" -L folia delete-buffer -b "$0" || echo "Folia: could not delete the token buffer; a scheduled cleanup will retry" >&2',
+  '  eval "$env" || exit 1',
+  '  cd "$FOLIA_CWD" || exit 1',
+  '  eval "set -- $FOLIA_ARGS"',
+  '  exec claude --name "$FOLIA_CARD_SLUG" ${FOLIA_MODEL:+--model "$FOLIA_MODEL"} ${FOLIA_EFFORT:+--effort "$FOLIA_EFFORT"} "$@" "$FOLIA_PROMPT"\' "$buffer" "$tmux_bin" ||',
+  '  { t delete-buffer -b "$buffer" 2>/dev/null; exit 1; }',
+].join("\n");
+
+/** The prompt unless the user wrote their own: the contract a launched agent works under. */
+export const DEFAULT_AGENT_PROMPT = [
+  "You are working on one card of a Folia Kanban board, as a member of the team. The card is {{card}} on the board {{board}}, and it is in the column {{column}}. Your run id is {{runId}}.",
+  "Use the folia-kanban MCP server for everything you do on the board, and start by reading the card with get_card.",
+  "- Assign yourself under your own name, not the user's: update_card with properties.assignee, keeping anyone already assigned (read the current value and write back the whole list).",
+  "- Comment with add_comment, signed with your own name, when you start and at each milestone.",
+  "- Tick subtasks with set_subtask_done as you finish them.",
+  "- Never edit the card's file, or any other card file, directly. Every change goes through the MCP tools.",
+  "- When you are done, move the card with move_card to the column where it belongs.",
+  '- If you stop without moving it, say why in a comment, then clear your run marker: update_card with properties: {"agent-run": null}.',
+].join("\n");
+
+/** The range the wait before a launch is held to, in seconds. */
+export const AGENT_DELAY_MAX = 60;
 
 /** What a board reads and writes: the settings, plus what this device keeps for itself. One object,
  *  so the board never has to know which of the two stores a value lives in; the plugin splits
@@ -130,6 +190,9 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   mcpEnabled: false,
   mcpPort: MCP_DEFAULT_PORT,
   mcpBindAddress: MCP_DEFAULT_BIND_ADDRESS,
+  agentCommand: DEFAULT_AGENT_COMMAND,
+  agentPrompt: DEFAULT_AGENT_PROMPT,
+  agentDelay: 10,
 };
 
 /** Where the bearer token used to live: an ordinary settings key, written to `data.json` in the
@@ -274,7 +337,26 @@ function dropUnusable(stored: StoredSettings): boolean {
     !(typeof stored.mcpBindAddress === "string" && isBindAddress(stored.mcpBindAddress))
   )
     drop("mcpBindAddress");
+  for (const key of unusableAgentKeys(stored)) drop(key);
   return dropped;
+}
+
+/** The agent settings a stored set holds unusable values for. A launch fills the templates in and
+ *  runs one of them, so anything but text is no template at all; the wait is whole seconds. */
+function unusableAgentKeys(stored: StoredSettings): (keyof KanbanSettings)[] {
+  const delay: unknown = stored.agentDelay;
+  const usable = {
+    agentCommand: typeof stored.agentCommand === "string",
+    agentPrompt: typeof stored.agentPrompt === "string",
+    agentDelay:
+      typeof delay === "number" &&
+      Number.isInteger(delay) &&
+      delay >= 0 &&
+      delay <= AGENT_DELAY_MAX,
+  };
+  return (Object.keys(usable) as (keyof typeof usable)[]).filter(
+    (key) => key in stored && !usable[key],
+  );
 }
 
 /**

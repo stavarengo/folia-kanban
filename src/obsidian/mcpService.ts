@@ -14,6 +14,7 @@ import type { ServerInfo } from "../mcp/protocol";
 import { startMcpServer, type RunningMcpServer } from "./mcpHttpServer";
 import { VaultRepository } from "./vaultRepo";
 import type { KanbanSettings } from "../settings";
+import type { StatusReport } from "../model/agent";
 
 /** Bytes of randomness behind a token: 32 of them is well past guessing, and stays short enough
  *  to paste into a config file by hand. */
@@ -87,12 +88,16 @@ export interface McpServiceOptions {
   info: ServerInfo;
   /** Told about every state change, so the plugin can surface a failure instead of a dead toggle. */
   onState?: (state: McpState) => void;
+  /** Told about every status write an agent's tool call makes, as the board view is about its own. */
+  onStatus?: (report: StatusReport) => void;
 }
 
 /** The vault, as the tools see it. Exported so a test can hold it without a running server. Only
  *  the two members it reads, so building one costs no token and no server lifetime. */
-export function vaultBoardHost(options: Pick<McpServiceOptions, "app" | "getSettings">): BoardHost {
-  const { app, getSettings } = options;
+export function vaultBoardHost(
+  options: Pick<McpServiceOptions, "app" | "getSettings" | "onStatus">,
+): BoardHost {
+  const { app, getSettings, onStatus } = options;
   const isBoard = (file: TFile): boolean =>
     isBoardFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
   return {
@@ -105,12 +110,11 @@ export function vaultBoardHost(options: Pick<McpServiceOptions, "app" | "getSett
     repoFor(boardPath: string): CardRepository | null {
       const file = app.vault.getFileByPath(boardPath);
       if (file === null || file.extension !== "md" || !isBoard(file)) return null;
-      return new VaultRepository(
-        app,
-        boardPath,
-        () => getSettings().historyScope,
-        () => getSettings().userName,
-      );
+      return new VaultRepository(app, boardPath, {
+        getHistoryScope: () => getSettings().historyScope,
+        getUserName: () => getSettings().userName,
+        ...(onStatus ? { onStatus } : {}),
+      });
     },
   };
 }
@@ -126,6 +130,20 @@ export function vaultBoardHost(options: Pick<McpServiceOptions, "app" | "getSett
 interface Target {
   port: number;
   bindAddress: string;
+  token: string;
+}
+
+/** What `settings` and `token` ask the server to be, or `null` for no server at all. */
+function targetFor(settings: KanbanSettings, token: string): Target | null {
+  return settings.mcpEnabled && token
+    ? { port: settings.mcpPort, bindAddress: settings.mcpBindAddress, token }
+    : null;
+}
+
+/** Where a server is answering, and the token it demands. */
+export interface McpEndpoint {
+  address: string;
+  port: number;
   token: string;
 }
 
@@ -149,13 +167,21 @@ export class McpService {
     return this.running?.port ?? null;
   }
 
+  /**
+   * The server an agent started now should be told about, or `null`. Only a server already serving
+   * exactly what the settings and the token ask for counts: one being switched off, one waiting to
+   * move to another port or address, and one still on a token that was just replaced all answer
+   * `null`, so a launch never hands out an address and a token that are about to stop working.
+   */
+  currentEndpoint(): McpEndpoint | null {
+    const desired = targetFor(this.options.getSettings(), this.options.getToken());
+    if (this.running === null || desired === null || !this.isServing(desired)) return null;
+    return { address: this.running.address, port: this.running.port, token: desired.token };
+  }
+
   /** Start, stop or restart so the running server matches `settings`. */
   sync(settings: KanbanSettings): Promise<void> {
-    const token = this.options.getToken();
-    const target =
-      settings.mcpEnabled && token
-        ? { port: settings.mcpPort, bindAddress: settings.mcpBindAddress, token }
-        : null;
+    const target = targetFor(settings, this.options.getToken());
     return this.enqueue(() => this.reconcile(target));
   }
 
@@ -170,23 +196,26 @@ export class McpService {
   }
 
   private async reconcile(target: Target | null): Promise<void> {
-    if (this.serving(target)) return;
+    if (this.isServing(target)) return;
     if (target && same(this.refused, target)) return;
     await this.shutDown();
     if (target) await this.start(target);
   }
 
   /** Is a server already up and answering on exactly what `target` asks for? */
-  private serving(target: Target | null): boolean {
+  private isServing(target: Target | null): boolean {
     return this.running !== null && same(this.wanted, target);
   }
 
+  /** A server that is closing is not running: `close()` drops its connections at once, so the
+   *  state is cleared before it is awaited, and nothing reads a closing server as current. */
   private async shutDown(): Promise<void> {
     this.refused = null;
-    if (!this.running) return;
-    await this.running.close();
+    const handle = this.running;
+    if (!handle) return;
     this.running = null;
     this.wanted = null;
+    await handle.close();
     this.options.onState?.({ kind: "off" });
   }
 

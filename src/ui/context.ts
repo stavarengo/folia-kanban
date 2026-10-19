@@ -1,4 +1,12 @@
-import { createContext, useContext, useMemo, type RefObject } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
+import type { AgentLaunches } from "../model/agent";
 import type { RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig, TodoLine } from "../model/types";
@@ -313,4 +321,26 @@ export function useBoardRootRef(): RefObject<HTMLElement | null> {
   const ref = useContext(BoardRootContext);
   if (!ref) throw new Error("BoardRootContext is missing a provider");
   return ref;
+}
+
+/** No launches at all: what a board drawn outside a plugin (a test, a preview) sees. */
+const NO_LAUNCHES: AgentLaunches = {
+  subscribe: () => () => {},
+  pending: () => null,
+  cancel: () => {},
+  startNow: () => {},
+};
+
+/** The plugin's agent launches, provided by App from the host. */
+export const AgentLaunchesContext = createContext<AgentLaunches>(NO_LAUNCHES);
+
+export function useAgentLaunches(): AgentLaunches {
+  return useContext(AgentLaunchesContext);
+}
+
+/** When the launch waiting on this card fires (`0` while it is being prepared), or `null`. */
+export function usePendingLaunch(path: string): number | null {
+  const agents = useAgentLaunches();
+  const subscribe = useCallback((cb: () => void) => agents.subscribe(cb), [agents]);
+  return useSyncExternalStore(subscribe, () => agents.pending(path));
 }

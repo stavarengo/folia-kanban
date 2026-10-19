@@ -875,7 +875,9 @@ describe("field edits and their history lines", () => {
     const app = new FakeApp();
     app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
     app.vault.addFile("basic/Cards/One.md", card("status: todo\npriority: B", body));
-    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => scope);
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => scope,
+    });
     return { app, repo };
   }
 
@@ -1482,12 +1484,10 @@ describe("the rest of the vault surface", () => {
     app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
     app.vault.addFile("basic/Cards/One.md", card("status: todo"));
     let scope: "moves" | "all" = "moves";
-    const repo = new VaultRepository(
-      app as unknown as App,
-      "basic/Board.md",
-      () => scope,
-      () => "Rafa",
-    );
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => scope,
+      getUserName: () => "Rafa",
+    });
 
     await repo.addComment("basic/Cards/One.md", "first");
     expect(app.vault.text("basic/Cards/One.md")).toContain("Rafa");
@@ -1505,12 +1505,10 @@ describe("the rest of the vault surface", () => {
     const app = new FakeApp();
     app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
     app.vault.addFile("basic/Cards/One.md", card("status: todo"));
-    const repo = new VaultRepository(
-      app as unknown as App,
-      "basic/Board.md",
-      () => "moves",
-      () => "Rafa",
-    );
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => "moves",
+      getUserName: () => "Rafa",
+    });
 
     await repo.addComment("basic/Cards/One.md", "from the agent", "Assistant");
 
@@ -1748,7 +1746,9 @@ describe("applying a move", () => {
     const app = new FakeApp();
     app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
     app.vault.addFile("basic/Cards/One.md", card("status: todo"));
-    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => "all",
+    });
 
     await repo.applyMove({ path: "basic/Cards/One.md", setFrontmatter: { status: "done" } });
 
@@ -1817,7 +1817,9 @@ describe("applying a move", () => {
     const parent = "\n# P\n\n## Subtasks\n- [ ] [[Child]]\n- [ ] Something else\n";
     app.vault.addFile("basic/Cards/One.md", card("status: todo", parent));
     app.vault.addFile("basic/Cards/Two.md", card("status: todo", parent));
-    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => "all",
+    });
 
     await repo.applyMove({
       path: "basic/Cards/Child.md",
@@ -1844,7 +1846,9 @@ describe("applying a move", () => {
       "basic/Cards/One.md",
       card("status: todo", "\n# P\n\n## Subtasks\n- [x] [[Child]]\n"),
     );
-    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => "all",
+    });
     const before = app.vault.text("basic/Cards/One.md");
     let writes = 0;
     app.vault.on("modify", () => writes++);
@@ -2155,7 +2159,9 @@ describe("an edit that leaves the note as it was", () => {
     app.vault.addFile("basic/Board.md", note(board));
     app.vault.addFile(PATH, card(FRONTMATTER, BODY));
     app.vault.addFile("basic/Cards/Two.md", card("status: todo"));
-    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", () => "all");
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      getHistoryScope: () => "all",
+    });
     const before = app.vault.text(PATH);
     const boardBefore = app.vault.text("basic/Board.md");
     let writes = 0;

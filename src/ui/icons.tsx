@@ -16,7 +16,8 @@ export type IconName =
   | "octagon-alert"
   | "link"
   | "user"
-  | "chevron-down";
+  | "chevron-down"
+  | "bot";
 
 interface IconProps {
   name: IconName;

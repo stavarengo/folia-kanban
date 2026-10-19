@@ -1,4 +1,5 @@
 import type { BoardHost, DetailModalHandle } from "../src/ui/App";
+import type { AgentLaunches } from "../src/model/agent";
 
 /** One open stand-in for the detail panel's dialog, as a test can drive it. */
 export interface FakeDetailModal extends DetailModalHandle {
@@ -77,10 +78,51 @@ export function fakeDetailModals(doc: Document = document) {
   };
 }
 
+/**
+ * Launches a test drives by hand: `wait` and `prepare` put one on a card, `clear` takes it off, and
+ * every call the tile makes is recorded.
+ */
+export function fakeLaunches() {
+  const pending = new Map<string, number>();
+  const listeners = new Set<() => void>();
+  const changed = () => listeners.forEach((cb) => cb());
+  const calls: { cancel: string[]; startNow: string[] } = { cancel: [], startNow: [] };
+  const agents: AgentLaunches = {
+    subscribe: (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    pending: (path) => pending.get(path) ?? null,
+    cancel: (path) => {
+      calls.cancel.push(path);
+    },
+    startNow: (path) => {
+      calls.startNow.push(path);
+    },
+  };
+  return {
+    agents,
+    calls,
+    wait(path: string, firesAt: number) {
+      pending.set(path, firesAt);
+      changed();
+    },
+    prepare(path: string) {
+      pending.set(path, 0);
+      changed();
+    },
+    clear(path: string) {
+      pending.delete(path);
+      changed();
+    },
+  };
+}
+
 /** A host with nothing but the dialog, for a board whose test is not about the leaf. */
-export function testHost(doc: Document = document): BoardHost {
+export function testHost(doc: Document = document, agents?: AgentLaunches): BoardHost {
   return {
     bindSearchShortcut: () => () => {},
     openDetailModal: fakeDetailModals(doc).openDetailModal,
+    agents: agents ?? fakeLaunches().agents,
   };
 }

@@ -6,6 +6,16 @@ import { App as BoardApp, type BoardHost } from "./ui/App";
 import { openDetailModal } from "./obsidian/detailModal";
 import { VaultRepository } from "./obsidian/vaultRepo";
 import type { BoardSettings, SettingsPatch } from "./settings";
+import type { AgentRuns } from "./obsidian/agentRuns";
+
+/** What a board view is handed by the plugin that registers it. */
+export interface KanbanViewHost {
+  getSettings: () => BoardSettings;
+  updateSettings: (patch: SettingsPatch) => void;
+  openAsMarkdown: (view: KanbanView) => void;
+  /** The plugin's launches: the tiles show them, and this board's status writes feed them. */
+  agents: AgentRuns;
+}
 import { OPEN_BOARD_COMMAND_NAME, VIEW_TYPE_KANBAN } from "./viewType";
 
 /**
@@ -49,13 +59,12 @@ export class KanbanView extends FileView {
       return () => registered.forEach((handler) => scope.unregister(handler));
     },
     openDetailModal: (onClosed) => openDetailModal(this.app, onClosed),
+    agents: this.plugin.agents,
   };
 
   constructor(
     leaf: WorkspaceLeaf,
-    private getSettings: () => BoardSettings,
-    private updateSettings: (patch: SettingsPatch) => void,
-    private openAsMarkdown: (view: KanbanView) => void,
+    private plugin: KanbanViewHost,
   ) {
     super(leaf);
     // A view scope runs only while its leaf has focus, which is what makes "/" belong to one board:
@@ -120,7 +129,7 @@ export class KanbanView extends FileView {
   }
 
   override async onOpen(): Promise<void> {
-    this.addAction("file-text", "Edit as markdown", () => this.openAsMarkdown(this));
+    this.addAction("file-text", "Edit as markdown", () => this.plugin.openAsMarkdown(this));
     this.renderApp();
   }
 
@@ -149,18 +158,17 @@ export class KanbanView extends FileView {
     // The repo reads the history scope and the comment signature live via getters, so settings
     // changes don't require rebuilding it — only a file change does (handled in onLoadFile).
     if (!this.repo)
-      this.repo = new VaultRepository(
-        this.app,
-        boardPath,
-        () => this.getSettings().historyScope,
-        () => this.getSettings().userName,
-      );
+      this.repo = new VaultRepository(this.app, boardPath, {
+        getHistoryScope: () => this.plugin.getSettings().historyScope,
+        getUserName: () => this.plugin.getSettings().userName,
+        onStatus: (report) => this.plugin.agents.report(report),
+      });
     this.root.render(
       <StrictMode>
         <BoardApp
           repo={this.repo}
-          settings={this.getSettings()}
-          onUpdateSettings={this.updateSettings}
+          settings={this.plugin.getSettings()}
+          onUpdateSettings={this.plugin.updateSettings}
           host={this.host}
         />
       </StrictMode>,
