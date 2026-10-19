@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.4](https://github.com/stavarengo/folia-kanban/compare/0.6.3...0.6.4) (2026-10-19)
+
+### Features
+
+* give a card's agent session the board, a stop and a status line ([#147](https://github.com/stavarengo/folia-kanban/issues/147)) ([0a6a5fe](https://github.com/stavarengo/folia-kanban/commit/0a6a5fe3816b2fa8656de406ce267ca222a5c688)), closes [#145](https://github.com/stavarengo/folia-kanban/issues/145)
+* start an agent on a card moved into an agent column ([#146](https://github.com/stavarengo/folia-kanban/issues/146)) ([2f77110](https://github.com/stavarengo/folia-kanban/commit/2f771105339c353787ccde02bdb86e7d38002502)), closes [#144](https://github.com/stavarengo/folia-kanban/issues/144)
+
+### Documentation
+
+* cover macOS hosts in the Obsidian testing guide ([397d62a](https://github.com/stavarengo/folia-kanban/commit/397d62a29755b1d019303e3665c7aa2aace7721c))
+* record the approved design for starting an agent from a column ([c3e64e8](https://github.com/stavarengo/folia-kanban/commit/c3e64e8a3218ab1448712b9458d5fa5d875c5b72))
+
 ## [0.6.3](https://github.com/stavarengo/folia-kanban/compare/0.6.2...0.6.3) (2026-10-16)
 
 ### Features
