@@ -272,6 +272,11 @@ describe("the scripts", () => {
     expect(hook("One.md", "review")).toBe("");
   });
 
+  it("reads a marker set to null as no marker, the way the board does", () => {
+    card("One.md", "---\nstatus: review\nagent-run: null\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/no longer carries/);
+  });
+
   it("stops when the card is nowhere to be found", () => {
     card("Other.md", ONE.replace("abc123", "zzz999"));
     expect(stopReason(hook("One.md", "review"))).toBe(

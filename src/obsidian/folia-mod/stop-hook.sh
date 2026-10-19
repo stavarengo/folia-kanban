@@ -102,6 +102,8 @@ frontmatter() {
       if (match(rest, idkey "[^,}]*")) {
         v = substr(rest, RSTART + 1, RLENGTH - 1)
         read_id(after_key(v))
+      } else if (rest ~ /^[ \t]*(null|Null|NULL|~)[ \t]*(#.*)?$/) {
+        id = ""
       } else if (rest ~ /^[ \t]*\{/ && rest !~ /\}/) {
         flag = flag "m"
       } else if (rest !~ /^[ \t]*(\{.*)?(#.*)?$/) {
