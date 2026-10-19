@@ -889,4 +889,57 @@ describe("found in review", () => {
     expect(h.fm("Elsewhere/One.md")["agent-run"]).toBeUndefined();
     expect(h.runs.pending("Elsewhere/One.md")).toBeNull();
   });
+
+  it("does not run what a board edit made during the launch no longer asks for", async () => {
+    for (const edit of [
+      (b: string) => b.replace("    agent:\n      model: sonnet\n", ""),
+      (b: string) => b.replace("model: sonnet", "model: opus"),
+    ]) {
+      const h = harness();
+      await h.move("review");
+      const statGate = deferred();
+      h.onStat(() => statGate.promise);
+      h.fireTimers();
+      await settle();
+      h.app.vault.addFile("Board.md", edit(BOARD));
+      statGate.release();
+      await settle();
+      expect(h.spawned).toHaveLength(0);
+      expect(h.fm()["agent-run"]).toBeUndefined();
+      expect(h.runs.pending(ONE)).toBeNull();
+    }
+  });
+
+  it("does not launch on a note that stopped being a board", async () => {
+    const h = harness();
+    await h.move("review");
+    h.app.vault.addFile("Board.md", BOARD.replace("folia-board: true", "folia-board: false"));
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+  });
+
+  it("reads the card last, so a move out while the board is being read is still caught", async () => {
+    const h = harness();
+    await h.move("review");
+    let release = () => {};
+    const write = h.app.fileManager.processFrontMatter.bind(h.app.fileManager);
+    h.app.fileManager.processFrontMatter = async (file, fn) => {
+      await write(file, fn);
+      h.app.fileManager.processFrontMatter = write;
+      // Right after the claim: hold the board read of the last look.
+      release = h.holdBoardRead();
+    };
+    h.fireTimers();
+    await settle();
+    h.app.vault.addFile(
+      ONE,
+      h.app.vault.text(ONE)?.replace("status: review", "status: done") ?? "",
+    );
+    release();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+  });
 });

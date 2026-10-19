@@ -14,13 +14,14 @@ import {
   statusOf,
   type AgentContext,
 } from "../model/agent";
-import type { AgentConfig } from "../model/types";
+import type { AgentConfig, BoardConfig } from "../model/types";
 import { appendHistory } from "../model/card";
 import { stamp } from "../model/dates";
 import { agentLaunchLine, historyAllows } from "../model/history";
 import { isWildcardBindAddress } from "../bindAddress";
 import { DEFAULT_AGENT_COMMAND, DEFAULT_AGENT_PROMPT, type KanbanSettings } from "../settings";
-import { readBoardConfig } from "./boardConfig";
+import { readBoardConfig, readBoardFrontmatter } from "./boardConfig";
+import { isBoardFrontmatter } from "./viewMode";
 import { byRunId, claimMarker, clearMarker, freshFrontmatter } from "./agentMarker";
 import type { Spawner } from "./agentLauncher";
 import { MCP_PATH } from "./mcpHttpServer";
@@ -100,16 +101,53 @@ async function reresolve(
 ): Promise<{ file: TFile; agent: AgentConfig } | null> {
   const { app } = host.deps;
   const file = app.vault.getFileByPath(request.cardPath);
-  const board = app.vault.getFileByPath(request.boardPath);
   if (file === null) throw new Error(`the card "${request.cardPath}" is gone`);
-  if (board === null) throw new Error(`the board "${request.boardPath}" is gone`);
   const fm = await freshFrontmatter(app, file);
-  const config = await readBoardConfig(app, board, request.boardPath);
-  // A card moved out of the board's folder while it waited is no longer this board's to launch.
-  if (statusOf(fm) !== request.column || !file.path.startsWith(`${config.cardFolder}/`))
-    return null;
+  const config = await launchingBoard(app, request, file);
+  if (config === null || statusOf(fm) !== request.column) return null;
   const agent = resolveAgent(config, request.column, fm);
   return agent ? { file, agent } : null;
+}
+
+/**
+ * The board as it stands now, or `null` when it can no longer launch this card: the note is not a
+ * board any more (agent access would refuse it), or the card has left its card folder.
+ */
+async function launchingBoard(
+  app: App,
+  request: LaunchRequest,
+  file: TFile,
+): Promise<BoardConfig | null> {
+  const board = app.vault.getFileByPath(request.boardPath);
+  if (board === null) throw new Error(`the board "${request.boardPath}" is gone`);
+  if (!isBoardFrontmatter(await readBoardFrontmatter(app, board, request.boardPath))) return null;
+  const config = await readBoardConfig(app, board, request.boardPath);
+  return file.path.startsWith(`${config.cardFolder}/`) ? config : null;
+}
+
+/**
+ * Whether the launch still stands on what it was decided from: the card in the column with this
+ * run's marker, the board asking for the same agent (an edit since is a launch to decide again),
+ * the request still current, and the same server and token.
+ */
+function lastLook(
+  host: LaunchHost,
+  request: LaunchRequest,
+  now: {
+    ready: { agent: AgentConfig; endpoint: McpEndpoint };
+    fm: Record<string, unknown>;
+    board: BoardConfig | null;
+  },
+): boolean {
+  const { ready, fm, board } = now;
+  if (statusOf(fm) !== request.column || agentRunOf(fm).id !== request.runId) return false;
+  if (!board || !sameAgent(resolveAgent(board, request.column, fm), ready.agent)) return false;
+  return host.isCurrent(request) && sameEndpoint(host.deps.endpoint(), ready.endpoint);
+}
+
+/** Whether two readings of the agent a column asks for say the same thing. */
+function sameAgent(a: AgentConfig | null, b: AgentConfig): boolean {
+  return a !== null && JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** The folder the command runs in, checked to exist; `null`, with the user told, when it does not. */
@@ -180,11 +218,12 @@ export async function performLaunch(host: LaunchHost, request: LaunchRequest): P
   if (!(await claimMarker(deps.app, host.writer, file, claim))) return;
   request.claimed = file;
   if (!host.isCurrent(request)) return;
+  // The board first and the card last: the card's status is what a launch is about, so its read
+  // is the one nothing else may come after.
+  const board = await launchingBoard(deps.app, request, file);
   const text = await deps.app.vault.read(file);
   // Nothing below awaits until the command is handed over: this is the last look.
-  const fm = parseFrontmatter(text);
-  if (statusOf(fm) !== request.column || agentRunOf(fm).id !== request.runId) return;
-  if (!host.isCurrent(request) || !sameEndpoint(deps.endpoint(), endpoint)) return;
+  if (!lastLook(host, request, { ready, fm: parseFrontmatter(text), board })) return;
   handOff(host, request, {
     ctx: contextFor(host, request, ready),
     token: endpoint.token,
