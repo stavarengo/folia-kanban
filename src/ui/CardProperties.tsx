@@ -3,15 +3,15 @@ import type { Board, Card } from "../model/types";
 import type { PropertyNamesInUse } from "../model/repo";
 import { TITLE_KEY } from "../model/cardTitle";
 import {
-  FOLIA_CARD_KEYS,
   PANEL_FIELD_KEYS,
   editScalar,
   propertySuggestions,
+  suggestedCardKeys,
   type PropertySuggestion,
   type ScalarValue,
 } from "../model/properties";
 import { relationKeys } from "../model/relationships";
-import { useBoardActions, useRepo } from "./context";
+import { useBoardActions, useRepo, useSettings } from "./context";
 import { HostButton, HostIconButton } from "./hostControls";
 import { isGenericTitleRow } from "./TitleFields";
 import { useFieldDraft } from "./useFieldDraft";
@@ -162,6 +162,7 @@ export function usePropertyForm({
   stillHere: () => boolean;
 }) {
   const repo = useRepo();
+  const { experimentalAgentColumns } = useSettings();
   const [newProp, setNewProp] = useState<NewProperty>({ key: "", val: "" });
   const editedKeys = useMemo(
     () => new Set([...EDITED_KEYS, ...relationKeys(board.config.relations)]),
@@ -184,13 +185,16 @@ export function usePropertyForm({
   }, [repo, isCreate]);
   const suggestLists = useMemo(
     () => ({
-      folia: [...FOLIA_CARD_KEYS, ...relationKeys(board.config.relations)],
+      folia: [
+        ...suggestedCardKeys(experimentalAgentColumns),
+        ...relationKeys(board.config.relations),
+      ],
       board: namesInUse.inCardFolder,
       vault: namesInUse.elsewhere,
       exclude: new Set(Object.keys(card?.frontmatter ?? {})),
       editedInPanel: editedKeys,
     }),
-    [board.config.relations, namesInUse, card?.frontmatter, editedKeys],
+    [board.config.relations, namesInUse, card?.frontmatter, editedKeys, experimentalAgentColumns],
   );
   const keySuggest = useSuggest({
     candidates: () =>

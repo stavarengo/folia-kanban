@@ -30,7 +30,9 @@ import {
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
   USER_NAME_PLACEHOLDER,
+  bindAddressConfirm,
   isRowDisabled,
+  settingCopy,
   type EditableSettingKey,
 } from "../src/settingsLayout";
 import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "../src/settings";
@@ -38,7 +40,10 @@ import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 
 const noop = (): void => {};
 
-const definitions = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+/** Every group on the tab, the experimental ones included: what the layout tests walk. */
+const ALL_ON: KanbanSettings = { ...DEFAULT_SETTINGS, experimentalAgentColumns: true };
+
+const definitions = settingDefinitions(() => ALL_ON, "1.2.3", {
   copy: noop,
   regenerate: noop,
   renderHeldField: noop,
@@ -110,7 +115,7 @@ describe("settingDefinitions", () => {
       const def = rows.find(
         (d) => ("control" in d && d.control?.key === key) || d.name === copy.name,
       );
-      expect(def).toMatchObject({ name: copy.name, desc: copy.desc });
+      expect(def).toMatchObject(settingCopy(key as EditableSettingKey, ALL_ON));
     }
   });
 
@@ -311,7 +316,7 @@ describe("settingsPatchFor", () => {
 
   it("hands the row it is asked to draw to the tab, with the key it belongs to", () => {
     const drawn: HeldFieldKey[] = [];
-    const defs = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+    const defs = settingDefinitions(() => ALL_ON, "1.2.3", {
       copy: noop,
       regenerate: noop,
       renderHeldField: (key) => drawn.push(key),
@@ -455,6 +460,38 @@ describe("the agents-in-columns rows", () => {
       expect(isRowDisabled(key, DEFAULT_SETTINGS), key).toBe(true);
       expect(isRowDisabled(key, { ...DEFAULT_SETTINGS, mcpEnabled: true }), key).toBe(false);
     }
+  });
+
+  it("are not on the tab at all, heading included, until the experimental switch is on", () => {
+    const off = settingDefinitions(() => DEFAULT_SETTINGS, "1.2.3", {
+      copy: noop,
+      regenerate: noop,
+      renderHeldField: noop,
+    });
+    const headings = off.filter(isGroup).map((g) => g.heading);
+    expect(headings).not.toContain("Agents in columns");
+    expect(headings.at(-2)).toBe("Experimental");
+    const offRows = rowsOf(off).map((r) => r.row);
+    for (const key of ["agentCommand", "agentPrompt", "agentDelay"] as const)
+      expect(
+        offRows.find((d) => d.name === SETTING_COPY[key].name),
+        key,
+      ).toBeUndefined();
+    // Off, nothing else on the tab says what an agent column does, either.
+    for (const row of offRows.filter((d) => d.name !== SETTING_COPY.experimentalAgentColumns.name))
+      expect(row.desc ?? "", row.name).not.toMatch(/agent column/);
+    expect(bindAddressConfirm("0.0.0.0", DEFAULT_SETTINGS).message).not.toMatch(/agent column/);
+    expect(bindAddressConfirm("0.0.0.0", ALL_ON).message).toMatch(/agent column/);
+    expect(settingCopy("mcpBindAddress", ALL_ON).desc).toMatch(/start an agent on this computer/);
+  });
+
+  it("are switched on from the Experimental section, off out of the box", () => {
+    expect(DEFAULT_SETTINGS.experimentalAgentColumns).toBe(false);
+    const experimental = definitions.filter(isGroup).find((g) => g.heading === "Experimental");
+    expect(experimental?.items).toMatchObject([
+      { control: { type: "toggle", key: "experimentalAgentColumns" } },
+    ]);
+    expect(SETTING_COPY.experimentalAgentColumns.desc).toMatch(/Experimental/);
   });
 
   it("offers the wait as a slider from 0 to 60, and holds it to whole seconds in range", () => {

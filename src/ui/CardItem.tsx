@@ -3,7 +3,14 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats, ContextConfig } from "../model/types";
 import { sameLine } from "../model/board";
-import { cardChips, cardUrgency, isCompletable, priorityTone, relationChips } from "./cardView";
+import {
+  agentRunChips,
+  cardChips,
+  cardUrgency,
+  isCompletable,
+  priorityTone,
+  relationChips,
+} from "./cardView";
 import {
   useBoardActions,
   useContexts,
@@ -141,7 +148,7 @@ function CardItemInner({
 function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   const actions = useBoardActions();
   const contexts = useContexts();
-  const { cardNextTodos } = useSettings();
+  const { cardNextTodos, experimentalAgentColumns } = useSettings();
   const subitems = useSubitemsCollapse();
   // Blocking markers come from the board graph (a link on ANOTHER card decides what this one
   // shows), so they arrive through their own context rather than this card's memoized props.
@@ -154,6 +161,7 @@ function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   const chips = [
     ...relationChips(relations),
     ...cardChips(card, today, actions.doneColumnId, actions.priorityScale),
+    ...(experimentalAgentColumns ? agentRunChips(card) : []),
   ];
   // Context grouping (#14): the card's folder-derived context + its (optional) config. The marker
   // is a left accent strip (inset clear of the priority bar) + a label badge, so cards sharing a
@@ -167,6 +175,7 @@ function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   return {
     unread,
     launchPending,
+    agentRuns: experimentalAgentColumns,
     chips,
     ctx,
     ctxColor: ctx?.color,
@@ -209,7 +218,7 @@ function CardFace({
       onClick={onOpen}
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
-      aria-label={tileName(card, view.unread, view.launchPending)}
+      aria-label={tileName(card, view.unread, view.launchPending, view.agentRuns)}
       aria-current={selected ? "true" : undefined}
     >
       {title.editing != null ? (

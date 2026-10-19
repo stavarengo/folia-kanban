@@ -32,7 +32,8 @@ export type EditableSettingKey =
   | "mcpBindAddress"
   | "agentCommand"
   | "agentPrompt"
-  | "agentDelay";
+  | "agentDelay"
+  | "experimentalAgentColumns";
 
 /** The settings that are a plain on/off. Kept as a value, not only a type, so `settingsPatchFor`
  *  can recognise one at runtime — a boolean reaching the dropdown branch would be refused. */
@@ -41,6 +42,7 @@ export const TOGGLE_SETTING_KEYS = [
   "boardSetupFileMenu",
   "boardSetupEditorMenu",
   "mcpEnabled",
+  "experimentalAgentColumns",
 ] as const satisfies readonly EditableSettingKey[];
 
 /** Every setting whose control is a dropdown, i.e. one with a fixed list of choices. */
@@ -72,6 +74,11 @@ export const SETTING_OPTIONS = {
   historyScope: { moves: "Moves only", structural: "Structural changes", all: "Everything" },
   boardPan: { shift: "Shift + click and drag", empty: "Click and drag (empty space only)" },
 } as const satisfies { [K in DropdownKey]: Record<KanbanSettings[K] & string, string> };
+
+/** Where the bind-address copy says what a token on the network can start, which is true only
+ *  while agent columns are on. {@link settingCopy} fills it in, or drops it. */
+const AGENT_REACH_MARK = "{{agentReach}}";
+const AGENT_REACH = ", and start an agent on this computer by moving a card into an agent column";
 
 /**
  * Name and description of every row of the settings tab. Both renderings read from here — the
@@ -135,7 +142,7 @@ export const SETTING_COPY = {
   },
   mcpBindAddress: {
     name: "Bind address",
-    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault${AGENT_REACH_MARK}. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
   },
   agentCommand: {
     name: "Command",
@@ -149,7 +156,22 @@ export const SETTING_COPY = {
     name: "Wait before starting",
     desc: `Seconds a card waits in an agent column, with Cancel and Now on its tile, before its agent starts (0–${AGENT_DELAY_MAX}). Moving the card out in that time is enough to stop it. Zero starts at once. Only used while agent access is on.`,
   },
+  experimentalAgentColumns: {
+    name: "Agents in columns",
+    desc: "Start an AI agent on every card the board, or an agent, moves into a column whose board note gives it `agent:`, and show its settings under Agents in columns. Experimental: it may change or break in any release, so use it at your own risk. Off until you turn it on, and it needs agent access as well. While it is off, `agent:` in your notes is kept as it is and does nothing. See docs/agents-in-columns.md.",
+  },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
+
+/** A row's name and description as the settings currently stand: the bind address names what a
+ *  token on the network can start only while agent columns are on. Both renderings read this. */
+export function settingCopy(
+  key: EditableSettingKey,
+  settings: KanbanSettings,
+): { name: string; desc: string } {
+  const { name, desc } = SETTING_COPY[key];
+  const reach = settings.experimentalAgentColumns ? AGENT_REACH : "";
+  return { name, desc: desc.replace(AGENT_REACH_MARK, reach) };
+}
 
 /**
  * The control a row is drawn with, so both renderings build the same row from one description
@@ -187,6 +209,7 @@ export const SETTING_CONTROLS = {
   agentCommand: { kind: "held" },
   agentPrompt: { kind: "held" },
   agentDelay: { kind: "slider", min: 0, max: AGENT_DELAY_MAX, step: 1 },
+  experimentalAgentColumns: { kind: "toggle" },
 } as const satisfies Record<EditableSettingKey, RowControlSpec>;
 
 /**
@@ -196,11 +219,12 @@ export const SETTING_CONTROLS = {
  *
  * The order runs from what a user changes to make the plugin fit their vault down to what most
  * vaults never touch: how board notes open, then the cards
- * themselves, then adding one, then who is writing and what gets recorded, then agent access.
+ * themselves, then adding one, then who is writing and what gets recorded, then agent access, and
+ * last the switches for features that are not settled yet.
  */
 export interface SettingGroupSpec {
   /** Identifies the group in code — the agent-access one is desktop-only and carries token rows. */
-  id: "boards" | "cards" | "addingCards" | "identity" | "agentAccess" | "agents";
+  id: "boards" | "cards" | "addingCards" | "identity" | "agentAccess" | "agents" | "experimental";
   heading: string;
   keys: readonly EditableSettingKey[];
 }
@@ -230,7 +254,19 @@ export const SETTING_GROUPS = [
     heading: "Agents in columns",
     keys: ["agentCommand", "agentPrompt", "agentDelay"],
   },
+  { id: "experimental", heading: "Experimental", keys: ["experimentalAgentColumns"] },
 ] as const satisfies readonly SettingGroupSpec[];
+
+/** The groups that belong to an experimental feature, and the switch that brings each one in. */
+const GROUP_SHOWN: Partial<Record<SettingGroupSpec["id"], (s: KanbanSettings) => boolean>> = {
+  agents: (s) => s.experimentalAgentColumns,
+};
+
+/** Whether a group is on the tab as the settings currently stand. Both renderings ask this, so a
+ *  group cannot be there on one path and gone on the other. */
+export function isGroupShown(id: SettingGroupSpec["id"], settings: KanbanSettings): boolean {
+  return GROUP_SHOWN[id]?.(settings) ?? true;
+}
 
 /**
  * Extra words the 1.13 settings search should find a row by. Short names read better under a
@@ -257,11 +293,14 @@ export const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]
   agentCommand: ["agent", "launch", "tmux", "claude", "shell", "agent-run"],
   agentPrompt: ["agent", "instructions", "claude"],
   agentDelay: ["agent", "countdown", "delay", "grace", "cancel"],
+  experimentalAgentColumns: ["agent", "agent column", "launch", "experimental"],
 };
 
 /** What a row needs the settings to say before it means anything. A row whose dependency is not met
  *  is disabled rather than hidden: a setting that vanishes is a setting nobody can find again. The
- *  words that explain the dependency live in {@link SETTING_COPY}, always visible. */
+ *  words that explain the dependency live in {@link SETTING_COPY}, always visible. The one exception
+ *  is a whole group behind an experimental switch, which {@link isGroupShown} leaves out while the
+ *  switch is off; the switch itself stays in view, under Experimental (see `docs/decisions.md`). */
 const ROW_DISABLED: Partial<Record<EditableSettingKey, (s: KanbanSettings) => boolean>> = {
   mcpPort: (s) => !s.mcpEnabled,
   mcpBindAddress: (s) => !s.mcpEnabled,
@@ -283,7 +322,7 @@ export function isRowDisabled(key: EditableSettingKey, settings: KanbanSettings)
 
 /** The rows whose new value changes which *other* rows exist or are live, so the imperative tab has
  *  to be drawn again rather than left as it is. */
-export const TAB_REDRAW_KEYS = ["mcpEnabled"] as const;
+export const TAB_REDRAW_KEYS = ["mcpEnabled", "experimentalAgentColumns"] as const;
 
 /** What is said when the token cannot be kept anywhere. Obsidian stores it in the platform's secure
  *  storage and refuses rather than falling back to the clear, so on a machine that has none there
@@ -340,14 +379,17 @@ export function splitHeldPatch(patch: Partial<KanbanSettings>): {
 }
 
 /** What is asked before the server moves off this computer onto a network address. */
-export function bindAddressConfirm(address: string): {
+export function bindAddressConfirm(
+  address: string,
+  settings: KanbanSettings,
+): {
   title: string;
   message: string;
   cta: string;
 } {
   return {
     title: "Open agent access to the network?",
-    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column.`,
+    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault${settings.experimentalAgentColumns ? AGENT_REACH : ""}.`,
     cta: `Listen on ${address}`,
   };
 }

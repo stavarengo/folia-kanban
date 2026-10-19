@@ -75,6 +75,10 @@ export class AgentRuns implements AgentLaunches {
   private readonly listeners = new Set<() => void>();
   private readonly writer: NoteWriter;
   private unloaded = false;
+  /** Whether the startup sweep has been asked for: before that the metadata cache is still filling. */
+  private layoutReady = false;
+  /** Whether the markers have been swept since agent columns were last switched on. */
+  private live = false;
 
   constructor(private readonly deps: AgentRunsDeps) {
     this.writer = new NoteWriter(deps.app);
@@ -82,6 +86,34 @@ export class AgentRuns implements AgentLaunches {
 
   private get app(): App {
     return this.deps.app;
+  }
+
+  /** Agent columns are an experimental feature behind a settings switch. Off, nothing launches and
+   *  nothing is marked. Two clears still happen, both of a marker a run left: a launch already under
+   *  way removes its own claim, and a card the plugin moves out of a column loses the marker it
+   *  carried there, so it never comes back to a run nobody is doing (see `report`). */
+  private get enabled(): boolean {
+    return !this.unloaded && this.deps.settings().experimentalAgentColumns;
+  }
+
+  /**
+   * The settings changed: follow the experimental switch. Turned off, everything in hand is called
+   * off and what was seen is forgotten, countdowns included, so nothing launches; a slot with work
+   * still in flight stays until that work ends, so its card keeps one queue. Turned on, the vault's
+   * markers are looked at the way they are at startup, which was skipped.
+   */
+  followSettings(): void {
+    if (!this.enabled) {
+      this.live = false;
+      for (const slot of [...this.slots.values()]) {
+        slot.seen = undefined;
+        this.cancel(slot.path);
+      }
+      return;
+    }
+    if (this.live || !this.layoutReady) return;
+    this.live = true;
+    this.sweepMarkers();
   }
 
   // ------------------------------------------------------------------ the board's port
@@ -125,7 +157,11 @@ export class AgentRuns implements AgentLaunches {
    * request may be published once the card and the board have been read again.
    */
   report(r: StatusReport): void {
-    if (this.unloaded) return;
+    // Switched off, a move still takes the marker its card carried in the column it left, and
+    // nothing else: a card moved out and back while off would otherwise come back, once switched on,
+    // carrying a run nobody is doing, which also keeps every later launch out.
+    const launching = this.enabled && r.mayLaunch;
+    if (this.unloaded || (!this.enabled && !departs(r.departingMarker, r.from))) return;
     const slot = this.slot(r.cardPath);
     this.drop(slot);
     const mine = ++slot.seq;
@@ -133,13 +169,14 @@ export class AgentRuns implements AgentLaunches {
       cardPath: r.cardPath,
       boardPath: r.boardPath,
       seq: mine,
-      column: r.mayLaunch ? r.to : null,
+      column: launching ? r.to : null,
     };
     slot.work = work;
     this.enqueue(slot, async () => {
       try {
         await this.depart(slot, r);
-        if (r.mayLaunch && r.to !== null) await this.schedule(slot, { r, mine, work });
+        if (launching && r.to !== null && this.enabled)
+          await this.schedule(slot, { r, mine, work });
       } finally {
         if (slot.work === work) slot.work = null;
         this.prune(slot);
@@ -158,7 +195,10 @@ export class AgentRuns implements AgentLaunches {
         marker: r.departingMarker,
         stale: () => true,
       });
+    // Switched off, the departing marker is all a move takes.
+    if (!this.enabled) return;
     const fm = await freshFrontmatter(this.app, file);
+    if (!this.enabled) return;
     const status = statusOf(fm);
     let marker = fm[AGENT_RUN_KEY];
     if (staleByColumn(marker, status) && (await this.clearStale(file, marker))) marker = undefined;
@@ -227,7 +267,7 @@ export class AgentRuns implements AgentLaunches {
 
   private isCurrent(request: LaunchRequest): boolean {
     const slot = this.slots.get(request.cardPath);
-    return !this.unloaded && slot?.request === request && slot.seq === request.seq;
+    return this.enabled && slot?.request === request && slot.seq === request.seq;
   }
 
   /** Start a waiting request: the countdown ended, or someone pressed Now. Once only. */
@@ -295,7 +335,7 @@ export class AgentRuns implements AgentLaunches {
    * so a launch this has to call off is never waited for. Never schedules.
    */
   observe(file: TFile, cached: Readonly<Record<string, unknown>> | undefined): void {
-    if (this.unloaded) return;
+    if (!this.enabled) return;
     const known = this.slots.get(file.path);
     if (!known && (cached?.[AGENT_RUN_KEY] ?? null) === null) return;
     const slot = known ?? this.slot(file.path);
@@ -314,7 +354,11 @@ export class AgentRuns implements AgentLaunches {
   /** `asOf` is the slot's sequence when the read started: a request published after that is newer
    *  than what the read can show, and it is not this read's to call off. */
   private observed(slot: Slot, read: { n: number; asOf: number }, text: string): void {
-    if (this.unloaded) return;
+    // Switched off while the read was out: it is answered, so the slot can go, and nothing is done.
+    if (!this.enabled) {
+      slot.observeApplied = Math.max(slot.observeApplied, read.n);
+      return;
+    }
     let fm: Record<string, unknown>;
     try {
       fm = parseFrontmatter(text);
@@ -349,12 +393,19 @@ export class AgentRuns implements AgentLaunches {
   private async clearObserved(slot: Slot, evidence: Evidence): Promise<void> {
     const file = this.app.vault.getFileByPath(slot.path);
     const clear = observedClear(evidence);
-    if (file !== null && clear !== null) await clearMarker(this.app, this.writer, file, clear);
+    if (file !== null && clear !== null && this.enabled)
+      await clearMarker(this.app, this.writer, file, clear);
   }
 
   /** At startup: every card carrying a marker is looked at under the same rules, which also seeds
    *  what this device has seen, so a later move can be told from a marker that was never ours. */
   sweep(): void {
+    this.layoutReady = true;
+    this.live = this.enabled;
+    if (this.live) this.sweepMarkers();
+  }
+
+  private sweepMarkers(): void {
     for (const file of this.app.vault.getMarkdownFiles()) {
       const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
       if (fm && (fm[AGENT_RUN_KEY] ?? null) !== null) this.observe(file, fm);
@@ -369,6 +420,7 @@ export class AgentRuns implements AgentLaunches {
    * it has read may no longer be the paths it would write.
    */
   followFileOp(op: FileOp): void {
+    // Not gated: switched off, the slots left hold a departure clear that must follow its card.
     for (const slot of [...this.slots.values()]) {
       const card = remapPath(slot.path, op);
       const boards = [slot.work?.boardPath, slot.request?.boardPath].filter(

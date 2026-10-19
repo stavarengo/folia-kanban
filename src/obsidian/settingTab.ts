@@ -23,12 +23,13 @@ import {
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_CONTROLS,
-  SETTING_COPY,
   SETTING_GROUPS,
   TAB_REDRAW_KEYS,
   VERSION_SETTING_NAME,
   bindAddressConfirm,
+  isGroupShown,
   isRowDisabled,
+  settingCopy,
   splitHeldPatch,
   type EditableSettingKey,
 } from "../settingsLayout";
@@ -45,6 +46,8 @@ export interface SettingTabHost extends Plugin {
   copyMcpToken(): Promise<void>;
   regenerateMcpToken(): Promise<void>;
 }
+
+const isRedrawKey = (key: string): boolean => (TAB_REDRAW_KEYS as readonly string[]).includes(key);
 
 export class KanbanSettingTab extends PluginSettingTab {
   constructor(
@@ -88,7 +91,7 @@ export class KanbanSettingTab extends PluginSettingTab {
   /**
    * The tab as data, so Obsidian 1.13 and later renders it itself and — the point of it — indexes
    * every setting for the settings search. Below 1.13 this method is never called and `display()`
-   * below draws the same rows imperatively; both read their wording from `SETTING_COPY`.
+   * below draws the same rows imperatively; both read their wording from `settingCopy`.
    */
   override getSettingDefinitions(): SettingDefinitionItem[] {
     return settingDefinitions(() => this.plugin.settings, this.plugin.manifest.version, {
@@ -123,9 +126,9 @@ export class KanbanSettingTab extends PluginSettingTab {
     void this.plugin.updateSettings(patch).then(() => {
       // Agent access gates the port and bind-address rows, and those two draw themselves from a
       // `render` callback — which carries no `disabled` predicate for `refreshDomState` to
-      // re-evaluate. Only redrawing the tab reaches them. No other row is gated, so every other
-      // change gets the cheap path.
-      refreshDeclarativeSettingTab(this, key === "mcpEnabled" ? "redraw" : "refresh");
+      // re-evaluate. The experimental switch decides whether a whole group is there at all. Only
+      // redrawing the tab reaches either; every other change gets the cheap path.
+      refreshDeclarativeSettingTab(this, isRedrawKey(key) ? "redraw" : "refresh");
     });
   }
 
@@ -187,7 +190,7 @@ export class KanbanSettingTab extends PluginSettingTab {
     if (this.askingBindAddress === address) return;
     this.askingBindAddress = address;
     try {
-      if (await confirmAction(this.app, bindAddressConfirm(address))) {
+      if (await confirmAction(this.app, bindAddressConfirm(address, this.plugin.settings))) {
         await this.plugin.updateSettings({ mcpBindAddress: address });
         return;
       }
@@ -318,6 +321,7 @@ export class KanbanSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     for (const group of SETTING_GROUPS) {
+      if (!isGroupShown(group.id, this.plugin.settings)) continue;
       new Setting(containerEl).setName(group.heading).setHeading();
       for (const key of group.keys) this.renderRow(key, containerEl);
       if (group.id === "agentAccess") this.renderTokenRows(containerEl);
@@ -335,9 +339,10 @@ export class KanbanSettingTab extends PluginSettingTab {
     const value = settings[key];
     const spec = SETTING_CONTROLS[key];
     const disabled = isRowDisabled(key, settings);
+    const copy = settingCopy(key, settings);
     const setting = new Setting(containerEl)
-      .setName(SETTING_COPY[key].name)
-      .setDesc(SETTING_COPY[key].desc)
+      .setName(copy.name)
+      .setDesc(copy.desc)
       .setDisabled(disabled);
 
     switch (spec.kind) {
@@ -396,7 +401,7 @@ export class KanbanSettingTab extends PluginSettingTab {
     const saved = this.plugin.updateSettings(patch);
     // A row that decides whether other rows exist or are live needs the tab drawn again: nothing
     // here re-evaluates a disabled state on its own the way `refreshDomState()` does on 1.13.
-    if ((TAB_REDRAW_KEYS as readonly string[]).includes(key)) void saved.then(() => this.render());
+    if (isRedrawKey(key)) void saved.then(() => this.render());
   }
 
   /** The two rows that close the agent-access section: neither is a setting, both are dead until

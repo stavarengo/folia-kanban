@@ -1201,8 +1201,7 @@ describe("property names suggest themselves (20260827.08)", () => {
       "created",
       "tags",
       "context",
-      "agent",
-      "agent-run",
+      // `agent` and `agent-run` belong to agent columns, which are off until switched on.
       "blocks",
       "blocked-by",
       "energy",
@@ -7607,12 +7606,13 @@ describe("column colour — what a board note paints", () => {
 
 describe("an agent launch on the tile", () => {
   const ALPHA = "Tasks/Alpha.md";
-  function renderWithLaunches(repo = makeRepo()) {
+  const AGENTS_ON = { ...DEFAULT_SETTINGS, experimentalAgentColumns: true };
+  function renderWithLaunches(repo = makeRepo(), settings = AGENTS_ON) {
     const launches = fakeLaunches();
     render(
       <App
         repo={repo}
-        settings={DEFAULT_SETTINGS}
+        settings={settings}
         onUpdateSettings={() => {}}
         today="2026-06-13"
         host={testHost(document, launches.agents)}
@@ -7688,5 +7688,22 @@ describe("an agent launch on the tile", () => {
       "An agent is working on this card, run 3f9a1c2b, started 2026-10-19 14:05",
     );
     expect(face()).toHaveAccessibleName(/agent running/);
+  });
+
+  // Agent columns are experimental and off by default: the board then looks as it did before
+  // they existed, whatever the plugin's launches or the card's frontmatter say.
+  it("shows neither a countdown nor a run while agent columns are off", async () => {
+    const repo = makeRepo();
+    await repo.setFrontmatter(ALPHA, {
+      "agent-run": { id: "3f9a1c2b", started: "2026-10-19 14:05", column: "todo" },
+    });
+    const launches = renderWithLaunches(repo, DEFAULT_SETTINGS);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    act(() => launches.wait(ALPHA, Date.now() + 9_400));
+    expect(tile().querySelector(".folia-agent-pending")).toBeNull();
+    expect(tile()).not.toHaveTextContent(/Agent/);
+    expect(face()).not.toHaveAccessibleName(/agent/);
+    // The marker is still the card's own: a property like any other, kept as it is.
+    expect(repo.files.get(ALPHA)!.fm["agent-run"]).toMatchObject({ id: "3f9a1c2b" });
   });
 });

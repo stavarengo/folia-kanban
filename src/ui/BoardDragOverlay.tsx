@@ -2,8 +2,8 @@ import { createPortal } from "react-dom";
 import { DragOverlay, defaultDropAnimationSideEffects } from "@dnd-kit/core";
 import type { Card, ColumnDef } from "../model/types";
 import { columnAccent } from "./columnColors";
-import { useBoardActions } from "./context";
-import { cardChips, priorityTone } from "./cardView";
+import { useBoardActions, useSettings } from "./context";
+import { agentRunChips, cardChips, priorityTone } from "./cardView";
 import { CardChips } from "./CardTileParts";
 
 /**
@@ -100,8 +100,12 @@ function CardGhost({
   doneColumnId: string | null;
 }) {
   const actions = useBoardActions();
+  const { experimentalAgentColumns } = useSettings();
   const priority = card.frontmatter.priority;
-  const chips = cardChips(card, today, doneColumnId, actions.priorityScale);
+  const chips = [
+    ...cardChips(card, today, doneColumnId, actions.priorityScale),
+    ...(experimentalAgentColumns ? agentRunChips(card) : []),
+  ];
   return (
     <div
       className="folia-card folia-card-overlay"

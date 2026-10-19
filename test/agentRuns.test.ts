@@ -57,7 +57,12 @@ function harness(frontmatter = "status: todo") {
   const app = new FakeApp();
   app.vault.addFile("Board.md", BOARD);
   app.vault.addFile(ONE, cardText(frontmatter));
-  const settings: KanbanSettings = { ...DEFAULT_SETTINGS, agentDelay: 10, historyScope: "all" };
+  const settings: KanbanSettings = {
+    ...DEFAULT_SETTINGS,
+    agentDelay: 10,
+    historyScope: "all",
+    experimentalAgentColumns: true,
+  };
   const spawned: SpawnRequest[] = [];
   const failures: ((why: string) => void)[] = [];
   const notices: string[] = [];
@@ -983,5 +988,146 @@ describe("found in review", () => {
     await settle();
     expect(h.spawned).toHaveLength(0);
     expect(h.fm()["agent-run"]).toBeUndefined();
+  });
+});
+
+describe("the experimental switch", () => {
+  it("off, a move into an agent column, a hand edit, a startup sweep and a rename start nothing and keep the marker", async () => {
+    const h = harness("status: done\nagent-run: { id: old, column: review }");
+    h.settings.experimentalAgentColumns = false;
+    h.runs.sweep();
+    await h.handEdit("status: build\nagent-run: { id: old, column: review }");
+    await h.move("review");
+    await h.app.fileManager.renameFile(h.file() as never, "Cards/Moved.md");
+    await settle();
+    expect(h.runs.pending("Cards/Moved.md")).toBeNull();
+    expect(h.slots()).toBe(0);
+    expect(h.timers.size).toBe(0);
+    expect(h.spawned).toHaveLength(0);
+    expect(h.installed).toHaveLength(0);
+    expect(h.notices).toEqual([]);
+    // The marker is left exactly as it was: off, it is a property like any other.
+    expect(h.fm("Cards/Moved.md")["agent-run"]).toEqual({ id: "old", column: "review" });
+  });
+
+  it("switched off mid-countdown, the countdown is called off and nothing starts", async () => {
+    const h = harness();
+    await h.move("review");
+    expect(h.runs.pending(ONE)).not.toBeNull();
+    h.settings.experimentalAgentColumns = false;
+    h.runs.followSettings();
+    expect(h.runs.pending(ONE)).toBeNull();
+    expect(h.timers.size).toBe(0);
+    expect(h.slots()).toBe(0);
+    h.runs.startNow(ONE);
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+  });
+
+  it("a move reported just before the switch went off takes the marker it carried, and launches nothing", async () => {
+    const h = harness("status: build\nagent-run: { id: a1, column: review }");
+    // The report is queued while the switch is on; it is switched off before the queue runs it.
+    h.runs.report({
+      boardPath: "Board.md",
+      cardPath: ONE,
+      from: "review",
+      to: "build",
+      departingMarker: { id: "a1", column: "review" },
+      mayLaunch: true,
+    });
+    h.settings.experimentalAgentColumns = false;
+    h.runs.followSettings();
+    await settle();
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    expect(h.timers.size).toBe(0);
+    expect(h.slots()).toBe(0);
+  });
+
+  // Without this the card would come back, once switched on, carrying a run nobody is doing: an
+  // Agent chip on the tile, and every later launch refused because the card already has a marker.
+  it("a card moved out and back in while off comes back without its run, and launches when on", async () => {
+    const h = harness("status: review\nagent-run: { id: a1, column: review }");
+    h.runs.sweep();
+    h.settings.experimentalAgentColumns = false;
+    h.runs.followSettings();
+    await h.move("build");
+    await h.move("review");
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    expect(h.timers.size).toBe(0);
+    h.settings.experimentalAgentColumns = true;
+    h.runs.followSettings();
+    await settle();
+    await h.move("build");
+    await h.move("review");
+    expect(h.runs.pending(ONE)).not.toBeNull();
+  });
+
+  it("off, a card renamed before its departure clear runs still loses the marker", async () => {
+    const h = harness("status: review\nagent-run: { id: a1, column: review }");
+    h.settings.experimentalAgentColumns = false;
+    h.runs.followSettings();
+    // Hold the card's queue so the clear is still waiting when the rename lands.
+    const gate = deferred();
+    const slots = (h.runs as unknown as { slot(path: string): { chain: Promise<void> } }).slot(ONE);
+    slots.chain = slots.chain.then(() => gate.promise);
+    await h.move("build");
+    await h.app.fileManager.renameFile(h.file() as never, "Cards/Renamed.md");
+    gate.release();
+    await settle();
+    expect(h.fm("Cards/Renamed.md")["agent-run"]).toBeUndefined();
+    expect(h.slots()).toBe(0);
+  });
+
+  it("switched off after the card was claimed, nothing starts and the claim is taken back", async () => {
+    const h = harness();
+    await h.move("review");
+    const write = h.app.fileManager.processFrontMatter.bind(h.app.fileManager);
+    h.app.fileManager.processFrontMatter = async (file, fn) => {
+      await write(file, fn);
+      h.app.fileManager.processFrontMatter = write;
+      // Right after the claim.
+      h.settings.experimentalAgentColumns = false;
+      h.runs.followSettings();
+    };
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    expect(h.slots()).toBe(0);
+  });
+
+  it("a read of a card still out when the switch goes off leaves nothing behind", async () => {
+    const h = harness("status: done\nagent-run: { id: old, column: review }");
+    h.runs.observe(h.file(), h.fm());
+    h.settings.experimentalAgentColumns = false;
+    h.runs.followSettings();
+    await settle();
+    expect(h.slots()).toBe(0);
+    expect(h.fm()["agent-run"]).toEqual({ id: "old", column: "review" });
+  });
+
+  it("a countdown that fires after the switch went off, before the plugin heard, starts nothing", async () => {
+    const h = harness();
+    await h.move("review");
+    h.settings.experimentalAgentColumns = false;
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm()["agent-run"]).toBeUndefined();
+  });
+
+  it("switched back on, it looks at the markers the startup sweep skipped, and launches again", async () => {
+    const h = harness("status: done\nagent-run: { id: old, column: review }");
+    h.settings.experimentalAgentColumns = false;
+    h.runs.sweep();
+    await settle();
+    expect(h.fm()["agent-run"]).toBeDefined();
+    h.settings.experimentalAgentColumns = true;
+    h.runs.followSettings();
+    await settle();
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    await h.move("review");
+    expect(h.runs.pending(ONE)).not.toBeNull();
   });
 });

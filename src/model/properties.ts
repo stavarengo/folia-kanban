@@ -36,6 +36,9 @@ interface FoliaProperty {
    * has nothing here that would misread a list.
    */
   scalarOnly?: boolean;
+  /** True for a key that only means something while agent columns, an experimental feature, are
+   *  on. It is read and written like any other key either way; only the suggestions follow it. */
+  agentColumns?: boolean;
 }
 
 const AGENT_CONFIG_REFUSAL =
@@ -104,9 +107,9 @@ const FOLIA_PROPERTIES = [
   { key: "context", scope: "card" },
   // Only the card's `model` and `effort` are read, but a value written here still decides what a
   // program started on this computer is asked to do, so it is set by hand, not by a tool.
-  { key: "agent", scope: "card", toolRefusal: AGENT_CONFIG_REFUSAL },
+  { key: "agent", scope: "card", toolRefusal: AGENT_CONFIG_REFUSAL, agentColumns: true },
   // No refusal: clearing it with `null` is how a launched agent says it stopped (docs/mcp.md).
-  { key: "agent-run", scope: "card" },
+  { key: "agent-run", scope: "card", agentColumns: true },
   {
     key: "folia-board",
     scope: "board",
@@ -134,6 +137,14 @@ export type FoliaPropertyKey = (typeof FOLIA_PROPERTIES)[number]["key"];
 export const FOLIA_CARD_KEYS: readonly string[] = FOLIA_PROPERTIES.filter(
   (p) => p.scope === "card",
 ).map((p) => p.key);
+
+/** The card keys the detail panel suggests: all of them while agent columns are on, the rest of
+ *  them while that experimental feature is off. */
+export function suggestedCardKeys(agentColumns: boolean): readonly string[] {
+  return FOLIA_PROPERTIES.filter(
+    (p) => p.scope === "card" && (agentColumns || !("agentColumns" in p)),
+  ).map((p) => p.key);
+}
 
 /**
  * The card keys the detail panel edits through a dedicated control, so its generic property rows

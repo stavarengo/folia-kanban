@@ -578,6 +578,29 @@ describe("the plugin reacts to an external settings change", () => {
 });
 
 describe("the agents-in-columns settings", () => {
+  // Experimental, and it starts programs: nothing happens until the user switches it on.
+  it("are off until the experimental switch is on, and only a real true turns it on", () => {
+    expect(DEFAULT_SETTINGS.experimentalAgentColumns).toBe(false);
+    expect(hydrateSettings(null, NOW).stored).not.toHaveProperty("experimentalAgentColumns");
+    const handEdited = hydrateSettings(
+      { settingsFormat: 2, commentsBaseline: NOW, experimentalAgentColumns: "true" },
+      NOW,
+    );
+    expect(handEdited.settings.experimentalAgentColumns).toBe(false);
+    expect(handEdited.stored).not.toHaveProperty("experimentalAgentColumns");
+    expect(handEdited.needsSave).toBe(true);
+  });
+
+  // Every way the settings change has to reach the launches, or switching off mid-countdown would
+  // still start the agent. `src/main.ts` cannot be imported here, so its source is read.
+  it("are wired to the launches on every settings change path, from here or from the file", () => {
+    const main = readFileSync(resolve(process.cwd(), "src/main.ts"), "utf8");
+    for (const name of ["private adopt(", "async resetSettings(", "async updateSettings("]) {
+      const from = main.slice(main.indexOf(name));
+      expect(from.slice(0, from.indexOf("\n  }")), name).toContain("this.agents.followSettings()");
+    }
+  });
+
   it("start from the default command, the default prompt and a ten-second wait", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       agentCommand: DEFAULT_AGENT_COMMAND,

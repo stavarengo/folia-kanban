@@ -15,6 +15,7 @@ import type { BoardSettings, SettingsPatch } from "../settings";
 import type { AgentLaunches } from "../model/agent";
 import {
   AgentLaunchesContext,
+  NO_LAUNCHES,
   BoardActionsContext,
   ContextsContext,
   RelationCountsContext,
@@ -181,7 +182,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       relations={view.relations}
       matchCtx={view.matchCtx}
       root={rootRef}
-      agents={host.agents}
+      agents={settings.experimentalAgentColumns ? host.agents : NO_LAUNCHES}
     >
       <div className="folia-root folia-scope" ref={rootRef}>
         <Toolbar

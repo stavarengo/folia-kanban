@@ -1,5 +1,8 @@
 # Agents in columns
 
+> [!WARNING]
+> **Experimental, and off by default.** Agents in columns may change or break in any release, so use it at your own risk. To try it, open **Settings → Folia Kanban → Experimental** and switch on **Agents in columns**. Until you do, nothing on this page happens: no countdown, no launch, no **Agent** chip, and no **Agents in columns** settings. A column's `agent:` and a card's `agent-run` stay in your notes as written, except that a card moved out of its column, on the board or through agent access, still loses the `agent-run` it carried there, so it does not come back to a run that has ended. Once you switch it on they take effect from the next move into the column; a card already sitting there does not start an agent by itself. Switching it off stops new launches only: a session already running keeps going until its card leaves the column or you close it (`tmux -L folia kill-server` closes them all).
+
 A column can start an AI agent on every card that enters it. Drop a card into a column the board note marks with `agent:`, and after a short wait the plugin runs a command of your choosing on that card. The default command opens a [Claude Code](https://code.claude.com) session in a terminal window of its own, which works the card through the board's [agent access (MCP)](mcp.md) like a teammate would: it assigns itself, comments, ticks subtasks, and moves the card where it belongs when it is done.
 
 Desktop only, macOS and Linux. Agent access has to be on: the agent reaches the board through it, and no launch happens without it.
@@ -70,7 +73,7 @@ Each launch also adds `Agent launch requested (run <id>)` to the card's history,
 
 ## Settings
 
-**Settings → Folia Kanban → Agents in columns**. The rows are greyed until agent access is on.
+**Settings → Folia Kanban → Agents in columns**. The section is there only while **Experimental → Agents in columns** is on, and its rows are greyed until agent access is on as well.
 
 | Setting | What it is |
 | --- | --- |
@@ -156,6 +159,6 @@ A launch runs a command as you, on this computer, with arguments taken from the 
 
 Agent access adds no way to change what runs: `update_card` refuses the `columns` and `agent` keys on any note it reaches, another board's note in this board's card folder included, and a card's own `agent:` carries only a model name and an effort. That is a limit on the MCP tools, not on the session a launch starts. The session runs as you, in the column's `cwd` (the vault's folder by default), with its own file and shell tools: it can edit a board note's `agent:` or the plugin's `data.json` like any program you run, and the next launch would run what it wrote. What stops it is the prompt and the agent's own permission prompts for those tools (the board's tools run unprompted, see [The Folia Mod](#the-folia-mod)), so treat text on a card that someone else wrote as input to a program running as you. One agent can also clear another run's `agent-run` through `update_card`, after which the next move into the column starts a second agent on that card.
 
-What agent access does add is a way to start one. Anything holding the token can `move_card` a card into an agent column, and a session then starts on this computer, reads that card and works on it. On the default loopback bind that is software already running as you; once the server listens on a network, it is any machine there with the token.
+What agent access does add, while agents in columns are switched on, is a way to start one. Anything holding the token can `move_card` a card into an agent column, and a session then starts on this computer, reads that card and works on it. On the default loopback bind that is software already running as you; once the server listens on a network, it is any machine there with the token.
 
 Software running as your user can still read a process's environment and the `folia` tmux server's buffers, as [What it does not protect you from](mcp.md#what-it-does-not-protect-you-from) already says of the token.

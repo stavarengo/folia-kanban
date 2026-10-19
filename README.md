@@ -309,7 +309,7 @@ Two cards can share a file name too. A `[[wikilink]]` between cards binds to the
 
 ## Settings
 
-Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is a handful of headed sections, and a row that only applies under another setting says so in its own description and greys out until that setting says otherwise.
+Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is a handful of headed sections, and a row that only applies under another setting says so in its own description and greys out until that setting says otherwise. The one exception is the **Agents in columns** section, which is left out altogether until its experimental switch is on.
 
 - **Boards and board notes**
   - **Open board notes as** — `board` or `markdown`: which view a note carrying `folia-board: true` opens in. Overridden per note by `folia-view`.
@@ -327,6 +327,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
   - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due changes), or `all` (also comments, subtasks and blocking links).
 - **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp).
 - **Agents in columns** — **Command**, **Prompt** and **Wait before starting**: what a card entering an agent column runs, what the agent is asked, and how long the tile waits first; see [Agents in columns](#agents-in-columns).
+- **Experimental** — switches for features that may still change or break. **Agents in columns** is the only one so far, off by default.
 
 The version the vault is running is the last row, under an **About** heading of its own.
 
@@ -342,6 +343,9 @@ claude mcp add --scope user --transport http folia-kanban http://127.0.0.1:27125
 Sessions an [agent column](#agents-in-columns) start need none of this, and a registration of your own takes the place of theirs; [docs/agents-in-columns.md](docs/agents-in-columns.md#the-folia-mod) says how to keep both. The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/mcp.md).
 
 ## Agents in columns
+
+> [!WARNING]
+> Experimental, and off by default: it may change or break in any release. Turn it on under **Settings → Folia Kanban → Experimental → Agents in columns**. Until then a column's `agent:` is kept in your note as written and does nothing.
 
 Give a column `agent:` in the board note, and every card the board or an agent moves into it starts an AI agent on that card. The tile counts a short wait down first, with **Cancel** and **Now** beside it. By default that is a Claude Code session in a window of the plugin's own tmux server, working the card through agent access, which it reaches with no setup of yours: it assigns itself, comments, ticks subtasks and moves the card on when it is done. Moving the card out of the column stops the session at its next step, and its status line names the card. The card shows an **Agent** chip while the run lasts. Agent access has to be on; macOS and Linux only.
 

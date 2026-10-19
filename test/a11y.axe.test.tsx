@@ -109,13 +109,34 @@ describe("a11y axe gate (no violations)", () => {
     render(
       <App
         repo={repo}
-        settings={DEFAULT_SETTINGS}
+        settings={{ ...DEFAULT_SETTINGS, experimentalAgentColumns: true }}
         onUpdateSettings={() => {}}
         today="2026-06-13"
         host={testHost(document, launches.agents)}
       />,
     );
     await screen.findByRole("group", { name: 'Agent starting for "Alpha"' });
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
+
+  // The same cards with agent columns off, the default: a marker is then a property like any other.
+  it("the same cards with agent columns switched off have no axe violations", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Gamma.md")!.fm["agent-run"] = { id: "3f9a1c2b", column: "doing" };
+    const launches = fakeLaunches();
+    launches.wait("Tasks/Alpha.md", Date.now() + 10_000);
+    render(
+      <App
+        repo={repo}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={testHost(document, launches.agents)}
+      />,
+    );
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    expect(screen.queryByRole("group", { name: 'Agent starting for "Alpha"' })).toBeNull();
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);
   }, 30000);

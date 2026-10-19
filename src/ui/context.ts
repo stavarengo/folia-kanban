@@ -323,8 +323,9 @@ export function useBoardRootRef(): RefObject<HTMLElement | null> {
   return ref;
 }
 
-/** No launches at all: what a board drawn outside a plugin (a test, a preview) sees. */
-const NO_LAUNCHES: AgentLaunches = {
+/** No launches at all: what a board drawn outside a plugin (a test, a preview) sees, and what a
+ *  board sees while agent columns, an experimental feature, are switched off. */
+export const NO_LAUNCHES: AgentLaunches = {
   subscribe: () => () => {},
   pending: () => null,
   cancel: () => {},

@@ -375,6 +375,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       // Port, bind address, token and the switch itself can all have moved; the running server has
       // to follow them here as it does on any other settings change.
       void this.mcp?.sync(this.settings);
+      this.agents.followSettings();
     }
     // Only when this instance decided something the file does not already say. Writing back what we
     // just read would reach the other side as its own external change, and come back again.
@@ -401,6 +402,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.stored = next;
     this.settings = resolveSettings(this.stored);
     this.refreshViews();
+    this.agents.followSettings();
     await this.saveSettings();
   }
 
@@ -451,6 +453,8 @@ export default class FoliaKanbanPlugin extends Plugin {
       if (deviceChanged || syncedChanged) this.refreshViews();
       if (syncedChanged) {
         void this.mcp?.sync(this.settings);
+        // The experimental switch for agent columns: off calls every launch in hand off.
+        this.agents.followSettings();
         await this.saveSettings();
       }
     }

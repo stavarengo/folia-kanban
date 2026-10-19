@@ -469,13 +469,17 @@ export function cardChips(
   if (typeof fm.due === "string" && fm.due) {
     chips.push(dueChip(fm.due, today, fm.status === doneColumnId));
   }
-  const run = agentRunOf(fm);
-  if (run.present) chips.push(agentRunChip(run));
-
   return chips;
 }
 
-/** The chip a card carrying `agent-run` shows for as long as the marker is there. */
+/** The chip a card carrying `agent-run` shows for as long as the marker is there, drawn after
+ *  {@link cardChips}. Only while agent columns, an experimental feature, are switched on: off, the
+ *  marker is a property like any other. */
+export function agentRunChips(card: Card): CardChip[] {
+  const run = agentRunOf(card.frontmatter);
+  return run.present ? [agentRunChip(run)] : [];
+}
+
 function agentRunChip(run: AgentRun): CardChip {
   const details = [
     run.id === undefined ? null : `run ${run.id}`,

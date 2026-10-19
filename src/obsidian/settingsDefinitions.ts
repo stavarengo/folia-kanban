@@ -6,13 +6,14 @@ import {
   MCP_TOKEN_COPY,
   MCP_TOKEN_REGENERATE,
   SETTING_CONTROLS,
-  SETTING_COPY,
   SETTING_GROUPS,
   SETTING_OPTIONS,
   TOGGLE_SETTING_KEYS,
   ABOUT_HEADING,
   VERSION_SETTING_NAME,
+  isGroupShown,
   isRowDisabled,
+  settingCopy,
   type DropdownKey,
   type EditableSettingKey,
   type RowControlSpec,
@@ -220,7 +221,7 @@ function rowDefinition(key: EditableSettingKey, ctx: RowContext): SettingDefinit
   const { heading, read, actions } = ctx;
   const spec: RowControlSpec = SETTING_CONTROLS[key];
   const base = {
-    ...SETTING_COPY[key],
+    ...settingCopy(key, read()),
     aliases: [heading, ...(EXTRA_ALIASES[key] ?? [])],
   };
   // A held field is not a control at all: it draws itself and writes on blur, and its disabled
@@ -294,8 +295,11 @@ export function settingDefinitions(
   version: string,
   actions: SettingTabActions,
 ): SettingDefinitionItem[] {
+  // A group behind an experimental switch is left out, not greyed, while the switch is off: no row,
+  // no heading, nothing for the settings search to find. Flipping it redraws the tab.
+  const shown = SETTING_GROUPS.filter((group) => isGroupShown(group.id, read()));
   return [
-    ...SETTING_GROUPS.map((group) => {
+    ...shown.map((group) => {
       const ctx: RowContext = { heading: group.heading, read, actions };
       return {
         type: "group" as const,

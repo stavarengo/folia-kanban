@@ -6,6 +6,7 @@ import {
   groupAndSortCards,
   boardPriorities,
   priorityOptions,
+  agentRunChips,
   cardChips,
   describeFill,
 } from "../src/ui/cardView";
@@ -428,6 +429,14 @@ describe("assignment (20260827.03)", () => {
     ]);
     expect(chips[0]?.tooltip).toBe("Assigned to Rafa");
     expect(cardChips(card({}), "2026-06-16", "done")).toEqual([]);
+  });
+
+  // The tile and the drag ghost both add it only while agent columns, an experimental feature, are on.
+  it("keeps the Agent chip out of the card's own chips", () => {
+    const running = card({ "agent-run": { id: "a1", column: "doing" } });
+    expect(cardChips(running, "2026-06-16", "done")).toEqual([]);
+    expect(agentRunChips(running).map((c) => c.label)).toEqual(["Agent"]);
+    expect(agentRunChips(card({}))).toEqual([]);
   });
 
   it("repeats the priority and the tag in their tooltips, so a cut-short chip can still be read", () => {

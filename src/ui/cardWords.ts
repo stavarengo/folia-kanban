@@ -6,16 +6,22 @@ import type { UnreadState } from "../model/unread";
  * The tile's accessible name. Subtask progress, unread comments and an agent's launch or run are
  * folded into it: everything inside the tile's face is a descendant of a `role="button"`, so a label
  * or role on the bar or the badge is never announced. The name is the only place a screen reader
- * can hear them. The words stay static — a countdown read out every second would be noise.
+ * can hear them. The words stay static — a countdown read out every second would be noise. The
+ * agent words follow the experimental switch for agent columns, `agentRuns`, as the chip does.
  */
-export function tileName(card: Card, unread: UnreadState, launchPending = false): string {
+export function tileName(
+  card: Card,
+  unread: UnreadState,
+  launchPending = false,
+  agentRuns = false,
+): string {
   const stats = card.stats;
   return [
     card.title,
     stats && stats.checklist > 0 ? progressWords(stats) : null,
     unread.kind === "none" ? null : unreadWords(unread),
-    launchPending ? "agent starting soon" : null,
-    agentRunOf(card.frontmatter).present ? "agent running" : null,
+    agentRuns && launchPending ? "agent starting soon" : null,
+    agentRuns && agentRunOf(card.frontmatter).present ? "agent running" : null,
   ]
     .filter(Boolean)
     .join(", ");

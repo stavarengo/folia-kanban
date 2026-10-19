@@ -91,6 +91,13 @@ export interface KanbanSettings {
   agentPrompt: string;
   /** Seconds a launch waits, with Cancel and Now on the tile, before it starts. 0 starts at once. */
   agentDelay: number;
+  /**
+   * Whether agent columns do anything at all, an experimental feature. Off (the default): no
+   * launch, no countdown, no Agent chip, no settings for it. `agent:` and
+   * `agent-run` in notes are still read and written back, though a card moved out of its column
+   * still loses its `agent-run`. See `docs/agents-in-columns.md`.
+   */
+  experimentalAgentColumns: boolean;
 }
 
 /**
@@ -200,6 +207,7 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   agentCommand: DEFAULT_AGENT_COMMAND,
   agentPrompt: DEFAULT_AGENT_PROMPT,
   agentDelay: 10,
+  experimentalAgentColumns: false,
 };
 
 /** Where the bearer token used to live: an ordinary settings key, written to `data.json` in the
@@ -345,6 +353,9 @@ function dropUnusable(stored: StoredSettings): boolean {
   )
     drop("mcpBindAddress");
   for (const key of unusableAgentKeys(stored)) drop(key);
+  // It decides whether programs start on this computer, so only a real `true` turns it on.
+  if ("experimentalAgentColumns" in stored && typeof stored.experimentalAgentColumns !== "boolean")
+    drop("experimentalAgentColumns");
   return dropped;
 }
 

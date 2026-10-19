@@ -13,6 +13,7 @@ import {
   TOOL_REFUSALS,
   editScalar,
   propertySuggestions,
+  suggestedCardKeys,
 } from "../src/model/properties";
 import type { CardFrontmatter } from "../src/model/types";
 
@@ -34,6 +35,13 @@ describe("the keys Folia Kanban knows", () => {
         "agent",
         "agent-run",
       ].sort(),
+    );
+  });
+
+  it("suggests the agent-column keys only while that experimental feature is on", () => {
+    expect(suggestedCardKeys(true)).toEqual(FOLIA_CARD_KEYS);
+    expect(suggestedCardKeys(false)).toEqual(
+      FOLIA_CARD_KEYS.filter((k) => k !== "agent" && k !== "agent-run"),
     );
   });
 
