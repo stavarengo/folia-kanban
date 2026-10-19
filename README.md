@@ -343,7 +343,7 @@ The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/m
 
 ## Agents in columns
 
-Give a column `agent:` in the board note, and every card the board or an agent moves into it starts an AI agent on that card. The tile counts a short wait down first, with **Cancel** and **Now** beside it. By default that is a Claude Code session in a window of the plugin's own tmux server, working the card through agent access: it assigns itself, comments, ticks subtasks and moves the card on when it is done. The card shows an **Agent** chip while the run lasts. Agent access has to be on; macOS and Linux only.
+Give a column `agent:` in the board note, and every card the board or an agent moves into it starts an AI agent on that card. The tile counts a short wait down first, with **Cancel** and **Now** beside it. By default that is a Claude Code session in a window of the plugin's own tmux server, working the card through agent access, which it reaches with no setup of yours: it assigns itself, comments, ticks subtasks and moves the card on when it is done. Moving the card out of the column stops the session at its next step, and its status line names the card. The card shows an **Agent** chip while the run lasts. Agent access has to be on; macOS and Linux only.
 
 ```yaml
 columns:

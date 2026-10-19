@@ -707,3 +707,13 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **A hand edit or a sync.** The design's rule: a second computer seeing the same move through Sync must not start a second agent. Both still call a countdown off and clear a stale marker.
 - **A launch still waiting when Obsidian quits.** Countdowns live in the running plugin and are not written anywhere, so the next start knows nothing of them. Writing them down would be a launch that happens on whichever computer opens the vault next. Would change with a report of launches lost this way that matters.
 - **There is no `agent:` field in the Edit column dialog.** The mapping configures a program that runs on this computer, and its keys (`cwd`, `args`) are the kind a form makes too easy to get wrong silently. It is written by hand in the board note, and every column edit keeps it. Would change once the keys settle and a form can validate them.
+
+## The Folia Mod is written at launch, not shipped as files
+
+**Decided 2026-10-19 (#145). The mod's files live in `main.js` and are written into the plugin's folder before each launch, rewriting only what differs. Its hook refuses the tool call as well as stopping the session.**
+
+A release carries exactly `main.js`, `styles.css` and `manifest.json`, and the community installer copies nothing else, so a folder shipped next to them would never reach a vault. The scripts stay real files in `src/obsidian/folia-mod/`, read into the bundle as text (`?raw`), and the JSON files are built in `src/obsidian/foliaMod.ts`. Writing at launch rather than when the plugin loads means a launch never runs against a folder someone deleted or an older release left, a failed write refuses that launch with a notice naming it, and a vault that never starts an agent gets no folder. The write goes through `DataAdapter`, since the plugin's folder is in the config folder, which the Vault API does not index.
+
+The stop is pulled, never pushed: the hook reads the card's file before each tool call. Measured on Claude Code 2.1.227, `{"continue": false}` from a `PreToolUse` hook ends the turn but still runs the tool call that triggered it, so the hook also answers `permissionDecision: "deny"`; otherwise the first call after a move out of the column, say a comment, would still land. A card renamed during a run is found again in its old folder by the run id in `agent-run`, which stays pull-only and keeps a retitle from reading as "work called off".
+
+**What would change this:** a release format that carries extra files, which would let the mod ship as files; or a Claude Code hook output that stops a session before the call without a separate deny.
