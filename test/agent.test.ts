@@ -186,7 +186,7 @@ describe("statusOf", () => {
 
 describe("resolveCwd", () => {
   const at = (raw: string | undefined) => resolveCwd(raw, "/vault/My Vault", "/home/me");
-  it("follows the table in docs/agents.md", () => {
+  it("follows the table in docs/agents-in-columns.md", () => {
     expect(at(undefined)).toBe("/vault/My Vault");
     expect(at("  ")).toBe("/vault/My Vault");
     expect(at("~")).toBe("/home/me");

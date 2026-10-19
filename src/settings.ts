@@ -84,7 +84,7 @@ export interface KanbanSettings {
   /**
    * The shell command a card entering an agent column starts, run by `/bin/sh -c` in the column's
    * `cwd`, detached from Obsidian. `{{name}}` placeholders become shell words; the same context
-   * arrives as `FOLIA_*` variables, the token only as `FOLIA_MCP_TOKEN`. See `docs/agents.md`.
+   * arrives as `FOLIA_*` variables, the token only as `FOLIA_MCP_TOKEN`. See `docs/agents-in-columns.md`.
    */
   agentCommand: string;
   /** The prompt handed to that command as `{{prompt}}` and `FOLIA_PROMPT`, placeholders filled. */

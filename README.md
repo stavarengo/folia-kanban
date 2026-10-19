@@ -352,7 +352,7 @@ columns:
     agent: { model: sonnet }
 ```
 
-The `agent:` keys, the command and its placeholders, and what a run marker means are in [docs/agents.md](docs/agents.md).
+The `agent:` keys, the command and its placeholders, and what a run marker means are in [docs/agents-in-columns.md](docs/agents-in-columns.md).
 
 ## Keyboard & mouse
 
