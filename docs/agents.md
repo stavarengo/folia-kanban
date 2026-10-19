@@ -111,7 +111,7 @@ The agent token is not a placeholder. It reaches the command only as `FOLIA_MCP_
 
 ## The default command
 
-It needs `tmux` 3.3 or later (for `remain-on-exit failed`) and `claude` on the `PATH` it sets, which adds `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` to the one Obsidian was started with.
+It needs `tmux` 3.2 or later (for `remain-on-exit failed`) and `claude` on the `PATH` it sets, which adds `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` to the one Obsidian was started with.
 
 It runs a tmux server of the plugin's own, `tmux -L folia`, never your own tmux server, with one session, `agents`, and one window per card, named after the card. That server starts without your `~/.tmux.conf` (`-f /dev/null`), so tmux's default key bindings apply in it, and plugins such as tmux-resurrect or tmux-continuum never restore your sessions into it or save it over yours. Attach to watch or talk to an agent:
 
