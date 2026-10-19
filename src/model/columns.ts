@@ -7,7 +7,7 @@
 // A board whose columns carry none of the new fields therefore serializes to exactly the same
 // shape it did before this vocabulary existed — `processFrontMatter` then writes no extra keys.
 
-import type { ColumnDef, ColumnGroup, ColumnSort } from "./types";
+import type { AgentMapping, ColumnDef, ColumnGroup, ColumnSort } from "./types";
 
 export const DEFAULT_COLUMNS: ColumnDef[] = [
   { id: "todo", title: "Todo" },
@@ -151,7 +151,16 @@ function readColumn(c: unknown): ColumnDef | null {
   };
   readContentFields(obj, col);
   readViewFields(obj, col);
+  const agent = agentMapping(obj["agent"]);
+  if (agent) col.agent = agent;
   return col;
+}
+
+/** An `agent:` value that is a mapping, kept whole; anything else (`null`, a list) is no agent. */
+export function agentMapping(value: unknown): AgentMapping | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : undefined;
 }
 
 /** The fields that say what a column holds, each kept only when it is usable. */
@@ -186,6 +195,7 @@ export function serializeColumns(columns: ColumnDef[]): Record<string, unknown>[
     if (typeof c["limit"] === "number") out["limit"] = c["limit"];
     if (typeof c["filter"] === "string" && c["filter"].trim()) out["filter"] = c["filter"];
     writeViewFields(c, out);
+    if (c.agent) out["agent"] = { ...c.agent };
     return out;
   });
 }

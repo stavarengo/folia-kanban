@@ -2,7 +2,7 @@ import type { App, TFile } from "obsidian";
 import { TFolder, normalizePath, parseFrontMatterEntry } from "obsidian";
 import type { BoardConfig } from "../model/types";
 import { resolveCardFolder } from "../model/board";
-import { normalizeColumns } from "../model/columns";
+import { agentMapping, normalizeColumns } from "../model/columns";
 import { normalizePriorities } from "../model/priorities";
 import { normalizeRelationTypes } from "../model/relationships";
 import { asTitleMode } from "../model/cardTitle";
@@ -59,7 +59,9 @@ export async function readBoardConfig(
     caseMatches: cardFolderCaseMatches,
   } = cardFolderFor(app, boardPath, cardFolderRaw);
   const titleMode = asTitleMode(fm["card-title"] ?? fm["card_title"]);
+  const agent = agentMapping(fm["agent"]);
   return {
+    ...(agent ? { agent } : {}),
     path: boardPath,
     columns: normalizeColumns(fm["columns"]),
     priorities: normalizePriorities(fm["priorities"]),

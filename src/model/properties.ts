@@ -38,6 +38,9 @@ interface FoliaProperty {
   scalarOnly?: boolean;
 }
 
+const AGENT_CONFIG_REFUSAL =
+  "agent configuration starts programs on this computer; it is edited by hand in the board note";
+
 /**
  * The vocabulary. Card keys come first in the order the README's example note lists them, because
  * that order is what the panel's suggestions show.
@@ -99,6 +102,11 @@ const FOLIA_PROPERTIES = [
   },
   { key: "tags", scope: "card" },
   { key: "context", scope: "card" },
+  // Only the card's `model` and `effort` are read, but a value written here still decides what a
+  // program started on this computer is asked to do, so it is set by hand, not by a tool.
+  { key: "agent", scope: "card", toolRefusal: AGENT_CONFIG_REFUSAL },
+  // No refusal: clearing it with `null` is how a launched agent says it stopped (docs/mcp.md).
+  { key: "agent-run", scope: "card" },
   {
     key: "folia-board",
     scope: "board",
@@ -108,9 +116,12 @@ const FOLIA_PROPERTIES = [
   { key: "card-folder", scope: "board" },
   { key: "card-title", scope: "board" },
   { key: "folia-view", scope: "board" },
-  { key: "columns", scope: "board" },
+  // Refused because another board's note can sit in this board's card folder, where `update_card`
+  // reaches it: a column's `agent:` starts programs, and `columns` carries it.
+  { key: "columns", scope: "board", toolRefusal: AGENT_CONFIG_REFUSAL },
   { key: "priorities", scope: "board" },
   { key: "relations", scope: "board" },
+  { key: "agent", scope: "board" },
 ] as const satisfies readonly FoliaProperty[];
 
 /** Every key this module declares, as a union — what the compiler checks other files against. */

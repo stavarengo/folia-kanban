@@ -50,6 +50,39 @@ export const BoardFrontmatterSchema = z.looseObject({
   columns: z.unknown().optional(),
   priorities: z.unknown().optional(),
   relations: z.unknown().optional(),
+  agent: z.unknown().optional(),
+});
+
+/**
+ * An `agent:` mapping, on a column, on the board note or on a card. A malformed field reads as
+ * absent rather than failing the board: the mapping only configures a launch, and the launch is
+ * where a missing value is answered. `args` may be written as one string.
+ */
+export const AgentConfigSchema = z.looseObject({
+  cwd: optionalConfigString,
+  model: optionalConfigString,
+  effort: optionalConfigString,
+  args: z.preprocess(
+    (v) => (typeof v === "string" ? [v] : v),
+    z.array(z.string()).optional().catch(undefined),
+  ),
+});
+
+/** Like {@link optionalConfigString}, but a number or a boolean is read as its text, the way the
+ *  board reads `status`: a column id or a run id YAML typed for us still names the same thing. */
+const optionalScalarString = z.preprocess(
+  (v) =>
+    typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+      ? String(v)
+      : undefined,
+  z.string().optional(),
+);
+
+/** The `agent-run` marker a launch writes on its card. Any non-null value counts as present. */
+export const AgentRunSchema = z.looseObject({
+  id: optionalScalarString,
+  started: optionalScalarString,
+  column: optionalScalarString,
 });
 
 /**

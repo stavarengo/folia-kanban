@@ -46,6 +46,12 @@ export interface CardMutation {
   parentLines?: { path: string; links: string[]; done: boolean }[];
   /** History event text to append (timestamp added by the adapter). */
   history?: string;
+  /**
+   * Set by {@link reassignColumn}: the write empties a column that is being deleted rather than
+   * moving a card anywhere anyone chose, so it never starts an agent (see `docs/decisions.md`,
+   * "What does not start an agent"). A launch waiting on the card is still called off.
+   */
+  rehomed?: true;
 }
 
 /**
@@ -404,7 +410,7 @@ export function reassignColumn(
   const card = board.cards[path];
   if (!card) return null;
   const todoRef = card.todoRef;
-  if (!todoRef) return { path, setFrontmatter: { status: toColumnId } };
+  if (!todoRef) return { path, setFrontmatter: { status: toColumnId }, rehomed: true };
   // The checkbox is left out: a column going away rehomes what it held, it does not decide that the
   // work in it is finished or unfinished. Stating one here would reopen a ticked line every time
   // someone deleted the done column, in their own note, with nothing to undo it.

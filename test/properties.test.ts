@@ -31,6 +31,8 @@ describe("the keys Folia Kanban knows", () => {
         "context",
         "type",
         "created",
+        "agent",
+        "agent-run",
       ].sort(),
     );
   });
@@ -43,11 +45,15 @@ describe("the keys Folia Kanban knows", () => {
 
   it("refuses an agent exactly the keys a tool or a field owns, in the words it used before", () => {
     expect(Object.keys(TOOL_REFUSALS).sort()).toEqual(
-      ["status", "order", "priority", "due", "title", "folia-board"].sort(),
+      ["status", "order", "priority", "due", "title", "folia-board", "agent", "columns"].sort(),
     );
     expect(TOOL_REFUSALS["priority"]).toBe(
       "use update_card's own `priority` field, so the board remembers the value",
     );
+    expect(TOOL_REFUSALS["agent"]).toBe(
+      "agent configuration starts programs on this computer; it is edited by hand in the board note",
+    );
+    expect(TOOL_REFUSALS["columns"]).toBe(TOOL_REFUSALS["agent"]);
   });
 
   it("marks scalar-only exactly the card keys a list would break", () => {
