@@ -767,3 +767,70 @@ describe("the URL a launched agent dials", () => {
     expect(mcpUrl({ address: "fe80::1%eth0", port: 6 })).toBeNull();
   });
 });
+
+describe("found in review", () => {
+  /** Hold this card's queue until the gate opens, so reports pile up behind it in order. */
+  function holdQueue(h: ReturnType<typeof harness>) {
+    const gate = deferred();
+    const internals = h.runs as unknown as {
+      slot(path: string): object;
+      enqueue(slot: object, run: () => Promise<void>): void;
+    };
+    internals.enqueue(internals.slot(ONE), () => gate.promise);
+    return gate.release;
+  }
+
+  it("a stale read that started before a newer move does not call that move's countdown off", async () => {
+    const h = harness();
+    await h.move("review");
+    const realRead = h.app.vault.read.bind(h.app.vault);
+    const gate = deferred();
+    h.app.vault.read = async (file: TFile) => {
+      h.app.vault.read = realRead;
+      const text = await realRead(file);
+      await gate.promise;
+      return text;
+    };
+    h.runs.observe(h.file(), h.fm());
+    await h.move("build");
+    gate.release();
+    await settle();
+    expect(h.runs.pending(ONE)).not.toBeNull();
+    h.fireTimers();
+    await settle();
+    expect(h.spawned.map((s) => s.env["FOLIA_COLUMN"])).toEqual(["build"]);
+  });
+
+  it("out and back in before the first move is handled still clears the old marker and schedules", async () => {
+    const h = harness("status: review\nagent-run: { id: old1, column: review }");
+    const release = holdQueue(h);
+    await h.repo.applyMove({ path: ONE, setFrontmatter: { status: "done" } });
+    await h.repo.applyMove({ path: ONE, setFrontmatter: { status: "review" } });
+    release();
+    await settle();
+    expect(h.fm()["agent-run"]).toBeUndefined();
+    expect(h.runs.pending(ONE)).not.toBeNull();
+  });
+
+  it("forgets a deleted card it had seen a marker on", async () => {
+    const h = harness("status: review\nagent-run: { id: old }");
+    h.runs.sweep();
+    await settle();
+    expect(h.slots()).toBe(1);
+    await h.app.fileManager.trashFile(h.file() as never);
+    await settle();
+    expect(h.slots()).toBe(0);
+  });
+
+  it("says nothing about a card deleted while it was being read, and lets its slot go", async () => {
+    const h = harness("status: review\nagent-run: { id: old }");
+    h.app.vault.read = async (file: TFile) => {
+      await h.app.fileManager.trashFile(file as never);
+      throw Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+    };
+    h.runs.observe(h.file(), h.fm());
+    await settle();
+    expect(h.notices).toEqual([]);
+    expect(h.slots()).toBe(0);
+  });
+});

@@ -143,11 +143,12 @@ export class AgentRuns implements AgentLaunches {
   private async depart(slot: Slot, r: StatusReport): Promise<void> {
     const file = this.app.vault.getFileByPath(slot.path);
     if (file === null) return;
-    const from = r.from;
-    if (departs(r.departingMarker, from))
+    // The write that moved the card is the proof this marker's stint is over, so the clear holds
+    // even when the card is already back in the column by the time it lands: that is a new stint.
+    if (departs(r.departingMarker, r.from))
       await clearMarker(this.app, this.writer, file, {
         marker: r.departingMarker,
-        stale: (status) => status !== from,
+        stale: () => true,
       });
     const fm = await freshFrontmatter(this.app, file);
     const status = statusOf(fm);
@@ -289,17 +290,23 @@ export class AgentRuns implements AgentLaunches {
     const known = this.slots.get(file.path);
     if (!known && (cached?.[AGENT_RUN_KEY] ?? null) === null) return;
     const slot = known ?? this.slot(file.path);
-    const n = ++slot.observeSeq;
+    const read = { n: ++slot.observeSeq, asOf: slot.seq };
     void this.app.vault
       .read(file)
-      .then((text) => this.observed(slot, n, text))
-      .catch((e: unknown) => this.failed(e))
+      .then((text) => this.observed(slot, read, text))
+      .catch((e: unknown) => {
+        slot.observeApplied = Math.max(slot.observeApplied, read.n);
+        // A note deleted while it was being read is followed by its own delete event.
+        if (this.app.vault.getFileByPath(file.path) === file) this.failed(e);
+      })
       .finally(() => this.prune(slot));
   }
 
-  private observed(slot: Slot, n: number, text: string): void {
-    if (n < slot.observeApplied || this.unloaded) return;
-    slot.observeApplied = n;
+  /** `asOf` is the slot's sequence when the read started: a request published after that is newer
+   *  than what the read can show, and it is not this read's to call off. */
+  private observed(slot: Slot, read: { n: number; asOf: number }, text: string): void {
+    if (read.n < slot.observeApplied || this.unloaded) return;
+    slot.observeApplied = read.n;
     let fm: Record<string, unknown>;
     try {
       fm = parseFrontmatter(text);
@@ -309,7 +316,9 @@ export class AgentRuns implements AgentLaunches {
       throw e;
     }
     const current: Seen = { status: statusOf(fm), marker: fm[AGENT_RUN_KEY] };
-    if (slot.request && current.status !== slot.request.column) this.cancel(slot.path);
+    const request = slot.request;
+    if (request && request.seq <= read.asOf && current.status !== request.column)
+      this.cancel(slot.path);
     const evidence: Evidence = { previous: slot.seen, current };
     slot.seen = agentRunOf(fm).present ? current : undefined;
     this.enqueue(slot, () => this.clearObserved(slot, evidence));
@@ -345,8 +354,11 @@ export class AgentRuns implements AgentLaunches {
         (p): p is string => p !== undefined,
       );
       const moved = boards.map((p) => remapPath(p, op));
-      if (card === null || moved.includes(null)) this.cancel(slot.path);
-      else if (card !== slot.path || moved.some((p, i) => p !== boards[i]))
+      if (card === null || moved.includes(null)) {
+        // What this device saw of a note that is gone says nothing about one created in its place.
+        if (card === null) slot.seen = undefined;
+        this.cancel(slot.path);
+      } else if (card !== slot.path || moved.some((p, i) => p !== boards[i]))
         this.follow(slot, card, op);
     }
   }
