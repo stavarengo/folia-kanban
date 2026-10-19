@@ -7604,3 +7604,89 @@ describe("column colour — what a board note paints", () => {
     expect(column.style.getPropertyValue("--folia-col-accent")).toBe("#9aa0a6");
   });
 });
+
+describe("an agent launch on the tile", () => {
+  const ALPHA = "Tasks/Alpha.md";
+  function renderWithLaunches(repo = makeRepo()) {
+    const launches = fakeLaunches();
+    render(
+      <App
+        repo={repo}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={testHost(document, launches.agents)}
+      />,
+    );
+    return launches;
+  }
+  const tile = () => document.querySelector(`[data-path="${ALPHA}"]`) as HTMLElement;
+  const face = () => tile().querySelector(".folia-card-main") as HTMLElement;
+
+  it("shows a countdown with Cancel and Now beside the card's face, never inside it", async () => {
+    const launches = renderWithLaunches();
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    expect(tile().querySelector(".folia-agent-pending")).toBeNull();
+
+    // A launch scheduled after the tile mounted still reaches it.
+    act(() => launches.wait(ALPHA, Date.now() + 9_400));
+    const group = within(tile()).getByRole("group", { name: 'Agent starting for "Alpha"' });
+    expect(group.parentElement).toBe(tile());
+    expect(face().contains(group)).toBe(false);
+    expect(group).toHaveTextContent("Agent in 10s");
+    expect(face()).toHaveAccessibleName(/Alpha, .*agent starting soon/);
+
+    fireEvent.click(within(group).getByRole("button", { name: 'Start the agent for "Alpha" now' }));
+    fireEvent.click(within(group).getByRole("button", { name: 'Cancel the agent for "Alpha"' }));
+    expect(launches.calls).toEqual({ cancel: [ALPHA], startNow: [ALPHA] });
+
+    act(() => launches.clear(ALPHA));
+    expect(tile().querySelector(".folia-agent-pending")).toBeNull();
+    expect(face()).not.toHaveAccessibleName(/agent starting soon/);
+  });
+
+  it("counts down once a second while it waits", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    try {
+      const launches = renderWithLaunches();
+      await vi.waitFor(() => expect(tile()).not.toBeNull());
+      act(() => launches.wait(ALPHA, Date.now() + 3_000));
+      expect(tile()).toHaveTextContent("Agent in 3s");
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(tile()).toHaveTextContent("Agent in 2s");
+      act(() => vi.advanceTimersByTime(5_000));
+      expect(tile()).toHaveTextContent("Agent in 0s");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers only Cancel while the launch is being prepared", async () => {
+    const launches = renderWithLaunches();
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    act(() => launches.prepare(ALPHA));
+    const group = within(tile()).getByRole("group", { name: 'Agent starting for "Alpha"' });
+    expect(group).toHaveTextContent("Agent starting…");
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Cancel"]);
+  });
+
+  it("shows a run on a card carrying agent-run, in its chips and its name", async () => {
+    const repo = makeRepo();
+    await repo.setFrontmatter(ALPHA, {
+      "agent-run": { id: "3f9a1c2b", started: "2026-10-19 14:05", column: "todo" },
+    });
+    renderWithLaunches(repo);
+    await screen.findByText("Alpha", { selector: ".folia-card-title" });
+    const chip = tile().querySelector(".folia-chip-accent") as HTMLElement;
+    expect(chip).toHaveTextContent("Agent");
+    expect(chip).toHaveAttribute(
+      "aria-label",
+      "An agent is working on this card, run 3f9a1c2b, started 2026-10-19 14:05",
+    );
+    expect(face()).toHaveAccessibleName(/agent running/);
+  });
+});

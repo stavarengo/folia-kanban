@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Vault, type App, type FileManager, type MetadataCache } from "obsidian";
 import { VaultRepository } from "../src/obsidian/vaultRepo";
+import type { StatusReport } from "../src/model/agent";
 import type { Suggestion, SuggestSource } from "../src/model/repo";
 import { moveCardOver, moveCardTo, setCardPriority } from "../src/model/boardOps";
 import { planDrop } from "../src/model/board";
@@ -2322,5 +2323,91 @@ describe("an edit that leaves the note as it was", () => {
 
     expect(app.vault.frontmatter(PATH)["status"]).toBe("done");
     expect(app.vault.text(PATH)).toContain("Moved from Todo to Done");
+  });
+});
+
+describe("status writes, reported the moment they land", () => {
+  function reporting(frontmatter = "status: todo") {
+    const app = new FakeApp();
+    app.vault.addFile("basic/Board.md", note(DEFAULT_CONFIG));
+    app.vault.addFile("basic/Cards/One.md", card(frontmatter));
+    const reports: StatusReport[] = [];
+    const repo = new VaultRepository(app as unknown as App, "basic/Board.md", {
+      onStatus: (r) => reports.push(r),
+    });
+    return { app, repo, reports };
+  }
+  const ONE = "basic/Cards/One.md";
+
+  it("takes the options object, every member optional", () => {
+    const repo = new VaultRepository(new FakeApp() as unknown as App, "basic/Board.md");
+    expect(repo.getHistoryScope()).toBe("moves");
+    expect(repo.getUserName()).toBe("");
+  });
+
+  it("reports a status set from the panel, with what the card left and what it carried", async () => {
+    const { repo, reports } = reporting("status: todo\nagent-run: { id: a1 }");
+    await repo.setFrontmatter(ONE, { status: "done", priority: "A" });
+    expect(reports).toEqual([
+      {
+        boardPath: "basic/Board.md",
+        cardPath: ONE,
+        from: "todo",
+        to: "done",
+        departingMarker: { id: "a1" },
+        mayLaunch: true,
+      },
+    ]);
+  });
+
+  it("reports a move, and a column being deleted as one that may never launch", async () => {
+    const { repo, reports } = reporting();
+    await repo.applyMove({ path: ONE, setFrontmatter: { status: "done", order: 1 } });
+    await repo.applyMove({ path: ONE, setFrontmatter: { status: "todo" }, rehomed: true });
+    expect(reports.map((r) => [r.from, r.to, r.mayLaunch])).toEqual([
+      ["todo", "done", true],
+      ["done", "todo", false],
+    ]);
+  });
+
+  it("reports a status removed, which never launches", async () => {
+    const { repo, reports } = reporting();
+    await repo.unsetFrontmatterKey(ONE, "status");
+    await repo.applyMove({ path: ONE, unsetFrontmatter: ["status"] });
+    expect(reports.map((r) => [r.from, r.to, r.mayLaunch])).toEqual([["todo", null, false]]);
+  });
+
+  it("does not report what is not a move: an order alone, or a status YAML retyped", async () => {
+    const { repo, reports } = reporting("status: 2");
+    await repo.applyMove({ path: ONE, setFrontmatter: { status: "2", order: 5 } });
+    await repo.setFrontmatter(ONE, { priority: "B" });
+    expect(reports).toEqual([]);
+  });
+
+  it("measures what changed inside the write, against an edit that landed after the first look", async () => {
+    const { app, repo, reports } = reporting();
+    const write = app.fileManager.processFrontMatter.bind(app.fileManager);
+    app.fileManager.processFrontMatter = async (file, fn) => {
+      // A sync lands between the writer's first look and its write.
+      app.vault.addFile(ONE, card("status: done\nagent-run: { id: z }"));
+      await write(file, fn);
+    };
+    await repo.setFrontmatter(ONE, { status: "done" });
+    expect(reports).toEqual([]);
+    await repo.setFrontmatter(ONE, { status: "todo" });
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ from: "done", to: "todo", departingMarker: { id: "z" } });
+  });
+
+  it("reports the move even when ticking a parent's line afterwards throws", async () => {
+    const { repo, reports } = reporting();
+    await expect(
+      repo.applyMove({
+        path: ONE,
+        setFrontmatter: { status: "done" },
+        parentLines: [{ path: "basic/Cards/Gone.md", links: ["One"], done: true }],
+      }),
+    ).rejects.toThrow();
+    expect(reports.map((r) => r.to)).toEqual(["done"]);
   });
 });

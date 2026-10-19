@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { App } from "../src/ui/App";
 import { FakeRepo } from "./fakeRepo";
-import { testHost } from "./fakeHost";
+import { fakeLaunches, testHost } from "./fakeHost";
 import type { BoardConfig } from "../src/model/types";
 import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
 import { BLOCKS } from "../src/model/relationships";
@@ -96,6 +96,26 @@ describe("a11y axe gate (no violations)", () => {
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
     await within(detail).findByRole("button", { name: /^Unassign me:/ });
+    const { violations } = await run(document.body);
+    expect(summarize(violations)).toEqual([]);
+  }, 30000);
+
+  // Both agent states at once: a countdown with its two links on one tile, a run on another.
+  it("a card waiting on an agent, and one an agent is working on, have no axe violations", async () => {
+    const repo = makeRepo();
+    repo.files.get("Tasks/Gamma.md")!.fm["agent-run"] = { id: "3f9a1c2b", column: "doing" };
+    const launches = fakeLaunches();
+    launches.wait("Tasks/Alpha.md", Date.now() + 10_000);
+    render(
+      <App
+        repo={repo}
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        today="2026-06-13"
+        host={testHost(document, launches.agents)}
+      />,
+    );
+    await screen.findByRole("group", { name: 'Agent starting for "Alpha"' });
     const { violations } = await run(document.body);
     expect(summarize(violations)).toEqual([]);
   }, 30000);

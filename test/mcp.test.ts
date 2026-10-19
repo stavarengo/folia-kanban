@@ -918,6 +918,37 @@ describe("the frontmatter keys update_card will not write by hand", () => {
       }),
     ).rejects.toThrow(/makes a note a board/);
   });
+
+  // A column's `agent:` starts a program on this computer, and another board's note can sit in this
+  // board's card folder, where `update_card` reaches it. The card's own override is a value the
+  // launch hands to that program, so it is the user's to write, not an agent's.
+  it.each([
+    ["agent", "opus"],
+    ["columns", ["todo", "done"]],
+  ])("refuses %s, which decides what a program on this computer runs", async (key, value) => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        properties: { [key]: value },
+      }),
+    ).rejects.toThrow(/starts programs on this computer/);
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty(key);
+  });
+
+  it("lets an agent clear its own run marker with null, the way it says it stopped", async () => {
+    const { host, repo } = fixture();
+    await repo.setFrontmatter("Tasks/Ship it.md", { "agent-run": { id: "a1", column: "todo" } });
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      properties: { "agent-run": null },
+    });
+    const board = await repo.loadBoard();
+    expect(board.cards["Tasks/Ship it.md"]?.frontmatter).not.toHaveProperty("agent-run");
+  });
 });
 
 describe("the values a card's own fields will and will not take", () => {
