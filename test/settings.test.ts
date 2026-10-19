@@ -593,12 +593,25 @@ describe("the agents-in-columns settings", () => {
     expect(() => execFileSync("/bin/sh", ["-n", "-c", DEFAULT_AGENT_COMMAND])).not.toThrow();
     for (const line of DEFAULT_AGENT_COMMAND.split("\n").filter((l) => /\btmux\b|\bt /.test(l)))
       expect(line, line).not.toMatch(/(^|[;|&(]\s*)tmux\s/);
-    expect(DEFAULT_AGENT_COMMAND).not.toMatch(/--plugin-dir|--settings/);
+    // The Folia Mod: the board's server, the stop hook and, through the settings file, the status
+    // line, which a plugin cannot set for itself.
+    expect(DEFAULT_AGENT_COMMAND).toContain(
+      '--plugin-dir "$FOLIA_MOD_DIR" --settings "$FOLIA_MOD_DIR/session.json"',
+    );
     // The user's tmux.conf, and the plugins it loads, are kept out of the plugin's own server.
     expect(DEFAULT_AGENT_COMMAND).toContain("-L folia -f /dev/null new-session -d -s agents");
     // An extra argument taking several values, or a prompt starting with "-", must not eat it.
     expect(DEFAULT_AGENT_COMMAND).toContain('"$@" -- "$FOLIA_PROMPT"');
     expect(DEFAULT_AGENT_COMMAND).not.toMatch(/\{\{/);
+  });
+
+  // The stop hook ends the session at the first tool call after the card leaves the column, so
+  // anything the agent means to write about its work has to come before the move.
+  it("asks for the closing comment before the move, and says the move ends the session", () => {
+    const line = DEFAULT_AGENT_PROMPT.split("\n").find((l) => l.includes("move_card"));
+    expect(line).toMatch(/stops at its next tool call once the card leaves \{\{column\}\}/);
+    expect(line?.indexOf("closing comment")).toBeLessThan(line?.indexOf("move_card") ?? -1);
+    expect(line).toContain("very last action");
   });
 
   it.each([

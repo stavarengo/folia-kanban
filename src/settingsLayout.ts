@@ -139,7 +139,7 @@ export const SETTING_COPY = {
   },
   agentCommand: {
     name: "Command",
-    desc: "The shell command a card starts when the board, or an agent, moves it into a column whose board note gives it `agent:`. It runs in the column's `cwd`, detached from Obsidian, so it outlives it. Write placeholders such as {{card}} or {{prompt}} bare, never inside quotes: each becomes one shell word. The same context arrives as FOLIA_* variables, and the agent token only ever as FOLIA_MCP_TOKEN. The default opens a Claude Code session in a tmux window: attach with `tmux -L folia attach -t agents`. Empty it to go back to the default. Only used while agent access is on. See docs/agents-in-columns.md.",
+    desc: "The shell command a card starts when the board, or an agent, moves it into a column whose board note gives it `agent:`. It runs in the column's `cwd`, detached from Obsidian, so it outlives it. Write placeholders such as {{card}} or {{prompt}} bare, never inside quotes: each becomes one shell word. The same context arrives as FOLIA_* variables, and the agent token only ever as FOLIA_MCP_TOKEN. The default opens a Claude Code session in a tmux window (attach with `tmux -L folia attach -t agents`) with the Folia Mod loaded: the session reaches the board without any setup, names its card on its status line, and stops once the card leaves the column. Empty it to go back to the default. Only used while agent access is on. See docs/agents-in-columns.md.",
   },
   agentPrompt: {
     name: "Prompt",
