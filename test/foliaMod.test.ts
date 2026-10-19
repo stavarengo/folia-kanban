@@ -229,10 +229,46 @@ describe("the scripts", () => {
     );
   });
 
-  it("leaves a card it cannot read alone, and a session Folia did not start", () => {
+  it("stops when the card is a note with no frontmatter any more, as the board reads it", () => {
     card("One.md", "no frontmatter here\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/has no status now/);
+  });
+
+  it("leaves a status it cannot read alone, and a session Folia did not start", () => {
+    card("One.md", "---\nstatus: >-\n  review\nagent-run: { id: abc123 }\n---\n");
     expect(hook("One.md", "review")).toBe("");
     expect(run("stop-hook.sh", {})).toBe("");
+  });
+
+  it.each([
+    ["a quoted key", '"status": review\n"agent-run":\n  "id": abc123', "review"],
+    [
+      "a single-quoted value with an apostrophe",
+      "status: 'Rafa''s review'\nagent-run: { 'id': abc123 }",
+      "Rafa's review",
+    ],
+    [
+      "an escaped double quote",
+      'status: "say \\"hi\\""\nagent-run: { "id": "abc123" }',
+      'say "hi"',
+    ],
+  ])("reads %s the way YAML does", (_label, lines, column) => {
+    card("One.md", `---\n${lines}\n---\n`);
+    expect(hook("One.md", column)).toBe("");
+  });
+
+  it("sees a newer run behind a quoted key in the marker", () => {
+    card("One.md", '---\nstatus: review\nagent-run: {"id": "fff000", "column": "review"}\n---\n');
+    expect(stopReason(hook("One.md", "review"))).toMatch(/another session/);
+  });
+
+  it("keeps following the renamed card when a new note takes its old name", () => {
+    card("Renamed.md", ONE);
+    card("One.md", "---\nstatus: todo\n---\n");
+    expect(hook("One.md", "review")).toBe("");
+    card("Renamed.md", ONE.replace('"review"', "done"));
+    card("One.md", "---\nstatus: review\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
   });
 
   it("keeps the stop reason valid JSON whatever the names hold", () => {
