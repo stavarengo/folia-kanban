@@ -105,7 +105,9 @@ async function reresolve(
   if (board === null) throw new Error(`the board "${request.boardPath}" is gone`);
   const fm = await freshFrontmatter(app, file);
   const config = await readBoardConfig(app, board, request.boardPath);
-  if (statusOf(fm) !== request.column) return null;
+  // A card moved out of the board's folder while it waited is no longer this board's to launch.
+  if (statusOf(fm) !== request.column || !file.path.startsWith(`${config.cardFolder}/`))
+    return null;
   const agent = resolveAgent(config, request.column, fm);
   return agent ? { file, agent } : null;
 }

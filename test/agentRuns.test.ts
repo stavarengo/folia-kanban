@@ -581,6 +581,8 @@ describe("renames and deletes", () => {
     await h.move("review");
     await h.app.fileManager.renameFile(h.app.vault.getFileByPath("Board.md") as never, "Main.md");
     await h.app.fileManager.renameFile(h.app.vault.getFolderByPath("Cards") as never, "Tasks");
+    // The folder rename leaves the board's `card-folder` behind; the user points it at the new one.
+    h.app.vault.addFile("Main.md", BOARD.replace("card-folder: Cards", "card-folder: Tasks"));
     h.fireTimers();
     await settle();
     expect(h.spawned[0]?.env).toMatchObject({ FOLIA_BOARD: "Main.md", FOLIA_CARD: "Tasks/One.md" });
@@ -874,5 +876,17 @@ describe("found in review", () => {
     await settle();
     h.runs.cancel(ONE);
     expect(h.slots()).toBe(0);
+  });
+
+  it("does not launch a card moved out of the board's folder while it waited", async () => {
+    const h = harness();
+    await h.move("review");
+    h.app.vault.addFolder("Elsewhere");
+    await h.app.fileManager.renameFile(h.file() as never, "Elsewhere/One.md");
+    h.fireTimers();
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.fm("Elsewhere/One.md")["agent-run"]).toBeUndefined();
+    expect(h.runs.pending("Elsewhere/One.md")).toBeNull();
   });
 });

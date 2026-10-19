@@ -102,6 +102,9 @@ export interface KanbanSettings {
  * a plugin it loads (tmux-resurrect, tmux-continuum) would otherwise restore their sessions into this
  * one, or save this one over theirs, through plain `tmux` calls that reach whichever server runs them.
  *
+ * The prompt follows `--`, so neither an extra argument that takes several values (`--add-dir`,
+ * `--allowedTools`) nor a prompt that starts with `-` can swallow it or be read as an option.
+ *
  * No value goes on tmux's own command line, where an argument ending in `;` is a command separator
  * however it was quoted: the context, the token and the repaired `PATH` travel in a paste buffer
  * read from stdin, which the window reads, deletes and `eval`s. The window's first tmux calls use
@@ -128,7 +131,7 @@ export const DEFAULT_AGENT_COMMAND = [
   '  eval "$env" || exit 1',
   '  cd "$FOLIA_CWD" || exit 1',
   '  eval "set -- $FOLIA_ARGS"',
-  '  exec claude --name "$FOLIA_CARD_SLUG" ${FOLIA_MODEL:+--model "$FOLIA_MODEL"} ${FOLIA_EFFORT:+--effort "$FOLIA_EFFORT"} "$@" "$FOLIA_PROMPT"\' "$buffer" "$tmux_bin" ||',
+  '  exec claude --name "$FOLIA_CARD_SLUG" ${FOLIA_MODEL:+--model "$FOLIA_MODEL"} ${FOLIA_EFFORT:+--effort "$FOLIA_EFFORT"} "$@" -- "$FOLIA_PROMPT"\' "$buffer" "$tmux_bin" ||',
   '  { t delete-buffer -b "$buffer" 2>/dev/null; exit 1; }',
 ].join("\n");
 

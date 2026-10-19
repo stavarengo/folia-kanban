@@ -26,14 +26,14 @@ columns:
 | `effort` | Handed over as `{{effort}}` and `FOLIA_EFFORT`; the default passes it to `claude --effort`. |
 | `args` | A list of extra arguments, as `{{args}}` and `FOLIA_ARGS`. One string is read as a list of one. |
 
-Each field is taken from the column first, then from the board note's top-level `agent:`. A card can carry `agent:` too, but only its `model` and `effort` count, and they win over both. Keys the plugin does not read are kept, and editing the column from the board keeps the whole mapping. A column with `filter:` (a lane) is never an agent column, and the Edit column dialog has no field for `agent:`: it is written by hand in the board note.
+Each field is taken from the column first, then from the board note's top-level `agent:`, so a column without `cwd` runs in the board's. A card can carry `agent:` too, but only its `model` and `effort` count, and they win over both. Keys the plugin does not read are kept, and editing the column from the board keeps the whole mapping. A column with `filter:` (a lane) is never an agent column, and the Edit column dialog has no field for `agent:`: it is written by hand in the board note.
 
 `cwd` resolves like this:
 
 | Written | Runs in |
 | --- | --- |
-| absent or empty | the vault's folder |
-| `~` | your home folder |
+| absent or empty on the column and the board note | the vault's folder |
+| `"~"` | your home folder; quote it, since YAML reads a bare `~` as no value at all |
 | `~/projects/app` | that folder under your home |
 | `/srv/app` | that folder, as written |
 | `code/app` | that folder, relative to the vault's folder |
@@ -107,7 +107,7 @@ The agent token is not a placeholder. It reaches the command only as `FOLIA_MCP_
 
 `FOLIA_EXPORTS` holds one `export NAME='…'` line per variable above, quoted so `eval "$FOLIA_EXPORTS"` gives back every value exactly. The token is not in it. It is for a command that hands the context to a shell of its own, as the default does.
 
-`FOLIA_MOD_DIR` names a folder nothing creates yet; it is where a later release ships the Claude Code side of this feature. Until then, a session reaches the board only if you registered agent access with Claude Code yourself, as [Connecting a client](mcp.md#connecting-a-client) shows.
+`FOLIA_MOD_DIR` names a folder nothing creates yet; it is where a later release ships the Claude Code side of this feature. Until then, a session reaches the board only if you registered agent access with Claude Code yourself, as [Connecting a client](mcp.md#connecting-a-client) shows, and for every folder a column runs in. `claude mcp add` registers a server for the folder you run it in unless you add `--scope user`, which registers it for all of them. A session that cannot reach the board still starts, and the plugin cannot tell: its card keeps the marker until it is moved out.
 
 ## The default command
 
@@ -135,6 +135,8 @@ The token is in the command's environment only. Anything you write to a file, a 
 
 A launch runs a command as you, on this computer, with arguments taken from the board note: `agent.args` and `cwd` in a board note, and the command in `data.json`, can run anything you can. That is the same trust you already give a synced vault's plugin code: anyone who can write your vault can change what it runs.
 
-Agent access adds no way around that: board notes cannot be written through MCP, `update_card` refuses the `columns` and `agent` keys on any note it reaches, and a card's own `agent:` carries only a model name and an effort. That is a limit on the MCP tools, not on the session a launch starts. The session runs as you, in the column's `cwd` (the vault's folder by default), with its own file and shell tools: it can edit a board note's `agent:` or the plugin's `data.json` like any program you run, and the next launch would run what it wrote. What stops it is the prompt and the agent's own permission prompts, so treat text on a card that someone else wrote as input to a program running as you. One agent can also clear another run's `agent-run` through `update_card`, after which the next move into the column starts a second agent on that card.
+Agent access adds no way to change what runs: board notes cannot be written through MCP, `update_card` refuses the `columns` and `agent` keys on any note it reaches, and a card's own `agent:` carries only a model name and an effort. That is a limit on the MCP tools, not on the session a launch starts. The session runs as you, in the column's `cwd` (the vault's folder by default), with its own file and shell tools: it can edit a board note's `agent:` or the plugin's `data.json` like any program you run, and the next launch would run what it wrote. What stops it is the prompt and the agent's own permission prompts, so treat text on a card that someone else wrote as input to a program running as you. One agent can also clear another run's `agent-run` through `update_card`, after which the next move into the column starts a second agent on that card.
+
+What agent access does add is a way to start one. Anything holding the token can `move_card` a card into an agent column, and a session then starts on this computer with that card's text in its prompt. On the default loopback bind that is software already running as you; once the server listens on a network, it is any machine there with the token.
 
 Software running as your user can still read a process's environment and the `folia` tmux server's buffers, as [What it does not protect you from](mcp.md#what-it-does-not-protect-you-from) already says of the token.

@@ -596,6 +596,8 @@ describe("the agents-in-columns settings", () => {
     expect(DEFAULT_AGENT_COMMAND).not.toMatch(/--plugin-dir|--settings/);
     // The user's tmux.conf, and the plugins it loads, are kept out of the plugin's own server.
     expect(DEFAULT_AGENT_COMMAND).toContain("-L folia -f /dev/null new-session -d -s agents");
+    // An extra argument taking several values, or a prompt starting with "-", must not eat it.
+    expect(DEFAULT_AGENT_COMMAND).toContain('"$@" -- "$FOLIA_PROMPT"');
     expect(DEFAULT_AGENT_COMMAND).not.toMatch(/\{\{/);
   });
 

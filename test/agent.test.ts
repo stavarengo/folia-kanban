@@ -18,6 +18,7 @@ import {
   type AgentContext,
 } from "../src/model/agent";
 import { normalizeColumns, serializeColumns } from "../src/model/columns";
+import { parseFrontmatter } from "../src/obsidian/frontmatter";
 import type { BoardConfig } from "../src/model/types";
 
 function config(over: Partial<BoardConfig> = {}): BoardConfig {
@@ -282,5 +283,24 @@ describe("the templates", () => {
     expect(script).not.toContain("FOLIA_MCP_TOKEN");
     expect(env["FOLIA_MCP_TOKEN"]).toBe("s3cr3t-token");
     expect(env["FOLIA_EXPORTS"]).toBe(script);
+  });
+});
+
+describe("cwd as YAML writes it", () => {
+  // A bare `~` is YAML's null, so only the quoted form reaches `resolveCwd` as the home folder.
+  it("takes a quoted ~ as the home folder, and a bare one as no cwd at all", () => {
+    const board = (cwd: string): BoardConfig => {
+      const fm = parseFrontmatter(`---\ncolumns:\n  - id: r\n    agent:\n      cwd: ${cwd}\n---\n`);
+      return {
+        ...config(),
+        agent: { cwd: "/srv/board" },
+        columns: normalizeColumns(fm["columns"]),
+      };
+    };
+    const cwdOf = (c: BoardConfig) =>
+      resolveCwd(resolveAgent(c, "r", {})?.cwd, "/vault", "/home/me");
+    expect(cwdOf(board('"~"'))).toBe("/home/me");
+    expect(cwdOf(board("~/app"))).toBe("/home/me/app");
+    expect(cwdOf(board("~"))).toBe("/srv/board");
   });
 });

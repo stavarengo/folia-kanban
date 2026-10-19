@@ -51,11 +51,11 @@ There is one server per vault. Every tool addresses a board by the vault path of
 With the server on and the token copied, register it in your MCP client. For example:
 
 ```sh
-claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \
+claude mcp add --scope user --transport http folia-kanban http://127.0.0.1:27125/mcp \
   --header "Authorization: Bearer PASTE_YOUR_TOKEN_HERE"
 ```
 
-Substitute the bind address for `127.0.0.1` if you have moved the server off this computer, in brackets if it is IPv6. Any other MCP client works the same way: **Streamable HTTP**, endpoint `http://<bind address>:<port>/mcp`, header `Authorization: Bearer <token>`. The server answers `POST` only — it never opens a stream of its own, so a client that also tries `GET` gets a `405` and carries on.
+`--scope user` makes the server available to Claude Code in every folder, which is what a session started by an [agent column](agents.md) needs; leave it out to register it for the folder you run the command in only. Substitute the bind address for `127.0.0.1` if you have moved the server off this computer, in brackets if it is IPv6. Any other MCP client works the same way: **Streamable HTTP**, endpoint `http://<bind address>:<port>/mcp`, header `Authorization: Bearer <token>`. The server answers `POST` only — it never opens a stream of its own, so a client that also tries `GET` gets a `405` and carries on.
 
 Sanity check from a terminal:
 
@@ -136,4 +136,4 @@ One upgrade case is worth knowing about, because it looks like a bug while it la
 
 What none of this does is protect the token from anything already running as you on this computer, which is where Obsidian decrypts it to use it. On the default loopback bind that is the end of it, because software running as you already has your files and did not need the server to get them.
 
-Moving the bind address off loopback changes that argument, and it is the reason the setting warns you where it lives. From that moment the token is a credential other machines can use, and it is travelling as plain text over plain HTTP: there is no TLS here, so anything that can watch the connection can take it. The plugin does not fix that for you. Keep a non-loopback bind to a network you trust, keep it on only while you need it, and replace the token afterwards.
+Moving the bind address off loopback changes that argument, and it is the reason the setting warns you where it lives. From that moment the token is a credential other machines can use. On a board with [agent columns](agents.md) it is more than a key to your boards: moving a card into one starts an agent on this computer, with that card's text in its prompt. And it is travelling as plain text over plain HTTP: there is no TLS here, so anything that can watch the connection can take it. The plugin does not fix that for you. Keep a non-loopback bind to a network you trust, keep it on only while you need it, and replace the token afterwards.

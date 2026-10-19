@@ -135,7 +135,7 @@ export const SETTING_COPY = {
   },
   mcpBindAddress: {
     name: "Bind address",
-    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
   },
   agentCommand: {
     name: "Command",
@@ -347,7 +347,7 @@ export function bindAddressConfirm(address: string): {
 } {
   return {
     title: "Open agent access to the network?",
-    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault.`,
+    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column.`,
     cta: `Listen on ${address}`,
   };
 }
