@@ -258,6 +258,20 @@ describe("the scripts", () => {
     else expect(stopReason(hook("One.md", "review"))).toMatch(/has no status now/);
   });
 
+  it("stops when the card left the column, even if a copy of it still carries the marker", () => {
+    card("One copy.md", ONE);
+    card("One.md", "---\nstatus: done\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
+  });
+
+  it.each([
+    ["a flow mapping over several lines", "agent-run: {\n  id: abc123,\n  column: review\n}"],
+    ["a block scalar id", "agent-run:\n  id: >-\n    abc123"],
+  ])("does not take a marker written as %s for a missing one", (_label, marker) => {
+    card("One.md", `---\nstatus: review\n${marker}\n---\n`);
+    expect(hook("One.md", "review")).toBe("");
+  });
+
   it("stops when the card is nowhere to be found", () => {
     card("Other.md", ONE.replace("abc123", "zzz999"));
     expect(stopReason(hook("One.md", "review"))).toBe(
@@ -300,7 +314,7 @@ describe("the scripts", () => {
 
   it("keeps following the renamed card when a new note takes its old name", () => {
     card("Renamed.md", ONE);
-    card("One.md", "---\nstatus: todo\n---\n");
+    card("One.md", "---\nstatus: review\n---\n");
     expect(hook("One.md", "review")).toBe("");
     card("Renamed.md", ONE.replace('"review"', "done"));
     card("One.md", "---\nstatus: review\n---\n");
