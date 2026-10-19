@@ -1,9 +1,9 @@
 // The one place a process is started. Desktop only: the manifest's `isDesktopOnly` keeps this off
 // mobile, where `child_process` does not exist (see `docs/decisions.md`, "Mobile is not supported").
 
-import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import { homedir } from "node:os";
+import { spawn } from "child_process";
+import { promises as fs } from "fs";
+import { homedir } from "os";
 
 /** What a launch asks for: the command, the folder it runs in, and what to add to its environment. */
 export interface SpawnRequest {

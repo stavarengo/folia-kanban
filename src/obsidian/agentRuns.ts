@@ -56,7 +56,7 @@ interface Evidence {
 }
 
 /** Timers, injected so a test can hold a countdown. */
-export interface Timers {
+interface Timers {
   set: (fn: () => void, ms: number) => number;
   clear: (id: number) => void;
 }

@@ -15,7 +15,7 @@ import { subtaskDoneLine, subtaskReopenedLine, type HistoryEventKind } from "../
 import type { NoteWriter } from "./noteWriter";
 
 /** Append a history line for a kind of change, when the history scope in force allows it. */
-export type RecordHistory = (path: string, kind: HistoryEventKind, line: string) => Promise<void>;
+type RecordHistory = (path: string, kind: HistoryEventKind, line: string) => Promise<void>;
 
 /** What the frontmatter half of a move changed: the keys set, the keys removed, and the
  *  frontmatter as the first of those writes found it. */

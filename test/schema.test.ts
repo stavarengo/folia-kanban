@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseFrontmatter } from "../src/obsidian/frontmatter";
 import {
+  AgentConfigSchema,
+  AgentRunSchema,
   BoardFrontmatterSchema,
   ContextFrontmatterSchema,
   DataCorruptionError,
@@ -183,6 +185,25 @@ describe("example vaults decode without false-positive corruption (§16)", () =>
       const fm = parseFrontmatter(readFileSync(f, "utf8"));
       expect(() => decode(ContextFrontmatterSchema, fm, f)).not.toThrow();
     }
+  });
+
+  it("every agent: mapping and agent-run marker decodes, and the showcase carries all three shapes", () => {
+    const seen = { agent: 0, run: 0 };
+    for (const f of files) {
+      const fm = parseFrontmatter(readFileSync(f, "utf8"));
+      const columns = Array.isArray(fm["columns"]) ? (fm["columns"] as unknown[]) : [];
+      const mappings = [fm["agent"], ...columns.map((c) => (c as { agent?: unknown })?.agent)];
+      for (const m of mappings.filter((m) => m !== undefined && m !== null)) {
+        expect(AgentConfigSchema.safeParse(m).success, f).toBe(true);
+        seen.agent++;
+      }
+      if (fm["agent-run"] !== undefined) {
+        expect(AgentRunSchema.safeParse(fm["agent-run"]).success, f).toBe(true);
+        seen.run++;
+      }
+    }
+    // The board's defaults, the In Review column, and one card's override; two markers.
+    expect(seen).toEqual({ agent: 3, run: 2 });
   });
 
   it("every card note's frontmatter decodes structurally", () => {

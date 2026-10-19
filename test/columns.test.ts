@@ -190,6 +190,21 @@ describe("round-trip: normalize(serialize(x)) is identity on the def shape", () 
     ];
     expect(normalizeColumns(serializeColumns(original))).toEqual(original);
   });
+
+  it("(c) a column's agent: comes back whole, unknown keys included; null or a list is no agent", () => {
+    const agent = { model: "sonnet", args: ["--verbose"], later: { nested: [1, 2] } };
+    const original: ColumnDef[] = [
+      { id: "review", title: "Review", agent },
+      { id: "done", title: "Done", agent: {} },
+    ];
+    expect(normalizeColumns(serializeColumns(original))).toEqual(original);
+    expect(
+      normalizeColumns([
+        { id: "a", agent: null },
+        { id: "b", agent: ["x"] },
+      ]).map((c) => c.agent),
+    ).toEqual([undefined, undefined]);
+  });
 });
 
 describe("updateColumn write path is byte-stable (#8 — the modal patch must not leak defaults)", () => {
