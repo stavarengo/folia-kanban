@@ -15,36 +15,66 @@ import { subtaskDoneLine, subtaskReopenedLine, type HistoryEventKind } from "../
 import type { NoteWriter } from "./noteWriter";
 
 /** Append a history line for a kind of change, when the history scope in force allows it. */
-export type RecordHistory = (path: string, kind: HistoryEventKind, line: string) => Promise<void>;
+type RecordHistory = (path: string, kind: HistoryEventKind, line: string) => Promise<void>;
+
+/** What the frontmatter half of a move changed: the keys set, the keys removed, and the
+ *  frontmatter as the first of those writes found it. */
+export interface Placement {
+  changed: string[];
+  removed: string[];
+  before: Record<string, unknown>;
+}
+
+/** What `applyMove` calls back into: the history policy, and who hears where the note landed. */
+export interface MoveHooks {
+  recordHistory: RecordHistory;
+  /** Called as soon as the moved note's frontmatter is written, before anything that can throw. */
+  onPlaced?: (placement: Placement) => void;
+}
 
 /** The repository's `applyMove`: the moved note first, its history line, then its parents. */
 export async function applyMove(
   app: App,
   writer: NoteWriter,
   mutation: CardMutation,
-  recordHistory: RecordHistory,
+  hooks: MoveHooks,
 ): Promise<void> {
+  const placement = await writePlacement(writer, mutation);
+  if (placement) hooks.onPlaced?.(placement);
   // Whether the moved note itself changed, which is what its history line describes: a move that
   // leaves it as it was (dropped back on its own slot, sent to the column it already stands in)
   // records nothing. The parent notes below keep their own count.
-  let changed = await writePlacement(writer, mutation);
+  let changed = placement !== null && placement.changed.length + placement.removed.length > 0;
   if (await writeSubtaskStatus(writer, mutation)) changed = true;
   if (await syncClaim(app, writer, mutation)) changed = true;
   if (changed && mutation.history) {
     const historyLine = mutation.history;
     await writer.editBody(mutation.path, (t) => appendHistory(t, historyLine, stamp()));
   }
-  await tickParents(writer, mutation.parentLines ?? [], recordHistory);
+  await tickParents(writer, mutation.parentLines ?? [], hooks.recordHistory);
 }
 
-async function writePlacement(writer: NoteWriter, mutation: CardMutation): Promise<boolean> {
-  let changed = false;
-  if (mutation.setFrontmatter)
-    changed = (await writer.writeFrontmatter(mutation.path, mutation.setFrontmatter)).length > 0;
-  for (const key of mutation.unsetFrontmatter ?? []) {
-    if (await writer.unsetKey(mutation.path, key)) changed = true;
+/** The frontmatter writes of a move, or `null` for a move that has none (a checklist line's). */
+async function writePlacement(
+  writer: NoteWriter,
+  mutation: CardMutation,
+): Promise<Placement | null> {
+  const unset = mutation.unsetFrontmatter ?? [];
+  if (!mutation.setFrontmatter && unset.length === 0) return null;
+  let placement: Placement | null = null;
+  if (mutation.setFrontmatter) {
+    const { changed, before } = await writer.writeFrontmatter(
+      mutation.path,
+      mutation.setFrontmatter,
+    );
+    placement = { changed, removed: [], before };
   }
-  return changed;
+  for (const key of unset) {
+    const { removed, before } = await writer.unsetKey(mutation.path, key);
+    placement ??= { changed: [], removed: [], before };
+    if (removed) placement.removed.push(key);
+  }
+  return placement;
 }
 
 async function writeSubtaskStatus(writer: NoteWriter, mutation: CardMutation): Promise<boolean> {

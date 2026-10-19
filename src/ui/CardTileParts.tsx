@@ -1,7 +1,13 @@
 import type { Card, CardStats, ContextConfig } from "../model/types";
 import type { UnreadState } from "../model/unread";
 import type { CardChip } from "./cardView";
-import { useBoardActions, useSubitemsCollapse } from "./context";
+import { useEffect, useState } from "react";
+import {
+  useAgentLaunches,
+  useBoardActions,
+  usePendingLaunch,
+  useSubitemsCollapse,
+} from "./context";
 import { commentsTitle, progressWords } from "./cardWords";
 import { Icon } from "./icons";
 import { HostIconButton, HostProgressBar } from "./hostControls";
@@ -133,6 +139,71 @@ export function SubitemsToggle({ card, collapsed }: { card: Card; collapsed: boo
       <Icon name="chevron-down" className={collapsed ? "folia-is-collapsed" : undefined} />
       {collapsed ? `${checklist} subitem${checklist === 1 ? "" : "s"}, ${done} done` : "Subitems"}
     </button>
+  );
+}
+
+/** The clock a countdown reads, ticking once a second while `active`, and current the moment it
+ *  becomes active. */
+function useSecondClock(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/**
+ * `Agent in 10s · Cancel · Now` while a launch waits on the card, `Agent starting… · Cancel` while
+ * it is being prepared. A sibling of the tile's face, never inside it, for the same reason as the
+ * buttons beside it. The countdown is not announced; the tile's name says a launch is coming.
+ */
+export function AgentCountdown({ card }: { card: Card }) {
+  const agents = useAgentLaunches();
+  const firesAt = usePendingLaunch(card.path);
+  const waiting = firesAt !== null && firesAt > 0;
+  const now = useSecondClock(waiting);
+  if (firesAt === null) return null;
+  const seconds = Math.max(0, Math.ceil((firesAt - now) / 1000));
+  const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
+  return (
+    <div
+      className="folia-agent-pending"
+      role="group"
+      aria-label={`Agent starting for "${card.title}"`}
+    >
+      <span>{waiting ? `Agent in ${seconds}s` : "Agent starting…"}</span>
+      <span aria-hidden="true">·</span>
+      <button
+        className="folia-link"
+        aria-label={`Cancel the agent for "${card.title}"`}
+        onClick={(e) => {
+          stop(e);
+          agents.cancel(card.path);
+        }}
+        onPointerDown={stop}
+      >
+        Cancel
+      </button>
+      {waiting && (
+        <>
+          <span aria-hidden="true">·</span>
+          <button
+            className="folia-link"
+            aria-label={`Start the agent for "${card.title}" now`}
+            onClick={(e) => {
+              stop(e);
+              agents.startNow(card.path);
+            }}
+            onPointerDown={stop}
+          >
+            Now
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

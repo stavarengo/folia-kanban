@@ -124,16 +124,26 @@ function deleteColumn(d: ColumnActionDeps, id: string): void {
 function applyColumnPatch(c: ColumnDef, patch: ColumnPatch): ColumnDef {
   const merged = { ...c, ...patch };
   const next: ColumnDef = { id: c.id, title: merged.title ?? c.title };
-  if (merged.color !== undefined) next.color = merged.color;
-  if (merged.limit !== undefined) next.limit = merged.limit;
-  if (merged.filter !== undefined) next.filter = merged.filter;
-  if (merged.group !== undefined) next.group = merged.group;
-  if (merged.sort !== undefined) next.sort = merged.sort;
-  if (merged.opacity !== undefined) next.opacity = merged.opacity;
-  if (merged.hoverOpacity !== undefined) next.hoverOpacity = merged.hoverOpacity;
-  if (merged.parked !== undefined) next.parked = merged.parked;
+  // `agent` is never in a patch (the dialog does not edit it), so it is the column's own, kept.
+  for (const key of KEPT_COLUMN_KEYS) {
+    const value = merged[key];
+    if (value !== undefined) Object.assign(next, { [key]: value });
+  }
   return next;
 }
+
+/** Every column field besides `id` and `title`, each kept only while it has a value. */
+const KEPT_COLUMN_KEYS = [
+  "color",
+  "limit",
+  "filter",
+  "group",
+  "sort",
+  "opacity",
+  "hoverOpacity",
+  "parked",
+  "agent",
+] as const satisfies readonly Exclude<keyof ColumnDef, "id" | "title">[];
 
 interface DeletePlan {
   title: string;

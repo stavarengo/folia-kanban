@@ -6,6 +6,8 @@ assignee:
   - alex
   - ana maria
 tags: [review, a11y]
+agent:
+  model: opus
 ---
 
 # Review PR - accessibility

@@ -348,6 +348,23 @@ export interface ColumnDef {
    * Default `false`.
    */
   parked?: boolean;
+  /**
+   * `agent:` on the column: a mapping (even `{}`) makes it an agent column, so a card the board or
+   * an agent moves into it starts one (see `model/agent.ts`). Kept as written, unknown keys
+   * included, so a column edit writes it back whole.
+   */
+  agent?: AgentMapping;
+}
+
+/** An `agent:` mapping as the note holds it. Read through `AgentConfigSchema`, never trusted. */
+export type AgentMapping = Readonly<Record<string, unknown>>;
+
+/** What an `agent:` mapping says, once read. Every field may be missing; see `resolveAgent`. */
+export interface AgentConfig {
+  cwd?: string | undefined;
+  model?: string | undefined;
+  effort?: string | undefined;
+  args?: string[] | undefined;
 }
 
 export interface BoardConfig {
@@ -379,6 +396,8 @@ export interface BoardConfig {
    * field for, and which frontmatter keys `buildBoard` reads as links.
    */
   relations: RelationTypeDef[];
+  /** The board note's own `agent:`: defaults for every agent column, never a column of its own. */
+  agent?: AgentMapping;
 }
 
 export interface Board {

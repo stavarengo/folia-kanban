@@ -7,7 +7,6 @@ import type {
   CardFrontmatter,
   ColumnDef,
   ContextConfig,
-  HistoryScope,
   LineRef,
   SubtaskRef,
   RelationType,
@@ -88,6 +87,7 @@ import { renderMarkdown } from "./markdownRender";
 import { collectPropertyNames } from "./propertyNames";
 import { watchFileOps, watchVault } from "./vaultEvents";
 import { applyMove } from "./applyMove";
+import { StatusReporter, type RepositoryOptions } from "./repositoryOptions";
 
 export class VaultRepository implements CardRepository {
   private writer: NoteWriter;
@@ -100,13 +100,16 @@ export class VaultRepository implements CardRepository {
   constructor(
     private app: App,
     private boardPath: string,
-    /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
-    public getHistoryScope: () => HistoryScope = () => "moves",
-    /** Live source of the name new comments are signed with. Empty = write them unsigned. */
-    public getUserName: () => string = () => "",
+    private readonly options: RepositoryOptions = {},
   ) {
     this.writer = new NoteWriter(app);
   }
+
+  /** Live source of the current history scope. Defaults to 'moves' = no extra history. */
+  readonly getHistoryScope = this.options.getHistoryScope ?? (() => "moves" as const);
+  /** Live source of the name new comments are signed with. Empty = write them unsigned. */
+  readonly getUserName = this.options.getUserName ?? (() => "");
+  private readonly status = new StatusReporter(this.boardPath, this.options.onStatus);
 
   /**
    * Append a history line for `kind` only when the current scope allows it. Called only after a
@@ -169,7 +172,8 @@ export class VaultRepository implements CardRepository {
   }
 
   async setFrontmatter(path: string, patch: Partial<CardFrontmatter>): Promise<void> {
-    const changed = await this.writer.writeFrontmatter(path, patch);
+    const { changed, before } = await this.writer.writeFrontmatter(path, patch);
+    if (changed.includes("status")) this.status.wrote(path, before, patch, true);
     // One concise line per changed key the policy recognizes. `order` is move-managed and has no
     // field-edit history string, so it's skipped here.
     for (const k of changed) {
@@ -181,13 +185,16 @@ export class VaultRepository implements CardRepository {
   }
 
   async unsetFrontmatterKey(path: string, key: string): Promise<void> {
-    await this.writer.unsetKey(path, key);
+    const { removed, before } = await this.writer.unsetKey(path, key);
+    // Dropping `status` sends the card back to its parent's column; it is not a move into one.
+    if (removed && key === "status") this.status.wrote(path, before, null, false);
   }
 
   async applyMove(mutation: CardMutation): Promise<void> {
-    await applyMove(this.app, this.writer, mutation, (path, kind, line) =>
-      this.maybeHistory(path, kind, line),
-    );
+    await applyMove(this.app, this.writer, mutation, {
+      recordHistory: (path, kind, line) => this.maybeHistory(path, kind, line),
+      onPlaced: (placement) => this.status.placed(mutation, placement),
+    });
   }
 
   async setDescription(path: string, description: string): Promise<void> {

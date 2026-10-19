@@ -12,7 +12,9 @@ import type { ContextConfig, RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { MatchContext } from "../model/filter";
 import type { BoardSettings, SettingsPatch } from "../settings";
+import type { AgentLaunches } from "../model/agent";
 import {
+  AgentLaunchesContext,
   BoardActionsContext,
   ContextsContext,
   RelationCountsContext,
@@ -71,6 +73,10 @@ export interface BoardHost {
    * closed it — the person (Escape, the backdrop, the host's close button) or the board.
    */
   openDetailModal(onClosed: () => void): DetailModalHandle;
+
+  /** The launches waiting on this board's cards. They belong to the plugin, not to the view, so
+   *  a board closed mid-countdown does not call one off. */
+  readonly agents: AgentLaunches;
 }
 
 /**
@@ -175,6 +181,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       relations={view.relations}
       matchCtx={view.matchCtx}
       root={rootRef}
+      agents={host.agents}
     >
       <div className="folia-root folia-scope" ref={rootRef}>
         <Toolbar
@@ -221,6 +228,7 @@ function BoardContexts({
   relations,
   matchCtx,
   root,
+  agents,
   children,
 }: {
   settings: SettingsContextValue;
@@ -230,6 +238,7 @@ function BoardContexts({
   relations: Record<string, RelationCount[]>;
   matchCtx: MatchContext;
   root: RefObject<HTMLDivElement | null>;
+  agents: AgentLaunches;
   children: ReactNode;
 }) {
   return (
@@ -239,7 +248,11 @@ function BoardContexts({
           <ContextsContext.Provider value={contexts}>
             <RelationCountsContext.Provider value={relations}>
               <MatchContextContext.Provider value={matchCtx}>
-                <BoardRootContext.Provider value={root}>{children}</BoardRootContext.Provider>
+                <BoardRootContext.Provider value={root}>
+                  <AgentLaunchesContext.Provider value={agents}>
+                    {children}
+                  </AgentLaunchesContext.Provider>
+                </BoardRootContext.Provider>
               </MatchContextContext.Provider>
             </RelationCountsContext.Provider>
           </ContextsContext.Provider>

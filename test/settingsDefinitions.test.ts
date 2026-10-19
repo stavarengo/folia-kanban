@@ -16,6 +16,7 @@ import {
   settingDefinitions,
   settingsPatchFor,
   type HeldFieldKey,
+  templateFieldOutcome,
 } from "../src/obsidian/settingsDefinitions";
 import {
   CARD_NEXT_TODOS_MAX,
@@ -86,7 +87,12 @@ const controlKeys = rows.flatMap((d) => ("control" in d && d.control ? [d.contro
 
 /** The port and the bind address are not controls: they draw themselves, because Obsidian's
  *  declarative controls write on every keystroke and offer no blur to hold that back. */
-const HELD_KEYS = ["mcpPort", "mcpBindAddress"] as const satisfies readonly HeldFieldKey[];
+const HELD_KEYS = [
+  "mcpPort",
+  "mcpBindAddress",
+  "agentCommand",
+  "agentPrompt",
+] as const satisfies readonly HeldFieldKey[];
 
 const heldRow = (key: HeldFieldKey) => rows.find((d) => d.name === SETTING_COPY[key].name);
 
@@ -164,7 +170,7 @@ describe("settingDefinitions", () => {
 
   // `renderRow` in src/obsidian/settingTab.ts casts a "held" row's key to `HeldFieldKey`. A third held row added
   // to the controls without being added to that type would make the cast lie, silently.
-  it("holds exactly the two fields the held-field type names", () => {
+  it("holds exactly the fields the held-field type names", () => {
     const held = Object.entries(SETTING_CONTROLS)
       .filter(([, spec]) => spec.kind === "held")
       .map(([key]) => key);
@@ -438,5 +444,52 @@ describe("the agent-access token rows", () => {
     // Obsidian hands the row element and its index; neither is read here.
     action?.(document.createElement("div"), 0);
     expect(called).toBe(1);
+  });
+});
+
+describe("the agents-in-columns rows", () => {
+  it("sit under their own heading, after agent access, greyed until agent access is on", () => {
+    const headings = SETTING_GROUPS.map((g) => g.heading);
+    expect(headings.indexOf("Agents in columns")).toBe(headings.indexOf("Agent access (MCP)") + 1);
+    for (const key of ["agentCommand", "agentPrompt", "agentDelay"] as const) {
+      expect(isRowDisabled(key, DEFAULT_SETTINGS), key).toBe(true);
+      expect(isRowDisabled(key, { ...DEFAULT_SETTINGS, mcpEnabled: true }), key).toBe(false);
+    }
+  });
+
+  it("offers the wait as a slider from 0 to 60, and holds it to whole seconds in range", () => {
+    expect(SETTING_CONTROLS.agentDelay).toEqual({ kind: "slider", min: 0, max: 60, step: 1 });
+    expect(settingsPatchFor("agentDelay", 99)).toEqual({ agentDelay: 60 });
+    expect(settingsPatchFor("agentDelay", 2.4)).toEqual({ agentDelay: 2 });
+    expect(settingsPatchFor("agentDelay", "x")).toBeNull();
+  });
+
+  it("takes any text for a template, and nothing else", () => {
+    expect(settingsPatchFor("agentCommand", "echo hi")).toEqual({ agentCommand: "echo hi" });
+    expect(settingsPatchFor("agentPrompt", 5)).toBeNull();
+  });
+
+  // Storage is sparse so a release that improves the default reaches every install that never
+  // chose its own. Writing the default back because the field was focused and left would freeze it.
+  describe("leaving a template field", () => {
+    const settings = { ...DEFAULT_SETTINGS, agentPrompt: "mine" };
+    it("writes nothing when nothing was changed, the default included", () => {
+      expect(
+        templateFieldOutcome("agentCommand", DEFAULT_SETTINGS.agentCommand, settings, false),
+      ).toBeNull();
+      expect(templateFieldOutcome("agentPrompt", "mine", settings, true)).toBeNull();
+    });
+    it("goes back to the default when emptied or put back exactly as the default reads", () => {
+      expect(templateFieldOutcome("agentPrompt", "  ", settings, true)).toBe("reset");
+      expect(
+        templateFieldOutcome("agentPrompt", DEFAULT_SETTINGS.agentPrompt, settings, true),
+      ).toBe("reset");
+      expect(templateFieldOutcome("agentCommand", "", DEFAULT_SETTINGS, false)).toBeNull();
+    });
+    it("writes an edit of the user's own", () => {
+      expect(templateFieldOutcome("agentPrompt", "yours", settings, true)).toEqual({
+        agentPrompt: "yours",
+      });
+    });
   });
 });

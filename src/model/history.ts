@@ -9,7 +9,14 @@ import type { HistoryScope, RelationType } from "./types";
 import { relationLabel, relationLinkText } from "./relationships";
 
 /** Mutation kinds consulted by the gating policy (move/reorder is handled directly in applyMove). */
-export type HistoryEventKind = "priority" | "due" | "status" | "comment" | "subtask" | "relation";
+export type HistoryEventKind =
+  | "priority"
+  | "due"
+  | "status"
+  | "comment"
+  | "subtask"
+  | "relation"
+  | "agent";
 
 const SCOPE_RANK: Record<HistoryScope, number> = { moves: 1, structural: 2, all: 3 };
 
@@ -23,6 +30,7 @@ const EVENT_MIN_RANK: Record<HistoryEventKind, number> = {
   // A relationship is a `[[wikilink]]` graph edge added and removed from the detail panel, exactly
   // like a subcard link — so it is logged under the same scope, not the stricter `structural` one.
   relation: 3,
+  agent: 2,
 };
 
 /** Does `scope` permit a history line for `kind`? */
@@ -40,6 +48,9 @@ export function dueLine(value: string): string {
 }
 export function statusLine(value: string): string {
   return `Status → ${value}`;
+}
+export function agentLaunchLine(runId: string): string {
+  return `Agent launch requested (run ${runId})`;
 }
 export function commentAddedLine(): string {
   return "Comment added";

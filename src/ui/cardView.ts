@@ -2,6 +2,7 @@
 // Backward-compatible across vaults: priority may be a letter scale (A/B/C/D), a word
 // scale (urgent/high/medium/low) — both map to the same four severity tones — or a board's own
 // words, ranked across those same tones by the order its note lists them.
+import { agentRunOf, type AgentRun } from "../model/agent";
 import { assigneeValues } from "../model/assignees";
 import { dueInfo, type DueUrgency } from "../model/dates";
 import { matchCard, type Filter } from "../model/filter";
@@ -468,8 +469,25 @@ export function cardChips(
   if (typeof fm.due === "string" && fm.due) {
     chips.push(dueChip(fm.due, today, fm.status === doneColumnId));
   }
+  const run = agentRunOf(fm);
+  if (run.present) chips.push(agentRunChip(run));
 
   return chips;
+}
+
+/** The chip a card carrying `agent-run` shows for as long as the marker is there. */
+function agentRunChip(run: AgentRun): CardChip {
+  const details = [
+    run.id === undefined ? null : `run ${run.id}`,
+    run.started === undefined ? null : `started ${run.started}`,
+  ].filter((d): d is string => d !== null);
+  return {
+    key: "agent-run",
+    label: "Agent",
+    tone: "accent",
+    icon: "bot",
+    tooltip: ["An agent is working on this card", ...details].join(", "),
+  };
 }
 
 function dueChip(due: string, today: string, done: boolean): CardChip {

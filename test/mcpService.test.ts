@@ -10,6 +10,7 @@ import type { ServerInfo } from "../src/mcp/protocol";
 import { MCP_PATH } from "../src/obsidian/mcpHttpServer";
 import { MCP_DEFAULT_BIND_ADDRESS } from "../src/bindAddress";
 import { FakeApp } from "./obsidianFake";
+import type { StatusReport } from "../src/model/agent";
 
 const INFO: ServerInfo = { name: "folia-kanban", title: "Folia Kanban", version: "0.0.0" };
 
@@ -343,5 +344,59 @@ describe("the repository an agent writes through", () => {
     h.set({ historyScope: "all", userName: "sam" });
     expect(vaultRepo.getHistoryScope()).toBe("all");
     expect(vaultRepo.getUserName()).toBe("sam");
+  });
+});
+
+describe("the endpoint a launched agent is handed", () => {
+  it("is the running server, only while it serves exactly what the settings and token ask for", async () => {
+    const s = setup({ mcpEnabled: true, mcpToken: "tok-a", mcpPort: 0 });
+    live = s.service;
+    expect(s.service.currentEndpoint()).toBeNull();
+    await s.service.sync(s.settings());
+    const port = s.service.port ?? 0;
+    expect(s.service.currentEndpoint()).toEqual({
+      address: MCP_DEFAULT_BIND_ADDRESS,
+      port,
+      token: "tok-a",
+    });
+    // Each of these is read live: until the restart lands, the server running is not the one
+    // asked for, and a launch handed its address would hand out one about to stop working.
+    void s.set({ mcpToken: "tok-b" });
+    expect(s.service.currentEndpoint()).toBeNull();
+    await s.set({});
+    expect(s.service.currentEndpoint()).toMatchObject({ token: "tok-b" });
+    void s.set({ mcpPort: port + 1 });
+    expect(s.service.currentEndpoint()).toBeNull();
+    await s.set({ mcpPort: 0 });
+    void s.set({ mcpEnabled: false });
+    expect(s.service.currentEndpoint()).toBeNull();
+  });
+
+  it("is never a server that is closing, even when it comes straight back on the same target", async () => {
+    const s = setup({ mcpEnabled: true, mcpToken: "tok-a", mcpPort: 0 });
+    live = s.service;
+    await s.service.sync(s.settings());
+    const off = s.set({ mcpEnabled: false });
+    // Let the shutdown begin, then ask for the very target it is closing.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    const on = s.set({ mcpEnabled: true });
+    expect(s.service.currentEndpoint()).toBeNull();
+    await off;
+    await on;
+    expect(s.service.currentEndpoint()).toMatchObject({ token: "tok-a" });
+  });
+
+  it("hears every status write an agent makes through the repositories behind it", async () => {
+    const app = new FakeApp();
+    app.vault.addFile("Work/Board.md", BOARD);
+    app.vault.addFile("Tasks/One.md", "---\nstatus: todo\n---\n# One\n");
+    const reports: StatusReport[] = [];
+    const host = vaultBoardHost({
+      app: app as unknown as App,
+      getSettings: () => DEFAULT_SETTINGS,
+      onStatus: (r) => reports.push(r),
+    });
+    await host.repoFor("Work/Board.md")?.setFrontmatter("Tasks/One.md", { status: "done" });
+    expect(reports).toMatchObject([{ boardPath: "Work/Board.md", from: "todo", to: "done" }]);
   });
 });

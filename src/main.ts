@@ -1,5 +1,5 @@
 import type { PaneType, TFile, WorkspaceLeaf } from "obsidian";
-import { Keymap, MarkdownView, Notice, Plugin } from "obsidian";
+import { FileSystemAdapter, Keymap, MarkdownView, Notice, Plugin } from "obsidian";
 import { KanbanView } from "./view";
 import { OPEN_BOARD_COMMAND_NAME, VIEW_TYPE_KANBAN } from "./viewType";
 import type { FileOp } from "./model/pathOps";
@@ -43,6 +43,8 @@ import { stamp } from "./model/dates";
 import { BoardTabs } from "./obsidian/boardTabs";
 import { BoardSetup } from "./obsidian/boardSetup";
 import { KanbanSettingTab } from "./obsidian/settingTab";
+import { AgentRuns } from "./obsidian/agentRuns";
+import { newRunId, nodeSystem, spawnDetached } from "./obsidian/agentLauncher";
 
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
@@ -85,26 +87,48 @@ export default class FoliaKanbanPlugin extends Plugin {
    */
   private mcpToken = "";
 
+  /** The agent launches in hand: countdowns on tiles, launches in flight, the markers they leave.
+   *  Kept here, not in a board view, so closing a board does not call a launch off. */
+  readonly agents: AgentRuns = new AgentRuns({
+    app: this.app,
+    settings: () => this.settings,
+    endpoint: () => this.mcp?.currentEndpoint() ?? null,
+    spawn: spawnDetached,
+    notify: (message) => new Notice(message, 10000),
+    ...nodeSystem,
+    vaultPath: () => {
+      const adapter = this.app.vault.adapter;
+      return adapter instanceof FileSystemAdapter ? adapter.getBasePath() : null;
+    },
+    pluginDir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
+    newRunId,
+    now: () => Date.now(),
+    timers: {
+      set: (fn, ms) => window.setTimeout(fn, ms),
+      clear: (id) => window.clearTimeout(id),
+    },
+  });
+
   override async onload(): Promise<void> {
     await this.loadSettings();
 
     this.registerView(
       VIEW_TYPE_KANBAN,
       (leaf) =>
-        new KanbanView(
-          leaf,
-          () => this.boardSettings(),
-          (p) =>
+        new KanbanView(leaf, {
+          getSettings: () => this.boardSettings(),
+          updateSettings: (p) =>
             void this.updateSettings(p).catch((e: unknown) => {
               // Nothing awaits a board's write, so a refused one would otherwise be an unhandled
               // rejection. What the board shows is already applied; only keeping it failed.
               new Notice(`Folia Kanban: could not save a board change. ${String(e)}`, 8000);
             }),
-          (view) => {
+          openAsMarkdown: (view) => {
             const file = view.file;
             if (file) void this.showMarkdownIn(view.leaf, file.path);
           },
-        ),
+          agents: this.agents,
+        }),
     );
 
     this.addRibbonIcon(
@@ -145,9 +169,12 @@ export default class FoliaKanbanPlugin extends Plugin {
     // The button follows the flag: a note that gains or loses `folia-board` while it is open
     // gains or loses the button, but the tab is never swapped out from under the user.
     this.registerEvent(
-      this.app.metadataCache.on("changed", (file) => {
+      this.app.metadataCache.on("changed", (file, _data, cache) => {
         this.tabs.retryColdOpens(file);
         this.tabs.syncMarkdownActions();
+        // Any hand, any device: a card leaving an agent column calls its launch off and loses
+        // its marker. Never a launch of its own — see `AgentRuns.observe`.
+        this.agents.observe(file, cache.frontmatter);
       }),
     );
     // Everything the plugin remembers by path follows the file it is about. The vault reports
@@ -171,6 +198,7 @@ export default class FoliaKanbanPlugin extends Plugin {
     this.register(() => {
       this.unloaded = true;
       this.tabs.removeMarkdownActions();
+      this.agents.unload();
       void this.mcp?.stop();
     });
     // `onLayoutReady` cannot be unregistered, and it can still fire after an unload that happened
@@ -185,6 +213,8 @@ export default class FoliaKanbanPlugin extends Plugin {
       // ready that cache is still filling — an agent connecting in the first seconds would be told
       // this vault has no boards.
       void this.mcp?.sync(this.settings);
+      // Same reason: the markers are found through the cache, so it has to be full first.
+      this.agents.sweep();
     });
   }
 
@@ -196,6 +226,8 @@ export default class FoliaKanbanPlugin extends Plugin {
    * `migratePathKeyedSettings` are built to expect.
    */
   private async followFileOp(op: FileOp): Promise<void> {
+    // Before anything awaits: a countdown about to fire must already read the new paths.
+    this.agents.followFileOp(op);
     this.tabs.followFileOp(op);
     try {
       await this.updateSettings((s) => ({
@@ -357,6 +389,19 @@ export default class FoliaKanbanPlugin extends Plugin {
     return key in this.stored;
   }
 
+  /** Take settings out of what is kept, so each answers with its default again — the default as
+   *  this build or any later one ships it. Nothing is written when none of them was set. */
+  async resetSettings(keys: (keyof KanbanSettings)[]): Promise<void> {
+    const set = keys.filter((key) => key in this.stored);
+    if (set.length === 0) return;
+    const next: StoredSettings = { ...this.stored };
+    for (const key of set) delete next[key];
+    this.stored = next;
+    this.settings = resolveSettings(this.stored);
+    this.refreshViews();
+    await this.saveSettings();
+  }
+
   private applyToStored(patch: Partial<KanbanSettings>): boolean {
     if (Object.keys(patch).length === 0) return false;
     this.stored = { ...this.stored, ...patch };
@@ -422,6 +467,7 @@ export default class FoliaKanbanPlugin extends Plugin {
         version: this.manifest.version,
       },
       onState: (state) => this.reportMcpState(state),
+      onStatus: (report) => this.agents.report(report),
     });
   }
 

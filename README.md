@@ -23,6 +23,7 @@ Columns, drag-and-drop, nested subcards, comments and an automatic history — b
 - [Set up a board](#set-up-a-board)
 - [Settings](#settings)
 - [Agent access (MCP)](#agent-access-mcp)
+- [Agents in columns](#agents-in-columns)
 - [Keyboard & mouse](#keyboard--mouse)
 - [Your data stays yours](#your-data-stays-yours)
 - [Install](#install)
@@ -325,6 +326,7 @@ Under **Settings → Folia Kanban** (changes apply live, no reload). The tab is 
   - **Your name** — signs the comments you write from the board, tells the board which comments are yours for [unread marking](#unread-comments), and is who "me" means when you [assign a card to yourself](#who-is-working-on-this). Empty (the default) writes comments unsigned and leaves the one-click assign out.
   - **What history records** — `moves` (card moves/reorders only), `structural` (also priority/status/due changes), or `all` (also comments, subtasks and blocking links).
 - **Agent access (MCP)** — **Enable agent access**, **Server port**, **Bind address**, **Agent token** and **Replace the token**; see [Agent access (MCP)](#agent-access-mcp).
+- **Agents in columns** — **Command**, **Prompt** and **Wait before starting**: what a card entering an agent column runs, what the agent is asked, and how long the tile waits first; see [Agents in columns](#agents-in-columns).
 
 The version the vault is running is the last row, under an **About** heading of its own.
 
@@ -333,11 +335,24 @@ The version the vault is running is the last row, under an **About** heading of 
 Off by default. Switch it on and the plugin hosts a [Model Context Protocol](https://modelcontextprotocol.io) server on `127.0.0.1`, so an AI agent can read and change your boards through the board's own rules rather than by editing the card files behind its back — which is the difference between a card that gets its history line and one that quietly does not. Desktop only, bearer-token authenticated, one server per vault, and the tools address boards by note path. A bind-address setting can move it off loopback when the client is not on this computer — [`docs/mcp.md`](./docs/mcp.md) says what you are agreeing to when you do.
 
 ```sh
-claude mcp add --transport http folia-kanban http://127.0.0.1:27125/mcp \
+claude mcp add --scope user --transport http folia-kanban http://127.0.0.1:27125/mcp \
   --header "Authorization: Bearer PASTE_YOUR_TOKEN_HERE"
 ```
 
 The tools, their arguments and the rest of the setup are in [docs/mcp.md](docs/mcp.md).
+
+## Agents in columns
+
+Give a column `agent:` in the board note, and every card the board or an agent moves into it starts an AI agent on that card. The tile counts a short wait down first, with **Cancel** and **Now** beside it. By default that is a Claude Code session in a window of the plugin's own tmux server, working the card through agent access: it assigns itself, comments, ticks subtasks and moves the card on when it is done. The card shows an **Agent** chip while the run lasts. Agent access has to be on; macOS and Linux only.
+
+```yaml
+columns:
+  - id: review
+    title: In Review
+    agent: { model: sonnet }
+```
+
+The `agent:` keys, the command and its placeholders, and what a run marker means are in [docs/agents-in-columns.md](docs/agents-in-columns.md).
 
 ## Keyboard & mouse
 

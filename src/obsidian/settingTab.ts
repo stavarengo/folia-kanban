@@ -11,9 +11,12 @@ import { MCP_DEFAULT_BIND_ADDRESS } from "../bindAddress";
 import { DEFAULT_SETTINGS, type KanbanSettings, type SettingsPatch } from "../settings";
 import {
   heldFieldOutcome,
+  isTemplateKey,
   settingDefinitions,
   settingsPatchFor,
+  templateFieldOutcome,
   type HeldFieldKey,
+  type TemplateKey,
 } from "./settingsDefinitions";
 import {
   ABOUT_HEADING,
@@ -37,6 +40,8 @@ export interface SettingTabHost extends Plugin {
   readonly settings: KanbanSettings;
   updateSettings(patch: SettingsPatch): Promise<void>;
   isSet(key: keyof KanbanSettings): boolean;
+  /** Forget what the user set for these, so each answers with its default again. */
+  resetSettings(keys: (keyof KanbanSettings)[]): Promise<void>;
   copyMcpToken(): Promise<void>;
   regenerateMcpToken(): Promise<void>;
 }
@@ -72,6 +77,10 @@ export class KanbanSettingTab extends PluginSettingTab {
    * holds nothing here, and leaving it then keeps what was already stored.
    */
   private pendingMcpFields: Partial<KanbanSettings> = {};
+
+  /** The command and prompt templates as typed, held like the fields above: a launch must never
+   *  pick up a command halfway through being written. */
+  private pendingTemplates: Partial<Record<TemplateKey, string>> = {};
 
   /** The bind-address input as last drawn, so a refused confirm can put the stored value back. */
   private bindAddressInput: TextComponent | null = null;
@@ -133,6 +142,7 @@ export class KanbanSettingTab extends PluginSettingTab {
   settingsChangedExternally(): void {
     this.pendingUserName = null;
     this.pendingMcpFields = {};
+    this.pendingTemplates = {};
     // From 1.13 the tab is Obsidian's to draw from `getSettingDefinitions`, and emptying
     // `containerEl` behind it would replace what it rendered — and what its settings search
     // indexed — with the older imperative rows. Below that, `render` is the only path there is, and
@@ -162,9 +172,11 @@ export class KanbanSettingTab extends PluginSettingTab {
    * value the server is not on, which is the failure these two rows were rebuilt to end.
    */
   private commitHeldFields(): void {
-    const { now, confirm } = splitHeldPatch(this.heldPatch());
+    const { patch, resets } = this.heldChanges();
+    const { now, confirm } = splitHeldPatch(patch);
     if (confirm !== null) void this.confirmBindAddress(confirm);
     if (Object.keys(now).length > 0) void this.plugin.updateSettings(now);
+    if (resets.length > 0) void this.plugin.resetSettings(resets);
   }
 
   /** The address a confirm is open for. Closing the Settings window both hides the tab and blurs
@@ -191,13 +203,25 @@ export class KanbanSettingTab extends PluginSettingTab {
    *  other write, because every keystroke passes through it. Editing 192.168.1.5 into 192.168.1.55
    *  passes through addresses that are real and bindable, and switching a toggle in the middle of
    *  that must not be what decides where the server listens. */
-  private heldPatch(): Partial<KanbanSettings> {
+  private heldChanges(): { patch: Partial<KanbanSettings>; resets: TemplateKey[] } {
     const patch: Partial<KanbanSettings> = { ...this.pendingMcpFields };
-    const { pendingUserName: name } = this;
+    const { pendingUserName: name, pendingTemplates } = this;
     this.pendingUserName = null;
     this.pendingMcpFields = {};
+    this.pendingTemplates = {};
     if (name !== null && name !== this.plugin.settings.userName) patch.userName = name;
-    return patch;
+    const resets: TemplateKey[] = [];
+    for (const [key, typed] of Object.entries(pendingTemplates) as [TemplateKey, string][]) {
+      const outcome = templateFieldOutcome(
+        key,
+        typed,
+        this.plugin.settings,
+        this.plugin.isSet(key),
+      );
+      if (outcome === "reset") resets.push(key);
+      else if (outcome !== null) Object.assign(patch, outcome);
+    }
+    return { patch, resets };
   }
 
   /**
@@ -206,6 +230,10 @@ export class KanbanSettingTab extends PluginSettingTab {
    * {@link heldFieldOutcome} for why neither field can be a declarative control.
    */
   private renderHeldField(key: HeldFieldKey, setting: Setting): void {
+    if (isTemplateKey(key)) {
+      this.renderTemplateField(key, setting);
+      return;
+    }
     const disabled = isRowDisabled(key, this.plugin.settings);
     setting.setDisabled(disabled).addText((t) => {
       if (key === "mcpBindAddress") this.bindAddressInput = t;
@@ -241,6 +269,31 @@ export class KanbanSettingTab extends PluginSettingTab {
         t.setValue(outcome.show);
         if (outcome.notice !== null) new Notice(outcome.notice, 5000);
         this.commitHeldFields();
+      });
+    });
+  }
+
+  /**
+   * A template, as a text area holding the whole of it: the default is shown in full, so changing
+   * one word of it is an edit rather than a rewrite. Written when focus leaves; emptied, or put back
+   * exactly as the default reads, it goes back to following the default.
+   */
+  private renderTemplateField(key: TemplateKey, setting: Setting): void {
+    const disabled = isRowDisabled(key, this.plugin.settings);
+    setting.setDisabled(disabled).setClass("folia-setting-template");
+    setting.addTextArea((t) => {
+      // Tall enough to read the default without scrolling, short of taking the whole tab.
+      t.inputEl.rows = Math.min(16, DEFAULT_SETTINGS[key].split("\n").length + 2);
+      t.inputEl.spellcheck = false;
+      t.setValue(this.pendingTemplates[key] ?? this.plugin.settings[key])
+        .setDisabled(disabled)
+        .onChange((v) => {
+          this.pendingTemplates[key] = v;
+        });
+      t.inputEl.addEventListener("blur", () => {
+        this.commitHeldFields();
+        // An emptied field shows the default it now follows, not a blank that reads as "nothing".
+        if (t.inputEl.value.trim() === "") t.setValue(DEFAULT_SETTINGS[key]);
       });
     });
   }

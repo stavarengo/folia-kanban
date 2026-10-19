@@ -10,6 +10,7 @@ import {
   type BoardActions,
   useRelationCounts,
   useSettings,
+  usePendingLaunch,
   useSubitemsCollapse,
   useUnreadComments,
 } from "./context";
@@ -17,6 +18,7 @@ import { useReducedMotion } from "./useReducedMotion";
 import { tileName } from "./cardWords";
 import { useTileEvents } from "./useTileEvents";
 import {
+  AgentCountdown,
   CardActions,
   CardChips,
   CardMeta,
@@ -113,6 +115,9 @@ function CardItemInner({
         selected={selected}
       />
 
+      {/* Sibling of `.folia-card-main` too: its Cancel and Now are buttons of their own. */}
+      <AgentCountdown card={card} />
+
       {/* Sibling of `.folia-card-main`, same reason as the buttons below: that div carries
           `role="button"` and a nested interactive element inside it would be unreachable to
           assistive tech. */}
@@ -145,6 +150,7 @@ function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   // from settings rather than arriving on the memoized card. `reply` = an unread comment that
   // landed after one of your own.
   const unread = useUnreadComments(card.path, card.stats?.commentMarks);
+  const launchPending = usePendingLaunch(card.path) !== null;
   const chips = [
     ...relationChips(relations),
     ...cardChips(card, today, actions.doneColumnId, actions.priorityScale),
@@ -160,6 +166,7 @@ function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   const hasNestedSubitems = hasSubcardChildren || hasNextTodosPreview;
   return {
     unread,
+    launchPending,
     chips,
     ctx,
     ctxColor: ctx?.color,
@@ -202,7 +209,7 @@ function CardFace({
       onClick={onOpen}
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
-      aria-label={tileName(card, view.unread)}
+      aria-label={tileName(card, view.unread, view.launchPending)}
       aria-current={selected ? "true" : undefined}
     >
       {title.editing != null ? (

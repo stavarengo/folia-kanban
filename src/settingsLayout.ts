@@ -1,5 +1,11 @@
 import { MCP_DEFAULT_BIND_ADDRESS, isLoopbackBindAddress } from "./bindAddress";
-import { DEFAULT_SETTINGS, MCP_PORT_MAX, MCP_PORT_MIN, type KanbanSettings } from "./settings";
+import {
+  AGENT_DELAY_MAX,
+  DEFAULT_SETTINGS,
+  MCP_PORT_MAX,
+  MCP_PORT_MIN,
+  type KanbanSettings,
+} from "./settings";
 
 // The settings tab as data: what it offers, in what order, under which headings, worded how, and
 // what makes a row go inert. Both renderings read it — the declarative definitions Obsidian 1.13
@@ -23,7 +29,10 @@ export type EditableSettingKey =
   | "boardSetupEditorMenu"
   | "mcpEnabled"
   | "mcpPort"
-  | "mcpBindAddress";
+  | "mcpBindAddress"
+  | "agentCommand"
+  | "agentPrompt"
+  | "agentDelay";
 
 /** The settings that are a plain on/off. Kept as a value, not only a type, so `settingsPatchFor`
  *  can recognise one at runtime — a boolean reaching the dropdown branch would be refused. */
@@ -37,7 +46,14 @@ export const TOGGLE_SETTING_KEYS = [
 /** Every setting whose control is a dropdown, i.e. one with a fixed list of choices. */
 export type DropdownKey = Exclude<
   EditableSettingKey,
-  "cardNextTodos" | "userName" | "mcpPort" | "mcpBindAddress" | (typeof TOGGLE_SETTING_KEYS)[number]
+  | "cardNextTodos"
+  | "userName"
+  | "mcpPort"
+  | "mcpBindAddress"
+  | "agentCommand"
+  | "agentPrompt"
+  | "agentDelay"
+  | (typeof TOGGLE_SETTING_KEYS)[number]
 >;
 
 /**
@@ -119,7 +135,19 @@ export const SETTING_COPY = {
   },
   mcpBindAddress: {
     name: "Bind address",
-    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
+    desc: `The address the server listens on. ${MCP_DEFAULT_BIND_ADDRESS} (the default) keeps it on this computer: nothing else can reach it, whatever the network. Any other address — 0.0.0.0 for every IPv4 address this computer has, :: for every address, or one particular interface — puts the board on that network, where any machine that can reach the address and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column. Use it when the client runs somewhere else (a container reaches its host through the gateway address, never through the host's loopback), and know that the token is then the only thing in the way. An IP address, not a name: 0.0.0.0 asks for every IPv4 address this computer has and :: for every address it has, while anything else has to be one it actually has, or the server will not start. Only used while agent access is on.`,
+  },
+  agentCommand: {
+    name: "Command",
+    desc: "The shell command a card starts when the board, or an agent, moves it into a column whose board note gives it `agent:`. It runs in the column's `cwd`, detached from Obsidian, so it outlives it. Write placeholders such as {{card}} or {{prompt}} bare, never inside quotes: each becomes one shell word. The same context arrives as FOLIA_* variables, and the agent token only ever as FOLIA_MCP_TOKEN. The default opens a Claude Code session in a tmux window: attach with `tmux -L folia attach -t agents`. Empty it to go back to the default. Only used while agent access is on. See docs/agents-in-columns.md.",
+  },
+  agentPrompt: {
+    name: "Prompt",
+    desc: "What the agent is asked to do, handed to the command as {{prompt}} and FOLIA_PROMPT, with the same placeholders filled in word for word. The default asks it to work the card like a teammate through the board's own tools and move it where it belongs when it is done. Empty it to go back to the default. Only used while agent access is on.",
+  },
+  agentDelay: {
+    name: "Wait before starting",
+    desc: `Seconds a card waits in an agent column, with Cancel and Now on its tile, before its agent starts (0–${AGENT_DELAY_MAX}). Moving the card out in that time is enough to stop it. Zero starts at once. Only used while agent access is on.`,
   },
 } as const satisfies Record<EditableSettingKey, { name: string; desc: string }>;
 
@@ -156,6 +184,9 @@ export const SETTING_CONTROLS = {
   mcpEnabled: { kind: "toggle" },
   mcpPort: { kind: "held" },
   mcpBindAddress: { kind: "held" },
+  agentCommand: { kind: "held" },
+  agentPrompt: { kind: "held" },
+  agentDelay: { kind: "slider", min: 0, max: AGENT_DELAY_MAX, step: 1 },
 } as const satisfies Record<EditableSettingKey, RowControlSpec>;
 
 /**
@@ -169,7 +200,7 @@ export const SETTING_CONTROLS = {
  */
 export interface SettingGroupSpec {
   /** Identifies the group in code — the agent-access one is desktop-only and carries token rows. */
-  id: "boards" | "cards" | "addingCards" | "identity" | "agentAccess";
+  id: "boards" | "cards" | "addingCards" | "identity" | "agentAccess" | "agents";
   heading: string;
   keys: readonly EditableSettingKey[];
 }
@@ -193,6 +224,11 @@ export const SETTING_GROUPS = [
     id: "agentAccess",
     heading: "Agent access (MCP)",
     keys: ["mcpEnabled", "mcpPort", "mcpBindAddress"],
+  },
+  {
+    id: "agents",
+    heading: "Agents in columns",
+    keys: ["agentCommand", "agentPrompt", "agentDelay"],
   },
 ] as const satisfies readonly SettingGroupSpec[];
 
@@ -218,6 +254,9 @@ export const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]
   // otherwise leave the search pointing at a value nothing uses.
   mcpPort: ["mcp", "port", String(DEFAULT_SETTINGS.mcpPort)],
   mcpBindAddress: ["mcp", "bind", MCP_DEFAULT_BIND_ADDRESS, "loopback", "network"],
+  agentCommand: ["agent", "launch", "tmux", "claude", "shell", "agent-run"],
+  agentPrompt: ["agent", "instructions", "claude"],
+  agentDelay: ["agent", "countdown", "delay", "grace", "cancel"],
 };
 
 /** What a row needs the settings to say before it means anything. A row whose dependency is not met
@@ -226,6 +265,10 @@ export const EXTRA_ALIASES: Partial<Record<EditableSettingKey, readonly string[]
 const ROW_DISABLED: Partial<Record<EditableSettingKey, (s: KanbanSettings) => boolean>> = {
   mcpPort: (s) => !s.mcpEnabled,
   mcpBindAddress: (s) => !s.mcpEnabled,
+  // A launch hands its agent the server's address and token; with no server there is no launch.
+  agentCommand: (s) => !s.mcpEnabled,
+  agentPrompt: (s) => !s.mcpEnabled,
+  agentDelay: (s) => !s.mcpEnabled,
 };
 
 /** The rows that go inert under another setting. Exported so the guard that every one of them
@@ -304,7 +347,7 @@ export function bindAddressConfirm(address: string): {
 } {
   return {
     title: "Open agent access to the network?",
-    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault.`,
+    message: `Listening on ${address} puts agent access on that network: any machine that can reach it and holds the token can read and change every board in this vault, and start an agent on this computer by moving a card into an agent column.`,
     cta: `Listen on ${address}`,
   };
 }

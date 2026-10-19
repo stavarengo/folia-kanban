@@ -6,6 +6,7 @@ import { FakeRepo } from "./fakeRepo";
 import { testHost } from "./fakeHost";
 import type { BoardConfig } from "../src/model/types";
 import { DEFAULT_BOARD_SETTINGS } from "./boardSettings";
+import { serializeColumns } from "../src/model/columns";
 
 const config: BoardConfig = {
   path: "Board.md",
@@ -111,6 +112,33 @@ describe("column actions", () => {
       opacity: 0.5,
       parked: true,
     });
+  });
+
+  // The dialog knows nothing of `agent:`, and a save rebuilds the column from the keys it knows.
+  // Dropping it there would quietly turn an agent column into a plain one on the first title edit.
+  it.each([
+    ["a title", { title: "Reviewing" }],
+    ["a colour", { color: "blue" }],
+    ["a limit", { limit: 4 }],
+  ])("keeps a column's agent:, unknown keys and all, through %s edit", async (_what, patch) => {
+    const user = userEvent.setup();
+    const agent = { model: "sonnet", args: ["--verbose"], future: { deep: true } };
+    const repo = new FakeRepo({
+      ...config,
+      columns: [
+        { id: "todo", title: "Todo" },
+        { id: "review", title: "Review", agent },
+      ],
+    });
+    renderBoard(repo);
+    await screen.findByText("Review");
+
+    await pickColumnMenu(user, "Review", /Edit column/);
+    repo.columnEditor!.save(patch);
+
+    await waitFor(() => expect(repo.config.columns[1]).toMatchObject(patch));
+    expect(repo.config.columns[1]?.agent).toEqual(agent);
+    expect(serializeColumns(repo.config.columns)[1]?.["agent"]).toEqual(agent);
   });
 
   it("refuses to delete a column whose cards have no plain column to go to, before asking", async () => {

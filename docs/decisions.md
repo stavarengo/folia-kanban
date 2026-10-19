@@ -102,7 +102,9 @@ Honouring it means real styling, real hit-target work and a device to test on. T
 
 The second half of this is Node's `http`, which hosts agent access. `src/obsidian/mcpHttpServer.ts` imports it statically, so the bundle `require`s it when the plugin loads. That is safe because the manifest is enforced, not just advertised: Obsidian's `enablePlugin` returns early for an `isDesktopOnly` plugin whenever `Platform.isDesktopApp` is false, so on a phone the plugin's code never runs at all (read off the app bundle, `docs/ai/reports/20260829.what-obsidian-already-provides/07.guidelines-mcp-build-and-the-rest.md`). The Obsidian lint preset reads the same flag and switches `obsidianmd/no-nodejs-modules` off when it is set. Until 2026-09-30 the import was a dynamic `import("http")` behind `if (!Platform.isDesktop) throw`, with matching checks before building the server, before minting its token and around the settings group; it needed a waiver, an ESLint override and an esbuild override to exist. All of it guarded a case the manifest already rules out, so it went. One side effect: Obsidian's mobile emulation on a desktop sets `isDesktop` false but leaves `isDesktopApp` true, and agent access now keeps running there, which is correct since Node is present.
 
-**What would change this:** someone wanting the board on a phone badly enough to fund the styling pass — touch-sized targets, the hover-only affordances given a tap route, and `.is-phone`/`.is-tablet` layouts — with a device to check it on. That is its own entry when it comes, not a manifest edit. That entry would also have to move the `http` import behind a runtime check again, because the manifest would no longer keep the plugin off phones and `http` does not exist there.
+Agents in columns (`docs/agents-in-columns.md`) adds `child_process`, `fs` and `os`, imported statically in `src/obsidian/agentLauncher.ts` on the same footing. Windows is desktop but is refused at launch with a notice: the command runs through `/bin/sh`, and the default one needs `tmux`.
+
+**What would change this:** someone wanting the board on a phone badly enough to fund the styling pass — touch-sized targets, the hover-only affordances given a tap route, and `.is-phone`/`.is-tablet` layouts — with a device to check it on. That is its own entry when it comes, not a manifest edit. That entry would also have to move the `http` and `child_process` imports behind a runtime check again, because the manifest would no longer keep the plugin off phones and neither module exists there.
 
 ## Agent access stays an HTTP server the plugin hosts, not a command on Obsidian's CLI
 
@@ -625,7 +627,7 @@ Each shows an icon and a label together. `ButtonComponent.setButtonText` replace
 
 ## In-text links and disclosures stay hand-drawn
 
-**Decided 2026-09-30 (#103). A card's "↳ parent" reference, the detail panel's title disclosure and "Why this title?", relation and subcard titles, and "Add a description…" are `<button>`s the board draws as text.**
+**Decided 2026-09-30 (#103). A card's "↳ parent" reference, the detail panel's title disclosure and "Why this title?", relation and subcard titles, and "Add a description…" are `<button>`s the board draws as text. Since #144, so are **Cancel** and **Now** in a card's agent countdown, which wear `folia-link`.**
 
 They sit in running text and must wrap with it. A `ButtonComponent` is a box one input high, and an `ExtraButtonComponent` is an icon. So `.folia-link` in `base.css` still undoes the two rules Obsidian's stylesheet puts on every button: `white-space: nowrap` and `height: var(--input-height)`. It is one of two rules the board keeps against undocumented app CSS, and both reset the host's values rather than reading them. The other is in `host-controls.css`: it removes the grey ring Obsidian's stylesheet draws around a focused control, so the board's accent outline is the only one. `scripts/theme-buttons.mjs` lists these classes beside the icon-and-label ones.
 
@@ -682,6 +684,7 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **The settings write chain** (`pendingWrite` in `src/main.ts`): `saveData` does not serialise calls, and two in flight can land on disk in either order.
 - **The agent-access queues** (the `turn` chain in `createServer`, `src/obsidian/mcpHttpServer.ts`, and `enqueue` in `src/obsidian/mcpService.ts` for starting and stopping the server): Node's server takes requests concurrently, two board writes must never compute against the same snapshot, and the API has no async queue.
 - **`onChange` and `onFileOp` on the repository port** (`src/model/repo.ts`): a thin layer over `vault.on`, because an `EventRef` cannot cross into the model.
+- **Starting a process** (`spawnDetached` in `src/obsidian/agentLauncher.ts`): the API has no way to run a command, so a column's agent is started through Node's `child_process`, detached, with nothing kept of it.
 - **`navigator.clipboard` and `crypto.getRandomValues`** (`src/main.ts` and `src/ui/cardActions.ts`; `newMcpToken` in `src/obsidian/mcpService.ts`): the API has no helper for either.
 - **No translations**: `getLanguage()` tells a plugin the app's language, but Obsidian has no string catalogue or loader for plugins.
 - **The `.theme-light` override** (`src/theme/tokens.css`, the only place it is used): a host class, and still inside "Folia uses only what Obsidian documents", because the developer docs' "Build a theme" page tells themes to define the documented variables under `.theme-dark` or `.theme-light`. The scheme classes are how those variables are scoped, and the board's own scheme-dependent values follow them the same way.
@@ -693,3 +696,14 @@ Obsidian's `CachedMetadata` has `headings`, `sections` and `listItems`, which wo
 - **Already native, only hand-built looking**: `renderMarkdown` in `src/obsidian/markdownRender.ts` renders through `MarkdownRenderer` with a `Component` it loads and unloads, React mounts on the view's `contentEl`, the `/` shortcut is registered on the view's own `Scope`, and `refreshViews` in `src/main.ts` walks `getLeavesOfType`.
 
 **What would change this:** the API gaining the piece a line says is missing, such as a typed drag manager, a date component, a day-changed event, a filename sanitiser, a `normalizePath` that resolves segments, a property registry or a translation API. That line then moves to the host, or earns its own entry if it stays.
+
+## What does not start an agent
+
+**Decided 2026-10-19 (#144). Only a status write the plugin makes for a move someone chose may start a column's agent. These writes never do, each for its own reason.**
+
+- **Deleting a column.** Its cards are rehomed to a neighbour by a status write, but nobody chose that column for them, and a neighbour that happens to be an agent column would start one agent per card at once. The write is still reported, so a countdown on a rehomed card is called off and its run marker cleared. Would change with a delete dialog that asks where the cards go, which would make the destination a choice.
+- **`create_card`, and a card added on the board.** A new card has no move behind it, and creating cards in a batch would start a batch of agents nobody watched being scheduled. Would change with a request to start an agent on creation, as its own option.
+- **A checklist line moved into an agent column.** A line has no frontmatter, so there is nowhere to write the run marker that keeps a second launch out. Would change if lines gained a marker of their own.
+- **A hand edit or a sync.** The design's rule: a second computer seeing the same move through Sync must not start a second agent. Both still call a countdown off and clear a stale marker.
+- **A launch still waiting when Obsidian quits.** Countdowns live in the running plugin and are not written anywhere, so the next start knows nothing of them. Writing them down would be a launch that happens on whichever computer opens the vault next. Would change with a report of launches lost this way that matters.
+- **There is no `agent:` field in the Edit column dialog.** The mapping configures a program that runs on this computer, and its keys (`cwd`, `args`) are the kind a form makes too easy to get wrong silently. It is written by hand in the board note, and every column edit keeps it. Would change once the keys settle and a form can validate them.

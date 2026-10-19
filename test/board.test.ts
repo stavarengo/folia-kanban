@@ -1680,7 +1680,7 @@ describe("subitems in a column of their own", () => {
     expect(moveCard(b, b.cards[makeTodoPath("Tasks/Root.md", 0)]!, "doing", 0)).toBeNull();
   });
 
-  it("rehomes an orphan of either kind without history", () => {
+  it("rehomes an orphan of either kind without history, marked as rehoming", () => {
     const b = buildBoard(config, [
       withTodos("Root", { status: "todo" }, [todo("Write docs", 0, "doing")]),
       card("Other", { status: "doing" }),
@@ -1688,6 +1688,8 @@ describe("subitems in a column of their own", () => {
     expect(reassignColumn(b, "Tasks/Other.md", "todo")).toEqual({
       path: "Tasks/Other.md",
       setFrontmatter: { status: "todo" },
+      // A column going away is not a move anyone chose, so it must never start an agent.
+      rehomed: true,
     });
     // No checkbox in the write: a column going away rehomes what it held, it does not decide the
     // work in it is unfinished — deleting the done column must not reopen everything that was in it.

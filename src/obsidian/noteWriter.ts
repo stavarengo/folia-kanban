@@ -5,6 +5,12 @@ import { commentDrift, subtaskDrift } from "../model/card";
 import { DataCorruptionError } from "../model/schemas";
 import { parseFrontmatter, sameValue } from "./frontmatter";
 
+/** What a frontmatter write changed, and the frontmatter it was made on. */
+export interface FrontmatterWrite {
+  changed: string[];
+  before: Record<string, unknown>;
+}
+
 /** How long a vault event on a path this writer just wrote is taken for the echo of that write. */
 const ECHO_WINDOW_MS = 2500;
 
@@ -69,36 +75,46 @@ export class NoteWriter {
   /**
    * Raw frontmatter write — NO history. The move path (applyMove) uses this so it never
    * double-emits a structural line on top of its own "Moved …" entry. Returns the keys whose stored
-   * value actually changed; when none would, the note is not touched.
+   * value actually changed, and the frontmatter as it was, both read inside the write from the very
+   * block it was made on; when no key would change, the note is not touched.
    */
-  async writeFrontmatter(path: string, patch: Record<string, unknown>): Promise<string[]> {
-    const fm = await this.currentFrontmatter(path);
-    const changed = Object.keys(patch).filter(
-      (k) => fm === null || !(k in fm) || !sameValue(fm[k], patch[k]),
-    );
-    if (changed.length === 0) return [];
+  async writeFrontmatter(path: string, patch: Record<string, unknown>): Promise<FrontmatterWrite> {
+    const differing = (fm: Record<string, unknown> | null): string[] =>
+      Object.keys(patch).filter((k) => fm === null || !(k in fm) || !sameValue(fm[k], patch[k]));
+    const seen = await this.currentFrontmatter(path);
+    if (differing(seen).length === 0) return { changed: [], before: seen ?? {} };
+    const result: FrontmatterWrite = { changed: [], before: {} };
     this.markWrite(path);
     await this.app.fileManager.processFrontMatter(
       this.file(path),
       (fm: Record<string, unknown>) => {
+        result.before = { ...fm };
+        result.changed = differing(fm);
         for (const [k, v] of Object.entries(patch)) fm[k] = v;
       },
     );
-    return changed;
+    return result;
   }
 
-  /** Remove one key; false, with the note untouched, when it does not carry that key. */
-  async unsetKey(path: string, key: string): Promise<boolean> {
-    const fm = await this.currentFrontmatter(path);
-    if (fm !== null && !(key in fm)) return false;
+  /** Remove one key. `removed` is false, with the note untouched, when it does not carry that key;
+   *  `before` is the frontmatter the removal was made on. */
+  async unsetKey(
+    path: string,
+    key: string,
+  ): Promise<{ removed: boolean; before: Record<string, unknown> }> {
+    const seen = await this.currentFrontmatter(path);
+    if (seen !== null && !(key in seen)) return { removed: false, before: seen };
+    const result = { removed: false, before: {} as Record<string, unknown> };
     this.markWrite(path);
     await this.app.fileManager.processFrontMatter(
       this.file(path),
       (fm: Record<string, unknown>) => {
+        result.before = { ...fm };
+        result.removed = key in fm;
         delete fm[key];
       },
     );
-    return true;
+    return result;
   }
 
   /**
