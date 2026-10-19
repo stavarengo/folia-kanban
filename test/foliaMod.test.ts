@@ -128,7 +128,7 @@ describe("the scripts", () => {
   function run(script: string, env: Record<string, string>): string {
     return execFileSync("/bin/sh", [join(root, "mod", "scripts", script)], {
       input: '{"hook_event_name":"PreToolUse","tool_name":"Bash"}',
-      env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", ...env },
+      env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", TMPDIR: root, ...env },
       encoding: "utf8",
     });
   }
@@ -220,6 +220,39 @@ describe("the scripts", () => {
     expect(hook("One.md", "review")).toBe("");
     card("Renamed.md", ONE.replace('"review"', "done"));
     expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
+  });
+
+  it("does not take a new note at the old name for the renamed card once its marker is cleared", () => {
+    card("Renamed.md", ONE);
+    card("One.md", "---\nstatus: review\n---\n");
+    expect(hook("One.md", "review")).toBe("");
+    // Moved out: the board clears the marker, so only the remembered path still leads to it.
+    card("Renamed.md", "---\nstatus: done\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/now in done/);
+  });
+
+  it("reads a marker block with blank lines and comments in it", () => {
+    card("One.md", "---\nstatus: review\nagent-run:\n\n  # owner\n  id: fff000\n---\n");
+    expect(stopReason(hook("One.md", "review"))).toMatch(/another session/);
+  });
+
+  it.each([
+    ["an escape it does not decode", 'status: "r\\u00e9vision"', "révision"],
+    ["a quoted value that goes on over lines", 'status: "in\n  review"', "in review"],
+    ["a plain value that goes on over lines", "status: in\n  review", "in review"],
+    ["a number in a form the board turns into another", "status: 2.50", "2.5"],
+  ])("goes on when the status is %s", (_label, line, column) => {
+    card("One.md", `---\n${line}\nagent-run: { id: abc123 }\n---\n`);
+    expect(hook("One.md", column)).toBe("");
+  });
+
+  it.each([
+    ["TRUE", "true"],
+    ["~", ""],
+  ])("reads the plain %s the way the board does", (value, read) => {
+    card("One.md", `---\nstatus: ${value}\nagent-run: { id: abc123 }\n---\n`);
+    if (read) expect(hook("One.md", read)).toBe("");
+    else expect(stopReason(hook("One.md", "review"))).toMatch(/has no status now/);
   });
 
   it("stops when the card is nowhere to be found", () => {
