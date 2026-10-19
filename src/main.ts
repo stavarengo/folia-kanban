@@ -45,6 +45,7 @@ import { BoardSetup } from "./obsidian/boardSetup";
 import { KanbanSettingTab } from "./obsidian/settingTab";
 import { AgentRuns } from "./obsidian/agentRuns";
 import { newRunId, nodeSystem, spawnDetached } from "./obsidian/agentLauncher";
+import { writeFoliaMod } from "./obsidian/foliaMod";
 
 export default class FoliaKanbanPlugin extends Plugin {
   override settings: KanbanSettings = DEFAULT_SETTINGS;
@@ -101,6 +102,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       return adapter instanceof FileSystemAdapter ? adapter.getBasePath() : null;
     },
     pluginDir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
+    installMod: (dir) => writeFoliaMod(this.app.vault.adapter, dir),
     newRunId,
     now: () => Date.now(),
     timers: {
