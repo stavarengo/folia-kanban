@@ -226,11 +226,16 @@ describe("what may schedule a launch", () => {
 
   it("a hand edit or a sync never schedules", async () => {
     const h = harness();
-    await h.handEdit("status: review");
-    expect(h.runs.pending(ONE)).toBeNull();
-    await h.app.vault.process(h.file() as never, (t) => t.replace("todo", "review"));
+    await h.app.vault.process(h.file() as never, (t) =>
+      t.replace("status: todo", "status: review"),
+    );
+    expect(h.fm()["status"]).toBe("review");
+    h.runs.observe(h.file(), h.fm());
     await settle();
     expect(h.runs.pending(ONE)).toBeNull();
+    await h.handEdit("status: build");
+    expect(h.runs.pending(ONE)).toBeNull();
+    expect(h.slots()).toBe(0);
   });
 
   it("a checklist line moved into an agent column is never reported", async () => {

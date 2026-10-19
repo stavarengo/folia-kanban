@@ -270,8 +270,9 @@ export class AgentRuns implements AgentLaunches {
     try {
       await clearMarker(this.app, this.writer, file, byRunId(runId));
     } catch (e) {
+      // Most often the note's frontmatter no longer parses, which no write can safely go through.
       this.deps.notify(
-        `Folia Kanban: could not clear the run marker on "${file.basename}". ${String(e)}`,
+        `Folia Kanban: could not clear the run marker on "${file.basename}". ${String(e)} Fix its frontmatter, then move the card out of the column to clear it.`,
       );
     }
   }
