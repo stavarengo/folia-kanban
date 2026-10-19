@@ -148,7 +148,8 @@ verdict() {
     set -- "${card_file%/*}"/*.md
     line=""
     if [ -e "$1" ]; then
-      line=$(frontmatter "$@" | awk -F '\t' -v run="$run_id" '$3 == run { print; exit }') || return 0
+      all=$(frontmatter "$@") || return 0
+      line=$(printf '%s\n' "$all" | awk -F '\t' -v run="$run_id" '$3 == run { print; exit }')
     fi
   else
     line=""

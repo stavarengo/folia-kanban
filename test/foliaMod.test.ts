@@ -99,7 +99,7 @@ describe("the Folia Mod's files", () => {
     const plugin = parsed(".claude-plugin/plugin.json") as { name: string };
     expect(parsed("session.json")).toEqual({
       statusLine: { type: "command", command: 'sh "$FOLIA_MOD_DIR/scripts/status-line.sh"' },
-      permissions: { allow: [`mcp__plugin_${plugin.name}_folia-kanban`, "mcp__folia-kanban"] },
+      permissions: { allow: [`mcp__plugin_${plugin.name}_folia-kanban`] },
     });
     expect(FOLIA_MOD_FILES).toHaveProperty(["scripts/status-line.sh"]);
   });
@@ -331,11 +331,20 @@ describe("the scripts", () => {
     else expect(out).toBe("");
   });
 
-  it("never stops a session because awk itself failed", () => {
+  it.each([
+    ["at the launch path", "One.md"],
+    ["renamed", "Renamed.md"],
+  ])("never stops a session because reading the card %s failed", (_label, name) => {
+    // An awk that runs the hook's small programs but fails on the frontmatter reader.
+    const real = execFileSync("/bin/sh", ["-c", "command -v awk"], { encoding: "utf8" }).trim();
     const bin = join(root, "bin");
     mkdirSync(bin);
-    writeFileSync(join(bin, "awk"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
-    card("One.md", ONE);
+    writeFileSync(
+      join(bin, "awk"),
+      `#!/bin/sh\ncase "$*" in *"function unquote"*) exit 2 ;; esac\nexec ${real} "$@"\n`,
+      { mode: 0o755 },
+    );
+    card(name, ONE);
     const out = run("stop-hook.sh", {
       PATH: `${bin}:${process.env["PATH"] ?? "/usr/bin:/bin"}`,
       FOLIA_CARD_FILE: join(cards, "One.md"),
