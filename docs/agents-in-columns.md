@@ -1,7 +1,7 @@
 # Agents in columns
 
 > [!WARNING]
-> **Experimental, and off by default.** Agents in columns may change or break in any release, so use it at your own risk. To try it, open **Settings → Folia Kanban → Experimental** and switch on **Agents in columns**. Until you do, nothing on this page happens: no countdown, no launch, no **Agent** chip, and no **Agents in columns** settings. A column's `agent:` and a card's `agent-run` stay in your notes as written, except that a card moved out of its column, on the board or through agent access, still loses the `agent-run` it carried there, so it does not come back to a run that has ended. Once you switch it on they take effect from the next move into the column; a card already sitting there does not start an agent by itself. Switching it off stops new launches only: a session already running keeps going until its card leaves the column or you close it (`tmux -L folia kill-server` closes them all).
+> **Experimental, and off by default.** Agents in columns may change or break in any release, so use it at your own risk. To try it, open **Settings → Folia Kanban → Experimental** and switch on **Agents in columns**. Until you do, no agent starts and none of this page shows: no countdown, no launch, no **Agent** chip, and no **Agents in columns** settings. The one thing that still happens, and what the switch does to running sessions, is in [Switching it on and off](#switching-it-on-and-off).
 
 A column can start an AI agent on every card that enters it. Drop a card into a column the board note marks with `agent:`, and after a short wait the plugin runs a command of your choosing on that card. The default command opens a [Claude Code](https://code.claude.com) session in a terminal window of its own, which works the card through the board's [agent access (MCP)](mcp.md) like a teammate would: it assigns itself, comments, ticks subtasks, and moves the card where it belongs when it is done.
 
@@ -14,7 +14,7 @@ Give a column an `agent:` key in the board note. A mapping marks it, even an emp
 ```yaml
 agent:            # board-wide defaults; this does not make any column an agent column
   effort: medium
-  cwd: ~/projects/app
+  cwd: ~/code/app
 columns:
   - id: review
     title: In Review
@@ -58,7 +58,7 @@ A card moved into an agent column by the board (a drag, the card menu, the keybo
 At launch the plugin writes a marker into the card's frontmatter, and the tile shows an **Agent** chip for as long as it is there:
 
 ```yaml
-agent-run: { id: 3f9a1c2b, started: "2026-10-19 14:05", column: review }
+agent-run: { id: 3f9a1c2b, started: "2026-01-15 09:30", column: review }
 ```
 
 The marker means "a session was handed this card". It goes when:
@@ -67,9 +67,13 @@ The marker means "a session was handed this card". It goes when:
 - the agent stops without moving the card and clears it itself, with `update_card` and `properties: {"agent-run": null}`, as the default prompt asks it to, which also ends its session at its next tool call;
 - the command fails before the agent starts (it exits non-zero), together with a notice saying why.
 
-A marker written without a `column` (by hand, or by an older build) is kept when Obsidian starts, and goes the next time the card moves out of the column it was in. A session you close by hand leaves its marker until the card is moved out; moving it back in then starts a new one.
+A marker without a `column`, such as one written by hand, is kept when Obsidian starts, and goes the next time the card moves out of the column it was in. A session you close by hand leaves its marker until the card is moved out; moving it back in then starts a new one.
 
 Each launch also adds `Agent launch requested (run <id>)` to the card's history, unless **What history records** is set to moves only.
+
+## Switching it on and off
+
+While the switch is off, a column's `agent:` and a card's `agent-run` stay in your notes as written, except that a card moved out of its column, on the board or through agent access, still loses the `agent-run` it carried there, so it does not come back to a run that has ended. Once you switch it on they take effect from the next move into the column; a card already sitting there does not start an agent by itself. Switching it off stops new launches only: a session already running keeps going until its card leaves the column or you close it (`tmux -L folia kill-server` closes them all).
 
 ## Settings
 
@@ -129,7 +133,7 @@ The session is not killed. It waits at its prompt, and anything you ask of it th
 
 Since a session stops at its first tool call after the card leaves the column, the default prompt asks the agent to write its closing comment first and move the card last. A prompt of your own should ask the same.
 
-**If you registered agent access with Claude Code yourself**, for your own sessions or because an earlier version of this page asked you to, that registration takes the mod's place in agent sessions too. Claude Code keeps one server per URL and lets yours win. Its tools then ask before every call, in a window nobody may be watching, and after **Replace the token** it leaves every agent session without the board at all. Remove it if you only had it for agents: `claude mcp remove folia-kanban --scope user`, and the same without `--scope user` in any folder you registered it in. To keep it for your own sessions, register it only in folders no agent column runs in, or allow its tools in your own settings and register it again whenever you replace the token.
+**If you registered agent access with Claude Code yourself**, as [Connecting a client](mcp.md#connecting-a-client) describes, that registration takes the mod's place in agent sessions too. Claude Code keeps one server per URL and lets yours win. Its tools then ask before every call, in a window nobody may be watching, and after **Replace the token** it leaves every agent session without the board at all. Remove it if you only had it for agents: `claude mcp remove folia-kanban --scope user`, and the same without `--scope user` in any folder you registered it in. To keep it for your own sessions, register it only in folders no agent column runs in, or allow its tools in your own settings and register it again whenever you replace the token.
 
 ## The default command
 
