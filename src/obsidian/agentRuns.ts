@@ -33,6 +33,9 @@ interface Seen {
 interface Work {
   cardPath: string;
   boardPath: string;
+  /** The report it belongs to, and the column it may schedule for (`null` when it may not). */
+  seq: number;
+  column: string | null;
 }
 
 interface Slot {
@@ -126,7 +129,12 @@ export class AgentRuns implements AgentLaunches {
     const slot = this.slot(r.cardPath);
     this.drop(slot);
     const mine = ++slot.seq;
-    const work: Work = { cardPath: r.cardPath, boardPath: r.boardPath };
+    const work: Work = {
+      cardPath: r.cardPath,
+      boardPath: r.boardPath,
+      seq: mine,
+      column: r.mayLaunch ? r.to : null,
+    };
     slot.work = work;
     this.enqueue(slot, async () => {
       try {
@@ -305,23 +313,35 @@ export class AgentRuns implements AgentLaunches {
   /** `asOf` is the slot's sequence when the read started: a request published after that is newer
    *  than what the read can show, and it is not this read's to call off. */
   private observed(slot: Slot, read: { n: number; asOf: number }, text: string): void {
-    if (read.n < slot.observeApplied || this.unloaded) return;
-    slot.observeApplied = read.n;
+    if (this.unloaded) return;
     let fm: Record<string, unknown>;
     try {
       fm = parseFrontmatter(text);
     } catch (e) {
       // Half-typed YAML in an editor is not ours to report; the next save is looked at again.
+      slot.observeApplied = Math.max(slot.observeApplied, read.n);
       if (e instanceof DataCorruptionError) return;
       throw e;
     }
     const current: Seen = { status: statusOf(fm), marker: fm[AGENT_RUN_KEY] };
-    const request = slot.request;
-    if (request && request.seq <= read.asOf && current.status !== request.column)
-      this.cancel(slot.path);
+    // Before the order check: a read that lands late still saw the card out of the column after
+    // the launch was asked for, and the card coming back since does not undo that it left.
+    this.callOffIfLeft(slot, read.asOf, current.status);
+    if (read.n < slot.observeApplied) return;
+    slot.observeApplied = read.n;
     const evidence: Evidence = { previous: slot.seen, current };
     slot.seen = agentRunOf(fm).present ? current : undefined;
     this.enqueue(slot, () => this.clearObserved(slot, evidence));
+  }
+
+  /** Call off a launch, waiting or still being decided, that a read showed its card outside of.
+   *  Only one asked for before the read started: a newer one is beyond what the read can show. */
+  private callOffIfLeft(slot: Slot, asOf: number, status: string | null): void {
+    const { request, work } = slot;
+    const left = (seq: number, column: string | null): boolean =>
+      column !== null && seq <= asOf && status !== column;
+    if ((request && left(request.seq, request.column)) || (work && left(work.seq, work.column)))
+      this.cancel(slot.path);
   }
 
   /** Clear what an observation showed to be stale, judged from what it saw, never a newer read. */

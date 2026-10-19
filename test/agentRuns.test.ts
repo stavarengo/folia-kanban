@@ -833,4 +833,46 @@ describe("found in review", () => {
     expect(h.notices).toEqual([]);
     expect(h.slots()).toBe(0);
   });
+
+  it("a hand edit out and back while the move is still being checked calls the launch off", async () => {
+    const h = harness();
+    const release = h.holdBoardRead();
+    await h.repo.applyMove({ path: ONE, setFrontmatter: { status: "review" } });
+    await settle();
+    await h.handEdit("status: todo");
+    await h.handEdit("status: review");
+    release();
+    await settle();
+    expect(h.runs.pending(ONE)).toBeNull();
+    expect(h.timers.size).toBe(0);
+  });
+
+  it("a read that saw the card leave still calls the countdown off when it lands after a newer one", async () => {
+    const h = harness();
+    await h.move("review");
+    const realRead = h.app.vault.read.bind(h.app.vault);
+    const gate = deferred();
+    h.app.vault.read = async (file: TFile) => {
+      h.app.vault.read = realRead;
+      const text = await realRead(file);
+      await gate.promise;
+      return text;
+    };
+    h.app.vault.addFile(ONE, cardText("status: todo"));
+    h.runs.observe(h.file(), h.fm());
+    await h.handEdit("status: review");
+    expect(h.runs.pending(ONE)).not.toBeNull();
+    gate.release();
+    await settle();
+    expect(h.runs.pending(ONE)).toBeNull();
+  });
+
+  it("lets a slot go after a read of half-typed YAML", async () => {
+    const h = harness("status: review\nagent-run: { id: old }");
+    h.app.vault.addFile(ONE, "---\nstatus: [review\nagent-run: { id: old }\n---\n");
+    h.runs.observe(h.file(), { "agent-run": { id: "old" } });
+    await settle();
+    h.runs.cancel(ONE);
+    expect(h.slots()).toBe(0);
+  });
 });
