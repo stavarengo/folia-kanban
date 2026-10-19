@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/stavarengo/folia-kanban/compare/0.6.4...0.7.0) (2026-10-19)
+
+### ⚠ BREAKING CHANGES
+
+* agents in columns are now off by default. To keep using them, turn on Settings > Folia Kanban > Experimental > Agents in columns.
+
+### Features
+
+* put agents in columns behind an experimental switch, off by default ([6a470e7](https://github.com/stavarengo/folia-kanban/commit/6a470e70b0e364a81ddf2456b5b9be57e0b2b66e))
+
 ## [0.6.4](https://github.com/stavarengo/folia-kanban/compare/0.6.3...0.6.4) (2026-10-19)
 
 ### Features
