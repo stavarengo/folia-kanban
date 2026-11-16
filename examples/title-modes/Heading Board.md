@@ -10,4 +10,4 @@ columns:
 
 # Heading Board
 
-The same three cards as the other boards in this folder, with `card-title: heading`: every card takes its title from the first heading in its note, whatever that heading looks like, and only a note with no heading falls back to its file name.
+These cards use `card-title: heading`. Unless a `title:` property supplies the title, each card reads its first heading outside code fences, skipping the plugin's own sections. A card with no such heading uses its file name. The heading stays visible in the description, and renaming a heading-sourced card edits that heading. Open Filename Board to compare the default behaviour.

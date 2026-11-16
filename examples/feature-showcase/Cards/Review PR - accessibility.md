@@ -10,6 +10,4 @@ agent:
   model: opus
 ---
 
-# Review PR - accessibility
-
 ARIA roles on columns and cards, focus management, and live-region announcements on drag. _Due in 3 days → **Soon** bucket._

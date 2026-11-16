@@ -4,8 +4,6 @@ priority: A
 area: engineering
 ---
 
-# Design the on-disk format
-
 The single-source-of-truth card layout: YAML frontmatter + `## Subtasks` / `## Comments` / `## History`. Body edits splice only the touched section.
 
 The whole shape, quoted — this fence is description text, so the `## Comments` inside it starts nothing:
@@ -14,8 +12,6 @@ The whole shape, quoted — this fence is description text, so the `## Comments`
 ---
 status: doing
 ---
-
-# Card title
 
 Description…
 

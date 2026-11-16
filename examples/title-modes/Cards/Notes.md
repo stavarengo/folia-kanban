@@ -4,4 +4,4 @@ status: todo
 
 # Notes from the kickoff meeting
 
-A file named like a word, with a heading that reads like a title. Shows as *Notes* on the Auto and Filename boards, and as *Notes from the kickoff meeting* on the Heading board.
+Decisions from the kickoff belong under this heading. The Filename board shows *Notes* and leaves the heading in the description. The Heading board opts into the heading and shows *Notes from the kickoff meeting*.

@@ -8,8 +8,6 @@ tags:
   - a11y
 ---
 
-# Fix keyboard-drag focus bug
-
 Focus is lost after dropping with the keyboard. Repro: pick up with **Space**, move with the arrow keys, drop — focus jumps to the board root instead of the moved card.
 
 ## Subtasks

@@ -5,6 +5,4 @@ priority: D
 tags: testing
 ---
 
-# Write tests for the board graph
-
 Cover parent/child inversion, cycle-safety, and fractional-order merges.

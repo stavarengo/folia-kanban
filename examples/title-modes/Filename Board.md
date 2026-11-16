@@ -10,4 +10,4 @@ columns:
 
 # Filename Board
 
-The same three cards as the other boards in this folder, with `card-title: filename`: every card shows its file name, and no heading is ever consulted.
+These cards use `card-title: filename`, the default when the property is omitted. A card shows its file name unless a `title:` property holds text the file name cannot spell. Headings are description content. Open Heading Board to compare the same cards with heading titles enabled.

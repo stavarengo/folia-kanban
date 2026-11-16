@@ -10,8 +10,6 @@ results-in:
   - "[[Someday - board swimlanes]]"
 ---
 
-# Triage community feedback
-
 Sort the latest issues into bugs vs. feature requests, then label and respond.
 
 The swimlanes idea came out of this triage, so this note says so with `results-in` — the inverse key of the board's own `a-result-of` type, written by hand from this end. The board reads it as the same edge: the swimlanes card shows *A result of 1* with nothing written to it.

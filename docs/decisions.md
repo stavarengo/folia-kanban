@@ -2,6 +2,22 @@
 
 Things deliberately *not* built, and why. Each entry records what was tried, what the constraint was, and what would have to change for the answer to change — so the same ground is not spiked a second time. A decision here is not a promise: bring it back when its "what would change this" actually happens.
 
+## A card has one title and the file follows it
+
+**Decided 2026-11-16. The user types one title; Folia derives the file name and stores a `title:` property only when the file name cannot hold the whole title exactly.**
+
+Separate file-name and title fields made naming a card a choice between competing values. Guessing from a file name's shape made a rename depend on whether the name looked like a slug. The panel now has one Title field, with a `File: <name>.md` line only when the file name differs. Retitling uses Obsidian's link-aware file rename, and `title:` appears or disappears as needed. Two cards may have the same title; the second file gets a number. Inline Markdown is rendered in the tile and panel header, while the file gets readable text and the property keeps the Markdown. Block Markdown stays literal and embeds become links, so a title cannot draw a whole note or image inside a tile.
+
+The limits belong to the file name, never the title. A name is at most 100 characters, cut at a word boundary where possible to keep the folder readable, and at most 200 UTF-8 bytes to leave room below the common 255-byte limit for `.md` and a duplicate suffix. The absolute path is at most 240 characters on the machine in use, leaving room below Windows' 260-character limit. Characters refused by file systems or given structural meaning by `[[wikilinks]]`, plus control characters, are removed from the file name. Leading dots are removed so the file is not hidden; trailing dots and spaces are removed because Windows drops them. Windows device names get a safe ending, such as `CON card`. A folder whose own path leaves too little room is refused with a message naming the folder.
+
+A typed title must never be lost. A failed create or retitle keeps the text in the field where it was typed and shows the reason, whether the failure is a refusal or a file-system error. This covers the add-card composer, the create form, inline tile rename and the panel's Title field. Agent tools must return the failure rather than claim success. A shorter file name is acceptable; asking someone to reconstruct a title after a failed save is not.
+
+A top `#` heading is ordinary description content. New cards do not repeat the title in a heading, and existing headings are kept and shown in the description. **Remove headings that repeat the card title** is an explicit cleanup command for redundant top headings. Boards that deliberately use headings can still set `card-title: heading`; that mode reads the first heading outside code fences, skipping the plugin's own sections, and renaming a heading-sourced card edits the heading. Otherwise the mode is `filename`, including an omitted property, `auto` or an unknown value. A non-blank `title:` is read first in either mode.
+
+The cost is that file paths can change when a title changes, and older boards using `auto` now show file names unless they opt into headings. Existing `title:` properties still supply their titles. Renaming a file by hand while `title:` exists does not change that title. These trade-offs keep normal naming predictable without discarding existing note content.
+
+**What would change this:** a supported way to store every inline title directly in a portable file name could remove the extra property. Evidence that the file-name limits reject usable vault layouts would justify revisiting the limits while retaining the full title. A request for independent file names would need to justify a second naming decision; it would not justify bringing back guessing or losing a typed title.
+
 ## The board and a Markdown editor side by side, in one tab
 
 **Decided 2026-08-26. Stays out until Obsidian exposes a supported way.**
@@ -124,7 +140,7 @@ What that route would lose, per [Obsidian's CLI help](https://obsidian.md/help/c
 
 **Decided 2026-09-29 (#77). Editing a custom property in the detail panel keeps the YAML type of the value in the note: a number stays a number, `true`/`false` stays a boolean, and text that type cannot hold is refused with the reason under the field.**
 
-Obsidian's Properties view goes by the type registered for the property name across the vault, but that registry (`metadataTypeManager`) is not in the documented API, and moving off undocumented API is where the plugin is heading. The value in the note is the one type the panel can read without it. The cost: a number that should have been text cannot be turned into text in its own row. The refusal names the way out, adding the property again under the same name in the add row, which writes text; Obsidian's own Number field refuses text as well. A `title:` row always edits as text, whatever YAML read it as.
+Obsidian's Properties view goes by the type registered for the property name across the vault, but that registry (`metadataTypeManager`) is not in the documented API, and moving off undocumented API is where the plugin is heading. The value in the note is the one type the panel can read without it. The cost: a number that should have been text cannot be turned into text in its own row. The refusal names the way out, adding the property again under the same name in the add row, which writes text; Obsidian's own Number field refuses text as well.
 
 **What would change this:** Obsidian documenting a way to read a property's registered type. Then both the row and the add row could follow it, and the refusal's way out would have to change with them.
 
@@ -380,11 +396,11 @@ On 2026-09-29, in Obsidian 1.13.7 with the default themes and accent and axe-cor
 | Text | Before | After |
 |---|---|---|
 | Context chip, light (`DSGN`, `ENG` in the showcase) | 1.95:1 and 2.44:1 | 7.65:1 and 8.26:1 |
-| `.folia-muted` (the title reason, "No subtasks yet." and the other empty lists) | 2.12:1 light, 2.56:1 dark | 6.68:1 light, 8.12:1 dark |
-| "Why this title?" and every other `.folia-link`, light | 3.94:1 | 5.93:1 |
+| `.folia-muted` ("No subtasks yet." and the other empty lists) | 2.12:1 light, 2.56:1 dark | 6.68:1 light, 8.12:1 dark |
+| `.folia-link` text buttons, light | 3.94:1 | 5.93:1 |
 | The same links under the pointer, light (computed before, colour measured after) | 2.54:1 | 5.87:1 |
 | Subtask column picker, faded at rest | 4.26:1 light, 4.41:1 dark | 5.89:1 light, 5.72:1 dark |
-| Other `--text-faint` text: group headings ("Overdue") and a lane's rule on a column; comment timestamps and the title trace's labels in the dialog | 2.12:1 light, 2.56:1 dark | column 6.18:1 light, 7.03:1 dark; dialog 6.68:1 and 8.12:1 |
+| Other `--text-faint` text: group headings ("Overdue") and a lane's rule on a column; comment timestamps in the dialog | 2.12:1 light, 2.56:1 dark | column 6.18:1 light, 7.03:1 dark; dialog 6.68:1 and 8.12:1 |
 | WIP over-limit count, white on the palette red | 4.2:1 light, 3.45:1 dark | 10.27:1 light, 6.61:1 dark |
 | A relation or subtask link naming no card (`.folia-link-missing`), computed before | 2.53:1 light, 3.37:1 dark | 5.48:1 light, 7.04:1 dark |
 | Priority chips on a card, light (`prio-3`, `prio-2`) | 3.47:1, 4.09:1 | 5.15:1, 4.92:1 |
@@ -627,7 +643,7 @@ Each shows an icon and a label together. `ButtonComponent.setButtonText` replace
 
 ## In-text links and disclosures stay hand-drawn
 
-**Decided 2026-09-30 (#103). A card's "↳ parent" reference, the detail panel's title disclosure and "Why this title?", relation and subcard titles, and "Add a description…" are `<button>`s the board draws as text. Since #144, so are **Cancel** and **Now** in a card's agent countdown, which wear `folia-link`.**
+**Decided 2026-09-30 (#103). A card's "↳ parent" reference, relation and subcard titles, and "Add a description…" are `<button>`s the board draws as text. Since #144, so are **Cancel** and **Now** in a card's agent countdown, which wear `folia-link`.**
 
 They sit in running text and must wrap with it. A `ButtonComponent` is a box one input high, and an `ExtraButtonComponent` is an icon. So `.folia-link` in `base.css` still undoes the two rules Obsidian's stylesheet puts on every button: `white-space: nowrap` and `height: var(--input-height)`. It is one of two rules the board keeps against undocumented app CSS, and both reset the host's values rather than reading them. The other is in `host-controls.css`: it removes the grey ring Obsidian's stylesheet draws around a focused control, so the board's accent outline is the only one. `scripts/theme-buttons.mjs` lists these classes beside the icon-and-label ones.
 

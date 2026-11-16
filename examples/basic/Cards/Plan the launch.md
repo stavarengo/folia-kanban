@@ -6,8 +6,6 @@ due: ""
 created: 2026-01-12
 ---
 
-# Plan the launch
-
 Coordinate the v1 launch.
 
 ## Subtasks

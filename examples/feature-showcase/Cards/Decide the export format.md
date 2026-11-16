@@ -10,8 +10,6 @@ a-result-of:
   - "[[Design the on-disk format]]"
 ---
 
-# Decide the export format
-
 Context: [[Design the on-disk format]]
 
 This card's `blocks` property says the announcement can't be drafted until the format is settled. It is written on **this** end only: the other card shows a read-only **Blocked by** entry the plugin derives at load time, and both tiles get a marker — "Blocks 1" here, "Blocked" there. Nothing is enforced: you can still drag either card anywhere.

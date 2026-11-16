@@ -7,6 +7,4 @@ tags: [marketing, writing]
 area: marketing
 ---
 
-# Draft the announcement post
-
 Forum + Reddit + the changelog. Lead with the "plain Markdown, no lock-in" angle.

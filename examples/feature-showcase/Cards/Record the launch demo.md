@@ -7,8 +7,6 @@ blocked-by:
   - "[[Fix keyboard-drag focus bug]]"
 ---
 
-# Record the launch demo
-
 _The other subcard of [[Plan the v1.0 launch]]. It has no `status` of its own, so it stays nested under that card in **Todo** — put it side by side with [[Write the changelog]] to see both halves of the rule._
 
 A ~15s GIF: drag a card across columns, then open the detail panel. Save it to `images/board-demo.gif`.
