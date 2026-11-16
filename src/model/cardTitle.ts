@@ -5,6 +5,7 @@
 
 import { SECTION, splitFrontmatter } from "./card";
 import { fencedLines } from "./fences";
+import { BARE_URL_SOURCE } from "./titleMarkdown";
 import type { CardFrontmatter, TitleMode, TitleSource } from "./types";
 
 /** The frontmatter key holding a title its file name cannot spell. */
@@ -157,7 +158,7 @@ export function plainTitleText(raw: string): string {
     .trim();
 }
 
-const BARE_URL_RE = /https?:\/\/[^\s<>"]+/gi;
+const BARE_URL_RE = new RegExp(BARE_URL_SOURCE, "gi");
 
 /** A web address as the words a file name can carry: its host, then each step of its path. */
 function urlWords(url: string): string {

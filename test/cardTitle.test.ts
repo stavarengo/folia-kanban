@@ -541,6 +541,28 @@ describe("retargetTitleLinks", () => {
     // What only looks like the start of a link is text, and the wikilink after it still follows.
     expect(retargetTitleLinks("[x](a b [[Plan]]", plan, "Renamed")).toBe("[x](a b [[Renamed]]");
   });
+  it("leaves a web address typed without a label alone too", () => {
+    const plan = (linkpath: string) => linkpath === "Plan";
+    for (const title of [
+      "See <https://example.com/[[Plan]]>",
+      "See https://example.com/[[Plan]]",
+      "See HTTP://example.com/a?b=[[Plan]]&c=1 today",
+      "Write to <team+[[Plan]]@example.com>",
+      "(https://example.com/[[Plan]])",
+    ])
+      expect(retargetTitleLinks(title, plan, "Renamed"), title).toBe(title);
+    // The address ends where the renderer ends it, and a link typed after it follows the note.
+    expect(retargetTitleLinks("<https://example.com/[[Plan]]> and [[Plan]]", plan, "Renamed")).toBe(
+      "<https://example.com/[[Plan]]> and [[Renamed]]",
+    );
+    expect(retargetTitleLinks("https://example.com/x [[Plan]]", plan, "Renamed")).toBe(
+      "https://example.com/x [[Renamed]]",
+    );
+    // A `<` that opens no address is text, and so is a word that only starts like a scheme.
+    expect(retargetTitleLinks("a < b [[Plan]] > c, http [[Plan]]", plan, "Renamed")).toBe(
+      "a < b [[Renamed]] > c, http [[Renamed]]",
+    );
+  });
   it("names the note in an alias when the link has to be written with its folder", () => {
     const pathTo = "Cards/Parent epic, the migration";
     expect(retargetTitleLinks("see [[Parent epic]]", moved, pathTo)).toBe(

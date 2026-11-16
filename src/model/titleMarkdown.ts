@@ -156,6 +156,20 @@ function holdsLink(s: string): boolean {
 
 // `<https://…>` and `<name@host>`: links, and the only uses of `<…>` a title keeps as markup.
 const AUTOLINK_AT_RE = /^<(?:[a-z][a-z0-9+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>]+)>/i;
+/** A web address typed bare, as the renderer links it: from its scheme to the next white space. */
+export const BARE_URL_SOURCE = String.raw`https?:\/\/[^\s<>"]+`;
+const BARE_URL_AT_RE = new RegExp(`^${BARE_URL_SOURCE}`, "i");
+
+/**
+ * Where the web address standing at `i` ends, written `<address>` or bare, or `i` when none
+ * stands there. It is one piece, like a code span: a `[[` inside it is part of the address.
+ */
+function addressEnd(s: string, i: number): number {
+  const c = s.charAt(i);
+  if (c !== "<" && c !== "h" && c !== "H") return i;
+  const found = (c === "<" ? AUTOLINK_AT_RE : BARE_URL_AT_RE).exec(s.slice(i));
+  return found ? i + found[0].length : i;
+}
 // What follows a `<` that opens a tag, a comment or a declaration.
 const HTML_AFTER_RE = /^[a-z/!?]/i;
 // What would end a label early or draw something inside one, in an address shown as the label.
@@ -299,7 +313,8 @@ function retargeted(inner: string, to: string): string {
  * `title` with each `[[wikilink]]` to a note that `moved` names pointed at `to` instead, the
  * way a link-aware rename rewrites one in a note's text: its `#heading`, its `|alias` and its
  * embed mark are kept. A link typed inside a code span is text, and stays; so does the address
- * and the caption of a Markdown link, where `[[` is part of a web address.
+ * and the caption of a Markdown link, and a web address typed as `<address>` or bare, where `[[`
+ * is part of the address.
  */
 export function retargetTitleLinks(
   title: string,
@@ -320,7 +335,7 @@ export function retargetTitleLinks(
       out += `[[${moved(linkpath.trim()) ? retargeted(inner, to) : inner}]]`;
       i = close;
     } else {
-      const next = Math.max(atom, i + 1);
+      const next = Math.max(atom, addressEnd(title, i), i + 1);
       out += title.slice(i, next);
       i = next;
     }
