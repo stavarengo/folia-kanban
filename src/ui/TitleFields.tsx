@@ -1,8 +1,9 @@
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import type { Card } from "../model/types";
 import { TITLE_KEY, hasInlineMarkdown, sameTitle } from "../model/cardTitle";
+import { remapPath } from "../model/pathOps";
 import { titleMarkdown } from "../model/titleMarkdown";
-import { useBoardActions } from "./context";
+import { useBoardActions, useRepo } from "./context";
 import { DetailDialogContext, type Settled } from "./detailDialog";
 import { Markdown } from "./Markdown";
 import { trimmed, useFieldDraft } from "./useFieldDraft";
@@ -67,6 +68,34 @@ export function TitleError({ failure, hint }: { failure: TitleFailure | null; hi
 }
 
 /**
+ * Where the card's file is at this moment, for a save that starts after the render that asked for
+ * it. A save queued behind a rename starts as soon as that rename answers, and nothing has been
+ * drawn in between: the reload that follows a rename never waits for React, so the path the last
+ * render was given is still the one the file just left. The vault says where a file went the
+ * moment it moves, and this follows that.
+ */
+function useCardPathNow(path: string) {
+  const repo = useRepo();
+  const now = useRef(path);
+  // Only a path the panel was newly handed replaces what the vault said: a render that still
+  // carries the old one knows less than the file operation did.
+  const rendered = useRef(path);
+  if (rendered.current !== path) {
+    rendered.current = path;
+    now.current = path;
+  }
+  useEffect(
+    () =>
+      repo.onFileOp((op) => {
+        // A deleted card has no path to follow to: the save that tries is told so by the vault.
+        now.current = remapPath(now.current, op) ?? now.current;
+      }),
+    [repo],
+  );
+  return now;
+}
+
+/**
  * The card's one title. Committing it names the file after it. Under the field: why the last
  * retitle did not go through, while the text that failed is still in it, and the file's own name
  * whenever that differs from the title.
@@ -80,11 +109,12 @@ export function CardTitleFields({ card, path }: { card: Card; path: string }) {
   const inDialog = useContext(DetailDialogContext) !== null;
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<TitleFailure | null>(null);
+  const pathNow = useCardPathNow(path);
   const title = useFieldDraft(
     card.title,
     async (val, retry) => {
       setError(null);
-      const failure = await actions.renameCard(path, val, retry);
+      const failure = await actions.renameCard(pathNow.current, val, retry);
       setError(failure);
       return failure === null;
     },

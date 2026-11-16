@@ -66,6 +66,32 @@ function renderBoard(repo: FakeRepo, settings: BoardSettings = DEFAULT_SETTINGS)
   return modals;
 }
 
+/**
+ * Let a slow write land the way it does in the app: from no event at all.
+ *
+ * React reads `window.event` to decide how soon to draw an update made outside its own handlers.
+ * A write that lands from the file system finds none there, so the redraw waits for a later task,
+ * after everything the write's answer sets off: the reload, and a save queued behind it. Under
+ * test React's development build assigns `window.event` back as it calls a handler, vitest's jsdom
+ * keeps an assigned value for good, and from the first click on every update is drawn at once,
+ * between two steps of one promise chain. A save that reads what the last render handed it then
+ * passes here and fails in the app, so what lands in `land` is given the app's timing.
+ */
+async function landOutsideAnyEvent(land: () => Promise<void>) {
+  const scope = globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean | undefined };
+  const act = scope.IS_REACT_ACT_ENVIRONMENT;
+  const event: unknown = Reflect.get(window, "event");
+  Reflect.set(window, "event", undefined);
+  // Outside `act` too: it draws as soon as its callback answers, which is no later task either.
+  scope.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    await land();
+  } finally {
+    scope.IS_REACT_ACT_ENVIRONMENT = act;
+    Reflect.set(window, "event", event);
+  }
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -416,7 +442,10 @@ describe("the panel's Title field", () => {
     const rename = repo.renameCard.bind(repo);
     const asked = vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path, title) => {
       await gate.promise;
-      return rename(path, title);
+      const moved = await rename(path, title);
+      // Another note takes the name the card just left, before anything is drawn again.
+      repo.files.set(ALPHA, { basename: "Alpha", fm: { type: "task", status: "doing" }, body: "" });
+      return moved;
     });
     renderBoard(repo);
     await openAlpha(user);
@@ -428,13 +457,23 @@ describe("the panel's Title field", () => {
     // More is typed and committed while `Alpha` is still being renamed to `First`.
     await typeInto(user, field, " and more");
     await user.tab();
-    // Another card takes the name the first one is about to leave.
-    await act(async () => gate.resolve());
 
-    await waitFor(() => expect(asked).toHaveBeenCalledTimes(2));
+    await landOutsideAnyEvent(async () => {
+      gate.resolve();
+      await waitFor(() => expect(asked).toHaveBeenCalledTimes(2));
+    });
+
     // The second save is for the same card, which is `First.md` by now: never `Alpha.md`.
     expect(asked.mock.calls[1]).toEqual(["Tasks/First.md", "First and more", { retry: false }]);
     await waitFor(() => expect(repo.files.has("Tasks/First and more.md")).toBe(true));
+    expect(repo.files.has("Tasks/First.md")).toBe(false);
+    // The note that took the old name is somebody else's, and was left alone.
+    expect(repo.files.get(ALPHA)).toEqual({
+      basename: "Alpha",
+      fm: { type: "task", status: "doing" },
+      body: "",
+    });
+    await waitFor(() => expect(field).toHaveValue("First and more"));
     expect(reasonIn(detail)).toBeNull();
   });
 
