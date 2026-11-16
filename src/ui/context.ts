@@ -168,8 +168,6 @@ export interface BoardActions {
   startCreate(columnId: string): void;
   /** Open the card's detail panel with its "Add a subcard" input focused, so the user types the title there. */
   addSubcard(path: string): void;
-  /** Open the card's detail panel with its "Override card title" field focused (the `title:` key). */
-  editTitleOverride(path: string): void;
   /**
    * Show a failed write the way every board mutation's failure is shown (an error notice). For the
    * writes the detail panel makes itself, which otherwise have no path to that notice.
@@ -220,13 +218,12 @@ export interface BoardActions {
    */
   setAssignee(path: string, value: string | readonly string[] | null): Promise<void>;
   /**
-   * Rename a card in place (#12): writes the title back to its source — the `.md` file name
-   * (link-aware so inbound wikilinks follow), the heading line, or the `title` frontmatter key.
-   * No-op for a blank/unchanged title.
+   * Retitle a card (#12): its file is renamed to match, link-aware so inbound wikilinks follow.
+   * No-op for a blank/unchanged title. Resolves, once the board has reloaded, to `null` when the
+   * title is written and to the reason when it is not. The reason is not raised as a notice: the
+   * caller holds the text that was typed, and shows the reason beside it so nothing typed is lost.
    */
-  renameCard(path: string, title: string): void;
-  /** Rename the card's file, whatever source its displayed title comes from. */
-  renameFile(path: string, newBasename: string): void;
+  renameCard(path: string, title: string): Promise<string | null>;
   /** Reorder a card one step within its current column (-1 up, +1 down); a no-op at the edges. */
   moveWithinColumn(path: string, dir: -1 | 1): void;
   /** Whether the card can move up/down within its column (false at the respective edge). */

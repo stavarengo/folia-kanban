@@ -2,6 +2,7 @@
 // the search toolbar, a column's lane rule and the MCP tools all judge a card the same way.
 import type { RelationCount, Card } from "./types";
 import { assigneeValues, sameAssignee } from "./assignees";
+import { plainTitleText } from "./cardTitle";
 import { dueInfo } from "./dates";
 import { tagValues } from "./tags";
 import { BLOCKS } from "./relationships";
@@ -147,10 +148,14 @@ export function isEmptyFilter(f: Filter): boolean {
   return f.text.length === 0 && f.tokens.length === 0;
 }
 
-/** Lower-cased free-text haystack: title + basename + priority + tags (area + frontmatter + body) + assignees. */
+/**
+ * Lower-cased free-text haystack: title + basename + priority + tags (area + frontmatter + body) +
+ * assignees. The title is searched as the words it reads as, so a search does not match inside an
+ * address a link hides behind its label.
+ */
 function freeTextHaystack(card: Card): string {
   return [
-    card.title,
+    plainTitleText(card.title),
     card.basename,
     String(card.frontmatter.priority ?? ""),
     ...tagValues(card),

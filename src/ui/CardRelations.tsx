@@ -1,3 +1,4 @@
+import { plainTitleText } from "../model/cardTitle";
 import { useState } from "react";
 import type { Board, Card, RelationLink, RelationTypeDef } from "../model/types";
 import { useRepo } from "./context";
@@ -32,7 +33,9 @@ function RelationRow({
 }) {
   const target = link.path;
   // What the row reads as, so the button that removes it announces the same card the row shows.
-  const label = (target !== null ? board.cards[target]?.title : undefined) ?? link.target;
+  // The card's title as words: a link drawn inside this row's own button would be a second button.
+  const title = target !== null ? board.cards[target]?.title : undefined;
+  const label = title === undefined ? link.target : plainTitleText(title);
   return (
     <li className="folia-relation">
       {target ? (
@@ -229,39 +232,55 @@ function RelationTypeSections({
  * itself.
  */
 export function relationChoices(board: Board, selfPath: string): Map<string, string> {
-  // A file name two cards share cannot be linked BY that name — the board refuses to bind it — so
-  // such a card is offered as its full path instead, which names exactly one note.
   // Only real notes: a placed inline todo is a checklist line, not a file. It borrows its note's
   // file name, so counting it would make every card holding one look like two cards sharing a name
   // — and offering it would write a link to a `#todo:` path that names nothing on disk.
   const linkable = Object.values(board.cards).filter((c): c is Card => c != null && !c.todoRef);
-  const nameCount = new Map<string, number>();
-  for (const c of linkable) nameCount.set(c.basename, (nameCount.get(c.basename) ?? 0) + 1);
-  const targetFor = (c: Card) =>
-    (nameCount.get(c.basename) ?? 0) > 1 ? c.path.replace(/\.md$/i, "") : c.basename;
-
+  const offered = offeredAs(linkable);
   const choices = new Map<string, { path: string; target: string }>();
   const ambiguous = new Set<string>();
-  const offer = (label: string, card: Card) => {
-    const seen = choices.get(label);
-    if (seen === undefined) choices.set(label, { path: card.path, target: targetFor(card) });
-    // Compared by card, not by what it would link to: a label answering for two different cards
-    // is one the field must not offer, whichever of them it would happen to pick.
-    else if (seen.path !== card.path) ambiguous.add(label);
-  };
-  for (const c of linkable) {
-    if (c.path === selfPath) continue;
-    offer(c.title, c);
-    if (c.basename !== c.title) offer(c.basename, c);
-    // A card whose file name another folder repeats is also offered under its path, which is
-    // unique — otherwise two cards sharing a name AND a title would be unreachable from here.
-    if ((nameCount.get(c.basename) ?? 0) > 1) offer(targetFor(c), c);
+  for (const c of linkable.filter((c) => c.path !== selfPath)) {
+    const { labels, target } = offered(c);
+    for (const label of labels) {
+      const seen = choices.get(label);
+      if (seen === undefined) choices.set(label, { path: c.path, target });
+      // Compared by card, not by what it would link to: a label answering for two different cards
+      // is one the field must not offer, whichever of them it would happen to pick.
+      else if (seen.path !== c.path) ambiguous.add(label);
+    }
   }
   const out = new Map<string, string>();
   for (const [label, card] of choices) {
     if (!ambiguous.has(label)) out.set(label, card.target);
   }
   return out;
+}
+
+/** What each of `cards` is offered under in the link field, and the link picking it writes. */
+function offeredAs(cards: readonly Card[]): (c: Card) => { labels: string[]; target: string } {
+  const nameCount = new Map<string, number>();
+  for (const c of cards) nameCount.set(c.basename, (nameCount.get(c.basename) ?? 0) + 1);
+  const shared = (c: Card) => (nameCount.get(c.basename) ?? 0) > 1;
+  // A file name only one card has is that card's: a link written with it binds to that card. So
+  // another card that merely shares it as a title (two cards may be titled alike, the second
+  // under a numbered file) does not claim it, and neither card drops out of the list.
+  const ownerOf = new Map<string, string>();
+  for (const c of cards) if (!shared(c)) ownerOf.set(c.basename, c.path);
+  return (c) => {
+    // A file name two cards share cannot be linked BY that name — the board refuses to bind it —
+    // so such a card is offered as its full path instead, which names exactly one note.
+    const target = shared(c) ? c.path.replace(/\.md$/i, "") : c.basename;
+    // Offered as the words the title reads as: that is what the list shows and what gets typed.
+    const title = plainTitleText(c.title);
+    const labels = [
+      ...((ownerOf.get(title) ?? c.path) === c.path ? [title] : []),
+      ...(c.basename !== title ? [c.basename] : []),
+      // A card whose file name another folder repeats is also offered under its path, which is
+      // unique — otherwise two cards sharing a name AND a title would be unreachable from here.
+      ...(shared(c) ? [target] : []),
+    ];
+    return { labels, target };
+  };
 }
 
 /** Every relationship type in the board's vocabulary, both directions each. */

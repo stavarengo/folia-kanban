@@ -132,3 +132,10 @@
   border-radius: var(--radius-s);
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--interactive-accent) 25%, transparent);
 }
+
+/* A title with inline Markdown is drawn by the host's renderer, which wraps it in a paragraph;
+   inside a title that paragraph is the title's own line, not a block of prose. */
+.folia-title-markdown p {
+  display: inline;
+  margin: 0;
+}

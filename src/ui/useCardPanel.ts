@@ -8,7 +8,7 @@ import { useCardBody } from "./useCardBody";
 import { useCommentReadState } from "./useCommentReadState";
 import { useDescriptionDraft, useDescriptionEditor } from "./useDescriptionEditor";
 import { useDetailFocus } from "./useDetailFocus";
-import { useInlineDraft } from "./useInlineDraft";
+import { useHeldDraft, useInlineDraft } from "./useInlineDraft";
 
 /**
  * Everything the detail panel keeps for as long as it is mounted: the note as last read, every
@@ -24,7 +24,6 @@ export function useCardPanel({
   onChanged,
   focusNew,
   focusAddSubcard,
-  focusTitleOverride,
   focusSeq,
 }: {
   path: string;
@@ -34,7 +33,6 @@ export function useCardPanel({
   onChanged: () => void;
   focusNew: boolean | undefined;
   focusAddSubcard: boolean | undefined;
-  focusTitleOverride: boolean | undefined;
   focusSeq: number | undefined;
 }) {
   const settings = useSettings();
@@ -48,7 +46,8 @@ export function useCardPanel({
     onRead: descDraft.adopt,
   });
   const todo = useInlineDraft(stillHere);
-  const subcard = useInlineDraft(stillHere);
+  // A subcard's title is the title of a card: it stays in its field until that card exists.
+  const subcard = useHeldDraft();
   const comment = useInlineDraft(stillHere);
   const propertyForm = usePropertyForm({ isCreate, board, card, stillHere });
   // Rebuilt only when the board or the open card changes — not on every keystroke in any field.
@@ -58,7 +57,7 @@ export function useCardPanel({
   // missing, and neither reading can bind a name to a card the other one refused.
   const resolve = useMemo(() => boardLinkResolver(board, path), [board, path]);
   const readState = useCommentReadState({ path, body, bodyPath, settings });
-  const focus = useDetailFocus({ isCreate, focusAddSubcard, focusTitleOverride, focusSeq });
+  const focus = useDetailFocus({ isCreate, focusAddSubcard, focusSeq });
   const desc = useDescriptionEditor({
     isCreate,
     focusNew,

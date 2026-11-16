@@ -16,7 +16,7 @@ import { columnDraft, columnPatch } from "../src/model/columns";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [BLOCKS],
   columns: [
@@ -30,12 +30,12 @@ function makeRepo() {
   return new FakeRepo(config, {
     "Tasks/Alpha.md": {
       fm: { type: "task", status: "todo", priority: "A", area: "home" },
-      body: "\n# Alpha\n\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- _2026-06-13 09:00:_ hi there\n",
+      body: "\nDesc A\n\n## Subtasks\n- [ ] first todo\n- [x] done todo\n- [ ] [[Beta]]\n\n## Comments\n- _2026-06-13 09:00:_ hi there\n",
     },
-    "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "\n# Beta\n" },
+    "Tasks/Beta.md": { fm: { type: "task", status: "todo" }, body: "" },
     "Tasks/Gamma.md": {
       fm: { type: "task", status: "doing", due: "2026-06-01" },
-      body: "\n# Gamma\n",
+      body: "",
     },
   });
 }
@@ -1649,7 +1649,7 @@ describe("inline card title edit (#12)", () => {
     expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
   });
 
-  it("shows a slug-named card by its heading and writes a rename back to that heading", async () => {
+  it("titles a slug-named card by its file name, and a rename renames the file (#137, #138)", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/01-fix-export.md": {
@@ -1657,6 +1657,33 @@ describe("inline card title edit (#12)", () => {
         body: "\n# Fix the export path\n\nDesc\n",
       },
     });
+    render_(repo);
+    const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
+    // No guessing from the shape of a file name: the note's heading is description, not a title.
+    expect(within(todoCol).getByText("01-fix-export")).toBeInTheDocument();
+    expect(within(todoCol).queryByText("Fix the export path")).not.toBeInTheDocument();
+    const input = await startRename(user, todoCol, "01-fix-export");
+    await user.clear(input);
+    await user.type(input, "Fix the export path on Windows{Enter}");
+    expect(await within(todoCol).findByText("Fix the export path on Windows")).toBeInTheDocument();
+    // The file moved; the note's own text, its old heading included, did not change.
+    expect(repo.files.has("Tasks/01-fix-export.md")).toBe(false);
+    expect(repo.files.get("Tasks/Fix the export path on Windows.md")!.body).toBe(
+      "\n# Fix the export path\n\nDesc\n",
+    );
+  });
+
+  it("on a `card-title: heading` board, shows a card by its heading and writes a rename back to it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(
+      { ...config, titleMode: "heading" },
+      {
+        "Tasks/01-fix-export.md": {
+          fm: { type: "task", status: "todo" },
+          body: "\n# Fix the export path\n\nDesc\n",
+        },
+      },
+    );
     render_(repo);
     const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
     expect(within(todoCol).getByText("Fix the export path")).toBeInTheDocument();
@@ -1672,27 +1699,33 @@ describe("inline card title edit (#12)", () => {
     );
   });
 
-  it("the detail panel names a subcard by its displayed title, not its file name", async () => {
+  it("the detail panel names a subcard by its title, as words, not by its file name", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/Parent.md": {
         fm: { type: "task", status: "todo" },
-        body: "\n# Parent\n\n## Subtasks\n- [ ] [[01-fix-export]]\n",
+        body: "\n## Subtasks\n- [ ] [[01-fix-export]]\n",
       },
       "Tasks/01-fix-export.md": {
-        fm: { type: "task", status: "todo" },
-        body: "\n# Fix the export path\n",
+        fm: {
+          type: "task",
+          status: "todo",
+          title: "Fix the [export](https://example.com/export) path",
+        },
+        body: "",
       },
     });
     render_(repo);
     await user.click(await screen.findByText("Parent"));
     const detail = await screen.findByTestId("card-detail");
+    // The row is a button that opens the subcard, so the title's own link is not drawn inside it.
     const link = within(detail).getByRole("button", { name: "Fix the export path" });
     expect(link).toHaveClass("folia-link");
+    expect(link).toHaveTextContent(/^Fix the export path$/);
     expect(within(detail).queryByText("01-fix-export")).not.toBeInTheDocument();
   });
 
-  it("a card's `title` frontmatter wins and a rename updates that key", async () => {
+  it("a card's `title` wins, and a rename names the file after the new title and drops the key", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/Alpha.md": {
@@ -1706,8 +1739,10 @@ describe("inline card title edit (#12)", () => {
     await user.clear(input);
     await user.type(input, "Alpha renamed{Enter}");
     expect(await within(todoCol).findByText("Alpha renamed")).toBeInTheDocument();
-    expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha renamed");
-    expect(repo.files.get("Tasks/Alpha.md")!.body).toBe("\n# Alpha heading\n");
+    // The file name holds the new title exactly, so `title` has nothing left to say.
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
+    expect(repo.files.get("Tasks/Alpha renamed.md")!.fm).not.toHaveProperty("title");
+    expect(repo.files.get("Tasks/Alpha renamed.md")!.body).toBe("\n# Alpha heading\n");
   });
 
   it("keeps subcard parentage after a rename by rewriting inbound wikilinks", async () => {
@@ -4705,10 +4740,10 @@ describe("blocking relationships", () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
       "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "\n# Here\n" },
-      // A slug file name, so the board titles this card from its heading instead.
+      // A file its title does not name: a card from before files were named after their titles.
       "Tasks/04-tune-the-index.md": {
-        fm: { type: "task", status: "todo" },
-        body: "\n# Tune the search index\n",
+        fm: { type: "task", status: "todo", title: "Tune the search index" },
+        body: "",
       },
     });
     render_(repo);
@@ -4719,6 +4754,40 @@ describe("blocking relationships", () => {
     // A wikilink binds to the file name, so that is what must land in the property.
     await waitFor(() =>
       expect(repo.files.get("Tasks/Here.md")!.fm["blocks"]).toEqual(["[[04-tune-the-index]]"]),
+    );
+  });
+
+  it("offers a card under the words its title reads as, and keeps cards titled alike both reachable", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/Here.md": { fm: { type: "task", status: "todo" }, body: "" },
+      "Tasks/monitor MR1.md": {
+        fm: { type: "task", status: "todo", title: "monitor [MR1](https://example.com/1)" },
+        body: "",
+      },
+      // Two cards may share a title: the second is filed under a number, its title in `title`.
+      "Tasks/Idea.md": { fm: { type: "task", status: "todo" }, body: "" },
+      "Tasks/Idea 1.md": { fm: { type: "task", status: "todo", title: "Idea" }, body: "" },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Here"));
+    const detail = await screen.findByTestId("card-detail");
+    const input = within(detail).getByLabelText("Link a card under Blocks");
+    // Nothing is offered before something is typed; what is typed is matched by the host.
+    const offered = repo
+      .suggestOn(input)
+      .candidates("i")
+      .map((c) => c.text);
+    expect(offered).toEqual(expect.arrayContaining(["monitor MR1", "Idea", "Idea 1"]));
+    expect(offered).not.toContain("monitor [MR1](https://example.com/1)");
+    // A name only one file has is that file's, so "Idea" is the first card and never a guess.
+    await user.type(input, "Idea{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Here.md")!.fm["blocks"]).toEqual(["[[Idea]]"]),
+    );
+    await user.type(within(detail).getByLabelText("Link a card under Blocks"), "Idea 1{Enter}");
+    await waitFor(() =>
+      expect(repo.files.get("Tasks/Here.md")!.fm["blocks"]).toEqual(["[[Idea]]", "[[Idea 1]]"]),
     );
   });
 
@@ -5495,17 +5564,25 @@ describe("the detail panel reads links the way the board does", () => {
 });
 
 describe("the detail panel reports a failed write", () => {
-  it("shows the error toast when adding a subcard fails", async () => {
+  it("keeps a subcard's typed title in its box when adding it fails, with the reason under it", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
-    repo.addSubcard = async () => {
-      throw new Error("disk is full");
-    };
+    const add = vi.spyOn(repo, "addSubcard").mockRejectedValueOnce(new Error("disk is full"));
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    await user.type(within(detail).getByLabelText("Add a subcard"), "Child{Enter}");
-    await expectNotice(repo, "disk is full");
+    const box = within(detail).getByLabelText("Add a subcard");
+    await user.type(box, "Child{Enter}");
+    // What was typed is a card's title: it stays where it was typed, the reason beside it.
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("Not saved: disk is full");
+    expect(box).toHaveValue("Child");
+    expect(repo.notices).toEqual([]);
+    // Enter again is the retry, and only then does the box let go of the text.
+    await user.type(box, "{Enter}");
+    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.body).toContain("[[Child]]"));
+    await waitFor(() => expect(box).toHaveValue(""));
+    expect(within(detail).queryByRole("alert")).toBeNull();
+    expect(add).toHaveBeenCalledTimes(2);
   });
 
   /** Todo · Research (a lane on `area:research`) · Done, holding one card that fails the rule. */
@@ -5904,21 +5981,30 @@ describe("the detail panel reports a failed write", () => {
     expect(within(stuck).queryByText("No matches")).not.toBeInTheDocument();
   });
 
-  it("shows the error toast when the detail create flow fails, and keeps the form for a retry", async () => {
+  it("keeps the typed title in the create form when the card cannot be written, with the reason under it", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
-    repo.createCard = async () => {
-      throw new Error("folder is read-only");
-    };
+    const create = vi
+      .spyOn(repo, "createCard")
+      .mockRejectedValueOnce(new Error("folder is read-only"));
     render_(repo, { ...DEFAULT_SETTINGS, addCardFlow: "detail" });
     await screen.findByText("Alpha");
     await user.click(screen.getByLabelText("Add card to Done"));
     const detail = await screen.findByTestId("card-detail");
     await user.type(within(detail).getByLabelText("New card title"), "Doomed");
     await user.click(within(detail).getByRole("button", { name: "Create" }));
-    await expectNotice(repo, "folder is read-only");
+    // The reason sits beside the text it is about, and stays there; it is not a notice that fades.
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(
+      "Not saved: folder is read-only",
+    );
+    expect(repo.notices).toEqual([]);
     expect(within(detail).getByLabelText("New card title")).toHaveValue("Doomed");
     expect(within(detail).getByRole("button", { name: "Create" })).toBeEnabled();
+    // Sending it again, unchanged, is the retry.
+    await user.click(within(detail).getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(repo.files.has("Tasks/Doomed.md")).toBe(true));
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole("heading", { name: "Doomed" })).toBeInTheDocument();
   });
 });
 
@@ -5984,39 +6070,77 @@ describe("an open detail panel follows its note", () => {
   });
 });
 
-describe("the card's title override", () => {
-  it("sets and clears the card's title key from the panel's Override card title field", async () => {
+describe("the card's one Title field", () => {
+  it("retitles the card from the panel: the file follows, and `title` is kept only while the file name cannot hold the title", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    const field = within(detail).getByLabelText("Override card title") as HTMLInputElement;
-    expect(field).toHaveValue("");
-    expect(field.placeholder).toBe("Alpha");
-    await user.type(field, "Alpha, shown{Enter}");
-    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha, shown"));
+    const field = () => within(detail).getByLabelText("Title") as HTMLInputElement;
+    expect(field()).toHaveValue("Alpha");
+    // The file is named after the title, so there is nothing to say about the file.
+    expect(within(detail).queryByText(/^File:/)).not.toBeInTheDocument();
+
+    await user.clear(field());
+    await user.type(field(), "Alpha, shown{Enter}");
+    await waitFor(() => expect(repo.files.has("Tasks/Alpha, shown.md")).toBe(true));
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
+    expect(repo.files.get("Tasks/Alpha, shown.md")!.fm).not.toHaveProperty("title");
     expect(await screen.findByRole("heading", { name: "Alpha, shown" })).toBeInTheDocument();
+    expect(within(detail).queryByText(/^File:/)).not.toBeInTheDocument();
+
+    // A title the file name cannot spell is kept whole in `title`, and the panel says what the
+    // file is called instead.
+    await user.clear(field());
+    await user.type(field(), "Alpha: shown?{Enter}");
+    await waitFor(() => expect(repo.files.has("Tasks/Alpha shown.md")).toBe(true));
+    expect(repo.files.get("Tasks/Alpha shown.md")!.fm["title"]).toBe("Alpha: shown?");
+    expect(await screen.findByRole("heading", { name: "Alpha: shown?" })).toBeInTheDocument();
+    await waitFor(() => expect(field()).toHaveValue("Alpha: shown?"));
+    expect(within(detail).getByText("File: Alpha shown.md")).toBeInTheDocument();
     // The key has its own control, so the generic property rows must not offer it a second time.
     expect(within(detail).queryByLabelText("Value of title")).not.toBeInTheDocument();
-    await user.clear(within(detail).getByLabelText("Override card title"));
-    await user.keyboard("{Enter}");
-    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBeUndefined());
-    expect(await screen.findByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+
+    // And `title` goes again, on its own, once the file name can hold the title.
+    await user.clear(field());
+    await user.type(field(), "Alpha{Enter}");
+    await waitFor(() => expect(repo.files.has("Tasks/Alpha.md")).toBe(true));
+    expect(repo.files.get("Tasks/Alpha.md")!.fm).not.toHaveProperty("title");
+    await waitFor(() => expect(within(detail).queryByText(/^File:/)).not.toBeInTheDocument());
   });
 
-  it("the card menu's Override card title opens the panel on that field", async () => {
+  it("offers no file name field, no override, no resulting title and no explanation of it", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
     const card = (await screen.findByText("Alpha")).closest(".folia-card") as HTMLElement;
     fireEvent.contextMenu(card.querySelector(".folia-card-title")!);
-    await user.click(
-      within(await screen.findByRole("menu")).getByRole("menuitem", {
-        name: /Override card title/,
-      }),
-    );
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: /Override card title/ })).toBeNull();
+    await user.click(within(menu).getByRole("menuitem", { name: "Open details" }));
     const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(within(detail).getByLabelText("Override card title")).toHaveFocus());
+    await within(detail).findByText("hi there");
+    for (const label of ["File name", "Override card title"])
+      expect(within(detail).queryByLabelText(label), label).toBeNull();
+    for (const text of ["File name", "Override card title", "Resulting display title"])
+      expect(within(detail).queryByText(text), text).toBeNull();
+    expect(within(detail).queryByRole("button", { name: "Why this title?" })).toBeNull();
+    expect(within(detail).getAllByLabelText("Title")).toHaveLength(1);
+  });
+
+  it("puts an emptied Title field back to the card's title rather than writing a blank one", async () => {
+    const user = userEvent.setup();
+    const repo = makeRepo();
+    const rename = vi.spyOn(repo, "renameCard");
+    render_(repo);
+    await user.click(await screen.findByText("Alpha"));
+    const detail = await screen.findByTestId("card-detail");
+    const field = within(detail).getByLabelText("Title");
+    await user.clear(field);
+    await user.type(field, "   {Enter}");
+    await waitFor(() => expect(field).toHaveValue("Alpha"));
+    expect(rename).not.toHaveBeenCalled();
+    expect(repo.files.has("Tasks/Alpha.md")).toBe(true);
   });
 });
 
@@ -6058,28 +6182,28 @@ describe("the detail panel keeps its drafts when a write fails or the note moves
   });
 });
 
-describe("the Override card title placeholder names the card's fallback under the board's mode", () => {
-  it("shows the heading a `card-title: heading` board would fall back to", async () => {
+describe("the Title field on a board that reads titles from headings", () => {
+  it("shows the heading as the title, says what the file is called, and writes a retitle back to the heading", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(
       { ...config, titleMode: "heading" },
       {
         "Tasks/Notes.md": {
-          fm: { type: "task", status: "todo", title: "Overridden" },
+          fm: { type: "task", status: "todo" },
           body: "\n# Notes from the kickoff\n\nBody.\n",
         },
       },
     );
     render_(repo);
-    await user.click(await screen.findByText("Overridden"));
+    await user.click(await screen.findByText("Notes from the kickoff"));
     const detail = await screen.findByTestId("card-detail");
-    const field = within(detail).getByLabelText("Override card title") as HTMLInputElement;
-    await waitFor(() => expect(field.placeholder).toBe("Notes from the kickoff"));
+    const field = within(detail).getByLabelText("Title");
+    expect(field).toHaveValue("Notes from the kickoff");
+    expect(within(detail).getByText("File: Notes.md")).toBeInTheDocument();
     await user.clear(field);
-    await user.keyboard("{Enter}");
-    expect(
-      await screen.findByRole("heading", { name: "Notes from the kickoff" }),
-    ).toBeInTheDocument();
+    await user.type(field, "Kickoff notes{Enter}");
+    expect(await screen.findByRole("heading", { name: "Kickoff notes" })).toBeInTheDocument();
+    expect(repo.files.get("Tasks/Notes.md")!.body).toBe("\n# Kickoff notes\n\nBody.\n");
   });
 });
 
@@ -6252,20 +6376,22 @@ describe("the detail panel's reads and field writes stay with their card", () =>
 });
 
 describe("a field draft belongs to the card it was typed on", () => {
-  it("does not carry a title override draft over to the next card opened", async () => {
+  it("does not carry a Title draft over to the next card opened", async () => {
     const user = userEvent.setup();
     const repo = makeRepo();
     render_(repo);
     await user.click(await screen.findByText("Alpha"));
     const detail = await screen.findByTestId("card-detail");
-    await user.type(within(detail).getByLabelText("Override card title"), "Alpha shown");
+    await user.type(within(detail).getByLabelText("Title"), " shown");
+    // Leaving the field for another card commits it, to the card it was typed on.
     await user.click(screen.getByText("Gamma"));
     await screen.findByRole("heading", { name: "Gamma" });
     const gammaDetail = await screen.findByTestId("card-detail");
-    expect(within(gammaDetail).getByLabelText("Override card title")).toHaveValue("");
-    await user.click(within(gammaDetail).getByLabelText("Override card title"));
+    expect(within(gammaDetail).getByLabelText("Title")).toHaveValue("Gamma");
+    await user.click(within(gammaDetail).getByLabelText("Title"));
     await user.keyboard("{Enter}");
-    await waitFor(() => expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBe("Alpha shown"));
+    await waitFor(() => expect(repo.files.has("Tasks/Alpha shown.md")).toBe(true));
+    expect(repo.files.has("Tasks/Gamma.md")).toBe(true);
     expect(repo.files.get("Tasks/Gamma.md")!.fm["title"]).toBeUndefined();
   });
 
@@ -6597,28 +6723,26 @@ describe("the panel's section inputs belong to the card they were typed on (2026
     const repo = makeRepo();
     render_(repo);
     const todoCol = (await screen.findByText("Todo")).closest("section") as HTMLElement;
-    const openTitleField = async () => {
+    const openSubcardField = async () => {
       const tile = within(todoCol).getAllByText("Alpha")[0]!.closest(".folia-card") as HTMLElement;
       fireEvent.contextMenu(tile.querySelector(".folia-card-title")!);
       await user.click(
-        within(await screen.findByRole("menu")).getByRole("menuitem", {
-          name: "Override card title",
-        }),
+        within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Add subcard" }),
       );
     };
-    await openTitleField();
+    await openSubcardField();
     const detail = await screen.findByTestId("card-detail");
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(detail).getByLabelText("Override card title")),
+      expect(document.activeElement).toBe(within(detail).getByLabelText("Add a subcard")),
     );
     // Something half-typed, so re-opening has something to lose.
     await user.type(within(detail).getByLabelText("Write a comment"), "half a comment");
     // Move focus elsewhere and ask again: the action has to land a second time on the same card.
     within(detail).getByLabelText("Write a comment").focus();
-    await openTitleField();
+    await openSubcardField();
     const reopened = await screen.findByTestId("card-detail");
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(reopened).getByLabelText("Override card title")),
+      expect(document.activeElement).toBe(within(reopened).getByLabelText("Add a subcard")),
     );
     // ...on the SAME panel: re-opening the card already showing must not remount it, or the
     // action would land on an empty panel and the comment would be gone.
@@ -6705,137 +6829,68 @@ describe("a rename under the open panel keeps what was typed in it (20260826.09)
   });
 });
 
-describe("the panel names the file, names the override, and explains the title (20260827.01)", () => {
-  /** The read-only line under the two title fields, and the sentence that justifies it. */
-  const outcome = (detail: HTMLElement) => ({
-    title: detail.querySelector(".folia-title-value")?.textContent,
-    reason: detail.querySelector(".folia-title-reason")?.textContent,
-  });
-
-  it("previews the title from what is typed, before anything is committed", async () => {
-    const user = userEvent.setup();
-    const repo = makeRepo();
-    render_(repo);
-    await user.click(await screen.findByText("Alpha"));
-    const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(outcome(detail).title).toBe("Alpha"));
-    expect(outcome(detail).reason).toBe(
-      "Taken from the file name, because it already reads as a name.",
-    );
-
-    // Typed, not saved: the note is untouched and the line already answers for it.
-    await user.type(within(detail).getByLabelText("Override card title"), "Shown instead");
-    expect(outcome(detail).title).toBe("Shown instead");
-    expect(outcome(detail).reason).toBe(
-      "Taken from the override, which wins over every other source.",
-    );
-    expect(repo.files.get("Tasks/Alpha.md")!.fm["title"]).toBeUndefined();
-
-    // A slug-shaped file name sends the rules looking for a heading — with nothing to find here.
-    await user.clear(within(detail).getByLabelText("Override card title"));
-    const name = within(detail).getByLabelText("File name");
-    await user.clear(name);
-    await user.type(name, "01-fix-export");
-    expect(outcome(detail).title).toBe("01-fix-export");
-    expect(outcome(detail).reason).toBe(
-      "Taken from the file name, because no heading in the note could supply a title.",
-    );
-    expect(repo.files.has("Tasks/Alpha.md")).toBe(true);
-  });
-
-  it("explains a title that comes from a heading", async () => {
+describe("the panel has one Title field, and names the file only when it differs (20260827.01)", () => {
+  it("retitles from the Title field: the file and the links to it follow, and the panel keeps its drafts", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
-      "Tasks/01-fix-export.md": {
-        fm: { type: "task", status: "todo" },
-        body: "\n# Fix the export path\n\nDesc\n",
-      },
-    });
-    render_(repo);
-    await user.click(await screen.findByText("Fix the export path"));
-    const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(outcome(detail).title).toBe("Fix the export path"));
-    expect(outcome(detail).reason).toBe(
-      "Taken from the note's first heading, because the file name reads like a slug.",
-    );
-
-    // "Why this title?" shows the sources in the order they were asked, the winner marked.
-    await user.click(within(detail).getByRole("button", { name: "Why this title?" }));
-    const steps = [...detail.querySelectorAll(".folia-title-step")].map((li) => ({
-      source: li.querySelector(".folia-title-step-source")?.textContent,
-      value: li.querySelector(".folia-title-step-value")?.textContent,
-      winner: li.classList.contains("folia-is-winner"),
-    }));
-    expect(steps).toEqual([
-      { source: "Override card title", value: "not set", winner: false },
-      { source: "First heading in the note", value: "“Fix the export path”", winner: true },
-    ]);
-  });
-
-  it("explains a title that comes from the override, and one skipped heading step", async () => {
-    const user = userEvent.setup();
-    const repo = new FakeRepo(
-      { ...config, titleMode: "filename" },
-      {
-        "Tasks/Notes.md": {
-          fm: { type: "task", status: "todo", title: "What it is really about" },
-          body: "\n# Notes from the kickoff\n",
-        },
-      },
-    );
-    render_(repo);
-    await user.click(await screen.findByText("What it is really about"));
-    const detail = await screen.findByTestId("card-detail");
-    await waitFor(() => expect(outcome(detail).title).toBe("What it is really about"));
-    await user.click(within(detail).getByRole("button", { name: "Why this title?" }));
-    expect(detail.querySelectorAll(".folia-title-step")).toHaveLength(1);
-    expect(detail.querySelector(".folia-title-step-reason")?.textContent).toBe(
-      "Taken from the override, which wins over every other source.",
-    );
-
-    // Clearing the override hands the decision to the board's mode, which reads no heading at all.
-    await user.clear(within(detail).getByLabelText("Override card title"));
-    expect(outcome(detail).reason).toBe(
-      "Taken from the file name, because this board titles cards by file name.",
-    );
-    const skipped = [...detail.querySelectorAll(".folia-title-step")][1];
-    expect(skipped?.querySelector(".folia-title-step-reason")?.textContent).toBe(
-      "This board titles cards by file name, so no heading is read.",
-    );
-  });
-
-  it("renames the file from the File name field, even when an override names the card", async () => {
-    const user = userEvent.setup();
-    const repo = new FakeRepo(config, {
-      "Tasks/Old name.md": {
-        fm: { type: "task", status: "todo", title: "Shown title" },
-        body: "\n# Old name\n",
-      },
+      "Tasks/Old name.md": { fm: { type: "task", status: "todo" }, body: "" },
       "Tasks/Parent.md": {
         fm: { type: "task", status: "todo" },
-        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Old name]]\n",
+        body: "\n## Subtasks\n- [ ] [[Old name]]\n",
       },
     });
     render_(repo);
-    await user.click(await screen.findByText("Shown title"));
+    await user.click(await screen.findByText("Old name"));
     const detail = await screen.findByTestId("card-detail");
     await within(detail).findByLabelText("Write a comment");
     await user.type(within(detail).getByLabelText("Write a comment"), "still being written");
 
-    const name = within(detail).getByLabelText("File name");
-    await user.clear(name);
-    await user.type(name, "New name{Enter}");
+    const title = within(detail).getByLabelText("Title");
+    await user.clear(title);
+    await user.type(title, "New name{Enter}");
 
-    // The FILE moved — the override was not rewritten in its place — and inbound links followed.
+    // The FILE moved, and inbound links followed.
     await waitFor(() => expect(repo.files.has("Tasks/New name.md")).toBe(true));
     expect(repo.files.has("Tasks/Old name.md")).toBe(false);
-    expect(repo.files.get("Tasks/New name.md")!.fm["title"]).toBe("Shown title");
+    expect(repo.files.get("Tasks/New name.md")!.fm).not.toHaveProperty("title");
     expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New name]]");
     // The panel stayed on the card, with what was being typed in it.
     const after = await screen.findByTestId("card-detail");
     expect(after).toBe(detail);
-    expect(within(after).getByLabelText("File name")).toHaveValue("New name");
+    expect(within(after).getByLabelText("Title")).toHaveValue("New name");
     expect(within(after).getByLabelText("Write a comment")).toHaveValue("still being written");
+  });
+
+  it("leaves a file that was named apart from its title alone until the card is retitled", async () => {
+    // A card from before files were named after titles: a slug for a name, the title in `title`.
+    const user = userEvent.setup();
+    const repo = new FakeRepo(config, {
+      "Tasks/01-fix-export.md": {
+        fm: { type: "task", status: "todo", title: "Fix the export path" },
+        body: "",
+      },
+    });
+    const rename = vi.spyOn(repo, "renameCard");
+    render_(repo);
+    await user.click(await screen.findByText("Fix the export path"));
+    const detail = await screen.findByTestId("card-detail");
+    const title = within(detail).getByLabelText("Title");
+    expect(title).toHaveValue("Fix the export path");
+    expect(within(detail).getByText("File: 01-fix-export.md")).toBeInTheDocument();
+    // Looking is not retitling: leaving the field as it was writes nothing.
+    await user.click(title);
+    await user.tab();
+    expect(rename).not.toHaveBeenCalled();
+    expect(repo.files.has("Tasks/01-fix-export.md")).toBe(true);
+
+    await user.type(title, " on Windows{Enter}");
+    await waitFor(() =>
+      expect(repo.files.has("Tasks/Fix the export path on Windows.md")).toBe(true),
+    );
+    expect(repo.files.get("Tasks/Fix the export path on Windows.md")!.fm).not.toHaveProperty(
+      "title",
+    );
+    await waitFor(() => expect(within(detail).queryByText(/^File:/)).not.toBeInTheDocument());
   });
 
   it("ignores a board that arrives still knowing the card under its old path", async () => {
@@ -6871,59 +6926,61 @@ describe("the panel names the file, names the override, and explains the title (
     const after = await screen.findByTestId("card-detail");
     expect(after).toBe(detail);
     expect(within(after).getByLabelText("Write a comment")).toHaveValue("half a comment");
-    expect(within(after).getByLabelText("File name")).toHaveValue("Moved");
+    // A file renamed by hand is a retitle too, for a card whose title is its file name.
+    expect(within(after).getByLabelText("Title")).toHaveValue("Moved");
   });
 
-  it("shows the name the file actually got, and does not rename again on the next blur", async () => {
+  it("allows a title another card has: the file is numbered, the title is kept, and the next blur renames nothing", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
-      "Tasks/Old.md": { fm: { type: "task", status: "todo" }, body: "\n# Old\n" },
-      "Tasks/New.md": { fm: { type: "task", status: "todo" }, body: "\n# New\n" },
+      "Tasks/Old.md": { fm: { type: "task", status: "todo" }, body: "" },
+      "Tasks/New.md": { fm: { type: "task", status: "todo" }, body: "" },
       "Tasks/Parent.md": {
         fm: { type: "task", status: "todo" },
-        body: "\n# Parent\n\n## Subtasks\n- [ ] [[Old]]\n",
+        body: "\n## Subtasks\n- [ ] [[Old]]\n",
       },
     });
     render_(repo);
     await user.click(await screen.findByText("Old"));
     const detail = await screen.findByTestId("card-detail");
-    const name = () => within(detail).getByLabelText("File name");
-    await user.clear(name());
-    await user.type(name(), "New{Enter}");
+    const title = () => within(detail).getByLabelText("Title");
+    await user.clear(title());
+    await user.type(title(), "New{Enter}");
 
     // The name was taken, so the file got the next one free — and the link followed it there,
     // rather than to the card it collided with.
     await waitFor(() => expect(repo.files.has("Tasks/New 1.md")).toBe(true));
     expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New 1]]");
-    // The field says so too. Anything else reads as still-unsaved text...
-    await waitFor(() => expect(name()).toHaveValue("New 1"));
+    // The card is titled what was typed, not what its file had to be called.
+    expect(repo.files.get("Tasks/New 1.md")!.fm["title"]).toBe("New");
+    await waitFor(() => expect(within(detail).getByText("File: New 1.md")).toBeInTheDocument());
+    expect(title()).toHaveValue("New");
 
-    // ...which the next blur would submit all over again, walking the file to `New 2` and
-    // rewriting the link a second time. Leaving the field without typing must write nothing.
-    await user.click(name());
+    // Leaving the field without typing must write nothing: no walk to `New 2`, no link rewritten
+    // a second time.
+    await user.click(title());
     await user.tab();
-    await waitFor(() => expect(name()).toHaveValue("New 1"));
+    await waitFor(() => expect(title()).toHaveValue("New"));
     expect(repo.files.has("Tasks/New 2.md")).toBe(false);
     expect(repo.files.get("Tasks/Parent.md")!.body).toContain("[[New 1]]");
   });
 
-  it("previews the file name as the name the file can actually take", async () => {
+  it("keeps a title a file name cannot hold whole, beside a file named with what it can", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
-      "Tasks/Plain.md": { fm: { type: "task", status: "todo" }, body: "\n# Plain\n" },
+      "Tasks/Plain.md": { fm: { type: "task", status: "todo" }, body: "" },
     });
     render_(repo);
     await user.click(await screen.findByText("Plain"));
     const detail = await screen.findByTestId("card-detail");
-    const name = within(detail).getByLabelText("File name");
-    await user.clear(name);
-    // `/` and `?` cannot be in a file name, so the preview drops them exactly as the write will.
-    await user.type(name, "Ship: v2/final?");
-    await waitFor(() =>
-      expect((detail.querySelector(".folia-title-value") as HTMLElement).textContent).toBe(
-        "Ship v2final",
-      ),
-    );
+    const title = within(detail).getByLabelText("Title");
+    await user.clear(title);
+    // `/` and `?` cannot be in a file name, so the file drops them and the title keeps them.
+    await user.type(title, "Ship: v2/final?{Enter}");
+    await waitFor(() => expect(repo.files.has("Tasks/Ship v2final.md")).toBe(true));
+    expect(repo.files.get("Tasks/Ship v2final.md")!.fm["title"]).toBe("Ship: v2/final?");
+    await waitFor(() => expect(title).toHaveValue("Ship: v2/final?"));
+    expect(within(detail).getByText("File: Ship v2final.md")).toBeInTheDocument();
   });
 });
 
@@ -6976,53 +7033,22 @@ describe("a title far wider than the panel (20260827.02)", () => {
     }
   });
 
-  it("wraps the resulting title, clamps it, and expands it on demand", async () => {
+  it("keeps the whole title in the Title field, and wraps the file's name under it", async () => {
     const user = userEvent.setup();
     const repo = new FakeRepo(config, {
-      "Tasks/Wide.md": { fm: { type: "task", status: "todo", title: HUGE }, body: "\n# Wide\n" },
+      "Tasks/Wide.md": { fm: { type: "task", status: "todo", title: HUGE }, body: "" },
     });
     render_(repo);
     await user.click(await screen.findByText(HUGE));
     const detail = await screen.findByTestId("card-detail");
-    const value = await waitFor(() => {
-      const el = detail.querySelector(".folia-title-value") as HTMLButtonElement;
-      expect(el).toHaveTextContent(HUGE);
-      return el;
-    });
-    expect(value).toHaveAttribute("aria-expanded", "false");
-    // Both of the things Obsidian's app.css does to every button have to be undone, and neither is
-    // visible from jsdom: `white-space: nowrap` would hold the whole title on one line whatever the
-    // clamp says, and `height: var(--input-height)` would pin the box at one line's worth of
-    // height, so the clamped lines would spill over the text underneath. The undo lives on
-    // `.folia-scope .folia-link` now, once for every link the board draws (20260829.02), so what
-    // this row needs is that rule AND the class that reaches it.
-    expect(value).toHaveClass("folia-link");
-    const linkRule = rule(".folia-scope .folia-link");
-    expect(linkRule).toContain("white-space: normal");
-    expect(linkRule).toContain("height: auto");
-
-    // The clamp lives in a plain element inside the control rather than on the button, so that it
-    // needs no assumption about how a browser treats a button's inner display. On a current
-    // Obsidian both placements work; this is a precaution for the older engines still supported.
-    const text = value.querySelector(".folia-title-value-text") as HTMLElement;
-    expect(text).toHaveTextContent(HUGE);
-    expect(text.tagName).not.toBe("BUTTON");
-    expect(value.contains(text)).toBe(true);
-    expect(rule(".folia-title-value-text")).toContain("-webkit-line-clamp: 3");
-    expect(rule(".folia-title-value-text")).toContain("-webkit-box-orient: vertical");
-    expect(rule(".folia-title-value-text")).toContain("overflow-wrap: anywhere");
-    expect(rule(".folia-title-value-text")).toContain("white-space: normal");
-
-    await user.click(value);
-    expect(value).toHaveClass("folia-is-expanded");
-    expect(value).toHaveAttribute("aria-expanded", "true");
-    // Expanding undoes every part of the clamp, the base rule's `overflow: hidden` included, so
-    // no future change to the collapsed rule can leave the open state half-clipped.
-    const openRule = rule(
-      ".folia-scope .folia-title-value.folia-is-expanded .folia-title-value-text",
-    );
-    expect(openRule).toContain("-webkit-line-clamp: none");
-    expect(openRule).toContain("overflow: visible");
+    // The header clamps; the field is where the whole title is read and edited.
+    expect(within(detail).getByLabelText("Title")).toHaveValue(HUGE);
+    const file = detail.querySelector(".folia-title-file") as HTMLElement;
+    expect(file).toHaveTextContent("File: Wide.md");
+    // Neither the field nor the line under it may widen the panel: the column they sit in can
+    // shrink, and a file name with nothing to break on breaks anyway.
+    expect(rule(".folia-title-outcome")).toContain("min-width: 0");
+    expect(rule(".folia-scope .folia-title-file")).toContain("overflow-wrap: anywhere");
   });
 });
 
@@ -7089,14 +7115,7 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
   it("writes each base class above the rules that refine it", () => {
     // Scoped base and refinement rules have equal specificity, so source order matters.
     for (const [base, refinements] of [
-      [
-        ".folia-scope .folia-link",
-        [".folia-scope .folia-title-value", ".folia-scope .folia-title-why"],
-      ],
-      [
-        ".folia-scope .folia-muted",
-        [".folia-scope .folia-title-reason", ".folia-scope .folia-title-step-reason"],
-      ],
+      [".folia-scope .folia-muted", [".folia-scope .folia-title-file"]],
     ] as const) {
       expect(ruleAt(base)).toBeGreaterThan(-1);
       for (const refinement of refinements) {
@@ -7118,40 +7137,22 @@ describe("a link that has to lose the theme's button shape (20260829.01, 2026082
     );
   });
 
-  it("keeps the title row reading as a title rather than as the link it is built from", async () => {
+  it("keeps the file line under the title at the size it asks for", async () => {
     const user = userEvent.setup();
-    render_(makeRepo());
-    await user.click(await screen.findByText("Alpha"));
+    const repo = new FakeRepo(config, {
+      "Tasks/01-fix-export.md": {
+        fm: { type: "task", status: "todo", title: "Fix the export path" },
+        body: "",
+      },
+    });
+    render_(repo);
+    await user.click(await screen.findByText("Fix the export path"));
     const detail = await screen.findByTestId("card-detail");
-    const value = detail.querySelector(".folia-title-value") as HTMLElement;
-    // The row is a `.folia-link` button, so `.folia-scope .folia-link` hands it the accent colour and
-    // `font: inherit`. The scoped refinement restores the title styling.
-    expect(value).toHaveClass("folia-link");
-    const own = rule(".folia-scope .folia-title-value");
-    expect(own).toContain("font-size: var(--font-ui-small)");
-    expect(own).toContain("font-weight: var(--font-semibold)");
-    expect(own).toContain("color: var(--text-normal)");
-  });
-
-  it("keeps the title's supporting lines at the size they ask for", async () => {
-    const user = userEvent.setup();
-    render_(makeRepo());
-    await user.click(await screen.findByText("Alpha"));
-    const detail = await screen.findByTestId("card-detail");
-    const reason = detail.querySelector(".folia-title-reason") as HTMLElement;
-    // The reason line wears `.folia-muted`, whose base rule sets a larger size than this line
-    // asks for, so the refinement needs the same scope.
-    expect(reason).toHaveClass("folia-muted");
-    expect(rule(".folia-scope .folia-title-reason")).toContain("font-size: var(--font-smaller)");
-    const why = within(detail).getByRole("button", { name: "Why this title?" });
-    expect(why).toHaveClass("folia-link");
-    expect(rule(".folia-scope .folia-title-why")).toContain("font-size: var(--font-smaller)");
-    await user.click(why);
-    const step = detail.querySelector(".folia-title-step-reason") as HTMLElement;
-    expect(step).toHaveClass("folia-muted");
-    expect(rule(".folia-scope .folia-title-step-reason")).toContain(
-      "font-size: var(--font-smaller)",
-    );
+    const file = detail.querySelector(".folia-title-file") as HTMLElement;
+    // The line wears `.folia-muted`, whose base rule sets a larger size than this line asks for,
+    // so the refinement needs the same scope.
+    expect(file).toHaveClass("folia-muted");
+    expect(rule(".folia-scope .folia-title-file")).toContain("font-size: var(--font-smaller)");
   });
 });
 

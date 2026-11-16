@@ -19,7 +19,7 @@ const ctx: MatchContext = { today: "2026-09-10", doneColumnId: "done", relations
 const base = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto" as const,
+  titleMode: "filename" as const,
   priorities: [],
   relations: [BLOCKS],
 };

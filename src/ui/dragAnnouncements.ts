@@ -1,9 +1,10 @@
 import type { Announcements, ScreenReaderInstructions } from "@dnd-kit/core";
 import type { Board as BoardModel } from "../model/types";
 import { splitCardDragId } from "../model/board";
+import { plainTitleText } from "../model/cardTitle";
 
 /**
- * What a keyboard drag says aloud: card titles and column names, not file paths or slugs. Card ids
+ * What a keyboard drag says aloud: card titles as words and column names, not file paths or markup. Card ids
  * are namespaced (`col::path`), so the bare path is resolved before the card is looked up.
  */
 export function dragAnnouncements(board: BoardModel, columnIds: string[]): Announcements {
@@ -11,7 +12,8 @@ export function dragAnnouncements(board: BoardModel, columnIds: string[]): Annou
     const key = String(id);
     if (columnIds.includes(key))
       return board.config.columns.find((c) => c.id === key)?.title ?? key;
-    return board.cards[splitCardDragId(key).path]?.title ?? key;
+    const title = board.cards[splitCardDragId(key).path]?.title;
+    return title === undefined ? key : plainTitleText(title);
   };
   return {
     onDragStart: ({ active }) => `Picked up ${labelFor(active.id)}.`,

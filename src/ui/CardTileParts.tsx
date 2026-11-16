@@ -8,6 +8,7 @@ import {
   usePendingLaunch,
   useSubitemsCollapse,
 } from "./context";
+import { plainTitleText } from "../model/cardTitle";
 import { commentsTitle, progressWords } from "./cardWords";
 import { Icon } from "./icons";
 import { HostIconButton, HostProgressBar } from "./hostControls";
@@ -127,8 +128,8 @@ export function SubitemsToggle({ card, collapsed }: { card: Card; collapsed: boo
       // reader's buttons list at once, and "Hide subitems" alone can't tell them apart.
       aria-label={
         collapsed
-          ? `Show ${checklist} subitems, ${done} done, for "${card.title}"`
-          : `Hide subitems for "${card.title}"`
+          ? `Show ${checklist} subitems, ${done} done, for "${plainTitleText(card.title)}"`
+          : `Hide subitems for "${plainTitleText(card.title)}"`
       }
       onClick={(e) => {
         e.stopPropagation();
@@ -172,13 +173,13 @@ export function AgentCountdown({ card }: { card: Card }) {
     <div
       className="folia-agent-pending"
       role="group"
-      aria-label={`Agent starting for "${card.title}"`}
+      aria-label={`Agent starting for "${plainTitleText(card.title)}"`}
     >
       <span>{waiting ? `Agent in ${seconds}s` : "Agent starting…"}</span>
       <span aria-hidden="true">·</span>
       <button
         className="folia-link"
-        aria-label={`Cancel the agent for "${card.title}"`}
+        aria-label={`Cancel the agent for "${plainTitleText(card.title)}"`}
         onClick={(e) => {
           stop(e);
           agents.cancel(card.path);
@@ -192,7 +193,7 @@ export function AgentCountdown({ card }: { card: Card }) {
           <span aria-hidden="true">·</span>
           <button
             className="folia-link"
-            aria-label={`Start the agent for "${card.title}" now`}
+            aria-label={`Start the agent for "${plainTitleText(card.title)}" now`}
             onClick={(e) => {
               stop(e);
               agents.startNow(card.path);
@@ -249,7 +250,7 @@ export function CardActions({
         <HostIconButton
           className="folia-card-action folia-action-done"
           icon="circle-check"
-          label={`Mark "${card.title}" done`}
+          label={`Mark "${plainTitleText(card.title)}" done`}
           stopPropagation={["click"]}
           onClick={() => actions.complete(card)}
         />
@@ -257,7 +258,11 @@ export function CardActions({
       <HostIconButton
         className="folia-card-action"
         icon="external-link"
-        label={todoRef ? `Open note holding "${card.title}"` : `Open note for "${card.title}"`}
+        label={
+          todoRef
+            ? `Open note holding "${plainTitleText(card.title)}"`
+            : `Open note for "${plainTitleText(card.title)}"`
+        }
         stopPropagation={["click"]}
         // "Open in a new tab" by middle click, the one Obsidian gesture that needs no modifier.
         middleClick
@@ -266,7 +271,11 @@ export function CardActions({
       <HostIconButton
         className="folia-card-action folia-action-delete"
         icon="trash-2"
-        label={todoRef ? `Remove todo "${card.title}"` : `Delete "${card.title}"`}
+        label={
+          todoRef
+            ? `Remove todo "${plainTitleText(card.title)}"`
+            : `Delete "${plainTitleText(card.title)}"`
+        }
         stopPropagation={["click"]}
         onClick={() => {
           // The line as this tile reads it now: the removal stays about what was clicked, even

@@ -11,7 +11,7 @@ import { FakeRepo } from "./fakeRepo";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: ["high"],
   relations: [],
   columns: [
@@ -1635,22 +1635,22 @@ describe("get_card answering about a card the board draws inside its parent", ()
   });
 });
 
-describe("a description that opens with a heading the card reads as its title", () => {
-  // Saved, the line is not description at all: it is where the title comes from, so it is eaten
-  // and never comes back. The call reported success over text that was already gone.
-  it("is refused rather than silently swallowed", async () => {
+describe("a description that opens with a heading", () => {
+  // A card's title is its file name or its `title` key, never a line of the note. A top heading in
+  // a description is description like any other line, and comes back as it was written.
+  it("is kept whole, a top `#` heading included", async () => {
     const { host, repo } = fixture();
-    await expect(
-      call(host, "update_card", {
-        board: "Board.md",
-        card: "Tasks/Ship it.md",
-        description: "# Injected\n\nreal body",
-      }),
-    ).rejects.toThrow(/reads its title/);
-    expect((await repo.readBody("Tasks/Ship it.md")).description).not.toBe("real body");
+    await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      description: "# Injected\n\nreal body",
+    });
+    expect((await repo.readBody("Tasks/Ship it.md")).description).toBe("# Injected\n\nreal body");
+    // And it retitles nothing: the card is still the one its file names.
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.title).toBe("Ship it");
   });
 
-  it("still allows a smaller heading, which survives the round trip", async () => {
+  it("keeps a smaller heading too", async () => {
     const { host, repo } = fixture();
     await call(host, "update_card", {
       board: "Board.md",
@@ -1658,6 +1658,211 @@ describe("a description that opens with a heading the card reads as its title", 
       description: "## Question\n\nwhy?",
     });
     expect((await repo.readBody("Tasks/Ship it.md")).description).toBe("## Question\n\nwhy?");
+  });
+});
+
+describe("a card's one title, through the tools", () => {
+  const LINKED = "monitor [MR130903](https://gitlab.example/group/app/-/merge_requests/130903)";
+
+  it("create_card names the file after the title and gives the note no heading", async () => {
+    const { host, repo } = fixture();
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: "New work",
+      column: "doing",
+    })) as { path: string };
+    expect(created.path).toBe("Tasks/New work.md");
+    expect(repo.files.get(created.path)?.body).toBe("");
+    expect(repo.files.get(created.path)?.fm).not.toHaveProperty("title");
+    expect(await call(host, "get_card", { board: "Board.md", card: created.path })).toMatchObject({
+      title: "New work",
+      titleSource: "filename",
+      description: "",
+    });
+  });
+
+  it("create_card keeps a title its file name cannot hold whole, and says where it is read from", async () => {
+    const { host } = fixture();
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: LINKED,
+      column: "todo",
+    })) as { path: string };
+    expect(created.path).toBe("Tasks/monitor MR130903.md");
+    expect(await call(host, "get_card", { board: "Board.md", card: created.path })).toMatchObject({
+      title: LINKED,
+      titleSource: "frontmatter",
+      frontmatter: { title: LINKED },
+    });
+  });
+
+  it("create_card allows a duplicate title, under a numbered file", async () => {
+    const { host } = fixture();
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: "Ship it",
+      column: "todo",
+    })) as { path: string };
+    expect(created.path).toBe("Tasks/Ship it 1.md");
+    expect(await call(host, "get_card", { board: "Board.md", card: created.path })).toMatchObject({
+      title: "Ship it",
+      titleSource: "frontmatter",
+    });
+  });
+
+  it("update_card retitles by renaming the file, links to it follow, and the reply carries the new path", async () => {
+    const { host, repo } = fixture();
+    await repo.setDescription("Tasks/Write docs.md", "After [[Ship it]] lands.");
+    const updated = (await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      title: "Ship the release",
+    })) as { path: string };
+    expect(updated.path).toBe("Tasks/Ship the release.md");
+    expect(repo.files.has("Tasks/Ship it.md")).toBe(false);
+    expect((await repo.readBody("Tasks/Write docs.md")).description).toBe(
+      "After [[Ship the release]] lands.",
+    );
+  });
+
+  it("update_card retitles to a title with a link, and back to a plain one", async () => {
+    const { host, repo } = fixture();
+    const linked = (await call(host, "update_card", {
+      board: "Board.md",
+      card: "Tasks/Ship it.md",
+      title: LINKED,
+    })) as { path: string };
+    expect(linked.path).toBe("Tasks/monitor MR130903.md");
+    expect(repo.files.get(linked.path)?.fm["title"]).toBe(LINKED);
+
+    const plain = (await call(host, "update_card", {
+      board: "Board.md",
+      card: linked.path,
+      title: "Monitor the MR",
+    })) as { path: string };
+    expect(plain.path).toBe("Tasks/Monitor the MR.md");
+    expect(repo.files.get(plain.path)?.fm).not.toHaveProperty("title");
+  });
+
+  it("answers to a title as typed, and as the words it reads as", async () => {
+    const { host } = fixture();
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: LINKED,
+      column: "todo",
+    })) as { path: string };
+    for (const card of [LINKED, "monitor MR130903"])
+      expect(await call(host, "get_card", { board: "Board.md", card }), card).toMatchObject({
+        path: created.path,
+      });
+  });
+
+  it("refuses a blank title rather than reporting a retitle that changed nothing", async () => {
+    const { host, repo } = fixture();
+    await expect(
+      call(host, "update_card", { board: "Board.md", card: "Tasks/Ship it.md", title: "   " }),
+    ).rejects.toThrow("A card's title cannot be blank.");
+    await expect(
+      call(host, "create_card", { board: "Board.md", title: "   ", column: "todo" }),
+    ).rejects.toThrow("A card's title cannot be blank.");
+    expect([...repo.files.keys()]).toEqual([
+      "Tasks/Write docs.md",
+      "Tasks/Ship it.md",
+      "Tasks/Old thing.md",
+    ]);
+  });
+
+  it("create_card returns the failure when the note cannot be written, and creates nothing", async () => {
+    const { host, repo } = fixture();
+    repo.createCard = () => Promise.reject(new Error("The card could not be written: ENOSPC."));
+    await expect(
+      call(host, "create_card", { board: "Board.md", title: LINKED, column: "todo" }),
+    ).rejects.toThrow("The card could not be written: ENOSPC.");
+    expect(repo.files.size).toBe(3);
+  });
+
+  it("update_card returns the failure when the retitle fails, never the card as renamed", async () => {
+    const { host, repo } = fixture();
+    repo.renameCard = () => Promise.reject(new Error("EBUSY: the file is in use."));
+    await expect(
+      call(host, "update_card", { board: "Board.md", card: "Tasks/Ship it.md", title: LINKED }),
+    ).rejects.toThrow(
+      "The card was not retitled: EBUSY: the file is in use. Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.",
+    );
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.title).toBe("Ship it");
+  });
+
+  it("update_card says which half landed when the fields were written and the retitle was not", async () => {
+    const { host, repo } = fixture();
+    repo.renameCard = () => Promise.reject(new Error("EBUSY"));
+    await expect(
+      call(host, "update_card", {
+        board: "Board.md",
+        card: "Tasks/Ship it.md",
+        title: "Ship the release",
+        due: "2026-09-09",
+      }),
+    ).rejects.toThrow(
+      "The card was not retitled: EBUSY. The other changes in this call were written.",
+    );
+    expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.frontmatter.due).toBe("2026-09-09");
+  });
+
+  it("reports a failed retitle as a tool error on the wire, not as a result", async () => {
+    const { host, repo } = fixture();
+    repo.renameCard = () => Promise.reject(new Error("EBUSY"));
+    const reply = await handleMessage(host, INFO, {
+      jsonrpc: "2.0",
+      id: 7,
+      method: "tools/call",
+      params: {
+        name: "update_card",
+        arguments: { board: "Board.md", card: "Tasks/Ship it.md", title: "Ship the release" },
+      },
+    });
+    expect(reply?.result).toMatchObject({ isError: true });
+    expect(JSON.stringify(reply?.result)).toContain("The card was not retitled: EBUSY");
+  });
+
+  it("on a `card-title: heading` board, reads and rewrites the title at the note's first heading", async () => {
+    const repo = new FakeRepo(
+      { ...config, titleMode: "heading" },
+      {
+        "Tasks/01-fix.md": { fm: { status: "todo" }, body: "\n# Fix the export\n\nWhy.\n" },
+        "Tasks/Plain.md": { fm: { status: "todo" }, body: "No heading here.\n" },
+      },
+      () => "all",
+    );
+    const host: BoardHost = {
+      listBoards: () => [{ path: "Board.md", name: "Board" }],
+      repoFor: (path) => (path === "Board.md" ? repo : null),
+    };
+    expect(
+      await call(host, "get_card", { board: "Board.md", card: "Tasks/01-fix.md" }),
+    ).toMatchObject({ title: "Fix the export", titleSource: "heading" });
+    // The heading holds the title there, so the file keeps its name.
+    expect(
+      await call(host, "update_card", {
+        board: "Board.md",
+        card: "Fix the export",
+        title: "Fix the export path",
+      }),
+    ).toEqual({ path: "Tasks/01-fix.md" });
+    expect(repo.files.get("Tasks/01-fix.md")?.body).toBe("\n# Fix the export path\n\nWhy.\n");
+    // A note with no heading is titled by its file, on a heading board too.
+    expect(
+      await call(host, "update_card", { board: "Board.md", card: "Plain", title: "Plainer" }),
+    ).toEqual({ path: "Tasks/Plainer.md" });
+    // A new card gets no heading, so its title is its file name.
+    const created = (await call(host, "create_card", {
+      board: "Board.md",
+      title: "Fresh",
+      column: "todo",
+    })) as { path: string };
+    expect(await call(host, "get_card", { board: "Board.md", card: created.path })).toMatchObject({
+      title: "Fresh",
+      titleSource: "filename",
+    });
   });
 });
 

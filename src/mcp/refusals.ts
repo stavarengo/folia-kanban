@@ -29,11 +29,6 @@ export function refuseUnsafeDescription(description: string): void {
       `That description contains "${refusal.line}", which starts a section the board owns. The note would read it as that section rather than as description, and everything after it would stop being description at all. Use add_comment for a comment; history is the board's to write.`,
     );
   }
-  if (refusal.kind === "title") {
-    throw new ToolError(
-      `That description opens with "${refusal.line}", and a card reads its title from the first \`#\` heading. The line would be taken as the title rather than kept as description, and it would not come back. Use \`##\` or lower, or set the title with update_card's own \`title\` field.`,
-    );
-  }
   throw new ToolError(
     `That description leaves a code fence open ("${refusal.line}"). Everything after it in the note, the board's own sections included, would be swallowed by the fence. Close it and try again.`,
   );

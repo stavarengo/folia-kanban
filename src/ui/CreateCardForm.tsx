@@ -1,10 +1,13 @@
-import { useId, useRef, useState } from "react";
+import { useId } from "react";
 import type { Board, CardFrontmatter } from "../model/types";
 import { addCard } from "../model/boardOps";
 import { laneFill, prospectiveCard } from "../model/lanes";
+import { failureReason } from "./cardActions";
 import { describeFill } from "./cardView";
 import { useBoardActions, useMatchContext, useRepo } from "./context";
 import { HostButton } from "./hostControls";
+import { TitleError } from "./TitleFields";
+import { useHeldDraft } from "./useInlineDraft";
 
 /** The title of the column a new card is being created in, or its id when the board has none. */
 export const createColumnTitle = (board: Board, createColumn: string) =>
@@ -17,32 +20,25 @@ export const createColumnTitle = (board: Board, createColumn: string) =>
 export function useCreateCard(onCreated: ((path: string) => void) | undefined) {
   const repo = useRepo();
   const actions = useBoardActions();
-  const [title, setTitle] = useState("");
-  // Synchronous in-flight guard for the create form: blocks a second submit (rapid Enter, or
-  // Enter-then-click) during the async createCard window before onCreated unmounts this branch.
-  const creatingRef = useRef(false);
-  const submit = (column: string, fill: Partial<CardFrontmatter>) => {
-    const t = title.trim();
-    if (!t || creatingRef.current) return;
-    creatingRef.current = true;
-    void (async () => {
-      try {
-        // The same refusal the inline composer and a drag get: a lane draws by its rule, so a
-        // card it would not draw is never written, whichever flow asked for it.
-        if (actions.refusedByLane(column, prospectiveCard(t, column, fill))) {
-          creatingRef.current = false;
-          return;
-        }
-        const newPath = await addCard(repo, { title: t, columnId: column, fill });
-        onCreated?.(newPath);
-        // On success this branch unmounts (createColumn→null), so no need to reset the guard.
-      } catch (e) {
-        creatingRef.current = false; // let the user retry after a failed create
-        actions.reportError(e);
+  // The title stays in its field until the card exists, and a second submit (rapid Enter, or
+  // Enter-then-click) is blocked while the first is being written.
+  const draft = useHeldDraft();
+  const submit = (column: string, fill: Partial<CardFrontmatter>) =>
+    draft.send(async (title) => {
+      // The same refusal the inline composer and a drag get: a lane draws by its rule, so a
+      // card it would not draw is never written, whichever flow asked for it.
+      if (actions.refusedByLane(column, prospectiveCard(title, column, fill))) {
+        return { sent: false };
       }
-    })();
-  };
-  return { title, setTitle, submit };
+      try {
+        onCreated?.(await addCard(repo, { title, columnId: column, fill }));
+        return { sent: true };
+      } catch (e) {
+        // The title stays in its field, with the reason under it, to fix and send again.
+        return { sent: false, reason: failureReason(e) };
+      }
+    });
+  return { title: draft.value, setTitle: draft.setValue, error: draft.error, submit };
 }
 
 /** The minimal CREATE form: a title for a new card in one column. */
@@ -83,6 +79,7 @@ export function CreateCardForm({
           }}
         />
       </label>
+      <TitleError reason={form.error} />
       {fillNote && (
         <p id={createFillId} className="folia-add-card-fill">
           Added with {fillNote}

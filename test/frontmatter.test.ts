@@ -67,7 +67,7 @@ describe("the model splits frontmatter where Obsidian's metadata reader does", (
   });
 
   it.each([
-    ["an empty note", "", "D", "\nD\n"],
+    ["an empty note", "", "D", "D\n"],
     ["a block closing at the end of the file", "---\na: 1\n---", "D", "---\na: 1\n---\nD\n"],
     ["an empty block closing at the end of the file", "---\n---", "D", "---\n---\nD\n"],
   ])("writes a description into %s with no extra line", (_, text, description, out) => {

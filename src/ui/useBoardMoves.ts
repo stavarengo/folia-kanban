@@ -5,7 +5,8 @@ import type { MatchContext } from "../model/filter";
 import { resolveDrop } from "../model/board";
 import { addCard, moveCardOver } from "../model/boardOps";
 import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
-import { laneSubject } from "./cardActions";
+import { failureReason, laneSubject } from "./cardActions";
+import type { HeldOutcome } from "./useInlineDraft";
 
 /** The board's own writes: a card dropped somewhere, a card added to a column, and the lane rule both answer to. */
 export function useBoardMoves({
@@ -70,31 +71,39 @@ export function useBoardMoves({
     [repo, load, reportError, refusedByLane, boardRef],
   );
 
-  /** Adds the card, answering at once whether it was taken, so a refused title stays typed. */
+  /**
+   * Adds the card, answering once it exists. Until then the composer keeps the title: a card the
+   * lane refuses, or one the vault could not write, leaves the text where it was typed.
+   */
   const onAddCard = useCallback(
-    (columnId: string, title: string): boolean => {
+    async (columnId: string, title: string): Promise<HeldOutcome> => {
       const b = boardRef.current;
       const ctx = matchCtxRef.current;
-      if (!b || !ctx) return false;
+      if (!b || !ctx) return { sent: false };
       // A lane's rule is written onto the card where it names a plain value, so adding to an
       // `area:research` lane makes a research card. What is left is judged before the note exists:
       // a title that misses a lane's words, say, is a card that lane would never draw.
       const fill = laneFill(b, columnId, ctx);
-      if (refusedByLane(columnId, prospectiveCard(title, columnId, fill))) return false;
-      void (async () => {
-        try {
-          const path = await addCard(repo, { title, columnId, fill });
-          await load();
-          // 'inline' (default): add-only — stay in the column, don't open the detail.
-          // 'inline-edit': open the new card's detail and focus its description for editing.
-          if (inlineEdit) showCreated(path);
-        } catch (e) {
-          reportError(e);
-        }
-      })();
-      return true;
+      if (refusedByLane(columnId, prospectiveCard(title, columnId, fill))) return { sent: false };
+      let path: string;
+      try {
+        path = await addCard(repo, { title, columnId, fill });
+      } catch (e) {
+        // A card made without what its column's rule asks for is still on the board, and the
+        // reason says so, which is why the board is read again either way.
+        void load();
+        return { sent: false, reason: failureReason(e) };
+      }
+      // The answer does not wait for the board: the card exists, so the composer can let go of
+      // its title now, before a tile for it is drawn beside the same words still in the field.
+      void load().then(() => {
+        // 'inline' (default): add-only — stay in the column, don't open the detail.
+        // 'inline-edit': open the new card's detail and focus its description for editing.
+        if (inlineEdit) showCreated(path);
+      });
+      return { sent: true };
     },
-    [repo, load, inlineEdit, reportError, refusedByLane, boardRef, matchCtxRef, showCreated],
+    [repo, load, inlineEdit, refusedByLane, boardRef, matchCtxRef, showCreated],
   );
 
   return { refusedByLane, onMove, onAddCard };

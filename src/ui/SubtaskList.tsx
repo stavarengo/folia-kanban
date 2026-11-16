@@ -2,9 +2,12 @@ import type { RefObject } from "react";
 import type { Board, CardBody, SubItem } from "../model/types";
 import { isTodoLine, syncSubcardLines, type LinkResolver } from "../model/board";
 import { setSubtaskDone } from "../model/boardOps";
+import { plainTitleText } from "../model/cardTitle";
 import { useBoardActions, useMatchContext, useRepo } from "./context";
 import { HostDropdown, HostIconButton } from "./hostControls";
-import type { InlineDraft } from "./useInlineDraft";
+import { failureReason } from "./cardActions";
+import { TitleError } from "./TitleFields";
+import type { HeldDraft, HeldOutcome, InlineDraft } from "./useInlineDraft";
 
 type Mutate = (fn: () => Promise<unknown>) => Promise<boolean>;
 
@@ -52,10 +55,11 @@ function SubtaskLabel({ board, item: s, resolve, onNavigate }: RowProps) {
   }
   const child = resolve(s.link);
   return child ? (
-    // The link text is the child's basename (that is what wikilinks bind to);
-    // show the child's displayed title, same as its tile on the board.
+    // The link text is the child's file name (that is what wikilinks bind to); show the child's
+    // title, as its tile on the board does. As words: this is a button, and a link drawn inside
+    // it would be a second one.
     <button className="folia-link" onClick={() => onNavigate?.(child)}>
-      {board.cards[child]?.title ?? s.link}
+      {plainTitleText(board.cards[child]?.title ?? s.link)}
     </button>
   ) : (
     <span
@@ -177,19 +181,16 @@ function AddInline({
   draft,
   label,
   placeholder,
-  inputRef,
   write,
 }: {
   draft: InlineDraft;
   label: string;
   placeholder: string;
-  inputRef?: RefObject<HTMLInputElement>;
   write: (text: string) => Promise<boolean>;
 }) {
   return (
     <div className="folia-add-inline">
       <input
-        ref={inputRef}
         value={draft.value}
         placeholder={placeholder}
         aria-label={label}
@@ -205,6 +206,37 @@ function AddInline({
   );
 }
 
+/**
+ * The box that adds a subcard. What is typed here is a card's title, so it leaves the box only
+ * once that card exists; until then it stays, with the reason under it when the write failed.
+ */
+function AddSubcard({
+  draft,
+  inputRef,
+  add,
+}: {
+  draft: HeldDraft;
+  inputRef: RefObject<HTMLInputElement>;
+  add: (title: string) => Promise<HeldOutcome>;
+}) {
+  return (
+    <div className="folia-add-inline">
+      <input
+        ref={inputRef}
+        value={draft.value}
+        placeholder="Add a subcard…"
+        aria-label="Add a subcard"
+        aria-invalid={draft.error !== null}
+        onChange={(e) => draft.setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") draft.send(add);
+        }}
+      />
+      <TitleError reason={draft.error} />
+    </div>
+  );
+}
+
 /** The card's checklist: its inline todos and the subcards it links, and the boxes that add them. */
 export function CardSubtasks({
   body,
@@ -215,7 +247,7 @@ export function CardSubtasks({
 }: Omit<RowProps, "item"> & {
   body: CardBody | null;
   todoDraft: InlineDraft;
-  subcardDraft: InlineDraft;
+  subcardDraft: HeldDraft;
   subcardRef: RefObject<HTMLInputElement>;
 }) {
   const repo = useRepo();
@@ -235,12 +267,20 @@ export function CardSubtasks({
         placeholder="Add a todo…"
         write={(text) => mutate(() => repo.addTodo(path, text))}
       />
-      <AddInline
+      <AddSubcard
         draft={subcardDraft}
-        label="Add a subcard"
-        placeholder="Add a subcard…"
         inputRef={subcardRef}
-        write={(text) => mutate(() => repo.addSubcard(path, text))}
+        add={async (title) => {
+          // The reason goes under the box rather than into a notice, so `mutate` is handed a
+          // write that has already caught it. It still re-reads the note and reloads the board.
+          let reason: string | undefined;
+          await mutate(() =>
+            repo.addSubcard(path, title).catch((e: unknown) => {
+              reason = failureReason(e);
+            }),
+          );
+          return reason === undefined ? { sent: true } : { sent: false, reason };
+        }}
       />
     </section>
   );

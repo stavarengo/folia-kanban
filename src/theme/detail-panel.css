@@ -56,8 +56,7 @@
 /* The sticky header names the card; it is not where a long title is read. `overflow-wrap: anywhere`
    makes an unbreakable 200-character slug break instead of widening the panel or shouldering the
    buttons off the edge, and the two-line clamp stops a long title from growing the header over the
-   body it is stuck above. The whole title is in the `title` attribute, and in full, expandable form
-   in the "Resulting display title" row just below. */
+   body it is stuck above. The whole title is in the Title field just below. */
 .folia-detail-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -168,8 +167,8 @@
 /* The same object Obsidian's own property editor draws — a note's frontmatter, label and typed
    value — so the label's type and colour come from the metadata variables, in the sentence case
    the host's Properties view uses. Every field of the panel wears this label, the ones in
-   `.folia-fields` too. The WIDTH does not come from the host: `--metadata-label-width` is `9em`,
-   which wraps "Resulting display title" onto two lines. A name longer than the gutter — any
+   `.folia-fields` too. The WIDTH does not come from the host, whose `--metadata-label-width` is
+   `9em`: the panel sets its own gutter in `--folia-prop-key-w`. A name longer than the gutter — any
    frontmatter key a note can carry — wraps inside it, even without a space to break on; it is
    never cut off. */
 .folia-prop-key {
@@ -184,7 +183,7 @@
    rule paints nothing there. It is the theme's hook: a theme that lifts a property row on hover
    reaches the board's rows too, and without it that could not happen. */
 .folia-fields label:hover .folia-prop-key,
-.folia-prop-row:not(.folia-title-result):hover .folia-prop-key {
+.folia-prop-row:hover .folia-prop-key {
   color: var(--metadata-label-text-color-hover);
 }
 .folia-prop-add .folia-prop-input:first-child {
@@ -246,15 +245,11 @@
   color: var(--text-error);
 }
 
-/* The title block at the top of the detail panel: the two inputs a card's title is made of (its
-   file name and its `title:` override) and, under them, the title they produce. The result is
-   read-only on purpose — it is an outcome, not a third place to type. */
+/* The title block at the top of the detail panel: the card's one title and, under it, the name
+   its file has when the file could not be given the title as typed. */
 .folia-title-fields {
   padding-bottom: var(--size-4-2);
   border-bottom: var(--border-width) solid var(--background-modifier-border);
-}
-.folia-title-result {
-  align-items: flex-start;
 }
 .folia-title-outcome {
   flex: 1 1 auto;
@@ -263,80 +258,11 @@
   flex-direction: column;
   gap: var(--size-2-1);
 }
-
-.folia-scope .folia-title-value {
-  display: block;
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-semibold);
-  color: var(--text-normal);
-}
-
-.folia-scope .folia-title-value:hover:where(:not(:disabled)) {
-  color: var(--text-normal);
-  text-decoration: underline;
-}
-/* The clamp is written on the title's own element rather than on the button. On the engine a
-   current Obsidian ships it makes no difference — measured, both placements clamp. It is a
-   precaution for the older engines this plugin still supports, where a button's inner display is
-   a long-standing source of trouble for `-webkit-line-clamp` and which cannot be measured from
-   here. A plain element needs no assumption either way. */
-.folia-title-value-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.folia-scope .folia-title-value.folia-is-expanded .folia-title-value-text {
-  display: block;
-  -webkit-line-clamp: none;
-  overflow: visible;
-}
-
-.folia-scope .folia-title-reason {
+/* A long file name wraps rather than widening the panel. */
+.folia-scope .folia-title-file {
   margin: 0;
   font-size: var(--font-smaller);
-}
-.folia-scope .folia-title-why {
-  align-self: flex-start;
-  font-size: var(--font-smaller);
-}
-/* The decision `resolveTitle` reported, one row per source it asked, the winner marked by its rule. */
-.folia-title-trace {
-  list-style: none;
-  margin: var(--size-4-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--size-2-3);
-}
-.folia-title-step {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--size-2-1) var(--size-4-2);
-  padding-left: var(--size-4-2);
-  border-left: var(--folia-border-width-thick) solid var(--background-modifier-border);
-}
-.folia-title-step.folia-is-winner {
-  border-left-color: var(--interactive-accent);
-}
-.folia-title-step-source {
-  font-size: var(--font-smallest);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
-}
-.folia-title-step-value {
-  min-width: 0;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-normal);
   overflow-wrap: anywhere;
-}
-
-.folia-scope .folia-title-step-reason {
-  grid-column: 1 / -1;
-  font-size: var(--font-smaller);
 }
 
 .folia-section h3 {

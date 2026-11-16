@@ -106,6 +106,36 @@ function refuseArrayForScalarKey(key: string, value: unknown): void {
 }
 
 /**
+ * Retitle the card and answer with its path afterwards. A retitle that failed is never reported
+ * as done, and the caller is told when the rest of its call did land, so a retry repeats only the
+ * title.
+ */
+async function retitle(
+  repo: CardRepository,
+  path: string,
+  title: string,
+  othersWritten: boolean,
+): Promise<string> {
+  try {
+    return await repo.renameCard(path, title);
+  } catch (e) {
+    const why = (e instanceof Error ? e.message : String(e)).replace(/\.$/, "");
+    throw new ToolError(
+      `The card was not retitled: ${why}.${othersWritten ? " The other changes in this call were written." : ""} Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.`,
+    );
+  }
+}
+
+/**
+ * A title of nothing but spaces is no title. The board's own fields refuse one before it reaches
+ * the repository; without the same refusal here, a retitle to `"  "` would change nothing and
+ * still be reported as done.
+ */
+function refuseBlankTitle(title: string): void {
+  if (title.trim() === "") throw new ToolError("A card's title cannot be blank.");
+}
+
+/**
  * Set or clear one frontmatter key. `null` clears it, and only `null` — an agent that writes `""`
  * asked for an empty value, and deleting the key instead is data loss it never asked for and is
  * not told about. `docs/mcp.md` promises exactly this.
@@ -127,7 +157,12 @@ const createCard = tool({
     "Add a card to a column. It is written into the board's card folder as a new note, exactly as the board's own add-card button writes it — in a column filled by a rule, with the values that rule names (its area, priority, tags, assignee or due date) already set.",
   input: z.object({
     board: boardArg,
-    title: z.string().min(1).describe("The card's title; it also names the file."),
+    title: z
+      .string()
+      .min(1)
+      .describe(
+        "The card's title, as one line. The file is named after it. Inline Markdown such as a link is kept and drawn on the board.",
+      ),
     column: columnArg,
     description: z.string().optional().describe("Body text above the card's own sections."),
     priority: z
@@ -141,6 +176,7 @@ const createCard = tool({
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     requireColumn(board, args.column);
+    refuseBlankTitle(args.title);
     // Both refusals run before the note exists, so neither leaves an empty card behind. The lane is
     // put to the card `createCard` is about to write: a rule asking for a field this call has no way
     // to set is a rule the new card cannot satisfy.
@@ -190,7 +226,9 @@ const updateCard = tool({
       title: z
         .string()
         .optional()
-        .describe("Retitles the card at whichever source its title comes from."),
+        .describe(
+          "The card's new title. Its file is renamed to match and links to it follow, so the reply's `path` is the one to use from then on.",
+        ),
       description: z.string().optional(),
       priority: z
         .string()
@@ -225,6 +263,7 @@ const updateCard = tool({
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
     refuseReservedKeys(board, args.properties);
+    if (args.title !== undefined) refuseBlankTitle(args.title);
     if (args.description !== undefined) {
       refuseUnsafeDescription(args.description);
       await repo.setDescription(path, args.description);
@@ -238,8 +277,9 @@ const updateCard = tool({
     }
     // Last, so a failed field write leaves the card where the caller last saw it, under the name
     // they addressed it by, rather than renamed with half the change applied.
-    const finalPath = args.title === undefined ? path : await repo.renameCard(path, args.title);
-    return { path: finalPath };
+    if (args.title === undefined) return { path };
+    const { title, board: _board, card: _card, ...others } = args;
+    return { path: await retitle(repo, path, title, Object.keys(others).length > 0) };
   },
 });
 

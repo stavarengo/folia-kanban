@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import { boardLinkResolver, columnOf, parseTodoPath } from "../model/board";
+import { plainTitleText } from "../model/cardTitle";
 import type { Board } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { BoardHost } from "./host";
@@ -108,7 +109,9 @@ export function resolveCardPath(board: Board, ref: string): string {
       // A checklist line standing in a column of its own carries its parent's file name, so
       // matching it by that name would make every such line a rival of the note it lives in. Its
       // own text is its title, which is what it answers to.
-      c.title === ref || (!c.todoRef && c.path === linked),
+      // A title answers as typed and as the words it reads as, so `[label](address)` can be
+      // named by its label.
+      c.title === ref || plainTitleText(c.title) === ref || (!c.todoRef && c.path === linked),
   );
   const ambiguous = (paths: string[]): never => {
     throw new ToolError(

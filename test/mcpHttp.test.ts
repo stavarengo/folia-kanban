@@ -16,7 +16,7 @@ const TOKEN = "test-token-0123456789";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [],
   columns: [

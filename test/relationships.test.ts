@@ -19,7 +19,7 @@ import type { BoardConfig, Card } from "../src/model/types";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [BLOCKS],
   columns: [

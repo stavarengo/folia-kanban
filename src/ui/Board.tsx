@@ -14,6 +14,7 @@ import {
 import type { Board as BoardModel, Card } from "../model/types";
 import { applyReloc } from "../model/board";
 import { Column } from "./Column";
+import type { HeldOutcome } from "./useInlineDraft";
 import { AddColumn } from "./AddColumn";
 import { useSettings } from "./context";
 import type { Filter } from "../model/filter";
@@ -32,7 +33,7 @@ interface Props {
   doneColumnId: string | null;
   /** A card drop: the card as it was when it was picked up, and the id it was released over. */
   onMove: (card: Card, overId: string) => void;
-  onAddCard: (columnId: string, title: string) => boolean;
+  onAddCard: (columnId: string, title: string) => Promise<HeldOutcome>;
 }
 
 export function Board({

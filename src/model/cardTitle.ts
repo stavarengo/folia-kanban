@@ -1,62 +1,191 @@
-// Where a card's displayed title comes from. The file's basename stays the card's identity (it is
-// what `[[wikilinks]]` bind to); the title is only what people read, search and sort by.
-//
-// Both judgements below are shape-based on purpose: the plugin must not impose a naming
-// convention, so it never keeps a list of forbidden words. A file name "looks like a slug" or a
-// heading "looks like a title" purely by how it is built.
+// A card has one title. The file is named after it, and the file's basename stays the card's
+// identity (it is what `[[wikilinks]]` bind to). A title the file name cannot hold exactly — a
+// link, a character a file name refuses, a name already taken, a title too long — is kept whole in
+// the `title` frontmatter key, beside a file named with the text that could be kept.
 
 import { SECTION, splitFrontmatter } from "./card";
 import { fencedLines } from "./fences";
 import type { CardFrontmatter, TitleMode, TitleSource } from "./types";
 
-/** The per-card frontmatter key that overrides every other source. */
+/** The frontmatter key holding a title its file name cannot spell. */
 export const TITLE_KEY = "title";
 
-const TITLE_MODES: readonly TitleMode[] = ["auto", "filename", "heading"];
+const TITLE_MODES: readonly TitleMode[] = ["filename", "heading"];
+
+/**
+ * A title as it is stored: one line, single spaces, and composed characters. The last is what
+ * lets a title be compared with a file name: macOS hands `é` back as `e` plus an accent, and a
+ * title typed either way must read as the same title.
+ */
+export function normalizeTitle(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim().normalize("NFC");
+}
+
+/** Whether two titles are the same text, however their accented characters are composed. */
+export function sameTitle(a: string, b: string): boolean {
+  return a.normalize("NFC") === b.normalize("NFC");
+}
 
 /**
  * The file name a typed name actually becomes: Obsidian (and the filesystems under it) refuse
  * `\ / : * ? " < > |`, and `# ^ [ ]` carry meaning inside a `[[wikilink]]`, so a name containing
  * them would not link back. A name left with nothing usable still has to be a file, hence the
- * fallback. One definition, shared by the vault adapter that writes the file, the fake that stands
- * in for it, and the detail panel that shows what a name will produce before it is saved.
+ * fallback.
  */
 export function sanitizeFilename(name: string): string {
-  return (
-    name
-      .replace(/[\\/:*?"<>|#^[\]]/g, "")
-      .replace(/\s+/g, " ")
-      .trim() || "Untitled card"
+  const base = name
+    // Before the control characters go: a tab or a line break is one of them, and it is a space.
+    .replace(/\s+/g, " ")
+    // eslint-disable-next-line no-control-regex -- control characters are what is being removed
+    .replace(/[\\/:*?"<>|#^[\]\u0000-\u001f\u007f]/g, "")
+    .replace(/ {2,}/g, " ")
+    // A leading dot hides the file; Windows drops a trailing dot or space from a name.
+    .replace(/^[. ]+|[. ]+$/g, "")
+    // Device names Windows will not let a file have, whatever follows the first dot.
+    .replace(/^(con|prn|aux|nul|com\d|lpt\d)(?=\.|$)/i, "$1 card");
+  return base || "Untitled card";
+}
+
+/** The longest file name a card is given; a longer title keeps its whole text in `title`. */
+export const FILE_NAME_CHARS = 100;
+// A name is at most 255 bytes on Linux, macOS and Android; this leaves room for `.md` and a
+// number added to tell two notes apart.
+const FILE_NAME_BYTES = 200;
+
+const utf8Length = (s: string) => new TextEncoder().encode(s).length;
+
+/** A string as the characters a person counts, so a cut never lands inside an emoji or an accent. */
+function characters(s: string): string[] {
+  return Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)).map(
+    (g) => g.segment,
   );
 }
 
-/** Normalize a raw `card-title` frontmatter value; anything unrecognized means `auto`. */
+/** Cut a file name to what every platform can hold, at a word boundary when one is near. */
+export function fitFileName(name: string, maxChars: number = FILE_NAME_CHARS): string {
+  const chars = characters(name);
+  if (chars.length <= maxChars && utf8Length(name) <= FILE_NAME_BYTES) return name;
+  let kept = chars.slice(0, maxChars);
+  while (utf8Length(kept.join("")) > FILE_NAME_BYTES) kept = kept.slice(0, -1);
+  let cut = kept.join("");
+  const space = cut.lastIndexOf(" ");
+  if (space > cut.length * 0.6) cut = cut.slice(0, space);
+  return cut.replace(/[. ]+$/, "") || "Untitled card";
+}
+
+// The characters Markdown lets a backslash escape: written `\*`, a `*` is read as itself.
+const ESCAPABLE = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+const ESCAPED_RE = /\\([!-/:-@[-`{-~])/g;
+// Where an escaped character waits while the markup around it is read, and what marks the place
+// of a code span set aside: Unicode's noncharacters, which no text is ever written in.
+const HELD_AT = 0xfdd0;
+const HELD_RE = /[\ufdd0-\ufdef]/g;
+const CODE_AT = "\uffff";
+const CODE_AT_RE = /\uffff(\d+)\uffff/g;
+
+const WIKILINK_RE = /!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+// One level of brackets inside the address, which is as far as a pasted URL goes in practice.
+const MARKDOWN_LINK_RE = /!?\[([^\]]*)\]\(((?:[^()\s]|\([^()]*\))*)[^)]*\)/g;
+const AUTOLINK_RE = /<(https?:\/\/[^\s<>]+)>/g;
+const CODE_SPAN_RE = /(`+)(?!`)(.+?)(?<!`)\1(?!`)/g;
+// Emphasis as CommonMark opens and closes it: the markers hug the words, and an underscore
+// inside a word (`snake_case_name`) is a letter, not a marker.
+const EMPHASIS_RES: readonly RegExp[] = [
+  /\*\*(?=\S)(.+?)(?<=\S)\*\*/g,
+  /(?<![\p{L}\p{N}])__(?=\S)(.+?)(?<=\S)__(?![\p{L}\p{N}])/gu,
+  /\*(?=\S)(.+?)(?<=\S)\*/g,
+  /(?<![\p{L}\p{N}])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}])/gu,
+  /~~(?=\S)(.+?)(?<=\S)~~/g,
+  /==(?=\S)(.+?)(?<=\S)==/g,
+];
+
+/** Inline Markdown as the plain text it reads as: a link is its label, emphasis is its words. */
+export function plainTitleText(raw: string): string {
+  // Most titles carry no markup at all, and this is asked of every card on every search.
+  if (!/[\\`*_~=[<]/.test(raw)) return raw.trim();
+  const held = raw.replace(ESCAPED_RE, (_, c: string) =>
+    String.fromCharCode(HELD_AT + ESCAPABLE.indexOf(c)),
+  );
+  // Code is read first and set aside, so the markup characters inside it stay what was typed.
+  const code: string[] = [];
+  let text = held.replace(CODE_SPAN_RE, (_, _ticks: string, inner: string) => {
+    code.push(inner.trim());
+    return `${CODE_AT}${code.length - 1}${CODE_AT}`;
+  });
+  text = text
+    .replace(WIKILINK_RE, (_, target: string, alias: string | undefined) => alias ?? target)
+    .replace(MARKDOWN_LINK_RE, (_, label: string, address: string) => label || address)
+    .replace(AUTOLINK_RE, "$1");
+  for (const re of EMPHASIS_RES) text = text.replace(re, "$1");
+  return text
+    .replace(CODE_AT_RE, (_, i: string) => code[Number(i)] ?? "")
+    .replace(HELD_RE, (c) => ESCAPABLE[c.charCodeAt(0) - HELD_AT] ?? "")
+    .trim();
+}
+
+const BARE_URL_RE = /https?:\/\/[^\s<>"]+/gi;
+
+/** A web address as the words a file name can carry: its host, then each step of its path. */
+function urlWords(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  let path = parsed.pathname;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // A path that is not valid percent-encoding is kept as it was written.
+  }
+  return [parsed.hostname.replace(/^www\./i, ""), ...path.split("/")].filter(Boolean).join(" ");
+}
+
+/**
+ * The file name a title asks for: what it reads as, less what a file name cannot hold. A web
+ * address is named by its host and path (`https://example.com/a/b?c=d` is `example.com a b`),
+ * since with its punctuation merely removed it reads as one unbroken run of letters.
+ */
+export function titleFileName(title: string): string {
+  return sanitizeFilename(plainTitleText(title).replace(BARE_URL_RE, urlWords));
+}
+
+/** Whether a title carries Markdown that draws differently from its source text. */
+export function hasInlineMarkdown(title: string): boolean {
+  // `test` on a global expression remembers where it stopped; `search` does not.
+  return plainTitleText(title) !== title.trim() || title.search(BARE_URL_RE) !== -1;
+}
+
+// What would open a block when it starts a line: a heading, a quote, a list, a rule, a code or
+// math fence. A numbered list is told apart below, since its marker is escaped after the number.
+const BLOCK_START_RE =
+  /^(?:#{1,6}(?:\s|$)|>|[-+*](?:\s|$)|`{3,}|~{3,}|\$\$|([-*_])(?:\s*\1){2,}\s*$)/;
+
+/**
+ * A title as the Markdown handed to the renderer. A title is one line of inline text, so what
+ * would open a block is escaped and shows as typed, and an embed (`![[note]]`, `![](image)`),
+ * which would draw a whole note or a picture inside a tile, is read as the link it wraps.
+ */
+export function titleMarkdown(title: string): string {
+  const line = title
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/!\[\[/g, "[[")
+    .replace(
+      /!\[([^\]]*)\]\(([^)\s]*)([^)]*)\)/g,
+      (_, label: string, address: string, rest: string) =>
+        `[${label || address}](${address}${rest})`,
+    );
+  if (BLOCK_START_RE.test(line)) return `\\${line}`;
+  return line.replace(/^(\d{1,9})([.)])(?=\s|$)/, "$1\\$2");
+}
+
+/** Normalize a raw `card-title` frontmatter value; anything but `heading` means the file name. */
 export function asTitleMode(raw: unknown): TitleMode {
   return typeof raw === "string" && (TITLE_MODES as readonly string[]).includes(raw)
     ? (raw as TitleMode)
-    : "auto";
-}
-
-/**
- * A basename reads as a slug when it is built for sorting or machines rather than for people:
- * it starts with a number (`01-fix-export`, `2026-08-24 notes`) or is words glued together with
- * dashes/underscores and no spaces (`fix-the-export-path`, `widget_helpers`). A single word or
- * anything containing spaces is taken as a name.
- */
-export function looksLikeSlug(basename: string): boolean {
-  const s = basename.trim();
-  if (/^\d+(?:[^\p{L}\p{N}]|$)/u.test(s)) return true;
-  return !/\s/.test(s) && /[\p{L}\p{N}][-_][\p{L}\p{N}]/u.test(s);
-}
-
-/**
- * A heading reads as a title when it has the breadth of one: three or more words, or two words
- * spanning at least twelve characters. Section labels (`Question`, `Answer`, `To Do`, `Notes`)
- * fall below that bar without any word being special-cased.
- */
-export function looksLikeTitle(heading: string): boolean {
-  const words = heading.trim().split(/\s+/).filter(Boolean);
-  return words.length >= 3 || (words.length === 2 && heading.trim().length >= 12);
+    : "filename";
 }
 
 // CommonMark shape, because that is what Obsidian renders: an ATX heading may be indented by up
@@ -66,22 +195,11 @@ const HEADING_RE = /^( {0,3})(#{1,6})[ \t]+(.*?)([ \t]*#*[ \t]*)\r?$/;
 /**
  * The section headings the card parser owns (`## Subtasks`, `## Comments`, `## History`). They are
  * never title candidates: retitling one would rewrite the heading `parseSubtasks` and friends look
- * for, silently detaching a card's subtasks, comments or history. This is structure, not a word
- * list — these three names are the plugin's own format, not a judgement about anyone's wording.
+ * for, silently detaching a card's subtasks, comments or history.
  */
 const RESERVED_HEADINGS: ReadonlySet<string> = new Set(
   Object.values(SECTION).map((s) => s.toLowerCase()),
 );
-
-/** Turn heading markup into the plain text a card tile can show. */
-function plainHeadingText(raw: string): string {
-  return raw
-    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
-    .replace(/\[\[([^\]]+)\]\]/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, "$2")
-    .trim();
-}
 
 interface Heading {
   /** Index into the body's `split("\n")` lines. */
@@ -89,45 +207,17 @@ interface Heading {
   text: string;
 }
 
-/** The first heading (any level, outside code fences) whose plain text passes `accept`. */
-function findHeading(body: string, accept: (text: string) => boolean): Heading | null {
+/** The note's first heading (any level, outside code fences) that is not one the plugin owns. */
+function firstHeading(body: string): Heading | null {
   const lines = body.split("\n");
   const fenced = fencedLines(lines);
   for (let i = 0; i < lines.length; i++) {
     if (fenced[i]) continue;
-    const text = plainHeadingText(HEADING_RE.exec(lines[i] ?? "")?.[3] ?? "");
-    if (!text || RESERVED_HEADINGS.has(text.toLowerCase())) continue;
-    if (accept(text)) return { line: i, text };
+    const text = (HEADING_RE.exec(lines[i] ?? "")?.[3] ?? "").trim();
+    if (text && !RESERVED_HEADINGS.has(plainTitleText(text).toLowerCase()))
+      return { line: i, text };
   }
   return null;
-}
-
-const ANY_HEADING = () => true;
-
-/**
- * Why a heading was or was not read, alongside the heading itself. The reason is part of the
- * answer rather than something a caller re-derives: `resolveTitle` turns it into the sentence a
- * reader sees, and nothing outside this file gets to have its own opinion about when a heading
- * counts.
- */
-type HeadingLookup =
-  | { consulted: false; why: "mode-filename" | "name-reads-as-name" }
-  | { consulted: true; why: "mode-heading" | "name-reads-as-slug"; heading: Heading | null };
-
-/** Whether a given mode reads a heading for this card at all, and which one it lands on. */
-function headingFor(body: string, basename: string, mode: TitleMode): HeadingLookup {
-  if (mode === "heading")
-    return { consulted: true, why: "mode-heading", heading: findHeading(body, ANY_HEADING) };
-  if (mode === "filename") return { consulted: false, why: "mode-filename" };
-  return looksLikeSlug(basename)
-    ? { consulted: true, why: "name-reads-as-slug", heading: findHeading(body, looksLikeTitle) }
-    : { consulted: false, why: "name-reads-as-name" };
-}
-
-/** The heading a mode actually takes the title from, or null when it reads none (or finds none). */
-function selectedHeading(body: string, basename: string, mode: TitleMode): Heading | null {
-  const lookup = headingFor(body, basename, mode);
-  return lookup.consulted ? lookup.heading : null;
 }
 
 function frontmatterTitle(frontmatter: CardFrontmatter): string | null {
@@ -135,84 +225,14 @@ function frontmatterTitle(frontmatter: CardFrontmatter): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
-/** The three sources `resolveTitle` can pick from, in the order it asks them. */
-export type TitleDecisionSource = Extract<TitleSource, "frontmatter" | "heading" | "filename">;
-
-/** What each source is called wherever a person reads about it — a field label, or a trace row. */
-export const TITLE_SOURCE_LABEL: Record<TitleDecisionSource, string> = {
-  frontmatter: "Override card title",
-  heading: "First heading in the note",
-  filename: "File name",
-};
-
-/** One source's turn in the decision: what it answered, and how that settled things. */
-export interface TitleStep {
-  source: TitleDecisionSource;
-  /** What the source offered, or null when it had nothing (or was never asked). */
-  value: string | null;
-  outcome: "won" | "empty" | "skipped";
-  /** One plain sentence, for a reader who has never seen the code. */
-  reason: string;
-}
-
 export interface ResolvedTitle {
   title: string;
   source: TitleSource;
-  /**
-   * The decision as it actually ran: one step per source consulted, in order, ending with the
-   * winner. Written here so anything that explains a title reads the algorithm's own account of
-   * itself rather than keeping a second copy that can drift from it.
-   */
-  trace: readonly TitleStep[];
-}
-
-/** The heading source's own account of its turn: what it found, or why it found nothing. */
-function headingStep(lookup: HeadingLookup): TitleStep {
-  if (lookup.consulted && lookup.heading)
-    return {
-      source: "heading",
-      value: lookup.heading.text,
-      outcome: "won",
-      reason:
-        lookup.why === "mode-heading"
-          ? "Taken from the note's first heading, because this board titles cards by heading."
-          : "Taken from the note's first heading, because the file name reads like a slug.",
-    };
-  if (lookup.consulted)
-    return {
-      source: "heading",
-      value: null,
-      outcome: "empty",
-      reason:
-        lookup.why === "mode-heading"
-          ? "The note has no heading to take a title from."
-          : "The file name reads like a slug, but no heading in the note reads as a title.",
-    };
-  return {
-    source: "heading",
-    value: null,
-    outcome: "skipped",
-    reason:
-      lookup.why === "mode-filename"
-        ? "This board titles cards by file name, so no heading is read."
-        : "The file name reads as a name rather than a slug, so no heading is read.",
-  };
-}
-
-/** Why the file name ended up answering — which depends on what stopped the heading from doing so. */
-function filenameReason(lookup: HeadingLookup): string {
-  if (lookup.consulted)
-    return "Taken from the file name, because no heading in the note could supply a title.";
-  return lookup.why === "mode-filename"
-    ? "Taken from the file name, because this board titles cards by file name."
-    : "Taken from the file name, because it already reads as a name.";
 }
 
 /**
- * Pick a card's displayed title. The card's own `title` frontmatter wins outright; otherwise the
- * board's mode decides whether a heading is consulted; the basename is always the last resort.
- * Each source's turn is appended to the trace as it is taken, so the answer arrives with its own
- * explanation rather than leaving one to be reconstructed elsewhere.
+ * A card's title: the `title` key when the note has one, else the file name. A board that sets
+ * `card-title: heading` reads the note's first heading before the file name.
  */
 export function resolveTitle(
   basename: string,
@@ -220,61 +240,53 @@ export function resolveTitle(
   text: string,
   mode: TitleMode,
 ): ResolvedTitle {
-  const trace: TitleStep[] = [];
   const fromFrontmatter = frontmatterTitle(frontmatter);
-  if (fromFrontmatter !== null) {
-    trace.push({
-      source: "frontmatter",
-      value: fromFrontmatter,
-      outcome: "won",
-      reason: "Taken from the override, which wins over every other source.",
-    });
-    return { title: fromFrontmatter, source: "frontmatter", trace };
-  }
-  trace.push({
-    source: "frontmatter",
-    value: null,
-    outcome: "empty",
-    reason: "No override is set on this card, so the next source decides.",
-  });
-
-  const lookup = headingFor(splitFrontmatter(text).body, basename, mode);
-  trace.push(headingStep(lookup));
-  if (lookup.consulted && lookup.heading)
-    return { title: lookup.heading.text, source: "heading", trace };
-
-  trace.push({
-    source: "filename",
-    value: basename,
-    outcome: "won",
-    reason: filenameReason(lookup),
-  });
-  return { title: basename, source: "filename", trace };
+  if (fromFrontmatter !== null) return { title: fromFrontmatter, source: "frontmatter" };
+  const heading = mode === "heading" ? firstHeading(splitFrontmatter(text).body) : null;
+  if (heading) return { title: heading.text, source: "heading" };
+  return { title: basename, source: "filename" };
 }
 
 /**
- * Rewrite the text of the heading `resolveTitle` would pick, keeping its `#` marker and every
- * other byte. Returns the text unchanged when no heading is selected under `mode`.
+ * Rewrite the text of the note's first heading, keeping its `#` marker and every other byte.
+ * Returns the text unchanged when the note has no heading.
  */
-export function setHeadingTitle(
-  text: string,
-  basename: string,
-  mode: TitleMode,
-  newTitle: string,
-): string {
+export function setHeadingTitle(text: string, newTitle: string): string {
   const { fmText, body } = splitFrontmatter(text);
-  const heading = selectedHeading(body, basename, mode);
+  const heading = firstHeading(body);
   if (!heading) return text;
   const lines = body.split("\n");
   const current = lines[heading.line] ?? "";
   const m = HEADING_RE.exec(current);
-  // Keep the indent, the `#` marker and any closing hashes; only the heading's text is replaced
-  // (the old text's inline markup goes with it — the new title is what the person typed, plain).
   const indent = m?.[1] ?? "";
   const marker = m?.[2] ?? "#";
   const suffix = m?.[4] ?? "";
   const cr = current.endsWith("\r") ? "\r" : "";
   lines[heading.line] =
     `${indent}${marker} ${newTitle.replace(/[\r\n]+/g, " ").trim()}${suffix}${cr}`;
+  return fmText + lines.join("\n");
+}
+
+const folded = (s: string) => normalizeTitle(s).toLowerCase();
+
+/**
+ * The note without its top `# heading`, when that heading only repeats the card's title; `null`
+ * when there is nothing to remove. "Top" is the body's first line of text, where cards made before
+ * a card had one title were given theirs. A heading that says more than the title (a link the
+ * title does not carry, a character its file name could not hold) is not a repeat and stays.
+ */
+export function withoutRepeatedHeading(text: string, title: string): string | null {
+  const { fmText, body } = splitFrontmatter(text);
+  const lines = body.split("\n");
+  const blank = (i: number) => (lines[i] ?? "").trim() === "";
+  const at = lines.findIndex((_, i) => !blank(i));
+  const m = HEADING_RE.exec(lines[at] ?? "");
+  if (m?.[2] !== "#") return null;
+  const heading = folded(m[3] ?? "");
+  if (heading !== folded(title) && heading !== folded(plainTitleText(title))) return null;
+  // The blank lines that set the heading apart from the text under it go with it.
+  let end = at + 1;
+  while (end < lines.length && blank(end)) end++;
+  lines.splice(at, end - at);
   return fmText + lines.join("\n");
 }

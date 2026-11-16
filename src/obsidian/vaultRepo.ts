@@ -33,12 +33,10 @@ import { showMenu } from "./menu";
 import { attachSuggest, mountSearch } from "./inputSuggest";
 import { mountButton, mountDropdown, mountIconButton, mountProgressBar } from "./hostControls";
 import { drawIcon } from "./icons";
-import { pathTaken } from "./pathTaken";
-import { uniqueNotePath } from "./boardNote";
 import { buildBoard } from "../model/board";
 import { normalizeColumns, scalarText, serializeColumns } from "../model/columns";
 import { mergePriorities, normalizePriorities, serializePriorities } from "../model/priorities";
-import { dateOnly, stamp } from "../model/dates";
+import { stamp } from "../model/dates";
 import {
   SECTION,
   addSubcard as addSubcardText,
@@ -69,18 +67,18 @@ import {
   subtaskReopenedLine,
   subtaskRemovedLine,
 } from "../model/history";
-import { TITLE_KEY, resolveTitle, sanitizeFilename, setHeadingTitle } from "../model/cardTitle";
+import { normalizeTitle } from "../model/cardTitle";
 import type { CardRepository } from "../model/repo";
 import type { FileOp } from "../model/pathOps";
 import { parseFrontmatter, sameValue } from "./frontmatter";
 import {
-  ambiguousCaseMessage,
   inspectCardFolder,
   readBoardConfig,
   readBoardFrontmatter,
   type ResolvedBoardConfig,
 } from "./boardConfig";
 import { cardFilesIn, readCard, readContexts } from "./cardNotes";
+import { createCardNote, failure, retitleCard } from "./cardTitles";
 import { NoteWriter } from "./noteWriter";
 import { followLink, linkTextTo, relationTargetPath, resolveLink } from "./vaultLinks";
 import { renderMarkdown } from "./markdownRender";
@@ -291,32 +289,10 @@ export class VaultRepository implements CardRepository {
       await this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
-  private uniquePath(folder: string, title: string, except?: string): string {
-    return uniqueNotePath(folder, sanitizeFilename(title), pathTaken(this.app.vault, except));
-  }
-
-  private async ensureFolder(folder: string): Promise<void> {
-    if (!this.app.vault.getAbstractFileByPath(folder)) {
-      await this.app.vault.createFolder(folder).catch(() => {});
-    }
-  }
-
   async createCard(title: string, status: string): Promise<string> {
-    const config = await this.readConfig();
-    // Creating the folder as written would only add one more spelling beside the ones already there.
-    if (config.cardFolderCaseMatches.length > 1) throw new Error(ambiguousCaseMessage(config));
-    await this.ensureFolder(config.cardFolder);
-    const path = this.uniquePath(config.cardFolder, title);
-    this.writer.markWrite(path);
-    // Create the body first, then let Obsidian serialize the frontmatter — never hand-build
-    // YAML (an odd column id / title could otherwise produce malformed frontmatter).
-    const file = await this.app.vault.create(path, `# ${title}\n`);
-    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-      fm["type"] = "task";
-      fm["status"] = status;
-      fm["created"] = dateOnly();
-    });
-    return path;
+    const card = { title: normalizeTitle(title), status };
+    const files = { app: this.app, writer: this.writer };
+    return createCardNote(files, await this.readConfig(), card);
   }
 
   async addSubcard(parentPath: string, title: string): Promise<string> {
@@ -327,11 +303,20 @@ export class VaultRepository implements CardRepository {
     // create the subcard in a column named "[object Object]".
     const parentStatus = scalarText(parentFm["status"]);
     const childPath = await this.createCard(title, parentStatus || "todo");
-    // Written the way THIS vault writes links, from this parent: a bare file name is ambiguous the
-    // moment a second note takes it, and Folia would then write a link Folia cannot read back.
-    await this.writer.editBody(parentPath, (t) =>
-      addSubcardText(t, linkTextTo(this.app, childPath, parentPath)),
-    );
+    try {
+      // Written the way THIS vault writes links, from this parent: a bare file name is ambiguous
+      // the moment a second note takes it, and Folia would then write a link Folia cannot read back.
+      await this.writer.editBody(parentPath, (t) =>
+        addSubcardText(t, linkTextTo(this.app, childPath, parentPath)),
+      );
+    } catch (e) {
+      // The child exists from here on. Told only that adding failed, a caller adds it again and
+      // the board ends up with two.
+      throw new Error(
+        `"${normalizeTitle(title)}" was created at ${childPath}, but linking it from its parent failed: ${failure(e)}. Link it by hand rather than adding it again.`,
+        { cause: e },
+      );
+    }
     return childPath;
   }
 
@@ -400,44 +385,10 @@ export class VaultRepository implements CardRepository {
 
   async renameCard(path: string, newTitle: string): Promise<string> {
     const file = this.file(path);
-    // Write the new title to whichever source currently produces it, so the tile changes the way
-    // the person expects: the `title` key, the heading line, or (only then) the file name.
-    const title = newTitle.trim();
+    const title = normalizeTitle(newTitle);
     if (!title) return path; // blank title — no-op, per the CardRepository contract
     const { titleMode } = await this.readConfig();
-    const text = await this.app.vault.cachedRead(file);
-    const { title: current, source } = resolveTitle(
-      file.basename,
-      parseFrontmatter(text),
-      text,
-      titleMode,
-    );
-    if (title === current) return path; // unchanged — no write
-    if (source === "frontmatter") {
-      await this.writer.writeFrontmatter(path, { [TITLE_KEY]: title });
-      return path;
-    }
-    if (source === "heading") {
-      await this.writer.editBody(path, (t) => setHeadingTitle(t, file.basename, titleMode, title));
-      return path;
-    }
-    return this.renameFile(path, title);
-  }
-
-  async renameFile(path: string, newBasename: string): Promise<string> {
-    const file = this.file(path);
-    const wanted = newBasename.trim();
-    if (!wanted) return path; // a blank name is not a name — nothing to rename to
-    const base = sanitizeFilename(wanted);
-    if (base === file.basename) return path; // unchanged once made safe to use as a file name
-    const folder = file.parent?.path ?? "";
-    const dest = this.uniquePath(folder === "/" ? "" : folder, base, file.path);
-    if (dest === path) return path;
-    this.writer.markWrite(path);
-    this.writer.markWrite(dest);
-    // fileManager.renameFile rewrites inbound [[links]] (the parent's ## Subtasks link survives).
-    await this.app.fileManager.renameFile(file, dest);
-    return dest;
+    return retitleCard({ app: this.app, writer: this.writer }, file, title, titleMode);
   }
 
   async openCard(path: string, evt?: MouseEvent): Promise<void> {

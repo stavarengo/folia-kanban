@@ -15,6 +15,7 @@ import {
   type FilterVerdict,
   type MatchContext,
 } from "./filter";
+import { plainTitleText } from "./cardTitle";
 import { dateOnly } from "./dates";
 import { samePriority } from "./priorities";
 import type { Board, Card, CardFrontmatter, ColumnDef } from "./types";
@@ -86,7 +87,7 @@ export function laneVerdict(
  * explanation; each caller adds its own next step.
  */
 export function laneMismatch(lane: Lane, card: Card): string {
-  return `"${lane.title}" shows the cards matching \`${lane.rule}\`, and "${card.title}" does not match it.`;
+  return `"${lane.title}" shows the cards matching \`${lane.rule}\`, and "${plainTitleText(card.title)}" does not match it.`;
 }
 
 /**

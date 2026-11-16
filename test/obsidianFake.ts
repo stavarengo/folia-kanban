@@ -194,6 +194,9 @@ export const Keymap = {
 
 export class FileSystemAdapter {
   constructor(private basePath: string) {}
+  getBasePath(): string {
+    return this.basePath;
+  }
   getFullPath(path: string): string {
     return `${this.basePath}/${path}`;
   }

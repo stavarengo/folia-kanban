@@ -25,7 +25,7 @@ function config(over: Partial<BoardConfig> = {}): BoardConfig {
   return {
     path: "Board.md",
     cardFolder: "Cards",
-    titleMode: "auto",
+    titleMode: "filename",
     priorities: [],
     relations: [],
     columns: normalizeColumns([

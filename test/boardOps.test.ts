@@ -13,7 +13,7 @@ import { FakeRepo } from "./fakeRepo";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [],
   columns: [

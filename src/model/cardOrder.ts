@@ -1,8 +1,15 @@
+import { plainTitleText } from "./cardTitle";
 import type { Card } from "./types";
 
-/** Alphabetical by displayed title; the basename breaks ties so the order stays deterministic. */
+/**
+ * Alphabetical by the title as it reads, so a title that opens with a link sorts by its label and
+ * not by the bracket; the basename breaks ties so the order stays deterministic.
+ */
 function byTitle(a: Card, b: Card): number {
-  return a.title.localeCompare(b.title) || a.basename.localeCompare(b.basename);
+  return (
+    plainTitleText(a.title).localeCompare(plainTitleText(b.title)) ||
+    a.basename.localeCompare(b.basename)
+  );
 }
 
 function orderOf(c: Card): number | null {

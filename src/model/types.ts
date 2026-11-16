@@ -4,11 +4,12 @@
 import type { FoliaPropertyKey } from "./properties";
 import type { CommentMark } from "./unread";
 
-/** The board-level `card-title` property. `auto` = guess per card from the file name's shape. */
-export type TitleMode = "auto" | "filename" | "heading";
+/** The board-level `card-title` property: `heading` reads the note's first heading as the title. */
+export type TitleMode = "filename" | "heading";
 
 /**
- * Which source produced a card's title (and which one a rename must write to).
+ * Where a card's title was read from: its file name, the `title` key that holds a title the file
+ * name cannot spell, or, on a `card-title: heading` board, the note's first heading.
  *
  * `subtask` belongs to the synthetic cards the board builds for inline todos placed in their own
  * column: their title is a checklist line, not a file, so there is nothing for a rename to write
@@ -148,7 +149,6 @@ interface HistoryEntry {
 
 /** Read-only parse of a card markdown body, for display. */
 export interface CardBody {
-  title: string;
   description: string;
   subtasks: SubItem[];
   comments: Comment[];
@@ -241,9 +241,12 @@ export interface Card {
   path: string;
   /** Filename without extension — the card's identity and the `[[link]]` target. */
   basename: string;
-  /** What people see, search and sort by. Equals `basename` unless a heading or `title` key won. */
+  /**
+   * The card's one title, as typed: inline Markdown included, so a reader that wants words rather
+   * than markup asks `plainTitleText`. Equals `basename` unless the file name could not hold it.
+   */
   title: string;
-  /** Which source produced `title`; a rename writes back to that same source. */
+  /** Where `title` was read from. */
   titleSource: TitleSource;
   frontmatter: CardFrontmatter;
   /** Link targets of the card-subtasks (the `[[...]]` checklist items), in order. */

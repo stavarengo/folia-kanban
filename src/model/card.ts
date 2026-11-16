@@ -133,46 +133,33 @@ const OWNED_HEADING_RE = new RegExp(
 );
 
 /**
- * The half-open line range `[from, to)` holding a card's description: everything after the `#`
- * title heading (or from the top when there is none) up to the first section the plugin owns.
- * Headings the plugin does not own stay inside the range — a note that keeps its whole body under
- * `## Question` / `## Answer` is still a description, and round-tripping it must not reshape it.
+ * The line a card's description stops before: it runs from the top of the body up to the first
+ * section the plugin owns. Every other heading is part of it, a top `# heading` included: a
+ * card's title is its file name or its `title` key, never a line of the note, so a note that keeps
+ * its whole body under `## Question` / `## Answer` is still a description, and round-tripping it
+ * must not reshape it.
  */
-function descriptionRange(lines: string[]): { h1: number; from: number; to: number } {
+function descriptionEnd(lines: string[]): number {
   const fenced = fencedLines(lines);
-  const h1 = lines.findIndex((l, i) => !fenced[i] && /^#\s+/.test(l));
-  const from = h1 === -1 ? 0 : h1 + 1;
-  let to = lines.length;
-  for (let i = from; i < lines.length; i++) {
-    if (!fenced[i] && OWNED_HEADING_RE.test(lines[i] ?? "")) {
-      to = i;
-      break;
-    }
-  }
-  return { h1, from, to };
+  const at = lines.findIndex((l, i) => !fenced[i] && OWNED_HEADING_RE.test(l));
+  return at === -1 ? lines.length : at;
 }
 
 /**
  * Why a would-be description must not be saved as one, or `null` when it is all description: a
  * line that would start a section the plugin owns (`## Comments` typed into the Description box),
  * or a code fence left open, which would run to the end of the note and swallow every section
- * after it. Fenced lines do not count as headings, matching what `descriptionRange` reads back.
+ * after it. Fenced lines do not count as headings, matching what `descriptionEnd` reads back.
  */
 export function descriptionRefusal(
   description: string,
-): { kind: "heading" | "fence" | "title"; line: string } | null {
+): { kind: "heading" | "fence"; line: string } | null {
   // Judge the bytes `setDescription` will write: it trims, so an indent on the first line that
   // would keep a heading or a fence inert here is gone by the time the note is read back.
   const lines = description.trim().split("\n");
   const fenced = fencedLines(lines);
   const i = lines.findIndex((l, n) => !fenced[n] && OWNED_HEADING_RE.test(l));
   if (i !== -1) return { kind: "heading", line: (lines[i] ?? "").trim() };
-  // A description opening with an `# H1` is not description at all once it is read back: that is
-  // where a card's title lives, so `descriptionRange` treats the line as the title and starts the
-  // description after it. Saved, the heading is silently eaten and never comes back.
-  if (!fenced[0] && /^#\s+/.test(lines[0] ?? "")) {
-    return { kind: "title", line: (lines[0] ?? "").trim() };
-  }
   const open = unclosedFence(lines);
   return open === null ? null : { kind: "fence", line: (lines[open.at] ?? "").trim() };
 }
@@ -345,12 +332,9 @@ function parseTimestamped(body: string, name: string): Timestamped[] {
 export function parseBody(text: string): CardBody {
   const body = splitFrontmatter(text).body;
   const lines = body.split("\n");
-  const { h1, from, to } = descriptionRange(lines);
-  const title = h1 === -1 ? "" : (lines[h1] ?? "").replace(/^#\s+/, "").trim();
-  const description = lines.slice(from, to).join("\n").trim();
+  const description = lines.slice(0, descriptionEnd(lines)).join("\n").trim();
 
   return {
-    title,
     description,
     subtasks: parseSubtasks(text),
     comments: parseTimestamped(body, SECTION.comments),
@@ -648,30 +632,40 @@ export function removeTimestampedLine(text: string, section: string, index: numb
 }
 
 /**
- * Replace the description region — between the `#` title heading and the first section the plugin
+ * Replace the description region — from the top of the body to the first section the plugin
  * owns. Mirrors what `parseBody` reads, so writing back an unedited description is a no-op beyond
- * blank-line normalization, and the note's own headings survive the round trip verbatim.
+ * blank-line normalization, and the note's own headings survive the round trip verbatim. The blank
+ * lines the body opens with are the note's own spacing under its frontmatter, and stay as they
+ * are.
  */
 export function setDescription(text: string, description: string): string {
   return withBody(text, (body) => {
     const cr = bodyCr(body, text);
     const lines = body.split("\n");
-    const { from, to } = descriptionRange(lines);
+    const to = descriptionEnd(lines);
+    const tail = lines.slice(to);
     // Strip any \r already embedded in `description` (it may be `parseBody`'s own round-tripped
     // CRLF output, one \r per line) before re-adding exactly one per line below — otherwise a
     // plain edit-and-save of a CRLF card's description would double every \r into \r\r\n.
     const desc = description.trim().replace(/\r\n/g, "\n");
-    const tail = to < lines.length ? lines.slice(to) : [];
-    const rawBlock = desc === "" ? [""] : ["", ...desc.split("\n"), ""];
-    // When nothing follows, the last element is the split artifact standing for "file ends right
-    // here" (an empty string, the same one a plain `.split("\n")` would leave), not a real blank
-    // line — it must stay bare, or a trailing \r would appear that was never in the note.
-    const block =
-      tail.length > 0
-        ? rawBlock.map((l) => `${l}${cr}`)
-        : rawBlock.map((l, i) => (i === rawBlock.length - 1 ? l : `${l}${cr}`));
-    const head = lines.slice(0, from);
-    const rebuilt = [...head, ...block, ...tail];
-    return rebuilt.join("\n");
+    const written = desc === "" ? [] : desc.split("\n").map((l) => `${l}${cr}`);
+    // A section that follows is set apart by one blank line. When nothing follows, the last
+    // element is the split artifact standing for "file ends right here" (an empty string, the
+    // same one a plain `.split("\n")` would leave), not a real blank line — it must stay bare, or
+    // a trailing \r would appear that was never in the note.
+    const after = tail.length === 0 ? [""] : written.length > 0 ? [cr] : [];
+    return [...leadingBlanks(lines, to), ...written, ...after, ...tail].join("\n");
   });
+}
+
+/**
+ * The blank lines a body opens with, as written, above a description that ends before line `to`.
+ * A region holding nothing but blank lines keeps one of them at most: that is the gap between the
+ * frontmatter and a section, not spacing anyone chose for a description.
+ */
+function leadingBlanks(lines: string[], to: number): string[] {
+  // Past the last line break there is no line, only the end of the file.
+  const region = lines.slice(0, to === lines.length ? to - 1 : to);
+  const text = region.findIndex((l) => l.trim() !== "");
+  return text === -1 ? region.slice(0, 1) : region.slice(0, text);
 }

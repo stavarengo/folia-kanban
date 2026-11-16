@@ -80,6 +80,15 @@
   color: var(--text-error);
 }
 
+/* Why a typed title was not saved, beside the field that still holds it: under the add-card
+   composer, the create form, a tile's rename box and the panel's Title field. */
+.folia-title-error {
+  margin: 0;
+  font-size: var(--font-smaller);
+  color: var(--text-error);
+  overflow-wrap: anywhere;
+}
+
 .folia-card-folder-notice {
   padding: 0.5em var(--size-4-3);
   font-size: var(--font-smaller);

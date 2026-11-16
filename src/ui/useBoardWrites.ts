@@ -100,7 +100,7 @@ function useActionsValue({
   priorities,
 }: {
   deps: CardActionDeps;
-  panelActions: Pick<BoardActions, "open" | "startCreate" | "addSubcard" | "editTitleOverride">;
+  panelActions: Pick<BoardActions, "open" | "startCreate" | "addSubcard">;
   matchCtxRef: { readonly current: MatchContext | null };
   board: BoardModel | null;
   doneColumnId: string | null;

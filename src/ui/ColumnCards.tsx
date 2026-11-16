@@ -1,5 +1,6 @@
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { Board } from "../model/types";
+import { plainTitleText } from "../model/cardTitle";
 import { isEmptyFilter, matchCard, type Filter, type MatchContext } from "../model/filter";
 import { CardItem } from "./CardItem";
 import { useMatchContext, useSubitemsCollapse } from "./context";
@@ -139,9 +140,7 @@ export function ColumnCards({
                 // `liftedParentOf` extends the same reference to a card lifted here only
                 // because the active filter's match reached past a non-matching parent.
                 parentPath={board.placedOf[c.path] ?? liftedParentOf[c.path]}
-                parentTitle={
-                  board.cards[board.placedOf[c.path] ?? liftedParentOf[c.path] ?? ""]?.title
-                }
+                parentTitle={parentTitleOf(board, board.placedOf[c.path] ?? liftedParentOf[c.path])}
                 hasSubcardChildren={hasVisibleSubcardChildren(c.path)}
               />
               {!subitems.isCollapsed(c.path) && (
@@ -161,4 +160,10 @@ export function ColumnCards({
       ))}
     </SortableContext>
   );
+}
+
+/** The parent's title as words, for the `↳ parent` line: a button of its own, so it draws no link. */
+function parentTitleOf(board: Board, parentPath: string | undefined): string | undefined {
+  const title = parentPath === undefined ? undefined : board.cards[parentPath]?.title;
+  return title === undefined ? undefined : plainTitleText(title);
 }

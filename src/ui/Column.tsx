@@ -9,6 +9,7 @@ import { useReducedMotion } from "./useReducedMotion";
 import { useBoardActions } from "./context";
 import { columnAccent, COLUMN_COLORS } from "./columnColors";
 import { CardComposer, useCardComposer } from "./CardComposer";
+import type { HeldOutcome } from "./useInlineDraft";
 import { ColumnCards } from "./ColumnCards";
 import { ColumnMenuButton } from "./ColumnMenuButton";
 import { useColumnCards } from "./useColumnCards";
@@ -40,7 +41,7 @@ interface Props {
    *  sortable mid-drag and the make-room/drop tween breaks. */
   dragReloc?: DragReloc;
   /** False when the card was refused, which leaves the title in the composer to be fixed. */
-  onAddCard: (columnId: string, title: string) => boolean;
+  onAddCard: (columnId: string, title: string) => Promise<HeldOutcome>;
 }
 
 export function Column({

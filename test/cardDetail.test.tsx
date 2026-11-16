@@ -11,7 +11,7 @@ import { BLOCKS } from "../src/model/relationships";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [BLOCKS],
   columns: [
@@ -77,37 +77,26 @@ describe("CardDetail", () => {
     expect(within(history).getByText("2026-06-12 08:00")).toHaveClass("folia-ts");
   });
 
-  it("opens a clamped display title in full, and closes it again", async () => {
+  it("shows the card's title in one Title field, and no line about a file named after it", async () => {
     const user = userEvent.setup();
     renderApp(makeRepo());
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
-    const title = within(detail).getByRole("button", { name: "Show the whole title" });
-    expect(title).toHaveAttribute("aria-expanded", "false");
-    await user.click(title);
-    expect(title).toHaveAttribute("aria-expanded", "true");
-    expect(title).toHaveAccessibleName("Show less of the title");
-    expect(title).toHaveClass("folia-is-expanded");
-    await user.click(title);
-    expect(title).toHaveAttribute("aria-expanded", "false");
+    const fields = detail.querySelector(".folia-title-fields") as HTMLElement;
+    expect(within(fields).getByLabelText("Title")).toHaveValue("Alpha");
+    expect(within(fields).getAllByRole("textbox")).toHaveLength(1);
+    expect(fields.querySelector(".folia-title-file")).toBeNull();
+    expect(within(fields).queryByRole("button")).toBeNull();
   });
 
-  it("walks the title rules step by step behind “Why this title?”", async () => {
+  it("shows a note's top heading in the description, where a card made before now kept its title", async () => {
     const user = userEvent.setup();
     renderApp(makeRepo());
     await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
     const detail = await screen.findByTestId("card-detail");
-    await within(detail).findByText("Created");
-    const why = within(detail).getByRole("button", { name: "Why this title?" });
-    await user.click(why);
-    expect(why).toHaveAttribute("aria-expanded", "true");
-    const steps = [...detail.querySelectorAll(".folia-title-step")];
-    expect(steps.length).toBeGreaterThan(1);
-    expect(detail.querySelectorAll(".folia-title-step.folia-is-winner")).toHaveLength(1);
-    expect(steps.map((s) => s.querySelector(".folia-title-step-value")?.textContent)).toContain(
-      "not set",
-    );
-    await user.click(why);
-    expect(detail.querySelector(".folia-title-trace")).toBeNull();
+    // The heading is ordinary description content now; nothing hides it and nothing reads it as
+    // the card's title.
+    expect(await within(detail).findByText("# Alpha")).toHaveClass("folia-desc-rendered");
+    expect(within(detail).getByRole("heading", { name: "Alpha", level: 2 })).toBeInTheDocument();
   });
 });

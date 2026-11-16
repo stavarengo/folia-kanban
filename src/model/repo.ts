@@ -277,9 +277,16 @@ export interface CardRepository {
    */
   removeRelation(path: string, type: RelationType, targets: readonly string[]): Promise<void>;
 
-  /** Create a new top-level card in a column. Returns its path. */
+  /**
+   * Create a new top-level card in a column, its file named after its title. Returns its path.
+   * Either the card is made whole, title included, or this throws and leaves no note behind. A
+   * blank title is refused.
+   */
   createCard(title: string, status: string): Promise<string>;
-  /** Create a child card and link it from the parent's checklist. Returns child path. */
+  /**
+   * Create a child card and link it from the parent's checklist. Returns child path. When the
+   * child is made and only the link fails, the error names the note that now exists.
+   */
   addSubcard(parentPath: string, title: string): Promise<string>;
   /** Move a card's note to the trash, without asking: for callers that have no one to ask (MCP). */
   deleteCard(path: string): Promise<void>;
@@ -289,20 +296,15 @@ export interface CardRepository {
    */
   promptDeleteCard(path: string): Promise<boolean>;
   /**
-   * Retitle a card by writing to whichever source its title currently comes from (see
-   * `Card.titleSource`): the `title` frontmatter key, the heading line, or the `.md` file name.
-   * A file rename goes through Obsidian's link-aware rename so every inbound `[[wikilink]]`
-   * (e.g. a parent's `## Subtasks` link) is rewritten to follow. Returns the card's (possibly
-   * new) path. A blank/unchanged title is a no-op that returns the original path.
+   * Retitle a card. Its file is renamed to match, through Obsidian's link-aware rename, so every
+   * inbound `[[wikilink]]` (e.g. a parent's `## Subtasks` link) is rewritten to follow. A title
+   * the file name cannot hold exactly is kept whole in the `title` frontmatter key, which comes
+   * and goes with the need for it. On a `card-title: heading` board, a title read from the note's
+   * first heading is written back to that heading instead. Returns the card's (possibly new)
+   * path. A blank/unchanged title is a no-op that returns the original path. A failure throws,
+   * and says so when part of the change was already written.
    */
   renameCard(path: string, newTitle: string): Promise<string>;
-  /**
-   * Rename the card's FILE, whatever source its displayed title happens to come from. This is the
-   * card's identity moving, so the rename is link-aware: every inbound `[[wikilink]]` follows.
-   * Returns the card's new path, or the original one when the name is blank, unchanged, or
-   * unchanged once it has been made safe to use as a file name.
-   */
-  renameFile(path: string, newBasename: string): Promise<string>;
 
   /** Persist column definitions to the board note frontmatter. */
   setColumns(columns: ColumnDef[]): Promise<void>;

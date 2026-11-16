@@ -42,6 +42,7 @@ import {
 import { stamp } from "./model/dates";
 import { BoardTabs } from "./obsidian/boardTabs";
 import { BoardSetup } from "./obsidian/boardSetup";
+import { registerRepeatedHeadingsCommand } from "./obsidian/repeatedHeadings";
 import { KanbanSettingTab } from "./obsidian/settingTab";
 import { AgentRuns } from "./obsidian/agentRuns";
 import { newRunId, nodeSystem, spawnDetached } from "./obsidian/agentLauncher";
@@ -144,6 +145,7 @@ export default class FoliaKanbanPlugin extends Plugin {
       callback: () => void this.activateView(),
     });
     new BoardSetup(this.app, this.tabs, () => this.settings).register(this);
+    registerRepeatedHeadingsCommand(this, this.app, this.tabs);
 
     this.settingTab = new KanbanSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);

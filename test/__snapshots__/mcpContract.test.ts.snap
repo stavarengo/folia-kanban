@@ -96,7 +96,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "type": "string",
         },
         "title": {
-          "description": "The card's title; it also names the file.",
+          "description": "The card's title, as one line. The file is named after it. Inline Markdown such as a link is kept and drawn on the board.",
           "minLength": 1,
           "type": "string",
         },
@@ -263,7 +263,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "type": "object",
         },
         "title": {
-          "description": "Retitles the card at whichever source its title comes from.",
+          "description": "The card's new title. Its file is renamed to match and links to it follow, so the reply's \`path\` is the one to use from then on.",
           "type": "string",
         },
       },

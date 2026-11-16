@@ -1,6 +1,7 @@
 import { useContext, useRef, type CSSProperties } from "react";
 import type { Board, Card, CardBody } from "../model/types";
 import { descriptionRefusal } from "../model/card";
+import { plainTitleText } from "../model/cardTitle";
 import { CardComments } from "./CardComments";
 import { CardFields } from "./CardFields";
 import { CardProperties } from "./CardProperties";
@@ -12,7 +13,7 @@ import { CardHeaderActions, DetailFrame, DetailScroll } from "./DetailFrame";
 import { HostButton, HostIconButton } from "./hostControls";
 import { Markdown } from "./Markdown";
 import { CardSubtasks } from "./SubtaskList";
-import { CardTitleFields } from "./TitleFields";
+import { CardTitleFields, TitleText } from "./TitleFields";
 import { useCardPanel, type CardPanelState } from "./useCardPanel";
 import type { DescriptionEditor } from "./useDescriptionEditor";
 
@@ -31,13 +32,11 @@ interface Props {
   focusNew?: boolean;
   /** When set, focus the "Add a subcard" input (the context-menu "Add subcard" action). */
   focusAddSubcard?: boolean;
-  /** When set, focus the "Override card title" field (the context-menu action). */
-  focusTitleOverride?: boolean;
   /**
    * Advances on every request to open a card, including a re-open of the card already showing.
-   * The two flags above are one-shot actions, and a repeat of one lands on the same panel with
-   * the same flag already true — so what makes it act a second time is this counter changing,
-   * not a remount. (A remount would take every draft in the panel with it.)
+   * The flag above is a one-shot action, and a repeat of it lands on the same panel with the
+   * same flag already true — so what makes it act a second time is this counter changing, not a
+   * remount. (A remount would take every draft in the panel with it.)
    */
   focusSeq?: number;
 }
@@ -47,8 +46,6 @@ type Mutate = (fn: () => Promise<unknown>) => Promise<boolean>;
 const REFUSAL_REASON: Record<NonNullable<ReturnType<typeof descriptionRefusal>>["kind"], string> = {
   heading:
     "would start a section the plugin owns (Subtasks, Comments, History), and everything below it would leave the description. Rename the heading, or quote it inside a code fence.",
-  title:
-    "is where the card's title is read from, so saving it would swallow the line and it would not come back. Use a smaller heading, or put it after a line of text.",
   fence:
     "opens a code block that is never closed, so it would run to the end of the note and swallow the sections after it. Close the fence.",
 };
@@ -208,14 +205,7 @@ function CardSections({
   const { body, reload, mutate, stillHere, focus, drafts } = panel;
   return (
     <>
-      <CardTitleFields
-        board={board}
-        card={card}
-        body={body}
-        path={path}
-        overrideRef={focus.titleOverrideRef}
-        mutate={mutate}
-      />
+      <CardTitleFields card={card} path={path} />
       <CardFields board={board} card={card} path={path} mutate={mutate} reload={reload} />
       <CardProperties
         card={card}
@@ -275,7 +265,6 @@ export function CardDetail({
   onCreated,
   focusNew,
   focusAddSubcard,
-  focusTitleOverride,
   focusSeq,
 }: Props) {
   // The board reloads on a debounce, so for a moment after this card's file is renamed or moved
@@ -287,6 +276,7 @@ export function CardDetail({
   if (liveCard) lastCard.current = liveCard;
   const card = liveCard ?? lastCard.current;
   const isCreate = createColumn != null;
+  const dialog = useContext(DetailDialogContext);
   const create = useCreateCard(onCreated);
   const panel = useCardPanel({
     path,
@@ -296,7 +286,6 @@ export function CardDetail({
     onChanged,
     focusNew,
     focusAddSubcard,
-    focusTitleOverride,
     focusSeq,
   });
   const { panelRef, scrollRef, titleRef } = panel.focus;
@@ -326,15 +315,21 @@ export function CardDetail({
   }
 
   return (
-    <DetailFrame label={card.title} testId="card-detail" panelRef={panelRef}>
+    <DetailFrame label={plainTitleText(card.title)} testId="card-detail" panelRef={panelRef}>
       <DetailScroll
         scrollRef={scrollRef}
         title={
           // A label, not the place to read a long title: clamped to two lines (see
-          // `.folia-detail-title`) with the whole of it on hover, and the full, wrapping copy
-          // sitting in the "Resulting display title" row a few pixels below.
-          <h2 className="folia-detail-title" aria-label={card.title} ref={titleRef} tabIndex={-1}>
-            {card.title}
+          // `.folia-detail-title`), with the whole of it in the Title field a few pixels below.
+          // Named by the words alone, so a link in the title is announced as its text.
+          <h2
+            className="folia-detail-title"
+            aria-label={plainTitleText(card.title)}
+            ref={titleRef}
+            tabIndex={-1}
+          >
+            {/* As in the description: following a link out of the dialog closes it. */}
+            <TitleText title={card.title} sourcePath={path} onFollowLink={() => dialog?.close()} />
           </h2>
         }
         actions={<CardHeaderActions card={card} path={path} deleting={panel.deleting} />}

@@ -38,7 +38,8 @@ const optionalConfigString = z.preprocess(
 
 /**
  * The board definition note's config frontmatter. `card-folder` + `columns` drive the board;
- * `card-title` picks where card titles come from (validated by `asTitleMode`, unknown = `auto`);
+ * `card-title: heading` reads each card's title from its note's first heading (validated by
+ * `asTitleMode`; any other value means the file name);
  * `priorities` remembers the board's own priority vocabulary (validated by `normalizePriorities`);
  * `relations` names the relationship types beyond `blocks` (validated by `normalizeRelationTypes`).
  */

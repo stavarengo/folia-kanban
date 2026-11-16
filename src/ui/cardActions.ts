@@ -3,6 +3,7 @@ import type { Board as BoardModel, Card } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import { columnOf } from "../model/board";
 import { moveCardTo, setCardPriority } from "../model/boardOps";
+import { plainTitleText } from "../model/cardTitle";
 import { baseName, parentFolder, relativeToFolder } from "../model/pathOps";
 import type { BoardSettings, SettingsPatch } from "../settings";
 import type { BoardActions, CopyPathForm } from "./context";
@@ -24,17 +25,14 @@ export interface CardActionDeps {
 export function cardActions(
   d: CardActionDeps,
   doneColumnId: string | null,
-): Pick<
-  BoardActions,
-  "complete" | "remove" | "setPriority" | "setAssignee" | "renameCard" | "renameFile"
-> {
+): Pick<BoardActions, "complete" | "remove" | "setPriority" | "setAssignee" | "renameCard"> {
   const { repo, load, reportError } = d;
   return {
     complete: (card) => {
       if (!doneColumnId) return;
       void moveTo(d, card, doneColumnId)
         .then((moved) => {
-          if (moved) d.notify(`${card.title} — done!`);
+          if (moved) d.notify(`${plainTitleText(card.title)} — done!`);
         })
         .catch(reportError);
     },
@@ -71,15 +69,10 @@ export function cardActions(
         await load();
       }
     },
-    renameCard: (path, title) => {
+    renameCard: async (path, title) => {
       const t = title.trim();
-      if (!t) return; // empty/whitespace title rejected — caller reverts to the old title
-      void runRename(d, path, () => repo.renameCard(path, t));
-    },
-    renameFile: (path, newBasename) => {
-      const name = newBasename.trim();
-      if (!name) return; // a blank file name is no name at all — the field reverts
-      void runRename(d, path, () => repo.renameFile(path, name));
+      if (!t) return null; // empty/whitespace title rejected — caller reverts to the old title
+      return runRename(d, path, () => repo.renameCard(path, t));
     },
   };
 }
@@ -223,23 +216,33 @@ async function setPriorityAndReload(d: CardActionDeps, path: string, raw: string
  * the render that first shows the new path, and it must find the migrated one there. The patch
  * is built from the settings at write time, not this render's snapshot, so another view's write
  * landing in between is not undone.
+ *
+ * Answers with the reason when the rename failed, and `null` when it went through. A rename that
+ * failed halfway may still have moved the file; the vault reports that move itself (`onFileOp`),
+ * which is what the selection and the plugin's per-path data follow then.
  */
 async function runRename(
   d: CardActionDeps,
   path: string,
   rename: () => Promise<string>,
-): Promise<void> {
+): Promise<string | null> {
   try {
     const newPath = await rename();
     if (newPath !== path) {
       d.onUpdateSettings((s) => movePath(s, path, newPath));
       d.setSelected((cur) => (cur === path ? newPath : cur));
     }
+    return null;
   } catch (e) {
-    d.reportError(e);
+    return failureReason(e);
   } finally {
     await d.load();
   }
+}
+
+/** Why a write failed, in the words it was refused with. */
+export function failureReason(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 /** The per-path plugin data a card owns, moved from its old path to its new one. */

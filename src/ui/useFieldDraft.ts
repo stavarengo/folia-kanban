@@ -12,10 +12,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * something other than what was asked for — a file name made safe to use as one, or given a
  * suffix because that name was taken — since the field would otherwise keep the asked-for text,
  * read as still unsaved, and re-submit it on the next blur, renaming again and again.
+ *
+ * A write that answers `false` did not happen, so the field goes back to reading as unsaved: the
+ * text stays, nothing arriving from the note may replace it, and the next blur tries again.
  */
 export function useFieldDraft(
   value: string,
-  onCommit: (v: string) => void,
+  onCommit: (v: string) => void | Promise<boolean>,
   normalize: (v: string) => string | null = (v) => v,
 ) {
   const [draft, setDraftState] = useState(value);
@@ -27,6 +30,8 @@ export function useFieldDraft(
     setDraftState(d);
   }, []);
   const shown = useRef(value);
+  const persisted = useRef(value);
+  persisted.current = value;
   useEffect(() => {
     const before = shown.current;
     shown.current = value;
@@ -40,7 +45,9 @@ export function useFieldDraft(
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
     if (next === normalize(value)) return;
     shown.current = next;
-    onCommit(next);
+    void onCommit(next)?.then((written) => {
+      if (!written && shown.current === next) shown.current = persisted.current;
+    });
   };
   return { draft, setDraft, commit };
 }

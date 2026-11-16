@@ -25,7 +25,7 @@ import { BLOCKS } from "../src/model/relationships";
 const config: BoardConfig = {
   path: "Board.md",
   cardFolder: "Tasks",
-  titleMode: "auto",
+  titleMode: "filename",
   priorities: [],
   relations: [BLOCKS],
   columns: [

@@ -1,4 +1,5 @@
 import { agentRunOf } from "../model/agent";
+import { plainTitleText } from "../model/cardTitle";
 import type { Card, CardStats } from "../model/types";
 import type { UnreadState } from "../model/unread";
 
@@ -8,6 +9,8 @@ import type { UnreadState } from "../model/unread";
  * or role on the bar or the badge is never announced. The name is the only place a screen reader
  * can hear them. The words stay static — a countdown read out every second would be noise. The
  * agent words follow the experimental switch for agent columns, `agentRuns`, as the chip does.
+ * The title is read as its words, as every name and tooltip built from one is: Markdown is for
+ * the eye, and `[label](address)` read aloud is noise.
  */
 export function tileName(
   card: Card,
@@ -17,7 +20,7 @@ export function tileName(
 ): string {
   const stats = card.stats;
   return [
-    card.title,
+    plainTitleText(card.title),
     stats && stats.checklist > 0 ? progressWords(stats) : null,
     unread.kind === "none" ? null : unreadWords(unread),
     agentRuns && launchPending ? "agent starting soon" : null,

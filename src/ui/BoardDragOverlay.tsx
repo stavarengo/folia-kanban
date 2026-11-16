@@ -1,3 +1,4 @@
+import { plainTitleText } from "../model/cardTitle";
 import { createPortal } from "react-dom";
 import { DragOverlay, defaultDropAnimationSideEffects } from "@dnd-kit/core";
 import type { Card, ColumnDef } from "../model/types";
@@ -116,7 +117,8 @@ function CardGhost({
       }
     >
       <div className="folia-card-main">
-        <div className="folia-card-title">{card.title}</div>
+        {/* The words alone: the renderer is asynchronous, and a lifted card has to be whole at once. */}
+        <div className="folia-card-title">{plainTitleText(card.title)}</div>
         <CardChips card={card} ctx={undefined} chips={chips} />
       </div>
     </div>

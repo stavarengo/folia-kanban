@@ -58,7 +58,15 @@ import {
   updateTimestampedLine,
 } from "../src/model/card";
 
-import { TITLE_KEY, resolveTitle, sanitizeFilename, setHeadingTitle } from "../src/model/cardTitle";
+import {
+  TITLE_KEY,
+  fitFileName,
+  normalizeTitle,
+  resolveTitle,
+  sameTitle,
+  setHeadingTitle,
+  titleFileName,
+} from "../src/model/cardTitle";
 import { isSelfRelation, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {
@@ -85,8 +93,6 @@ interface Entry {
   fm: CardFrontmatter;
   body: string;
 }
-
-let seq = 0;
 
 export class FakeRepo implements CardRepository {
   files = new Map<string, Entry>();
@@ -360,15 +366,36 @@ export class FakeRepo implements CardRepository {
       this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
-  async createCard(title: string, status: string): Promise<string> {
-    const path = `${this.config.cardFolder}/${title}.md`;
-    const unique = this.files.has(path) ? `${this.config.cardFolder}/${title} ${++seq}.md` : path;
-    this.files.set(unique, {
-      basename: basename(unique),
-      fm: { type: "task", status, created: "2026-06-13" },
-      body: `\n# ${title}\n`,
+  /**
+   * Mirrors the vault adapter: a file named after the title, numbered past a name already taken,
+   * with the whole title in the `title` key when the file name could not hold it exactly.
+   */
+  private cardPath(folder: string, title: string, except?: string): string {
+    const prefix = folder ? `${folder}/` : "";
+    const base = fitFileName(titleFileName(title));
+    const taken = (p: string) =>
+      p !== except && [...this.files.keys()].some((k) => k.toLowerCase() === p.toLowerCase());
+    let dest = `${prefix}${base}.md`;
+    for (let n = 1; taken(dest); n++) dest = `${prefix}${base} ${n}.md`;
+    return dest;
+  }
+
+  async createCard(rawTitle: string, status: string): Promise<string> {
+    const title = normalizeTitle(rawTitle);
+    if (!title) throw new Error("A card needs a title.");
+    const path = this.cardPath(this.config.cardFolder, title);
+    const exact = sameTitle(basename(path), title);
+    this.files.set(path, {
+      basename: basename(path),
+      fm: {
+        type: "task",
+        status,
+        created: "2026-06-13",
+        ...(exact ? {} : { [TITLE_KEY]: title }),
+      },
+      body: "",
     });
-    return unique;
+    return path;
   }
 
   async addSubcard(parentPath: string, title: string): Promise<string> {
@@ -395,50 +422,47 @@ export class FakeRepo implements CardRepository {
 
   async renameCard(path: string, newTitle: string): Promise<string> {
     const e = this.entry(path);
-    const title = newTitle.trim();
+    const title = normalizeTitle(newTitle);
     if (!title) return path; // blank title — no-op, per the CardRepository contract
-    // Mirrors the vault adapter: the title is written back to the source it came from.
+    // Mirrors the vault adapter: the file follows the title, the `title` key holds what the file
+    // name cannot, and a title a heading board reads from the heading is written back there.
     const { title: current, source } = this.resolveTitle(e);
-    if (title === current) return path; // unchanged — no write
-    if (source === "frontmatter") {
-      e.fm[TITLE_KEY] = title;
-      return path;
-    }
+    if (sameTitle(title, current)) return path; // unchanged — no write
     if (source === "heading") {
-      e.body = setHeadingTitle(e.body, e.basename, this.config.titleMode, title);
+      e.body = setHeadingTitle(e.body, title);
       return path;
     }
-    return this.renameFile(path, title);
+    const shadowed =
+      resolveTitle(e.basename, {}, e.body, this.config.titleMode).source === "heading";
+    const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    const dest = this.cardPath(folder, title, path);
+    const keyed = shadowed || !sameTitle(basename(dest), title);
+    if (keyed) e.fm[TITLE_KEY] = title;
+    this.moveFile(path, dest);
+    if (!keyed && source === "frontmatter") delete e.fm[TITLE_KEY];
+    return dest;
   }
 
-  async renameFile(path: string, newBasename: string): Promise<string> {
+  /** Move a note the way Obsidian's link-aware rename does, links and file op included. */
+  private moveFile(path: string, dest: string): void {
+    if (dest === path) return;
     const e = this.entry(path);
-    const wanted = newBasename.trim();
-    if (!wanted) return path; // a blank name is not a name — nothing to rename to
-    const base = sanitizeFilename(wanted);
-    if (base === e.basename) return path; // unchanged once made safe to use as a file name
-    const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    const prefix = folder ? `${folder}/` : "";
-    let dest = `${prefix}${base}.md`;
-    let n = 1;
-    while (this.files.has(dest) && dest !== path) dest = `${prefix}${base} ${n++}.md`;
-    if (dest === path) return path;
     // Move the map entry under its new basename — the one the destination path actually got, which
     // a collision suffixes (`New` landing beside an existing `New.md` becomes `New 1`)...
+    const oldBase = e.basename;
     const newBase = basename(dest);
+    e.basename = newBase;
     this.files.delete(path);
-    this.files.set(dest, { ...e, basename: newBase });
+    this.files.set(dest, e);
     // ...and rewrite every inbound `[[OldBasename]]` wikilink to THAT name, so a suffixed rename
     // links to the card that moved rather than to the one it collided with (mirrors Obsidian's
     // link-aware fileManager.renameFile, keeping buildBoard's `## Subtasks` graph correct).
-    const oldBase = e.basename;
     for (const other of this.files.values()) {
       other.body = rewriteWikilinks(other.body, oldBase, newBase);
     }
     // The vault reports the plugin's own file operations too, so the fake does the same — that is
     // what makes a test cover the in-app path and the listener path running over each other.
     this.emitFileOp({ kind: "rename", from: path, to: dest });
-    return dest;
   }
 
   /** Stands in for a desktop vault; set to `null` to act like one with no filesystem path. */

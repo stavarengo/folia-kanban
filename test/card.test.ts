@@ -58,10 +58,12 @@ describe("frontmatter", () => {
 });
 
 describe("parseBody", () => {
-  it("extracts title and description, empty sections", () => {
+  it("reads the description, top heading included, and empty sections", () => {
     const b = parseBody(SAMPLE_CARD);
-    expect(b.title).toBe("Write the getting-started guide");
-    expect(b.description).toBe("Cover installation and creating a first board.");
+    // A card's title is its file name or its `title` key. The note's top heading is description.
+    expect(b.description).toBe(
+      "# Write the getting-started guide\n\nCover installation and creating a first board.",
+    );
     expect(b.subtasks).toEqual([]);
     expect(b.comments).toEqual([]);
     expect(b.history).toEqual([]);
@@ -207,14 +209,45 @@ describe("subtasks: Obsidian's own checkbox rule — space is open, anything els
 });
 
 describe("setDescription", () => {
-  it("replaces description, preserves title and later sections", () => {
+  it("replaces the description, top heading included, and preserves later sections", () => {
     let t = appendComment(SAMPLE_CARD, "keep me", "2026-06-13 10:00");
     t = setDescription(t, "A brand new description.");
     const b = parseBody(t);
-    expect(b.title).toBe("Write the getting-started guide");
+    expect(t).not.toContain("# Write the getting-started guide");
     expect(b.description).toBe("A brand new description.");
     expect(b.comments).toEqual([{ timestamp: "2026-06-13 10:00", author: null, text: "keep me" }]);
     expect(splitFrontmatter(t).fmText).toBe(splitFrontmatter(SAMPLE_CARD).fmText);
+  });
+
+  const fm = "---\nstatus: todo\n---\n";
+
+  it("writes a new card's first description straight under its frontmatter", () => {
+    expect(setDescription(fm, "Hello")).toBe(`${fm}Hello\n`);
+    expect(setDescription(`${fm}## Subtasks\n- [ ] one\n`, "Hello")).toBe(
+      `${fm}Hello\n\n## Subtasks\n- [ ] one\n`,
+    );
+  });
+
+  it("keeps the blank lines the body opens with, so an unedited save changes nothing", () => {
+    // Both shapes exist in real vaults: cards made before a card had one title open with their
+    // heading on the line after the frontmatter, hand-written notes usually leave a gap.
+    for (const note of [
+      `${fm}# Old card\n\nSome words.\n`,
+      `${fm}\n# Old card\n\nSome words.\n`,
+      `${fm}\n\nSome words.\n\n## Comments\n- _t:_ hi\n`,
+      `${fm}Some words.\n\n## Comments\n- _t:_ hi\n`,
+    ])
+      expect(setDescription(note, parseBody(note).description), JSON.stringify(note)).toBe(note);
+  });
+
+  it("clears a description down to the note's own spacing", () => {
+    expect(setDescription(`${fm}\n# Old card\n\nSome words.\n`, "")).toBe(`${fm}\n`);
+    expect(setDescription(`${fm}Some words.\n\n## Subtasks\n- [ ] one\n`, "")).toBe(
+      `${fm}## Subtasks\n- [ ] one\n`,
+    );
+    expect(setDescription(`${fm}\n\n\n## Subtasks\n- [ ] one\n`, "Hello")).toBe(
+      `${fm}\nHello\n\n## Subtasks\n- [ ] one\n`,
+    );
   });
 });
 
@@ -586,23 +619,23 @@ describe("CRLF files round-trip byte-stably (only the touched line changes)", ()
   it("setDescription round-trips a multi-line CRLF description without doubling any CR", () => {
     const doc = "# T\r\n\r\none\r\ntwo\r\n";
     const desc = parseBody(doc).description;
-    expect(desc).toBe("one\r\ntwo");
+    expect(desc).toBe("# T\r\n\r\none\r\ntwo");
     expect(setDescription(doc, desc)).toBe(doc); // no-op: reading back the same text changes nothing
   });
 
   it("setDescription follows the BODY's own convention over CRLF frontmatter's, on a mixed-EOL card", () => {
     const mixed = "---\r\nstatus: todo\r\n---\r\n# T\n\nold\n";
-    expect(setDescription(mixed, "new")).toBe("---\r\nstatus: todo\r\n---\r\n# T\n\nnew\n");
+    expect(setDescription(mixed, "# T\n\nnew")).toBe("---\r\nstatus: todo\r\n---\r\n# T\n\nnew\n");
   });
 
   it("setDescription picks the body's MAJORITY convention, not swayed by one stray CRLF line", () => {
     const mostlyLF = "# T\r\n\nold\n\n## Comments\n- _t:_ hi\n";
-    expect(setDescription(mostlyLF, "new")).toBe("# T\r\n\nnew\n\n## Comments\n- _t:_ hi\n");
+    expect(setDescription(mostlyLF, "# T\n\nnew")).toBe("# T\n\nnew\n\n## Comments\n- _t:_ hi\n");
   });
 
   it("setDescription keeps a real trailing blank line CRLF when a section follows", () => {
     const doc = "# T\r\n\r\nold\r\n\r\n## Comments\r\n- _2026-08-28 10:00:_ hi\r\n";
-    const out = setDescription(doc, "new");
+    const out = setDescription(doc, "# T\n\nnew");
     expect(out).toBe("# T\r\n\r\nnew\r\n\r\n## Comments\r\n- _2026-08-28 10:00:_ hi\r\n");
   });
 
@@ -706,8 +739,7 @@ describe("round-trip on fixture cards", () => {
       const after = parseBody(out);
       // Frontmatter must be byte-identical.
       expect(splitFrontmatter(out).fmText).toBe(fmBefore);
-      // Title and description must be untouched.
-      expect(after.title).toBe(before.title);
+      // The description, the note's top heading with it, must be untouched.
       expect(after.description).toBe(before.description);
       // Nothing lost: every pre-existing item survives, plus exactly the new ones appended.
       expect(after.comments.map((c) => c.text)).toEqual([
@@ -748,9 +780,10 @@ All three landed.
 
   it("keeps foreign headings in the description", () => {
     const b = parseBody(ownHeadings);
-    expect(b.title).toBe("Rename the widget factory helpers");
     expect(b.description).toBe(
       [
+        "# Rename the widget factory helpers",
+        "",
         "Context: [overview.md](../overview.md)",
         "",
         "## Question",
@@ -784,20 +817,21 @@ All three landed.
     // The boundary and `headingIndex` are both case-insensitive on purpose: if they disagreed,
     // `## comments` would show inside the description AND in the comments list.
     const b = parseBody("# T\n\ndesc\n\n## comments\n- _2026-08-21 11:49:_ hi\n");
-    expect(b.description).toBe("desc");
+    expect(b.description).toBe("# T\n\ndesc");
     expect(b.comments).toEqual([{ timestamp: "2026-08-21 11:49", author: null, text: "hi" }]);
   });
 
-  it("reads the whole body when the note has no H1", () => {
+  it("reads the whole body up to the first owned section, with or without a top heading", () => {
     const b = parseBody("## Question\n\nWhy?\n\n## Comments\n- _t:_ x\n");
-    expect(b.title).toBe("");
     expect(b.description).toBe("## Question\n\nWhy?");
+    // Text above a top heading is description too: nothing in the note is hidden from the panel.
+    expect(parseBody("Intro.\n\n# T\n\nbody\n").description).toBe("Intro.\n\n# T\n\nbody");
   });
 
   it("leaves a foreign heading that follows an owned section on disk, outside the description", () => {
     const trailing =
       "# T\n\ndesc\n\n## Comments\n- _2026-08-21 11:49:_ hi\n\n## Appendix\n\nkept\n";
-    expect(parseBody(trailing).description).toBe("desc");
+    expect(parseBody(trailing).description).toBe("# T\n\ndesc");
     const out = setDescription(trailing, "edited");
     expect(out).toContain("## Appendix\n\nkept\n");
     expect(parseBody(out).comments).toHaveLength(1);
@@ -883,7 +917,7 @@ describe("code fences hide structure from every lookup at once", () => {
   it("keeps a quoted owned heading inside the description, and out of the comments", () => {
     const b = parseBody(fenced);
     expect(b.description).toBe(
-      "desc\n\n```md\n## Comments\n- _2026-08-21 11:49:_ sample\n```\n\nafter",
+      "# T\n\ndesc\n\n```md\n## Comments\n- _2026-08-21 11:49:_ sample\n```\n\nafter",
     );
     expect(b.comments).toEqual([{ timestamp: "2026-08-22 09:00", author: null, text: "real" }]);
   });
@@ -948,18 +982,17 @@ describe("code fences hide structure from every lookup at once", () => {
     const doc =
       "# T\r\n\r\n```md\r\n## Comments\r\n- _t:_ quoted\r\n```\r\n\r\n## Comments\r\n- _2026-08-22 09:00:_ real\r\n";
     const b = parseBody(doc);
-    expect(b.description).toBe("```md\r\n## Comments\r\n- _t:_ quoted\r\n```");
+    expect(b.description).toBe("# T\r\n\r\n```md\r\n## Comments\r\n- _t:_ quoted\r\n```");
     expect(b.comments).toEqual([{ timestamp: "2026-08-22 09:00", author: null, text: "real" }]);
     expect(appendComment(doc, "new", "2026-08-23 10:00")).toBe(
       doc + "- _2026-08-23 10:00:_ new\r\n",
     );
   });
 
-  it("a fenced `# heading` is not the title", () => {
-    expect(parseBody("```\n# not me\n```\n# Me\n\nbody\n")).toMatchObject({
-      title: "Me",
-      description: "body",
-    });
+  it("a heading, fenced or not, is description like any other line", () => {
+    const text = "```\n# not me\n```\n# Me\n\nbody\n";
+    expect(parseBody(text).description).toBe(text.trim());
+    expect(descriptionRefusal("# Me\n\nbody")).toBeNull();
   });
 });
 

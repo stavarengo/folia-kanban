@@ -33,7 +33,6 @@ export function cardMenu(a: BoardActions, args: CardMenuArgs): MenuRow[] {
   const rows: MenuRow[] = [
     { title: "Open details", icon: "panel-right-open", onClick: () => a.open(path) },
     { title: "Rename", icon: "pencil", onClick: onRename },
-    { title: "Override card title", icon: "type", onClick: () => a.editTitleOverride(path) },
   ];
   if (!isDone)
     rows.push({ title: "Mark done", icon: "circle-check", onClick: () => a.complete(card()) });

@@ -2,17 +2,20 @@ import { useId, useState } from "react";
 import type { ColumnDef } from "../model/types";
 import { HostButton } from "./hostControls";
 import { useBoardActions, useSettings } from "./context";
+import { TitleError } from "./TitleFields";
+import { useHeldDraft, type HeldOutcome } from "./useInlineDraft";
 
 /** The column's inline add-card composer: whether it is open, and what is typed into it. */
 export function useCardComposer(
   column: ColumnDef,
-  /** False when the card was refused, which leaves the title in the composer to be fixed. */
-  onAddCard: (columnId: string, title: string) => boolean,
+  onAddCard: (columnId: string, title: string) => Promise<HeldOutcome>,
 ) {
   const settings = useSettings();
   const actions = useBoardActions();
   const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState("");
+  // The title leaves the field only once its card exists: whatever stops the write, the text is
+  // still here to fix and send again.
+  const draft = useHeldDraft();
   const fillNoteId = useId();
 
   // 'detail' flow opens the create form in the detail panel; 'inline'/'inline-edit' use the composer.
@@ -20,17 +23,31 @@ export function useCardComposer(
     if (settings.addCardFlow === "detail") actions.startCreate(column.id);
     else setAdding(true);
   };
-  const submit = (keepOpen: boolean) => {
-    const t = title.trim();
-    if (t && !onAddCard(column.id, t)) return;
-    setTitle("");
-    if (!keepOpen) setAdding(false);
-  };
   const cancel = () => {
     setAdding(false);
-    setTitle("");
+    draft.clear();
   };
-  return { adding, title, setTitle, fillNoteId, start, submit, cancel };
+  const submit = () => {
+    if (!draft.value.trim()) {
+      cancel();
+      return;
+    }
+    draft.send(async (title) => {
+      const outcome = await onAddCard(column.id, title);
+      if (outcome.sent) setAdding(false);
+      return outcome;
+    });
+  };
+  return {
+    adding,
+    title: draft.value,
+    setTitle: draft.setValue,
+    error: draft.error,
+    fillNoteId,
+    start,
+    submit,
+    cancel,
+  };
 }
 
 export function CardComposer({
@@ -41,7 +58,7 @@ export function CardComposer({
   /** How the lane fills an added card, said before anything is written; null for a plain column. */
   fillNote: string | null;
 }) {
-  const { title, setTitle, fillNoteId, submit, cancel } = composer;
+  const { title, setTitle, error, fillNoteId, submit, cancel } = composer;
   return (
     <div className="folia-add-card">
       <textarea
@@ -55,7 +72,7 @@ export function CardComposer({
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            submit(false);
+            submit();
           } else if (e.key === "Escape") {
             cancel();
           }
@@ -66,14 +83,9 @@ export function CardComposer({
           Added with {fillNote}
         </p>
       )}
+      <TitleError reason={error} />
       <div className="folia-row-actions">
-        <HostButton
-          className="folia-btn"
-          cta
-          text="Add card"
-          keepFocus
-          onClick={() => submit(false)}
-        />
+        <HostButton className="folia-btn" cta text="Add card" keepFocus onClick={submit} />
         <HostButton className="folia-btn" text="Cancel" onClick={cancel} />
       </div>
     </div>

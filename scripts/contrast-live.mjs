@@ -6,7 +6,7 @@
 //   pnpm contrast:live http://<host>:<port> [--verbose]
 //
 // For the default dark and light themes it measures the Feature Showcase board with no dialog open,
-// then the card detail dialog alone (title trace expanded) for each card that shows a context chip;
+// then the card detail dialog alone for each card that shows a context chip;
 // the board behind the dialog's backdrop is not measured twice. axe skips text
 // scrolled out of view, so every scroll container is stepped through its range. Where axe cannot
 // resolve the colours behind Folia's own text (a pseudo-element, a gradient, a colour it cannot
@@ -142,10 +142,7 @@ async function openCard(title) {
     (title) => document.querySelector(".folia-detail-title")?.textContent.includes(title),
     title,
   );
-  await page.waitForFunction(() => document.querySelector(".folia-title-reason"));
-  // Open the title trace too, so its rows are measured with the rest of the panel.
-  await page.evaluate(() => document.querySelector(".folia-title-why").click());
-  await page.waitForFunction(() => document.querySelector(".folia-title-trace"));
+  await page.waitForFunction(() => document.querySelector(".folia-title-fields"));
 }
 
 // "board" measures the board leaf with no dialog open; "detail" measures only the dialog, since the

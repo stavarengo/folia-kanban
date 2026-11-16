@@ -30,8 +30,6 @@ export function useDetailPanel(
   const [focusNew, setFocusNew] = useState(false);
   // One-shot: focus the open card's "Add a subcard" input (the context-menu "Add subcard" action).
   const [focusAddSubcard, setFocusAddSubcard] = useState(false);
-  // One-shot: focus the open card's "Override card title" field (the context-menu action).
-  const [focusTitleOverride, setFocusTitleOverride] = useState(false);
   // The detail panel's identity, and the ONLY thing that remounts it. It is bumped when the panel
   // is pointed at something else (another card, the create form), and deliberately NOT when the
   // open card's own file is renamed or moved: the panel is then still about the same card, and a
@@ -54,7 +52,6 @@ export function useDetailPanel(
   const openCard = useCallback((path: string) => {
     setFocusNew(false);
     setFocusAddSubcard(false);
-    setFocusTitleOverride(false);
     setCreateColumn(null);
     // An inline todo placed in its own column has no note of its own, so opening its tile opens the
     // note that owns the checklist line — where the todo is edited, exactly as it always was. One
@@ -74,7 +71,6 @@ export function useDetailPanel(
     setCreateColumn,
     setOpenId,
     setFocusAddSubcard,
-    setFocusTitleOverride,
   });
 
   /** Open a card the inline composer just added, with its description focused for editing. */
@@ -89,7 +85,6 @@ export function useDetailPanel(
     setCreateColumn(null);
     setFocusNew(false);
     setFocusAddSubcard(false);
-    setFocusTitleOverride(false);
   };
 
   // The create form stays up until a board that knows the new card arrives (see the handover in
@@ -121,7 +116,6 @@ export function useDetailPanel(
         openId,
         focusNew,
         focusAddSubcard,
-        focusTitleOverride,
         focusSeq,
       },
       {
@@ -147,9 +141,8 @@ function usePanelActions(
     setCreateColumn: Dispatch<SetStateAction<string | null>>;
     setOpenId: Dispatch<SetStateAction<number>>;
     setFocusAddSubcard: Dispatch<SetStateAction<boolean>>;
-    setFocusTitleOverride: Dispatch<SetStateAction<boolean>>;
   },
-): Pick<BoardActions, "open" | "startCreate" | "addSubcard" | "editTitleOverride"> {
+): Pick<BoardActions, "open" | "startCreate" | "addSubcard"> {
   // `set` holds only state setters, which React keeps stable, so `openCard` alone decides identity.
   return useMemo(
     () => ({
@@ -165,10 +158,6 @@ function usePanelActions(
         openCard(path);
         set.setFocusAddSubcard(true);
       },
-      editTitleOverride: (path) => {
-        openCard(path);
-        set.setFocusTitleOverride(true);
-      },
     }),
     [openCard],
   );
@@ -183,7 +172,6 @@ function panelFor(
     openId: number;
     focusNew: boolean;
     focusAddSubcard: boolean;
-    focusTitleOverride: boolean;
     focusSeq: number;
   },
   on: {
@@ -210,7 +198,6 @@ function panelFor(
       board={b}
       focusNew={p.focusNew}
       focusAddSubcard={p.focusAddSubcard}
-      focusTitleOverride={p.focusTitleOverride}
       focusSeq={p.focusSeq}
       onClose={on.close}
       onNavigate={on.navigate}

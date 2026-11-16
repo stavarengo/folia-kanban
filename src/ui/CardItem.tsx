@@ -22,6 +22,7 @@ import {
   useUnreadComments,
 } from "./context";
 import { useReducedMotion } from "./useReducedMotion";
+import { TitleError, TitleText } from "./TitleFields";
 import { tileName } from "./cardWords";
 import { useTileEvents } from "./useTileEvents";
 import {
@@ -222,20 +223,26 @@ function CardFace({
       aria-current={selected ? "true" : undefined}
     >
       {title.editing != null ? (
-        <input
-          ref={title.inputRef}
-          className="folia-card-title-input"
-          value={title.editing}
-          aria-label="Card title"
-          // Stop the parent's click/pointer/keyboard handlers (open, drag) from firing while editing.
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onChange={(e) => title.setEditing(e.target.value)}
-          onKeyDown={title.onKeyDown}
-          onBlur={title.commit}
-        />
+        <>
+          <input
+            ref={title.inputRef}
+            className="folia-card-title-input"
+            value={title.editing}
+            aria-label="Card title"
+            aria-invalid={title.error !== null}
+            // Stop the parent's click/pointer/keyboard handlers (open, drag) from firing while editing.
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onChange={(e) => title.setEditing(e.target.value)}
+            onKeyDown={title.onKeyDown}
+            onBlur={title.commit}
+          />
+          <TitleError reason={title.error} />
+        </>
       ) : (
-        <div className="folia-card-title">{card.title}</div>
+        <div className="folia-card-title">
+          <TitleText title={card.title} sourcePath={card.path} />
+        </div>
       )}
       <CardChips card={card} ctx={view.ctx} chips={view.chips} />
       <CardProgress stats={card.stats} />
@@ -280,14 +287,34 @@ function useTitleEdit(card: Card) {
   const actions = useBoardActions();
   // When set, the title swaps for an <input> seeded with this draft.
   const [editing, setEditing] = useState<string | null>(null);
+  /** Why the last rename did not go through. The input stays open on its text while this is set. */
+  const [error, setError] = useState<string | null>(null);
+  // Blocks a second commit (Enter, then the blur it causes) while the rename is being written.
+  const saving = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const commit = () => {
-    if (editing == null) return;
-    const next = editing.trim();
-    // Rename only on a real change; empty/whitespace is rejected (revert). renameCard writes the
-    // title back to its source (file name, heading or `title` key), link-aware for file renames.
-    if (next && next !== card.title) actions.renameCard(card.path, next);
+  const close = () => {
     setEditing(null);
+    setError(null);
+  };
+  const commit = () => {
+    if (editing == null || saving.current) return;
+    const typed = editing;
+    const next = typed.trim();
+    // Rename only on a real change; empty/whitespace is rejected (revert).
+    if (!next || next === card.title) {
+      close();
+      return;
+    }
+    saving.current = true;
+    setError(null);
+    // The input closes only once the title is written: whatever stops the rename, the text is
+    // still in it, with the reason underneath, to fix and send again or to abandon with Escape.
+    void actions.renameCard(card.path, next).then((why) => {
+      saving.current = false;
+      if (why !== null) setError(why);
+      // Words typed while the rename was being written are a newer draft, and stay.
+      else setEditing((now) => (now === typed ? null : now));
+    });
   };
   const onKeyDown = (e: KeyboardEvent) => {
     e.stopPropagation(); // keep typing (incl. Space) out of the dnd keyboard sensor
@@ -296,7 +323,7 @@ function useTitleEdit(card: Card) {
       commit();
     } else if (e.key === "Escape") {
       e.preventDefault();
-      setEditing(null); // cancel — no write
+      close(); // cancel — no write
     }
   };
   // Focus + select-all once the input mounts.
@@ -307,7 +334,7 @@ function useTitleEdit(card: Card) {
       el?.select();
     }
   }, [editing != null]);
-  return { editing, setEditing, inputRef, commit, onKeyDown };
+  return { editing, setEditing, error, inputRef, commit, onKeyDown };
 }
 
 function tileClassName(
