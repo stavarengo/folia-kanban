@@ -11,9 +11,10 @@ import { Markdown } from "../src/ui/Markdown";
 import { columnEffectiveOrders } from "../src/model/cardOrder";
 import { matchQuery } from "../src/model/filter";
 import { BLOCKS } from "../src/model/relationships";
+import { PartlyWritten } from "../src/model/repo";
 import type { BoardConfig, Card } from "../src/model/types";
 import { DEFAULT_BOARD_SETTINGS as DEFAULT_SETTINGS } from "./boardSettings";
-import { testHost } from "./fakeHost";
+import { fakeDetailModals, testHost } from "./fakeHost";
 import { FakeRepo } from "./fakeRepo";
 
 const config: BoardConfig = {
@@ -42,16 +43,34 @@ const task = (fm: Record<string, unknown> = {}, body = "") => ({
 const board = (notes: Notes = { "Tasks/Alpha.md": task() }, over: Partial<BoardConfig> = {}) =>
   new FakeRepo({ ...config, ...over }, notes);
 
-const renderApp = (repo: FakeRepo, settings = DEFAULT_SETTINGS) =>
+const renderApp = (repo: FakeRepo, settings = DEFAULT_SETTINGS, host = testHost()) =>
   render(
     <App
       repo={repo}
       settings={settings}
       onUpdateSettings={() => {}}
       today="2026-06-13"
-      host={testHost()}
+      host={host}
     />,
   );
+
+/** Render the board with a dialog stand-in the test can ask whether it closed. */
+function renderWithDialog(repo: FakeRepo, settings = DEFAULT_SETTINGS) {
+  const modals = fakeDetailModals();
+  renderApp(repo, settings, { ...testHost(), openDetailModal: modals.openDetailModal });
+  return modals;
+}
+
+/** A write the test finishes by hand, so that something can happen while it is in flight. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 const tileOf = (title: HTMLElement) => title.closest(".folia-card") as HTMLElement;
 
@@ -197,7 +216,7 @@ describe("names and tooltips read a title's words, not its Markdown", () => {
       return el as HTMLElement;
     });
     const tile = tileOf(drawn);
-    expect(tile.querySelector(".folia-card-main")).toHaveAccessibleName(
+    expect(tile.querySelector(".folia-card-open")).toHaveAccessibleName(
       `${WORDS}, 0 of 2 subtasks done`,
     );
     for (const name of [
@@ -476,6 +495,8 @@ describe("a typed title is never lost", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(
         '"Read the paper" was added, but giving it what its column\'s rule asks for failed: EIO: the disk refused the write. The card is at Tasks/Read the paper.md; set the rest by hand rather than adding it again.',
       );
+      // The card exists, so the reason is not announced as a title that was not saved.
+      expect(screen.getByRole("alert")).not.toHaveTextContent("Not saved");
       expect(field).toHaveValue("Read the paper");
       expect(repo.files.has("Tasks/Read the paper.md")).toBe(true);
     });
@@ -514,7 +535,24 @@ describe("a typed title is never lost", () => {
       await act(async () => finish());
 
       await waitFor(() => expect(repo.files.has("Tasks/First.md")).toBe(true));
+      await screen.findByText("First", { selector: ".folia-card-title" });
+      // The composer is still open around the newer words: the field is the one on screen, not
+      // one that kept its value after being taken away.
+      expect(field).toBeInTheDocument();
+      expect(screen.getByLabelText("New card title")).toBe(field);
       expect(field).toHaveValue("First and more");
+    });
+
+    it("closes once the card exists when nothing more was typed", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      renderApp(repo);
+      await screen.findByText("Alpha");
+      await typeInto(user, await openComposer(user), "First");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(repo.files.has("Tasks/First.md")).toBe(true));
+      await waitFor(() => expect(screen.queryByLabelText("New card title")).toBeNull());
     });
   });
 
@@ -540,6 +578,31 @@ describe("a typed title is never lost", () => {
       await user.click(within(detail).getByRole("button", { name: "Create" }));
       expect(await screen.findByRole("dialog", { name: WORDS })).toBeInTheDocument();
       expect(repo.files.get(`Tasks/${WORDS}.md`)!.fm["title"]).toBe(LINKED);
+    });
+
+    it("keeps the dialog open, with the text and the reason, when it is closed while the card is being written and the write fails", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      const write = deferred<string>();
+      vi.spyOn(repo, "createCard").mockReturnValueOnce(write.promise);
+      const modals = renderWithDialog(repo, { ...DEFAULT_SETTINGS, addCardFlow: "detail" });
+      await screen.findByText("Alpha");
+      await user.click(screen.getByLabelText("Add card to Todo"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("New card title");
+      await typeInto(user, field, LINKED);
+      await user.keyboard("{Enter}");
+      // The form gives way to the card it makes, so nothing more can be typed into it meanwhile.
+      expect(field).toHaveAttribute("readonly");
+
+      await user.keyboard("{Escape}");
+      await act(async () => write.reject(failure()));
+
+      expect(await within(detail).findByRole("alert")).toHaveTextContent("Not saved: EIO");
+      expect(modals.current()?.closed).toBe(false);
+      expect(field).toBeInTheDocument();
+      expect(field).toHaveValue(LINKED);
+      expect(field).not.toHaveAttribute("readonly");
     });
   });
 
@@ -594,14 +657,14 @@ describe("a typed title is never lost", () => {
       rename.mockRestore();
     });
 
-    it("shows what the repository says when the title was saved and only the file could not follow", async () => {
+    it("says the title was saved when only the file could not follow, and renames the file on the next try", async () => {
       const user = userEvent.setup();
       const repo = board();
       const halfway =
-        "The title was saved, but the file could not be renamed to match: EBUSY. It is still called Alpha.md.";
-      vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path) => {
+        "The title was saved, but the file could not be renamed to match: EBUSY. It is still called Alpha.md. Try again to rename it.";
+      const rename = vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path) => {
         repo.files.get(path)!.fm["title"] = LINKED;
-        throw new Error(halfway);
+        throw new PartlyWritten(halfway);
       });
       renderApp(repo);
       const input = await startRename(user, "Alpha");
@@ -610,8 +673,119 @@ describe("a typed title is never lost", () => {
       await user.keyboard("{Enter}");
 
       const tile = input.closest(".folia-card") as HTMLElement;
-      expect(await within(tile).findByRole("alert")).toHaveTextContent(`Not saved: ${halfway}`);
+      const alert = await within(tile).findByRole("alert");
+      // The title is in the note: the reason must not open by saying it was not saved.
+      expect(alert).toHaveTextContent(new RegExp(`^${halfway.replace(/[.]/g, "\\.")}$`));
+      expect(input).toBeInTheDocument();
       expect(input).toHaveValue(LINKED);
+
+      // The card already reads this title, and the next Enter still reaches the repository, as
+      // the retry of a save that got only part of the way.
+      await user.type(input, "{Enter}");
+      await waitFor(() => expect(repo.files.has(`Tasks/${WORDS}.md`)).toBe(true));
+      expect(rename).toHaveBeenLastCalledWith("Tasks/Alpha.md", LINKED, { retry: true });
+      expect(repo.files.has("Tasks/Alpha.md")).toBe(false);
+      await waitFor(() => expect(screen.queryByLabelText("Card title")).toBeNull());
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("keeps the input and the reason on the tile the card is drawn in after its file was renamed", async () => {
+      const user = userEvent.setup();
+      // A card whose title is in `title:`. Renamed to a plain title, its file takes the new name
+      // and the old property is then taken away, which is the step that fails here.
+      const repo = board({ [`Tasks/${WORDS}.md`]: task({ title: LINKED }) });
+      const stuck =
+        "The file is now called Plain title.md, but the note's old `title` property could not be removed, so the card still shows it: EIO. Try again.";
+      const rename = repo.renameCard.bind(repo);
+      vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path, title) => {
+        const dest = await rename(path, title);
+        repo.files.get(dest)!.fm["title"] = LINKED;
+        throw new PartlyWritten(stuck);
+      });
+      renderApp(repo);
+      const drawn = await waitFor(() => {
+        const el = document.querySelector(".folia-title-markdown");
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      fireEvent.contextMenu(drawn);
+      await user.click(
+        within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Rename" }),
+      );
+      const input = screen.getByLabelText("Card title");
+      await user.clear(input);
+      await typeInto(user, input, "Plain title");
+      await user.keyboard("{Enter}");
+
+      // The card is drawn anew under its new path: what was typed and why it stopped are on it.
+      const tile = await waitFor(() => {
+        const el = document.querySelector('[data-path="Tasks/Plain title.md"]');
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      const kept = await within(tile).findByLabelText("Card title");
+      expect(kept).toBeInTheDocument();
+      expect(kept).toHaveValue("Plain title");
+      expect(within(tile).getByRole("alert")).toHaveTextContent(stuck);
+      expect(within(tile).getByRole("alert")).not.toHaveTextContent("Not saved");
+      // It had the focus when the tile was replaced, and has it again.
+      expect(kept).toHaveFocus();
+
+      // The next Enter finishes the job.
+      await user.type(kept, "{Enter}");
+      await waitFor(() =>
+        expect(repo.files.get("Tasks/Plain title.md")!.fm).not.toHaveProperty("title"),
+      );
+      await waitFor(() => expect(screen.queryByLabelText("Card title")).toBeNull());
+    });
+
+    it("keeps words typed while a rename was being written, on the tile the card is drawn in afterwards", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      const gate = deferred<void>();
+      const rename = repo.renameCard.bind(repo);
+      vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path, title) => {
+        await gate.promise;
+        return rename(path, title);
+      });
+      renderApp(repo);
+      const input = await startRename(user, "Alpha");
+      await user.clear(input);
+      await typeInto(user, input, "First");
+      await user.keyboard("{Enter}");
+      await user.type(input, " and more");
+      await act(async () => gate.resolve());
+
+      await waitFor(() => expect(repo.files.has("Tasks/First.md")).toBe(true));
+      const tile = await waitFor(() => {
+        const el = document.querySelector('[data-path="Tasks/First.md"]');
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      const kept = await within(tile).findByLabelText("Card title");
+      expect(kept).toBeInTheDocument();
+      expect(kept).toHaveValue("First and more");
+      // The caret stays where it was: the next key adds to the words, and does not replace them.
+      expect((kept as HTMLInputElement).selectionStart).toBe("First and more".length);
+    });
+
+    it("keeps what is being typed when someone else moves the card to another column", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      renderApp(repo);
+      const input = await startRename(user, "Alpha");
+      await user.clear(input);
+      await typeInto(user, input, "Alpha, half typed");
+
+      // An agent, sync or another pane files the card under Doing while the rename is open.
+      await act(async () => {
+        repo.files.get("Tasks/Alpha.md")!.fm["status"] = "doing";
+        repo.notify();
+      });
+
+      const doing = screen.getByText("Doing").closest("section") as HTMLElement;
+      const kept = await within(doing).findByLabelText("Card title");
+      expect(kept).toHaveValue("Alpha, half typed");
     });
   });
 
@@ -668,6 +842,155 @@ describe("a typed title is never lost", () => {
       await screen.findByRole("heading", { level: 2, name: "Alpha, by someone else" });
       expect(field).toHaveValue("Alpha, as I meant it");
     });
+
+    it("keeps the text when the card is refreshed while its save is in flight, and the save then fails", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      const write = deferred<string>();
+      vi.spyOn(repo, "renameCard").mockReturnValueOnce(write.promise);
+      renderApp(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, "Alpha, as I meant it");
+      await user.keyboard("{Enter}");
+
+      // The card is retitled from elsewhere before the save has answered.
+      await act(async () => {
+        repo.files.get("Tasks/Alpha.md")!.fm["title"] = "Alpha, by someone else";
+        repo.notify();
+      });
+      await screen.findByRole("heading", { level: 2, name: "Alpha, by someone else" });
+      expect(field).toHaveValue("Alpha, as I meant it");
+
+      await act(async () => write.reject(failure()));
+      expect(await within(detail).findByRole("alert")).toHaveTextContent("Not saved: EIO");
+      expect(field).toHaveValue("Alpha, as I meant it");
+    });
+
+    it("shows the note's answer once a save went through, when that is not what was typed", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      renderApp(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, "Alpha   with   spaces");
+      await user.keyboard("{Enter}");
+
+      // A title is stored as one line with single spaces, and the field follows what was stored.
+      await waitFor(() => expect(repo.files.has("Tasks/Alpha with spaces.md")).toBe(true));
+      await waitFor(() => expect(field).toHaveValue("Alpha with spaces"));
+    });
+
+    it("renames the file on the next try once the title was saved and only the move had failed", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      const halfway =
+        "The title was saved, but the file could not be renamed to match: EBUSY. It is still called Alpha.md. Try again to rename it.";
+      const rename = vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path) => {
+        repo.files.get(path)!.fm["title"] = LINKED;
+        throw new PartlyWritten(halfway);
+      });
+      renderApp(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, LINKED);
+      await user.keyboard("{Enter}");
+
+      const alert = await within(detail).findByRole("alert");
+      expect(alert).toHaveTextContent(halfway);
+      expect(alert).not.toHaveTextContent("Not saved");
+      expect(within(detail).getByText("File: Alpha.md")).toBeInTheDocument();
+
+      // Leaving the field again, with the very title the card now has, retries the rename.
+      await user.click(field);
+      await user.tab();
+      await waitFor(() => expect(repo.files.has(`Tasks/${WORDS}.md`)).toBe(true));
+      expect(rename).toHaveBeenLastCalledWith("Tasks/Alpha.md", LINKED, { retry: true });
+      await waitFor(() => expect(within(detail).queryByRole("alert")).toBeNull());
+      expect(field).toHaveValue(LINKED);
+    });
+
+    it("keeps the dialog open, with the text and the reason, when it is closed and the title cannot be saved", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      vi.spyOn(repo, "renameCard").mockRejectedValue(failure());
+      const modals = renderWithDialog(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, "Alpha, as I meant it");
+      // Closing is what commits the field, and the commit is what fails.
+      await user.keyboard("{Escape}");
+
+      const alert = await within(detail).findByRole("alert");
+      expect(alert).toHaveTextContent(
+        "Not saved: EIO: the disk refused the write. Press Escape in the field to go back to the title the card has.",
+      );
+      expect(modals.current()?.closed).toBe(false);
+      expect(field).toBeInTheDocument();
+      expect(field).toHaveValue("Alpha, as I meant it");
+      // The field has the focus again, so its reason is in view.
+      await waitFor(() => expect(field).toHaveFocus());
+
+      // The close button gets the same answer: the title is tried again, and still cannot go.
+      await user.click(within(modals.current()!.containerEl).getByLabelText("Close dialog"));
+      await waitFor(() => expect(field).toHaveFocus());
+      expect(modals.current()?.closed).toBe(false);
+      expect(field).toHaveValue("Alpha, as I meant it");
+
+      // Only the person gives the text up: Escape in the field goes back to the card's title...
+      await user.keyboard("{Escape}");
+      expect(field).toHaveValue("Alpha");
+      expect(within(detail).queryByRole("alert")).toBeNull();
+      expect(modals.current()?.closed).toBe(false);
+      // ...and with nothing unsaved left, the next one closes the dialog.
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+    });
+
+    it("closes the dialog once a title that was being saved has gone through", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      renderWithDialog(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, "Alpha, renamed");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(screen.queryByTestId("card-detail")).toBeNull());
+      expect(repo.files.has("Tasks/Alpha, renamed.md")).toBe(true);
+    });
+
+    it("stays on the card, with the text and the reason, when a link to another card is followed and the title cannot be saved", async () => {
+      const user = userEvent.setup();
+      const repo = board({
+        "Tasks/Alpha.md": task({}, "\n## Subtasks\n- [ ] [[Child]]\n"),
+        "Tasks/Child.md": task(),
+      });
+      vi.spyOn(repo, "renameCard").mockRejectedValue(failure());
+      renderWithDialog(repo);
+      await user.click(await screen.findByText("Alpha", { selector: ".folia-card-title" }));
+      const detail = await screen.findByTestId("card-detail");
+      const field = within(detail).getByLabelText("Title");
+      await user.clear(field);
+      await typeInto(user, field, "Alpha, as I meant it");
+      // The click takes the focus from the field, which commits it, and asks for the other card.
+      await user.click(within(detail).getByRole("button", { name: "Child" }));
+
+      expect(await within(detail).findByRole("alert")).toHaveTextContent("Not saved: EIO");
+      expect(screen.getByRole("dialog", { name: "Alpha" })).toBeInTheDocument();
+      expect(field).toBeInTheDocument();
+      expect(field).toHaveValue("Alpha, as I meant it");
+    });
   });
 
   describe("in the panel's subcard box", () => {
@@ -675,7 +998,7 @@ describe("a typed title is never lost", () => {
       const user = userEvent.setup();
       const repo = board();
       const unlinked = `"${LINKED}" was created at Tasks/${WORDS}.md, but linking it from its parent failed: EBUSY. Link it by hand rather than adding it again.`;
-      vi.spyOn(repo, "addSubcard").mockRejectedValueOnce(new Error(unlinked));
+      vi.spyOn(repo, "addSubcard").mockRejectedValueOnce(new PartlyWritten(unlinked));
       renderApp(repo);
       await user.click(await screen.findByText("Alpha"));
       const detail = await screen.findByTestId("card-detail");
@@ -683,9 +1006,32 @@ describe("a typed title is never lost", () => {
       await typeInto(user, box, LINKED);
       await user.keyboard("{Enter}");
 
-      expect(await within(detail).findByRole("alert")).toHaveTextContent(`Not saved: ${unlinked}`);
+      const alert = await within(detail).findByRole("alert");
+      expect(alert).toHaveTextContent(unlinked);
+      // The subcard exists: the reason is not announced as a title that was not saved.
+      expect(alert).not.toHaveTextContent("Not saved");
       expect(box).toHaveValue(LINKED);
       expect(box).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("keeps the dialog open, with the title and the reason, when it is closed while the subcard is being written and the write fails", async () => {
+      const user = userEvent.setup();
+      const repo = board();
+      const write = deferred<string>();
+      vi.spyOn(repo, "addSubcard").mockReturnValueOnce(write.promise);
+      const modals = renderWithDialog(repo);
+      await user.click(await screen.findByText("Alpha"));
+      const detail = await screen.findByTestId("card-detail");
+      const box = within(detail).getByLabelText("Add a subcard");
+      await typeInto(user, box, LINKED);
+      await user.keyboard("{Enter}");
+      await user.keyboard("{Escape}");
+      await act(async () => write.reject(failure()));
+
+      expect(await within(detail).findByRole("alert")).toHaveTextContent("Not saved: EIO");
+      expect(modals.current()?.closed).toBe(false);
+      expect(box).toBeInTheDocument();
+      expect(box).toHaveValue(LINKED);
     });
 
     it("adds a subcard under its whole title, linked by its file name", async () => {

@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Settled } from "./detailDialog";
 
 /**
  * A one-line field's local draft, committed on blur/Enter. The persisted value follows the note
- * (a reload after an external edit), and the draft follows it too — but only a draft that still
- * reads what the field showed before: anything typed, committed or not, is never taken away. So a
- * write that fails keeps its text in the field, and an edit landing from elsewhere waits for the
- * field to be left. `normalize` rewrites the draft on commit (stripping it, say) and can refuse it
- * with `null`, which writes nothing and leaves the text as typed.
+ * (a reload after an external edit), and the draft follows it too, but only a draft that is
+ * clean: one that still reads what the note said, with no save in flight and none that failed.
+ * Anything typed is never taken away. `normalize` rewrites the draft on commit (stripping it, say)
+ * and can refuse it with `null`, which writes nothing and leaves the text as typed.
  *
- * Committing counts as showing what was committed. That matters where the write answers back with
- * something other than what was asked for — a file name made safe to use as one, or given a
- * suffix because that name was taken — since the field would otherwise keep the asked-for text,
- * read as still unsaved, and re-submit it on the next blur, renaming again and again.
+ * Three things are kept apart, because each answers a different question about an incoming value:
  *
- * A write that answers `false` did not happen, so the field goes back to reading as unsaved: the
- * text stays, nothing arriving from the note may replace it, and the next blur tries again.
+ * - the save in flight. Its text must outlive whatever the note says meanwhile, since the save
+ *   may yet fail, and a failure has to find the text still in the field;
+ * - the save that failed (`onCommit` answered `false`). Its text stays until it is saved or given
+ *   up, nothing arriving from the note may replace it, and committing it again is sent as a
+ *   retry even when the note already reads that text: a save can fail after storing the value;
+ * - what the note last said to a clean field. A save that went through makes the field clean
+ *   again, and it then shows the note's answer, which need not be what was asked for: a file name
+ *   made safe to use as one, or given a number because the name was taken.
  */
 export function useFieldDraft(
   value: string,
-  onCommit: (v: string) => void | Promise<boolean>,
+  onCommit: (v: string, retry: boolean) => void | Promise<boolean>,
   normalize: (v: string) => string | null = (v) => v,
 ) {
   const [draft, setDraftState] = useState(value);
@@ -29,27 +32,79 @@ export function useFieldDraft(
     latest.current = d;
     setDraftState(d);
   }, []);
-  const shown = useRef(value);
+  const base = useRef(value);
+  const pending = useRef<Promise<boolean> | null>(null);
+  // Set by a commit asked for while another is in flight: it runs once that one is through.
+  const again = useRef(false);
+  const failedText = useRef<string | null>(null);
+  const [failed, setFailedState] = useState(false);
+  const setFailed = (text: string | null) => {
+    failedText.current = text;
+    setFailedState(text !== null);
+  };
   const persisted = useRef(value);
   persisted.current = value;
   useEffect(() => {
-    const before = shown.current;
-    shown.current = value;
+    if (pending.current !== null || failedText.current !== null) return;
+    const before = base.current;
+    base.current = value;
     if (latest.current === before) setDraft(value);
   }, [value, setDraft]);
-  const commit = () => {
+
+  /** Start the save the draft asks for. Answers how it ends, or at once when there is none. */
+  const save = (): Settled => {
+    if (pending.current) {
+      again.current = true;
+      return pending.current;
+    }
     const typed = latest.current;
     const next = normalize(typed);
-    if (next === null) return;
+    if (next === null) return false;
     if (next !== typed) setDraft(next);
+    const retry = failedText.current === next;
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
-    if (next === normalize(value)) return;
-    shown.current = next;
-    void onCommit(next)?.then((written) => {
-      if (!written && shown.current === next) shown.current = persisted.current;
+    if (next === normalize(persisted.current) && !retry) {
+      setFailed(null);
+      base.current = persisted.current;
+      return true;
+    }
+    const from = persisted.current;
+    const answer = onCommit(next, retry);
+    if (!answer) {
+      setFailed(null);
+      base.current = next;
+      return true;
+    }
+    const done: Promise<boolean> = answer.then((written) => {
+      pending.current = null;
+      if (!written) {
+        again.current = false;
+        setFailed(next);
+        return false;
+      }
+      setFailed(null);
+      // The note may have answered while the save was in flight. A draft that still reads what
+      // was sent takes the answer; words typed since stay, and are saved next.
+      const answered = persisted.current !== from;
+      base.current = answered ? persisted.current : next;
+      if (answered && latest.current === next) setDraft(persisted.current);
+      if (!again.current) return true;
+      again.current = false;
+      return save();
     });
+    pending.current = done;
+    return done;
   };
-  return { draft, setDraft, commit };
+  const commit = () => {
+    void save();
+  };
+  /** Give up what is typed: the field reads what the note says again. */
+  const revert = () => {
+    setFailed(null);
+    base.current = persisted.current;
+    setDraft(persisted.current);
+  };
+  return { draft, setDraft, commit, flush: save, revert, failed };
 }
 
 export const trimmed = (v: string) => v.trim();

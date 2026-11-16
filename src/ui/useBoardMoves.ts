@@ -5,8 +5,8 @@ import type { MatchContext } from "../model/filter";
 import { resolveDrop } from "../model/board";
 import { addCard, moveCardOver } from "../model/boardOps";
 import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
-import { failureReason, laneSubject } from "./cardActions";
-import type { HeldOutcome } from "./useInlineDraft";
+import { laneSubject } from "./cardActions";
+import { titleFailure, type HeldOutcome } from "./useInlineDraft";
 
 /** The board's own writes: a card dropped somewhere, a card added to a column, and the lane rule both answer to. */
 export function useBoardMoves({
@@ -92,7 +92,7 @@ export function useBoardMoves({
         // A card made without what its column's rule asks for is still on the board, and the
         // reason says so, which is why the board is read again either way.
         void load();
-        return { sent: false, reason: failureReason(e) };
+        return { sent: false, failure: titleFailure(e) };
       }
       // The answer does not wait for the board: the card exists, so the composer can let go of
       // its title now, before a tile for it is drawn beside the same words still in the field.

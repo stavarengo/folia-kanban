@@ -58,7 +58,7 @@ export class KanbanView extends FileView {
       // failed to load, a tab with no board note yet — would silently eat the key.
       return () => registered.forEach((handler) => scope.unregister(handler));
     },
-    openDetailModal: (onClosed) => openDetailModal(this.app, onClosed),
+    openDetailModal: (onClosed, mayClose) => openDetailModal(this.app, onClosed, mayClose),
     agents: this.plugin.agents,
   };
 

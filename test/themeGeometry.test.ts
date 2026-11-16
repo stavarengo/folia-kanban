@@ -190,3 +190,11 @@ describe("values the board's code shares with the theme", () => {
     }
   });
 });
+
+describe("a link in a card's title", () => {
+  it("carries the title's weight instead of the weight the host gives links in prose", () => {
+    expect(declarations(".folia-scope .folia-title-markdown a")).toMatchObject({
+      "font-weight": "inherit",
+    });
+  });
+});

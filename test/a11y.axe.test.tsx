@@ -100,6 +100,35 @@ describe("a11y axe gate (no violations)", () => {
     expect(summarize(violations)).toEqual([]);
   }, 30000);
 
+  // A title's links are real anchors here, as the app's renderer draws them. Inside the tile's
+  // button they would be interactive elements nested in another, which axe reports as serious.
+  const linkedRepo = () => {
+    const repo = makeRepo();
+    repo.drawLinks = true;
+    repo.files.get("Tasks/Gamma.md")!.fm["title"] =
+      "monitor [MR130903](https://gitlab.example/mr/130903) for [[Alpha|the launch]]";
+    return repo;
+  };
+
+  it("a card whose title holds links has no axe violations, on the board or in its panel", async () => {
+    const user = userEvent.setup();
+    render_(linkedRepo());
+    const link = await screen.findByRole("link", { name: "MR130903" });
+    const tile = link.closest(".folia-card") as HTMLElement;
+    expect(within(tile).getByRole("link", { name: "the launch" })).toBeInTheDocument();
+    // The card's own button is beside the links, never around them.
+    const control = tile.querySelector(".folia-card-open") as HTMLElement;
+    expect(control).toHaveAccessibleName(/^monitor MR130903 for the launch/);
+    expect(control.contains(link)).toBe(false);
+    expect(link.closest('[role="button"]')).toBeNull();
+    expect(summarize((await run(document.body)).violations)).toEqual([]);
+
+    await user.click(tile.querySelector(".folia-card-main") as HTMLElement);
+    const detail = await screen.findByTestId("card-detail");
+    await within(detail).findByRole("link", { name: "MR130903" });
+    expect(summarize((await run(document.body)).violations)).toEqual([]);
+  }, 30000);
+
   // Both agent states at once: a countdown with its two links on one tile, a run on another.
   it("a card waiting on an agent, and one an agent is working on, have no axe violations", async () => {
     const repo = makeRepo();

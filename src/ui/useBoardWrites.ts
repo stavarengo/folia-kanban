@@ -9,13 +9,15 @@ import type { useDetailPanel } from "./useDetailPanel";
 import { cardActions, cardViewActions, type CardActionDeps } from "./cardActions";
 import { todoActions } from "./todoActions";
 import { columnActions } from "./columnActions";
+import { useTitleEditsStore } from "./titleEdits";
 
 /** Stable empty column list, so the actions object keeps its identity before the board loads. */
 const EMPTY_COLUMNS: readonly ColumnDef[] = [];
 const EMPTY_PRIORITIES: readonly string[] = [];
 
 /**
- * Everything the board writes: a drop, an added card, and the actions object. They read the latest
+ * Everything the board writes: a drop, an added card, the actions object, and the titles still
+ * being typed into tiles. The first three read the latest
  * board and match context through refs, so they can stay stable across reloads.
  */
 export function useBoardWrites({
@@ -83,7 +85,9 @@ export function useBoardWrites({
     doneColumnId,
     priorities,
   });
-  return { actions, onMove: moves.onMove, onAddCard: moves.onAddCard };
+  // What is typed into a tile's rename box is a write not made yet, and is kept with the writes.
+  const titleEdits = useTitleEditsStore(repo);
+  return { actions, onMove: moves.onMove, onAddCard: moves.onAddCard, titleEdits };
 }
 
 /**

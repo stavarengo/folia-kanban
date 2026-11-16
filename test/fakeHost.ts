@@ -1,4 +1,5 @@
 import type { BoardHost, DetailModalHandle } from "../src/ui/App";
+import type { Settled } from "../src/ui/detailDialog";
 import type { AgentLaunches } from "../src/model/agent";
 
 /** One open stand-in for the detail panel's dialog, as a test can drive it. */
@@ -12,12 +13,16 @@ export interface FakeDetailModal extends DetailModalHandle {
 /**
  * Stands in for `src/obsidian/detailModal.ts`, keeping the behaviour the panel relies on: the
  * dialog sees Escape before anything inside it, a pushed Escape handler wins over closing, closing
- * blurs the focused field first so it commits, and focus goes back to whatever had it at open.
+ * blurs the focused field first so it commits and then asks the panel whether it may go (waiting
+ * for a save in flight, staying open on a no), and focus goes back to whatever had it at open.
  * The dialog lands in `doc`, the way Obsidian opens a modal on the active window.
  */
 export function fakeDetailModals(doc: Document = document) {
   const opened: FakeDetailModal[] = [];
-  const openDetailModal = (onClosed: () => void): FakeDetailModal => {
+  const openDetailModal = (
+    onClosed: () => void,
+    mayClose: () => Settled = () => true,
+  ): FakeDetailModal => {
     const opener = doc.activeElement as HTMLElement | null;
     const containerEl = doc.createElement("div");
     const closeButton = doc.createElement("button");
@@ -28,6 +33,7 @@ export function fakeDetailModals(doc: Document = document) {
     doc.body.appendChild(containerEl);
     const escapes: (() => void)[] = [];
     let closed = false;
+    let closing = false;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || opened.at(-1) !== modal) return;
       e.preventDefault();
@@ -44,8 +50,7 @@ export function fakeDetailModals(doc: Document = document) {
         return closed;
       },
       close() {
-        if (closed) return;
-        closed = true;
+        if (closed || closing) return;
         const focused = doc.activeElement as HTMLElement | null;
         if (
           focused &&
@@ -53,6 +58,21 @@ export function fakeDetailModals(doc: Document = document) {
           (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA")
         )
           focused.blur();
+        const may = mayClose();
+        if (may === true) {
+          modal.dispose();
+          return;
+        }
+        if (may === false) return;
+        closing = true;
+        void may.then((ok) => {
+          closing = false;
+          if (ok) modal.dispose();
+        });
+      },
+      dispose() {
+        if (closed) return;
+        closed = true;
         doc.removeEventListener("keydown", onKey, true);
         containerEl.remove();
         opened.splice(opened.indexOf(modal), 1);

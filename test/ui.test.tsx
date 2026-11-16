@@ -2172,7 +2172,9 @@ describe("drag overlay portal", () => {
   it("renders the lifted card ghost into the document body, outside the .folia-root subtree", async () => {
     const user = userEvent.setup();
     render_(makeRepo());
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }"); // Space → pick up the focused card
 
@@ -2196,10 +2198,12 @@ describe("drag overlay portal", () => {
     const repo = makeRepo();
     repo.files.get("Tasks/Alpha.md")!.fm["assignee"] = "Maximiliana Wolfeschlegelsteinhausen";
     render_(repo);
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     const chipsOf = (el: Element) =>
       [...el.querySelectorAll(".folia-chip")].map((chip) => chip.innerHTML);
-    const tileChips = chipsOf(main);
+    const tileChips = chipsOf(main.closest(".folia-card")!);
     main.focus();
     await user.keyboard("{ }");
 
@@ -2231,7 +2235,9 @@ describe("reduced-motion drag", () => {
     );
     const user = userEvent.setup();
     render_(makeRepo());
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     // dnd-kit puts the overlay's transition on the positioned wrapper around our ghost.
@@ -2327,7 +2333,7 @@ describe("card context menu", () => {
     const focusCard = async (cardName: string, repo = ctxRepo()) => {
       render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
       const tile = (await screen.findByText(cardName)).closest(".folia-card") as HTMLElement;
-      const main = tile.querySelector<HTMLElement>(".folia-card-main")!;
+      const main = tile.querySelector<HTMLElement>(".folia-card-open")!;
       main.focus();
       return { repo, main };
     };
@@ -2408,7 +2414,7 @@ describe("card context menu", () => {
     const repo = ctxRepo();
     render_(repo, { ...DEFAULT_SETTINGS, cardNextTodos: 2 });
     const tile = (await screen.findByText("First")).closest(".folia-card") as HTMLElement;
-    const main = tile.querySelector<HTMLElement>(".folia-card-main")!;
+    const main = tile.querySelector<HTMLElement>(".folia-card-open")!;
     fireEvent.contextMenu(main, { clientX: 0, clientY: 0 });
     expect(repo.menus.at(-1)?.at).toEqual({ below: main });
   });
@@ -4295,7 +4301,9 @@ describe("cross-column make-room (live relocation gap)", () => {
     placeCards();
     const user = userEvent.setup();
     render_(crossRepo());
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }"); // pick up Alpha (still in todo)
     expect(cardsIn("Todo")).toContain("Tasks/Alpha.md");
@@ -4331,7 +4339,9 @@ describe("cross-column make-room (live relocation gap)", () => {
       },
     );
     render_(repo);
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     expect(cardsIn("Todo")).toEqual(["Tasks/Alpha.md"]); // the fallback column drew it
     main.focus();
     await user.keyboard("{ }");
@@ -4365,7 +4375,9 @@ describe("cross-column make-room (live relocation gap)", () => {
       },
     );
     render_(repo);
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     await crossIntoDoing(user);
@@ -4404,7 +4416,10 @@ describe("cross-column make-room (live relocation gap)", () => {
     // Matching the rule, Alpha is already drawn twice — in Todo and in the lane. Drag the Todo one.
     await screen.findAllByText("Alpha");
     const todoCol = screen.getByText("Todo").closest("section") as HTMLElement;
-    const main = within(todoCol).getByText("Alpha").closest(".folia-card-main") as HTMLElement;
+    const main = within(todoCol)
+      .getByText("Alpha")
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     await crossIntoDoing(user);
@@ -4419,7 +4434,9 @@ describe("cross-column make-room (live relocation gap)", () => {
     const user = userEvent.setup();
     const repo = crossRepo();
     render_(repo);
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     await crossIntoDoing(user);
@@ -4434,7 +4451,9 @@ describe("cross-column make-room (live relocation gap)", () => {
     const user = userEvent.setup();
     const repo = crossRepo();
     render_(repo);
-    const main = (await screen.findByText("Alpha")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     await crossIntoDoing(user);
@@ -4463,7 +4482,9 @@ describe("cross-column make-room (live relocation gap)", () => {
     cardY["Tasks/First.md"] = 40;
     cardY["Tasks/Echo.md"] = 110;
     render_(repo);
-    const main = (await screen.findByText("beta")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("beta"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     main.focus();
     await user.keyboard("{ }");
     await crossIntoDoing(user);
@@ -4504,7 +4525,9 @@ describe("cross-column make-room (live relocation gap)", () => {
     cardY["Tasks/First.md#todo:0"] = 40;
     cardY["Tasks/First.md"] = 40;
     render_(repo);
-    const main = (await screen.findByText("beta")).closest(".folia-card-main") as HTMLElement;
+    const main = (await screen.findByText("beta"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
     expect(cardsIn("Done")).toContain("Tasks/First.md#todo:0");
     main.focus();
     await user.keyboard("{ }");
@@ -4933,16 +4956,16 @@ describe("unread comments", () => {
     expect(
       within(alpha).getByLabelText("2 comments, 1 unread comment, a reply to yours"),
     ).toHaveClass("folia-comments-reply");
-    // The tile's own name carries it too: everything in the tile is inside a role="button", so a
-    // label on the badge alone would never be announced.
+    // The tile's own name carries it too: it is what a screen reader says for the card's button,
+    // which the badge is not part of.
     expect(
       within(alpha).getByLabelText("Alpha, 1 unread comment, a reply to yours"),
     ).toBeInTheDocument();
   });
 
   it("names the tile with its subtask progress before its unread comments", async () => {
-    // The bar sits inside the tile's role="button" as well, so the name is the only place a screen
-    // reader hears how far the card has got.
+    // The bar is drawn beside the tile's button, not inside it, so the button's name is where a
+    // screen reader hears how far the card has got.
     render_(
       new FakeRepo(config, {
         "Tasks/Alpha.md": {
@@ -7622,9 +7645,9 @@ describe("an agent launch on the tile", () => {
     return launches;
   }
   const tile = () => document.querySelector(`[data-path="${ALPHA}"]`) as HTMLElement;
-  const face = () => tile().querySelector(".folia-card-main") as HTMLElement;
+  const face = () => tile().querySelector(".folia-card-open") as HTMLElement;
 
-  it("shows a countdown with Cancel and Now beside the card's face, never inside it", async () => {
+  it("shows a countdown with Cancel and Now beside the card's own control, never inside it", async () => {
     const launches = renderWithLaunches();
     await screen.findByText("Alpha", { selector: ".folia-card-title" });
     expect(tile().querySelector(".folia-agent-pending")).toBeNull();

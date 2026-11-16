@@ -75,7 +75,7 @@ export function useTileEvents({
     // A contextmenu fired from the keyboard can report (0, 0) rather than a point on the card.
     const byKeyboard = e.clientX === 0 && e.clientY === 0;
     openMenu(
-      byKeyboard ? { below: cardMain(e.currentTarget) } : { event: e.nativeEvent },
+      byKeyboard ? { below: cardControl(e.currentTarget) } : { event: e.nativeEvent },
       (e.target as HTMLElement).closest(".folia-card-next-todo"),
     );
   };
@@ -120,7 +120,7 @@ function isMenuKey(e: KeyboardEvent): boolean {
   );
 }
 
-/** The card's focusable face, which a menu opened without a pointer sits under and returns to. */
-function cardMain(el: Element): HTMLElement {
-  return (el.querySelector(".folia-card-main") ?? el) as HTMLElement;
+/** The card's own control, which a menu opened without a pointer sits under and returns to. */
+function cardControl(el: Element): HTMLElement {
+  return (el.querySelector(".folia-card-open") ?? el) as HTMLElement;
 }

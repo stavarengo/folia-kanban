@@ -7,6 +7,7 @@ import { plainTitleText } from "../model/cardTitle";
 import { baseName, parentFolder, relativeToFolder } from "../model/pathOps";
 import type { BoardSettings, SettingsPatch } from "../settings";
 import type { BoardActions, CopyPathForm } from "./context";
+import { titleFailure, type TitleFailure } from "./useInlineDraft";
 
 /** What the card actions write through and read from. */
 export interface CardActionDeps {
@@ -69,10 +70,10 @@ export function cardActions(
         await load();
       }
     },
-    renameCard: async (path, title) => {
+    renameCard: async (path, title, retry = false) => {
       const t = title.trim();
       if (!t) return null; // empty/whitespace title rejected — caller reverts to the old title
-      return runRename(d, path, () => repo.renameCard(path, t));
+      return runRename(d, path, () => repo.renameCard(path, t, { retry }));
     },
   };
 }
@@ -225,7 +226,7 @@ async function runRename(
   d: CardActionDeps,
   path: string,
   rename: () => Promise<string>,
-): Promise<string | null> {
+): Promise<TitleFailure | null> {
   try {
     const newPath = await rename();
     if (newPath !== path) {
@@ -234,15 +235,10 @@ async function runRename(
     }
     return null;
   } catch (e) {
-    return failureReason(e);
+    return titleFailure(e);
   } finally {
     await d.load();
   }
-}
-
-/** Why a write failed, in the words it was refused with. */
-export function failureReason(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }
 
 /** The per-path plugin data a card owns, moved from its old path to its new one. */

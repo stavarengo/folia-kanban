@@ -5,9 +5,14 @@ import { setSubtaskDone } from "../model/boardOps";
 import { plainTitleText } from "../model/cardTitle";
 import { useBoardActions, useMatchContext, useRepo } from "./context";
 import { HostDropdown, HostIconButton } from "./hostControls";
-import { failureReason } from "./cardActions";
 import { TitleError } from "./TitleFields";
-import type { HeldDraft, HeldOutcome, InlineDraft } from "./useInlineDraft";
+import {
+  titleFailure,
+  type HeldDraft,
+  type HeldOutcome,
+  type InlineDraft,
+  type TitleFailure,
+} from "./useInlineDraft";
 
 type Mutate = (fn: () => Promise<unknown>) => Promise<boolean>;
 
@@ -232,7 +237,7 @@ function AddSubcard({
           if (e.key === "Enter") draft.send(add);
         }}
       />
-      <TitleError reason={draft.error} />
+      <TitleError failure={draft.error} />
     </div>
   );
 }
@@ -273,13 +278,15 @@ export function CardSubtasks({
         add={async (title) => {
           // The reason goes under the box rather than into a notice, so `mutate` is handed a
           // write that has already caught it. It still re-reads the note and reloads the board.
-          let reason: string | undefined;
+          const failed: { failure?: TitleFailure } = {};
           await mutate(() =>
             repo.addSubcard(path, title).catch((e: unknown) => {
-              reason = failureReason(e);
+              failed.failure = titleFailure(e);
             }),
           );
-          return reason === undefined ? { sent: true } : { sent: false, reason };
+          return failed.failure === undefined
+            ? { sent: true }
+            : { sent: false, failure: failed.failure };
         }}
       />
     </section>

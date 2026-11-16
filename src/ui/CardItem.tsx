@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats, ContextConfig } from "../model/types";
@@ -23,6 +23,7 @@ import {
 } from "./context";
 import { useReducedMotion } from "./useReducedMotion";
 import { TitleError, TitleText } from "./TitleFields";
+import { useTitleEditAt, useTitleEdits } from "./titleEdits";
 import { tileName } from "./cardWords";
 import { useTileEvents } from "./useTileEvents";
 import {
@@ -91,7 +92,7 @@ function CardItemInner({
     isDragging: sortable.isDragging,
     canComplete: view.canComplete,
     listeners: sortable.listeners,
-    onRename: () => title.setEditing(latest.current.title),
+    onRename: () => title.start(latest.current),
   });
 
   return (
@@ -116,24 +117,20 @@ function CardItemInner({
         card={card}
         view={view}
         title={title}
-        dragProps={draggable ? { ...sortable.attributes, ...sortable.listeners } : null}
+        drag={draggable ? sortable : null}
         onOpen={events.open}
         onKeyDown={events.onKeyDown}
         onKeyUp={events.onKeyUp}
         selected={selected}
       />
 
-      {/* Sibling of `.folia-card-main` too: its Cancel and Now are buttons of their own. */}
+      {/* Every control below is a sibling of `.folia-card-open`, the tile's own button, and never
+          inside it: an interactive element within a `role="button"` is unreachable to assistive
+          tech. The same goes for a link in the title, which `.folia-card-main` holds. */}
       <AgentCountdown card={card} />
 
-      {/* Sibling of `.folia-card-main`, same reason as the buttons below: that div carries
-          `role="button"` and a nested interactive element inside it would be unreachable to
-          assistive tech. */}
       {view.hasNestedSubitems && <SubitemsToggle card={card} collapsed={view.subitemsCollapsed} />}
 
-      {/* Sibling of `.folia-card-main`, never inside it: that div carries `role="button"` (from the
-          drag attributes, or the explicit non-draggable branch), and a button within it is unreachable to
-          assistive tech — the same reason the action cluster below lives out here. */}
       {parentPath && <ParentRef parentPath={parentPath} parentTitle={parentTitle} />}
 
       {/* Hidden while renaming: the rename commits on blur, without waiting, so an action clicked out
@@ -188,12 +185,28 @@ function useTileView(card: Card, today: string, hasSubcardChildren: boolean) {
   };
 }
 
-/** The tile's focusable face: the title (or its rename input) and what the card carries. */
+/** What a pointer does to a draggable tile: the sortable's listeners, less the keyboard's. */
+function pointerListeners(listeners: object | undefined): object {
+  return Object.fromEntries(
+    Object.entries(listeners ?? {}).filter(([name]) => name !== "onKeyDown"),
+  );
+}
+
+/**
+ * The tile's face, in two parts that are siblings on purpose.
+ *
+ * `.folia-card-open` is the card's own control: the tab stop, the button a screen reader names and
+ * activates, and what the keyboard opens, lifts and asks a menu of. It lies over the whole tile
+ * and takes no pointer. `.folia-card-main` is what is drawn: the title (or its rename input) and
+ * what the card carries. A click or a press lands there, so the mouse opens and drags the card as
+ * before. Were the drawing inside the button, a link in the title would be an interactive element
+ * nested in another, which no assistive technology can reach.
+ */
 function CardFace({
   card,
   view,
   title,
-  dragProps,
+  drag,
   onOpen,
   onKeyDown,
   onKeyUp,
@@ -202,55 +215,76 @@ function CardFace({
   card: Card;
   view: ReturnType<typeof useTileView>;
   title: ReturnType<typeof useTitleEdit>;
-  /** The sortable's attributes and listeners, or null for a tile that can't be dragged. */
-  dragProps: object | null;
+  /** The tile's sortable, or null for a tile that can't be dragged. */
+  drag: ReturnType<typeof useTileSortable> | null;
   onOpen: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onKeyUp: (e: KeyboardEvent) => void;
   selected: boolean;
 }) {
+  const control = useRef<HTMLDivElement | null>(null);
+  const setControl = (el: HTMLDivElement | null) => {
+    control.current = el;
+    drag?.setActivatorNodeRef(el);
+  };
+  // A click on the face leaves the focus on the card's control, as it would on a button: that is
+  // where the dialog hands the focus back to when it closes.
+  const openByPointer = () => {
+    control.current?.focus({ preventScroll: true });
+    onOpen();
+  };
   return (
-    // a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit non-draggable branch
-    <div
-      className="folia-card-main"
-      // A tile that can't be dragged skips the drag listeners/attributes (which also supply
-      // tabIndex/role), and restores keyboard reachability + open semantics explicitly.
-      {...(dragProps ?? { tabIndex: 0, role: "button" })}
-      onClick={onOpen}
-      onKeyDown={onKeyDown}
-      onKeyUp={onKeyUp}
-      aria-label={tileName(card, view.unread, view.launchPending, view.agentRuns)}
-      aria-current={selected ? "true" : undefined}
-    >
-      {title.editing != null ? (
-        <>
-          <input
-            ref={title.inputRef}
-            className="folia-card-title-input"
-            value={title.editing}
-            aria-label="Card title"
-            aria-invalid={title.error !== null}
-            // Stop the parent's click/pointer/keyboard handlers (open, drag) from firing while editing.
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onChange={(e) => title.setEditing(e.target.value)}
-            onKeyDown={title.onKeyDown}
-            onBlur={title.commit}
-          />
-          <TitleError reason={title.error} />
-        </>
-      ) : (
-        <div className="folia-card-title">
-          <TitleText title={card.title} sourcePath={card.path} />
-        </div>
-      )}
-      <CardChips card={card} ctx={view.ctx} chips={view.chips} />
-      <CardProgress stats={card.stats} />
-      {!view.subitemsCollapsed && view.hasNextTodosPreview && (
-        <CardNextTodos stats={card.stats} limit={view.cardNextTodos} />
-      )}
-      <CardMeta stats={card.stats} unread={view.unread} />
-    </div>
+    <>
+      {/* a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit non-draggable branch */}
+      <div
+        className="folia-card-open"
+        ref={setControl}
+        // A tile that can't be dragged skips the drag attributes (which also supply
+        // tabIndex/role), and restores keyboard reachability + open semantics explicitly.
+        {...(drag?.attributes ?? { tabIndex: 0, role: "button" })}
+        onClick={onOpen}
+        onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
+        aria-label={tileName(card, view.unread, view.launchPending, view.agentRuns)}
+        aria-current={selected ? "true" : undefined}
+      />
+      {/* a11y exception (no-static-element-interactions, click-events-have-key-events): a pointer's way to the card over everything the tile draws; the keyboard's is the `.folia-card-open` button beside it */}
+      <div
+        className="folia-card-main"
+        {...pointerListeners(drag?.listeners)}
+        onClick={openByPointer}
+      >
+        {title.editing != null ? (
+          <>
+            <input
+              ref={title.inputRef}
+              className="folia-card-title-input"
+              value={title.editing}
+              aria-label="Card title"
+              aria-invalid={title.error !== null}
+              // Stop the face's click/pointer handlers (open, drag) from firing while editing.
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={(e) => title.setEditing(e.target.value)}
+              onKeyDown={title.onKeyDown}
+              onFocus={title.onFocus}
+              onBlur={title.onBlur}
+            />
+            <TitleError failure={title.error} />
+          </>
+        ) : (
+          <div className="folia-card-title">
+            <TitleText title={card.title} sourcePath={card.path} />
+          </div>
+        )}
+        <CardChips card={card} ctx={view.ctx} chips={view.chips} />
+        <CardProgress stats={card.stats} />
+        {!view.subitemsCollapsed && view.hasNextTodosPreview && (
+          <CardNextTodos stats={card.stats} limit={view.cardNextTodos} />
+        )}
+        <CardMeta stats={card.stats} unread={view.unread} />
+      </div>
+    </>
   );
 }
 
@@ -263,7 +297,15 @@ function CardFace({
  */
 function useTileSortable(id: string, draggable: boolean) {
   const reducedMotion = useReducedMotion();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id,
     disabled: !draggable,
     // null switches off both the make-room slide and the settle.
@@ -276,44 +318,48 @@ function useTileSortable(id: string, draggable: boolean) {
     // Keep it above settling neighbours so the dashed outline isn't clipped during the drop animation.
     zIndex: isDragging ? 1 : undefined,
   };
-  return { attributes, listeners, setNodeRef, style, isDragging };
+  return { attributes, listeners, setNodeRef, setActivatorNodeRef, style, isDragging };
 }
 
 /**
  * #12 inline title edit. Entered via the right-click menu's "Rename" (a single title click can't
- * trigger it — that opens the detail), which sets the draft and swaps in the <input>.
+ * trigger it — that opens the detail), which swaps the title for an <input> seeded with it.
+ *
+ * What is typed, and why its last save failed, are kept by the board and not by this tile (see
+ * `TitleEdits`): a retitle renames the file, which replaces the tile with a new one, and the new
+ * one has to open on the same text and the same reason.
  */
 function useTitleEdit(card: Card) {
   const actions = useBoardActions();
-  // When set, the title swaps for an <input> seeded with this draft.
-  const [editing, setEditing] = useState<string | null>(null);
-  /** Why the last rename did not go through. The input stays open on its text while this is set. */
-  const [error, setError] = useState<string | null>(null);
-  // Blocks a second commit (Enter, then the blur it causes) while the rename is being written.
-  const saving = useRef(false);
+  const edits = useTitleEdits();
+  const edit = useTitleEditAt(card.path);
+  const id = edit?.id ?? null;
   const inputRef = useRef<HTMLInputElement>(null);
-  const close = () => {
-    setEditing(null);
-    setError(null);
-  };
   const commit = () => {
-    if (editing == null || saving.current) return;
-    const typed = editing;
+    const open = edits.at(card.path);
+    // One save at a time: Enter, then the blur it causes, is one commit.
+    if (!open || open.saving) return;
+    const typed = open.text;
     const next = typed.trim();
-    // Rename only on a real change; empty/whitespace is rejected (revert).
-    if (!next || next === card.title) {
-      close();
+    // A save that failed is sent again even when the card already reads that title: the title
+    // may be in the note, with the file still to rename after it.
+    const retry = open.failure !== null;
+    // Otherwise rename only on a real change; empty/whitespace is rejected (revert).
+    if (!next || (next === card.title && !retry)) {
+      edits.close(open.id);
       return;
     }
-    saving.current = true;
-    setError(null);
+    edits.change(open.id, { saving: true, failure: null });
     // The input closes only once the title is written: whatever stops the rename, the text is
     // still in it, with the reason underneath, to fix and send again or to abandon with Escape.
-    void actions.renameCard(card.path, next).then((why) => {
-      saving.current = false;
-      if (why !== null) setError(why);
+    void actions.renameCard(card.path, next, retry).then((failure) => {
+      const now = edits.byId(open.id);
+      // Abandoned with Escape while the save was in flight.
+      if (!now) return;
+      if (failure !== null) edits.change(open.id, { saving: false, failure });
       // Words typed while the rename was being written are a newer draft, and stay.
-      else setEditing((now) => (now === typed ? null : now));
+      else if (now.text === typed) edits.close(open.id);
+      else edits.change(open.id, { saving: false });
     });
   };
   const onKeyDown = (e: KeyboardEvent) => {
@@ -323,18 +369,39 @@ function useTitleEdit(card: Card) {
       commit();
     } else if (e.key === "Escape") {
       e.preventDefault();
-      close(); // cancel — no write
+      if (id !== null) edits.close(id); // cancel — no write
     }
   };
-  // Focus + select-all once the input mounts.
+  // A rename that has just been opened takes the focus with its text selected. One that was
+  // already open, on a tile drawn anew for its card, takes the focus back only if it had it, and
+  // keeps the caret: selecting the text there would have the next key replace it.
   useEffect(() => {
-    if (editing != null) {
-      const el = inputRef.current;
-      el?.focus();
-      el?.select();
+    const el = inputRef.current;
+    if (id === null || !el) return;
+    if (edits.takeFirstFocus(id)) {
+      el.focus();
+      el.select();
+    } else if (edits.hadFocus(id)) {
+      el.focus();
     }
-  }, [editing != null]);
-  return { editing, setEditing, error, inputRef, commit, onKeyDown };
+  }, [id, edits]);
+  return {
+    editing: edit?.text ?? null,
+    error: edit?.failure ?? null,
+    /** Open the rename on `card`, as it reads now. */
+    start: (now: Card) => edits.type(now.path, now.title),
+    setEditing: (text: string) => edits.type(card.path, text),
+    inputRef,
+    onKeyDown,
+    onFocus: () => {
+      if (id !== null) edits.setFocused(id, true);
+    },
+    onBlur: (e: { currentTarget: HTMLElement }) => {
+      // An input taken away with its tile did not lose the focus to anything.
+      if (id !== null && e.currentTarget.isConnected) edits.setFocused(id, false);
+      commit();
+    },
+  };
 }
 
 function tileClassName(

@@ -2,12 +2,11 @@ import { useId } from "react";
 import type { Board, CardFrontmatter } from "../model/types";
 import { addCard } from "../model/boardOps";
 import { laneFill, prospectiveCard } from "../model/lanes";
-import { failureReason } from "./cardActions";
 import { describeFill } from "./cardView";
 import { useBoardActions, useMatchContext, useRepo } from "./context";
 import { HostButton } from "./hostControls";
 import { TitleError } from "./TitleFields";
-import { useHeldDraft } from "./useInlineDraft";
+import { titleFailure, useHeldDraft } from "./useInlineDraft";
 
 /** The title of the column a new card is being created in, or its id when the board has none. */
 export const createColumnTitle = (board: Board, createColumn: string) =>
@@ -35,10 +34,16 @@ export function useCreateCard(onCreated: ((path: string) => void) | undefined) {
         return { sent: true };
       } catch (e) {
         // The title stays in its field, with the reason under it, to fix and send again.
-        return { sent: false, reason: failureReason(e) };
+        return { sent: false, failure: titleFailure(e) };
       }
     });
-  return { title: draft.value, setTitle: draft.setValue, error: draft.error, submit };
+  return {
+    title: draft.value,
+    setTitle: draft.setValue,
+    error: draft.error,
+    sending: draft.sending,
+    submit,
+  };
 }
 
 /** The minimal CREATE form: a title for a new card in one column. */
@@ -67,6 +72,9 @@ export function CreateCardForm({
           className="folia-create-title"
           autoFocus
           value={title}
+          // Held as sent while the card is being written: the form gives way to the card it
+          // made, and words typed in between would go with it.
+          readOnly={form.sending}
           aria-label="New card title"
           placeholder="What needs doing?"
           aria-describedby={fillNote ? createFillId : undefined}
@@ -79,7 +87,7 @@ export function CreateCardForm({
           }}
         />
       </label>
-      <TitleError reason={form.error} />
+      <TitleError failure={form.error} />
       {fillNote && (
         <p id={createFillId} className="folia-add-card-fill">
           Added with {fillNote}

@@ -4,13 +4,17 @@
 
 import { Modal, Scope, type App } from "obsidian";
 import type { DetailModalHandle } from "../ui/App";
+import type { Settled } from "../ui/detailDialog";
 
 class DetailModal extends Modal {
   private closed = false;
+  /** A request to close is waiting for `mayClose`. */
+  private closing = false;
 
   constructor(
     app: App,
     private onClosed: () => void,
+    private mayClose: () => Settled,
   ) {
     super(app);
     this.modalEl.addClass("folia-detail-modal");
@@ -22,12 +26,14 @@ class DetailModal extends Modal {
    * Escape, the backdrop, the close button and a closing pop-out window all end here, and the
    * inherited close removes the DOM before `onClose` runs. A field commits on blur, so the focused
    * one is blurred first, while it is still in the document: otherwise a half-typed value is lost.
-   * The board closes the dialog too when the panel goes away, which can come right after the
-   * dialog closed itself, so a second call does nothing.
+   *
+   * A commit is not a save that went through. The panel is asked whether it may go, and a save
+   * still in flight is waited for: one that fails would otherwise fail on a field already taken
+   * away, with the text typed into it. So the dialog closes once the answer is yes, and stays,
+   * field and reason in view, when it is no.
    */
   override close(): void {
-    if (this.closed) return;
-    this.closed = true;
+    if (this.closed || this.closing) return;
     const focused = this.contentEl.doc.activeElement;
     if (
       focused?.instanceOf(HTMLElement) &&
@@ -35,6 +41,28 @@ class DetailModal extends Modal {
       (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA")
     )
       focused.blur();
+    const may = this.mayClose();
+    if (may === true) {
+      this.dispose();
+      return;
+    }
+    if (may === false) return;
+    this.closing = true;
+    void may
+      .catch(() => false)
+      .then((ok) => {
+        this.closing = false;
+        if (ok) this.dispose();
+      });
+  }
+
+  /**
+   * Close without asking. The board does this when the panel goes away, which can come right
+   * after the dialog closed itself, so a second call does nothing.
+   */
+  dispose(): void {
+    if (this.closed) return;
+    this.closed = true;
     super.close();
   }
 
@@ -62,13 +90,21 @@ class DetailModal extends Modal {
   }
 }
 
-/** Open the detail panel's dialog on the active window. `onClosed` runs however it was closed. */
-export function openDetailModal(app: App, onClosed: () => void): DetailModalHandle {
-  const modal = new DetailModal(app, onClosed);
+/**
+ * Open the detail panel's dialog on the active window. `onClosed` runs however it was closed, and
+ * `mayClose` decides whether a request to close it goes through (see `BoardHost.openDetailModal`).
+ */
+export function openDetailModal(
+  app: App,
+  onClosed: () => void,
+  mayClose: () => Settled,
+): DetailModalHandle {
+  const modal = new DetailModal(app, onClosed, mayClose);
   modal.open();
   return {
     contentEl: modal.contentEl,
     close: () => modal.close(),
+    dispose: () => modal.dispose(),
     pushEscape: (handler) => modal.pushEscape(handler),
   };
 }

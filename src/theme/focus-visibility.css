@@ -3,7 +3,7 @@
   outline: var(--folia-focus-ring-w) solid var(--interactive-accent);
   outline-offset: var(--size-2-1);
 }
-.folia-card-main:focus-visible {
+.folia-card-open:focus-visible {
   outline-offset: calc(-1 * var(--size-2-1));
 }
 

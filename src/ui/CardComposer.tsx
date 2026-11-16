@@ -32,11 +32,12 @@ export function useCardComposer(
       cancel();
       return;
     }
-    draft.send(async (title) => {
-      const outcome = await onAddCard(column.id, title);
-      if (outcome.sent) setAdding(false);
-      return outcome;
-    });
+    // The composer closes with the title it let go of. Words typed while the card was being
+    // written are a newer draft: they stay, in a composer that stays open around them.
+    draft.send(
+      (title) => onAddCard(column.id, title),
+      () => setAdding(false),
+    );
   };
   return {
     adding,
@@ -83,7 +84,7 @@ export function CardComposer({
           Added with {fillNote}
         </p>
       )}
-      <TitleError reason={error} />
+      <TitleError failure={error} />
       <div className="folia-row-actions">
         <HostButton className="folia-btn" cta text="Add card" keepFocus onClick={submit} />
         <HostButton className="folia-btn" text="Cancel" onClick={cancel} />

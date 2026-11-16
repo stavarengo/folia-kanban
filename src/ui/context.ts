@@ -11,6 +11,7 @@ import type { RelationCount } from "../model/types";
 import type { CardRepository } from "../model/repo";
 import type { Card, ColumnDef, ContextConfig, TodoLine } from "../model/types";
 import type { CommentMark, UnreadState } from "../model/unread";
+import type { TitleFailure } from "./useInlineDraft";
 import { unreadComments } from "../model/unread";
 import {
   isCollapsedIn,
@@ -222,8 +223,10 @@ export interface BoardActions {
    * No-op for a blank/unchanged title. Resolves, once the board has reloaded, to `null` when the
    * title is written and to the reason when it is not. The reason is not raised as a notice: the
    * caller holds the text that was typed, and shows the reason beside it so nothing typed is lost.
+   * `retry` is for a title whose last save did not go through whole: it is carried out even when
+   * the card already reads it (see `CardRepository.renameCard`).
    */
-  renameCard(path: string, title: string): Promise<string | null>;
+  renameCard(path: string, title: string, retry?: boolean): Promise<TitleFailure | null>;
   /** Reorder a card one step within its current column (-1 up, +1 down); a no-op at the edges. */
   moveWithinColumn(path: string, dir: -1 | 1): void;
   /** Whether the card can move up/down within its column (false at the respective edge). */

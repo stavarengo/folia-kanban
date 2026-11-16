@@ -335,9 +335,9 @@ describe("card tile keys and links", () => {
       },
     });
     renderBoard(repo);
-    const tile = (await screen.findByText("Buy soil", { selector: ".folia-card-title" })).closest(
-      ".folia-card-main",
-    ) as HTMLElement;
+    const tile = (await screen.findByText("Buy soil", { selector: ".folia-card-title" }))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
 
     tile.focus();
     await user.keyboard("{Enter}");

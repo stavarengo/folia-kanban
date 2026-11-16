@@ -13,6 +13,7 @@ import { parseTodoPath } from "../model/board";
 import { remapPath } from "../model/pathOps";
 import type { BoardActions } from "./context";
 import { CardDetail } from "./CardDetail";
+import { LeaveGuard } from "./detailDialog";
 
 /**
  * Which card the detail panel shows, or which column's create form, and everything the panel is
@@ -45,26 +46,17 @@ export function useDetailPanel(
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selected;
   const renamedTo = useSelectionFollowsFile(repo, board, selectedRef, setSelected);
+  // What a title field holds the panel with while its text is unsaved (see `LeaveGuard`).
+  const guard = useMemo(() => new LeaveGuard(), []);
 
-  // Opening a real card resets every add-card flow field so a stale create form can't resurface
-  // when the panel later flips to create mode (e.g. the opened card is deleted out from under it).
-  // Invariant: createColumn is null whenever a real card's details are on screen.
-  const openCard = useCallback((path: string) => {
-    setFocusNew(false);
-    setFocusAddSubcard(false);
-    setCreateColumn(null);
-    // An inline todo placed in its own column has no note of its own, so opening its tile opens the
-    // note that owns the checklist line — where the todo is edited, exactly as it always was. One
-    // place, so no caller has to know which kind of tile it just handed us.
-    const target = parseTodoPath(path)?.parentPath ?? path;
-    // A new panel identity ONLY when the panel is pointed at something else. Re-opening the card
-    // already showing — a second click on its tile, or a context-menu action on it — leaves the
-    // mount alone, because remounting would throw away everything half-typed in it. The one-shot
-    // focus actions still fire, on `focusSeq` rather than on the new mount.
-    if (target !== selectedRef.current) setOpenId((n) => n + 1);
-    setFocusSeq((n) => n + 1);
-    setSelected(target);
-  }, []);
+  const openCard = useOpenCard(guard, selectedRef, {
+    setSelected,
+    setCreateColumn,
+    setOpenId,
+    setFocusNew,
+    setFocusAddSubcard,
+    setFocusSeq,
+  });
 
   const panelActions = usePanelActions(openCard, {
     setSelected,
@@ -120,14 +112,66 @@ export function useDetailPanel(
       },
       {
         close: closeDetail,
-        navigate: openCard,
+        navigate: (path) => openCard(path),
         changed: () => void load(),
         created: onCreated,
         handOver: () => setCreateColumn(null),
       },
     );
 
-  return { selected, setSelected, panelActions, showCreated, closeDetail, render };
+  return { selected, setSelected, panelActions, showCreated, closeDetail, render, guard };
+}
+
+/**
+ * Point the panel at a card. Opening a real card resets every add-card flow field so a stale
+ * create form can't resurface when the panel later flips to create mode (e.g. the opened card is
+ * deleted out from under it). Invariant: createColumn is null whenever a real card's details are
+ * on screen. `andThen` runs once the panel has been pointed there.
+ */
+function useOpenCard(
+  guard: LeaveGuard,
+  selectedRef: { readonly current: string | null },
+  set: {
+    setSelected: Dispatch<SetStateAction<string | null>>;
+    setCreateColumn: Dispatch<SetStateAction<string | null>>;
+    setOpenId: Dispatch<SetStateAction<number>>;
+    setFocusNew: Dispatch<SetStateAction<boolean>>;
+    setFocusAddSubcard: Dispatch<SetStateAction<boolean>>;
+    setFocusSeq: Dispatch<SetStateAction<number>>;
+  },
+) {
+  // `set` holds only state setters, which React keeps stable.
+  return useCallback(
+    (path: string, andThen?: () => void) => {
+      // An inline todo placed in its own column has no note of its own, so opening its tile opens
+      // the note that owns the checklist line — where the todo is edited, exactly as it always
+      // was. One place, so no caller has to know which kind of tile it just handed us.
+      const target = parseTodoPath(path)?.parentPath ?? path;
+      const open = () => {
+        set.setFocusNew(false);
+        set.setFocusAddSubcard(false);
+        set.setCreateColumn(null);
+        // A new panel identity ONLY when the panel is pointed at something else. Re-opening the
+        // card already showing — a second click on its tile, or a context-menu action on it —
+        // leaves the mount alone, because remounting would throw away everything half-typed in
+        // it. The one-shot focus actions still fire, on `focusSeq` rather than on the new mount.
+        if (target !== selectedRef.current) set.setOpenId((n) => n + 1);
+        set.setFocusSeq((n) => n + 1);
+        set.setSelected(target);
+        andThen?.();
+      };
+      if (target === selectedRef.current) {
+        open();
+        return;
+      }
+      // Pointing the panel at another card takes this one's fields away, so a title still being
+      // saved is waited for first, and one that cannot be saved keeps the panel where it is.
+      const settled = guard.settle();
+      if (settled === true) open();
+      else if (settled !== false) void settled.then((ok) => ok && open());
+    },
+    [guard, selectedRef],
+  );
 }
 
 /**
@@ -135,7 +179,7 @@ export function useDetailPanel(
  * so the actions object they are part of keeps its identity.
  */
 function usePanelActions(
-  openCard: (path: string) => void,
+  openCard: (path: string, andThen?: () => void) => void,
   set: {
     setSelected: Dispatch<SetStateAction<string | null>>;
     setCreateColumn: Dispatch<SetStateAction<string | null>>;
@@ -146,7 +190,7 @@ function usePanelActions(
   // `set` holds only state setters, which React keeps stable, so `openCard` alone decides identity.
   return useMemo(
     () => ({
-      open: openCard,
+      open: (path) => openCard(path),
       startCreate: (col) => {
         set.setSelected(null);
         set.setCreateColumn(col);
@@ -155,8 +199,7 @@ function usePanelActions(
       addSubcard: (path) => {
         // The subcard needs a title; route through the detail's existing add-subcard input
         // (which calls repo.addSubcard on Enter) rather than inventing a separate prompt.
-        openCard(path);
-        set.setFocusAddSubcard(true);
+        openCard(path, () => set.setFocusAddSubcard(true));
       },
     }),
     [openCard],

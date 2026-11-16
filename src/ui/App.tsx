@@ -27,7 +27,13 @@ import {
   type SettingsContextValue,
 } from "./context";
 import { Board } from "./Board";
-import { DetailDialogContext } from "./detailDialog";
+import {
+  DetailDialogContext,
+  LeaveGuardContext,
+  type LeaveGuard,
+  type Settled,
+} from "./detailDialog";
+import { TitleEditsContext, type TitleEdits } from "./titleEdits";
 import { Toolbar } from "./Toolbar";
 import { useToday } from "./useToday";
 import { useBoardLoad } from "./useBoardLoad";
@@ -39,8 +45,15 @@ import { useBoardWrites } from "./useBoardWrites";
 export interface DetailModalHandle {
   /** Where the panel goes. It already carries `folia-scope`, since it is outside the board root. */
   readonly contentEl: HTMLElement;
-  /** Close the dialog, committing a half-typed field first. A second call does nothing. */
+  /**
+   * Close the dialog, committing a half-typed field first. It closes once every save that was
+   * started or is still in flight has gone through, and stays open when one of them fails (see
+   * `mayClose` in {@link BoardHost.openDetailModal}). A call while it waits, or after it closed,
+   * does nothing.
+   */
   close(): void;
+  /** Take the dialog away without asking, for a panel that is gone already. */
+  dispose(): void;
   /**
    * Make Escape call `handler` instead of closing the dialog, until the returned function is
    * called. Calling that function more than once is harmless.
@@ -72,8 +85,10 @@ export interface BoardHost {
   /**
    * Open the dialog the card detail panel is drawn in. `onClosed` runs whenever it closes, whoever
    * closed it — the person (Escape, the backdrop, the host's close button) or the board.
+   * `mayClose` is asked on every request to close, after the focused field was blurred: the
+   * dialog closes on `true`, waits on a promise, and stays open when the answer is `false`.
    */
-  openDetailModal(onClosed: () => void): DetailModalHandle;
+  openDetailModal(onClosed: () => void, mayClose: () => Settled): DetailModalHandle;
 
   /** The launches waiting on this board's cards. They belong to the plugin, not to the view, so
    *  a board closed mid-countdown does not call one off. */
@@ -87,10 +102,13 @@ export interface BoardHost {
  */
 function DetailDialog({
   host,
+  guard,
   onClosed,
   children,
 }: {
   host: BoardHost;
+  /** What the panel's fields hold the dialog open with while a title is unsaved. */
+  guard: LeaveGuard;
   onClosed: () => void;
   children: ReactNode;
 }) {
@@ -102,17 +120,20 @@ function DetailDialog({
     let ours = false;
     const opened = host.openDetailModal(() => {
       if (!ours) onClosedRef.current();
-    });
+    }, guard.settle);
     setModal(opened);
     return () => {
       ours = true;
-      opened.close();
+      // The panel is gone, and its fields with it: there is nothing left to wait for.
+      opened.dispose();
     };
-  }, [host]);
+  }, [host, guard]);
   return (
     modal &&
     createPortal(
-      <DetailDialogContext.Provider value={modal}>{children}</DetailDialogContext.Provider>,
+      <DetailDialogContext.Provider value={modal}>
+        <LeaveGuardContext.Provider value={guard}>{children}</LeaveGuardContext.Provider>
+      </DetailDialogContext.Provider>,
       modal.contentEl,
     )
   );
@@ -183,6 +204,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
       matchCtx={view.matchCtx}
       root={rootRef}
       agents={settings.experimentalAgentColumns ? host.agents : NO_LAUNCHES}
+      titleEdits={writes.titleEdits}
     >
       <div className="folia-root folia-scope" ref={rootRef}>
         <Toolbar
@@ -211,7 +233,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           />
         </div>
         {shown && (
-          <DetailDialog host={host} onClosed={panel.closeDetail}>
+          <DetailDialog host={host} guard={panel.guard} onClosed={panel.closeDetail}>
             {detail}
           </DetailDialog>
         )}
@@ -230,6 +252,7 @@ function BoardContexts({
   matchCtx,
   root,
   agents,
+  titleEdits,
   children,
 }: {
   settings: SettingsContextValue;
@@ -240,6 +263,7 @@ function BoardContexts({
   matchCtx: MatchContext;
   root: RefObject<HTMLDivElement | null>;
   agents: AgentLaunches;
+  titleEdits: TitleEdits;
   children: ReactNode;
 }) {
   return (
@@ -251,7 +275,9 @@ function BoardContexts({
               <MatchContextContext.Provider value={matchCtx}>
                 <BoardRootContext.Provider value={root}>
                   <AgentLaunchesContext.Provider value={agents}>
-                    {children}
+                    <TitleEditsContext.Provider value={titleEdits}>
+                      {children}
+                    </TitleEditsContext.Provider>
                   </AgentLaunchesContext.Provider>
                 </BoardRootContext.Provider>
               </MatchContextContext.Provider>

@@ -86,6 +86,15 @@
   background: transparent;
 }
 
+/* The card's own control: the tab stop, and what a screen reader names and activates. It lies over
+   the whole tile so its focus ring is the tile's, and takes no pointer, so a click or a press
+   lands on what is drawn under it. */
+.folia-card-open {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
 .folia-card-main {
   display: flex;
   flex-direction: column;
@@ -138,4 +147,9 @@
 .folia-title-markdown p {
   display: inline;
   margin: 0;
+}
+/* A link is part of the title it stands in, and carries its weight: the host draws links in the
+   weight of running prose, which reads as a lighter word in the middle of a title. */
+.folia-scope .folia-title-markdown a {
+  font-weight: inherit;
 }
