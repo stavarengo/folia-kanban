@@ -79,7 +79,7 @@ import {
 } from "./boardConfig";
 import { cardFilesIn, readCard, readContexts } from "./cardNotes";
 import { createCardNote, retitleCard } from "./cardTitles";
-import { failure } from "./failures";
+import { failure, readable, readableMessage } from "./failures";
 import { NoteWriter } from "./noteWriter";
 import { followLink, linkTextTo, relationTargetPath, resolveLink } from "./vaultLinks";
 import { renderMarkdown } from "./markdownRender";
@@ -290,13 +290,31 @@ export class VaultRepository implements CardRepository {
       await this.maybeHistory(path, "relation", relationRemovedLine(type, shown));
   }
 
-  async createCard(title: string, status: string): Promise<string> {
-    const card = { title: normalizeTitle(title), status };
-    const files = { app: this.app, writer: this.writer };
-    return createCardNote(files, await this.readConfig(), card);
+  /**
+   * A title's write, failing only with a reason that can stand beside the field the title was
+   * typed in: in plain words, and with no absolute path (see `readable`).
+   */
+  private async titled(write: () => Promise<string>): Promise<string> {
+    try {
+      return await write();
+    } catch (e) {
+      throw readable(this.app, e);
+    }
   }
 
-  async addSubcard(parentPath: string, title: string): Promise<string> {
+  createCard(title: string, status: string): Promise<string> {
+    return this.titled(async () => {
+      const card = { title: normalizeTitle(title), status };
+      const files = { app: this.app, writer: this.writer };
+      return createCardNote(files, await this.readConfig(), card);
+    });
+  }
+
+  addSubcard(parentPath: string, title: string): Promise<string> {
+    return this.titled(() => this.linkedSubcard(parentPath, title));
+  }
+
+  private async linkedSubcard(parentPath: string, title: string): Promise<string> {
     // Read the parent status from write-fresh text (metadataCache can lag a just-written status).
     const parentFm = parseFrontmatter(await this.app.vault.cachedRead(this.file(parentPath)));
     // Unquoted YAML turns `status: 2` into a number, and a column id may legitimately be one, so
@@ -369,7 +387,7 @@ export class VaultRepository implements CardRepository {
   }
 
   showNotice(message: string, tone: "success" | "error"): void {
-    boardNotice(message, tone);
+    boardNotice(tone === "error" ? readableMessage(this.app, message) : message, tone);
   }
 
   confirm(request: ConfirmRequest): Promise<boolean> {
@@ -384,22 +402,20 @@ export class VaultRepository implements CardRepository {
     showMenu(rows, at);
   }
 
-  async renameCard(
-    path: string,
-    newTitle: string,
-    options: { retry?: boolean } = {},
-  ): Promise<string> {
-    const file = this.file(path);
-    const title = normalizeTitle(newTitle);
-    if (!title) return path; // blank title — no-op, per the CardRepository contract
-    const config = await this.readConfig();
-    return retitleCard({ app: this.app, writer: this.writer }, file, title, {
-      titleMode: config.titleMode,
-      retry: options.retry === true,
-      cards: () => {
-        const folder = this.app.vault.getFolderByPath(config.cardFolder);
-        return folder === null ? [] : cardFilesIn(folder, this.boardPath);
-      },
+  renameCard(path: string, newTitle: string, options: { retry?: boolean } = {}): Promise<string> {
+    return this.titled(async () => {
+      const file = this.file(path);
+      const title = normalizeTitle(newTitle);
+      if (!title) return path; // blank title — no-op, per the CardRepository contract
+      const config = await this.readConfig();
+      return retitleCard({ app: this.app, writer: this.writer }, file, title, {
+        titleMode: config.titleMode,
+        retry: options.retry === true,
+        cards: () => {
+          const folder = this.app.vault.getFolderByPath(config.cardFolder);
+          return folder === null ? [] : cardFilesIn(folder, this.boardPath);
+        },
+      });
     });
   }
 

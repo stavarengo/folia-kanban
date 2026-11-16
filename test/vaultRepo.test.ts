@@ -21,6 +21,7 @@ import {
   FakeApp,
   FileSystemAdapter,
   MarkdownRenderer,
+  Notice,
   TFolder,
 } from "./obsidianFake";
 
@@ -42,6 +43,20 @@ const failureOf = (write: Promise<unknown>): Promise<Error> =>
     },
     (e: unknown) => e as Error,
   );
+
+/** The file system's refusal as Obsidian hands it on: its code, the system call, the absolute path. */
+const eacces = (call: string) =>
+  Object.assign(new Error(`EACCES: permission denied, ${call}`), { code: "EACCES" });
+
+/** Make one note unreadable, as a file without read permission is once it has left the cache. */
+function makeUnreadable(app: FakeApp, path: string): Error {
+  const raw = eacces(`open '/vault/${path}'`);
+  const read = app.vault.cachedRead.bind(app.vault);
+  vi.spyOn(app.vault, "cachedRead").mockImplementation((file) =>
+    file.path === path ? Promise.reject(raw) : read(file),
+  );
+  return raw;
+}
 
 /** A vault holding one board note at `basic/Board.md`, plus the repository pointed at it. */
 function setup(config = DEFAULT_CONFIG, boardPath = "basic/Board.md") {
@@ -1538,6 +1553,55 @@ describe("retitling a card", () => {
       expect(app.vault.getFileByPath("basic/Cards/New.md")).not.toBeNull();
       expect(app.vault.frontmatter("basic/Cards/Follow up.md")["title"]).toBe("After [[Old]]");
     });
+  });
+
+  describe("while another card cannot be read", () => {
+    it("still retitles the card: the other note has no title to follow it", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Fix.md", card("status: todo"));
+      app.vault.addFile("basic/Cards/Budget.md", card("status: todo"));
+      const raw = makeUnreadable(app, "basic/Cards/Budget.md");
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(await repo.renameCard("basic/Cards/Fix.md", "Fixed")).toBe("basic/Cards/Fixed.md");
+
+      expect(logged).toHaveBeenCalledWith("Folia Kanban: a read failed", raw);
+      logged.mockRestore();
+    });
+
+    it("gives the reason its own write failed, never the other card's file", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Fix.md", card("status: todo"));
+      app.vault.addFile("basic/Cards/Budget.md", card("status: todo"));
+      makeUnreadable(app, "basic/Cards/Budget.md");
+      const moved = vi
+        .spyOn(app.fileManager, "renameFile")
+        .mockRejectedValue(
+          eacces("rename '/vault/basic/Cards/Fix.md' -> '/vault/basic/Cards/Fixed.md'"),
+        );
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const failed = await failureOf(repo.renameCard("basic/Cards/Fix.md", "Fixed"));
+
+      expect(moved).toHaveBeenCalledTimes(1);
+      expect(failed.message).toBe(
+        "The file or its folder cannot be written to (permission denied).",
+      );
+      logged.mockRestore();
+    });
+  });
+
+  it("says in plain words, with no path, why the card's own note could not be read", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Fix.md", card("status: todo"));
+    const raw = makeUnreadable(app, "basic/Cards/Fix.md");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const failed = await failureOf(repo.renameCard("basic/Cards/Fix.md", "Fixed"));
+
+    expect(failed.message).toBe("The file or its folder cannot be written to (permission denied).");
+    expect(logged).toHaveBeenCalledWith("Folia Kanban: a write failed", raw);
+    logged.mockRestore();
   });
 
   describe("on a board that reads titles from headings (`card-title: heading`)", () => {
@@ -3270,5 +3334,61 @@ describe("status writes, reported the moment they land", () => {
       }),
     ).rejects.toThrow();
     expect(reports.map((r) => r.to)).toEqual(["done"]);
+  });
+});
+
+describe("a reason the person is shown", () => {
+  it("names the note a board could not read, by its vault path, and says why in plain words", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Fix.md", card("status: todo"));
+    app.vault.addFile("basic/Cards/Budget.md", card("status: todo"));
+    const raw = makeUnreadable(app, "basic/Cards/Budget.md");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const failed = await failureOf(repo.loadBoard());
+
+    expect(failed.message).toBe("basic/Cards/Budget.md cannot be read: permission denied");
+    expect(logged).toHaveBeenCalledWith("Folia Kanban: a read failed", raw);
+    logged.mockRestore();
+  });
+
+  it("names the board note the same way when it is the one that cannot be read", async () => {
+    const { app, repo } = setup();
+    makeUnreadable(app, "basic/Board.md");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const failed = await failureOf(repo.loadBoard());
+
+    expect(failed.message).toBe("basic/Board.md cannot be read: permission denied");
+    logged.mockRestore();
+  });
+
+  it("leaves a board's own refusal as it is", async () => {
+    const { app, repo } = setup();
+    app.vault.addFile("basic/Cards/Bad.md", "---\nstatus: [todo\n---\n");
+
+    const failed = await failureOf(repo.loadBoard());
+
+    expect(failed).toBeInstanceOf(DataCorruptionError);
+    expect(failed.message).toBe('Card "basic/Cards/Bad.md" has invalid frontmatter');
+  });
+
+  it("is put in plain words in a notice too, and one already in plain words is left alone", () => {
+    const { repo } = setup();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    Notice.shown = [];
+
+    repo.showNotice("EACCES: permission denied, open '/vault/basic/Cards/Budget.md'", "error");
+    repo.showNotice("Something odd happened at /vault/basic/Cards/Budget.md.", "error");
+    repo.showNotice("Alpha — done!", "success");
+    repo.showNotice('"Doing" still holds cards. Nothing was changed.', "error");
+
+    expect(Notice.shown).toEqual([
+      "The file or its folder cannot be written to (permission denied).",
+      "Something odd happened at basic/Cards/Budget.md.",
+      "Alpha — done!",
+      '"Doing" still holds cards. Nothing was changed.',
+    ]);
+    logged.mockRestore();
   });
 });

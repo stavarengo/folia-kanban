@@ -7,6 +7,7 @@ import { normalizePriorities } from "../model/priorities";
 import { normalizeRelationTypes } from "../model/relationships";
 import { asTitleMode } from "../model/cardTitle";
 import { BoardFrontmatterSchema, decode } from "../model/schemas";
+import { readNote } from "./failures";
 import { parseFrontmatter } from "./frontmatter";
 
 /**
@@ -31,7 +32,7 @@ export async function readBoardFrontmatter(
 ): Promise<Record<string, unknown>> {
   return decode(
     BoardFrontmatterSchema,
-    parseFrontmatter(await app.vault.cachedRead(boardFile)),
+    parseFrontmatter(await readNote(app, boardFile)),
     `board config (${boardPath})`,
   );
 }

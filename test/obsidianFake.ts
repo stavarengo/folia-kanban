@@ -169,7 +169,13 @@ export class FileView {
   navigation = true;
 }
 export class Setting {}
-export class Notice {}
+/** A notice, kept so a test can read what the person was told. */
+export class Notice {
+  static shown: string[] = [];
+  constructor(message = "") {
+    Notice.shown.push(message);
+  }
+}
 
 export class Component {
   loaded = false;

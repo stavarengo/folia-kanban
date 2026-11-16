@@ -17,7 +17,7 @@ import { baseName } from "../model/pathOps";
 import { PartlyWritten } from "../model/repo";
 import type { TitleMode } from "../model/types";
 import { ambiguousCaseMessage, type ResolvedBoardConfig } from "./boardConfig";
-import { failure, unwritten } from "./failures";
+import { failure, readNote, unwritten } from "./failures";
 import { parseFrontmatter } from "./frontmatter";
 import type { NoteWriter } from "./noteWriter";
 import { pathTaken } from "./pathTaken";
@@ -202,6 +202,10 @@ interface TitleLinks {
  * The other cards whose `title` holds a `[[link]]` to `file`. Read before the file moves:
  * afterwards those links name nothing. Obsidian's own link-aware rename does not look inside a
  * property's text, so these are the board's to keep.
+ *
+ * A card that cannot be read is passed over, like one whose frontmatter cannot be: a title that
+ * cannot be read cannot be rewritten either, and another card's trouble is no reason this one's
+ * retitle gives for failing.
  */
 async function titleLinksTo(
   app: App,
@@ -211,10 +215,10 @@ async function titleLinksTo(
   const found = new Map<TFile, TitleLinks>();
   for (const card of cards) {
     if (card === file) continue;
-    const text = await app.vault.cachedRead(card);
-    if (!text.includes("[[")) continue;
     let title: unknown;
     try {
+      const text = await readNote(app, card);
+      if (!text.includes("[[")) continue;
       title = parseFrontmatter(text)[TITLE_KEY];
     } catch {
       // A note whose frontmatter cannot be read has no title to hold a link.

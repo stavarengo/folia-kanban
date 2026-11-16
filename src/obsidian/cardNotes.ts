@@ -4,6 +4,7 @@ import type { Card, CardFrontmatter, ContextConfig, TitleMode } from "../model/t
 import { cardStats, parseSubtasks, splitFrontmatter } from "../model/card";
 import { resolveTitle } from "../model/cardTitle";
 import { ContextFrontmatterSchema, DataCorruptionError, decode } from "../model/schemas";
+import { readNote } from "./failures";
 import { parseFrontmatter } from "./frontmatter";
 
 /** The per-context config note (#14). Lives inside a context subfolder; read-only for the plugin. */
@@ -26,7 +27,7 @@ export function cardFilesIn(folder: TFolder, boardPath: string): TFile[] {
 
 export async function readCard(app: App, f: TFile, titleMode: TitleMode): Promise<Card> {
   let fm = frontmatterOf(app, f);
-  const text = await app.vault.cachedRead(f);
+  const text = await readNote(app, f);
   if (Object.keys(fm).length === 0) {
     try {
       fm = parseFrontmatter(text);
@@ -104,7 +105,7 @@ async function readContext(app: App, child: TFolder): Promise<ContextConfig> {
   const folder = child.name;
   const note = child.children.find((f) => f instanceof TFile && f.name === CONTEXT_NOTE);
   if (!(note instanceof TFile)) return { name: folder, body: "", folder };
-  const text = await app.vault.cachedRead(note);
+  const text = await readNote(app, note);
   const fm = decode(
     ContextFrontmatterSchema,
     parseFrontmatter(text),
