@@ -7,11 +7,11 @@ import {
   TITLE_KEY,
   cardFileName,
   resolveTitle,
-  retargetTitleLinks,
   retitleHeading,
   sameTitle,
   type HeadingRetitle,
 } from "../model/cardTitle";
+import { retargetTitleLinks } from "../model/titleMarkdown";
 import { dateOnly } from "../model/dates";
 import { baseName } from "../model/pathOps";
 import { PartlyWritten } from "../model/repo";
@@ -168,7 +168,7 @@ function headingRefusal(outcome: Exclude<HeadingRetitle, { text: string }>, titl
 
 /** Write `title` over the heading the title `was` is read from, or refuse and write nothing. */
 async function retitleInHeading(
-  writer: NoteWriter,
+  { app, writer }: CardFiles,
   path: string,
   was: string,
   title: string,
@@ -176,27 +176,39 @@ async function retitleInHeading(
   // The heading is judged inside the write, on the text the write is made on: a heading another
   // writer changed or removed since the title was read is refused there, not written over.
   const seen: { outcome: HeadingRetitle | null } = { outcome: null };
-  await writer.editBody(path, (text) => {
-    seen.outcome = retitleHeading(text, was, title);
-    return "text" in seen.outcome ? seen.outcome.text : text;
-  });
+  await writer
+    .editBody(path, (text) => {
+      seen.outcome = retitleHeading(text, was, title);
+      return "text" in seen.outcome ? seen.outcome.text : text;
+    })
+    .catch((e: unknown) => {
+      throw unwritten(app, e);
+    });
   if (seen.outcome === null || "text" in seen.outcome) return;
   // Nothing was written, so a change arriving now is somebody else's and must reload the board.
   writer.forgetWrite(path);
   throw new Error(headingRefusal(seen.outcome, title));
 }
 
+/** A card whose `title` links to the note being renamed, as it was read before the move. */
+interface TitleLinks {
+  title: string;
+  path: string;
+  /** The linkpaths in that title that reach the note. */
+  linkpaths: Set<string>;
+}
+
 /**
- * The other cards whose `title` holds a `[[link]]` to `file`, each with the linkpaths that reach
- * it. Read before the file moves: afterwards those links name nothing. Obsidian's own link-aware
- * rename does not look inside a property's text, so these are the board's to keep.
+ * The other cards whose `title` holds a `[[link]]` to `file`. Read before the file moves:
+ * afterwards those links name nothing. Obsidian's own link-aware rename does not look inside a
+ * property's text, so these are the board's to keep.
  */
 async function titleLinksTo(
   app: App,
   file: TFile,
   cards: readonly TFile[],
-): Promise<Map<TFile, Set<string>>> {
-  const found = new Map<TFile, Set<string>>();
+): Promise<Map<TFile, TitleLinks>> {
+  const found = new Map<TFile, TitleLinks>();
   for (const card of cards) {
     if (card === file) continue;
     const text = await app.vault.cachedRead(card);
@@ -218,39 +230,80 @@ async function titleLinksTo(
       },
       "",
     );
-    if (linkpaths.size > 0) found.set(card, linkpaths);
+    if (linkpaths.size > 0) found.set(card, { title, path: card.path, linkpaths });
   }
   return found;
 }
 
-/** Point the title links collected by {@link titleLinksTo} at the file's new path. */
-async function retargetTitleLinksTo(
+/**
+ * Point the links in one card's title at `dest`, and say how it went: `"changed"` for a title
+ * that is no longer the one the links were read from, and the reason for a write that failed.
+ *
+ * Only that very title is rewritten, and only where the card still is. By now the old name is
+ * free, so the same linkpath in a title written since may name a new note of that name, and
+ * rewriting it would point somebody else's link at the card that moved.
+ */
+async function retargetOne(
   { app, writer }: CardFiles,
   dest: string,
-  links: ReadonlyMap<TFile, ReadonlySet<string>>,
+  card: TFile,
+  seen: TitleLinks,
+): Promise<"done" | "changed" | { failed: string }> {
+  if (card.path !== seen.path) return "changed";
+  let changed = false;
+  try {
+    await writer.editKey(card.path, TITLE_KEY, (value) => {
+      changed = value !== seen.title;
+      return changed
+        ? value
+        : retargetTitleLinks(
+            seen.title,
+            (linkpath) => seen.linkpaths.has(linkpath),
+            linkTextTo(app, dest, card.path),
+          );
+    });
+  } catch (e) {
+    return { failed: failure(app, e) };
+  }
+  return changed ? "changed" : "done";
+}
+
+/** Point the title links collected by {@link titleLinksTo} at the file's new path. */
+async function retargetTitleLinksTo(
+  files: CardFiles,
+  dest: string,
+  links: ReadonlyMap<TFile, TitleLinks>,
 ): Promise<void> {
   const stale: string[] = [];
+  const changed: string[] = [];
   let why = "";
-  for (const [card, linkpaths] of links) {
-    try {
-      await writer.editKey(card.path, TITLE_KEY, (value) =>
-        typeof value === "string"
-          ? retargetTitleLinks(
-              value,
-              (linkpath) => linkpaths.has(linkpath),
-              linkTextTo(app, dest, card.path),
-            )
-          : value,
-      );
-    } catch (e) {
+  for (const [card, seen] of links) {
+    const outcome = await retargetOne(files, dest, card, seen);
+    if (outcome === "changed") changed.push(card.name);
+    else if (outcome !== "done") {
       stale.push(card.name);
-      why = failure(app, e);
+      why = outcome.failed;
     }
   }
-  if (stale.length === 0) return;
-  throw new PartlyWritten(
-    `The card was retitled, but the link to it in the title of ${stale.join(", ")} could not be updated: ${why}. Edit ${stale.length === 1 ? "that title" : "those titles"} by hand.`,
-  );
+  const unfinished: string[] = [];
+  if (stale.length > 0)
+    unfinished.push(
+      `The card was retitled, but the link to it in the title of ${stale.join(", ")} could not be updated: ${why}. Edit ${stale.length === 1 ? "that title" : "those titles"} by hand.`,
+    );
+  if (changed.length > 0)
+    unfinished.push(
+      changed.length === 1
+        ? `The card was retitled, but the title of ${changed[0]} was changed while that was being saved, so the link to the card in it was left alone. Check that title by hand.`
+        : `The card was retitled, but the titles of ${changed.join(", ")} were changed while that was being saved, so the links to the card in them were left alone. Check those titles by hand.`,
+    );
+  if (unfinished.length > 0) throw new PartlyWritten(unfinished.join(" "));
+}
+
+/** One failure for everything a retitle left unfinished, so that none of it goes unsaid. */
+function allUnfinished(failures: readonly Error[]): Error {
+  const [only] = failures;
+  if (only !== undefined && failures.length === 1) return only;
+  return new PartlyWritten(failures.map((e) => e.message).join(" "), { cause: failures });
 }
 
 /** What a retitle is told beyond the card and its new title. */
@@ -296,11 +349,14 @@ async function renameAfterTitle(
     });
   }
   await moveNote(files, file, dest, keyed);
-  // The links are tried before the old key goes and reported after it: neither step's failure
-  // may keep the other from being made.
-  const linked = await retargetTitleLinksTo(files, dest, links).catch((e: unknown) => e);
-  if (!keyed && was !== null) await dropTitleKey(files, dest, was);
-  if (linked instanceof Error) throw linked;
+  // Both steps are tried whatever the other does, and everything left unfinished is reported
+  // together: a retry finds the file already moved and the stale links no longer findable, so
+  // this is the one time they can be named.
+  const unfinished: Error[] = [];
+  const kept = (e: unknown) => void unfinished.push(e instanceof Error ? e : new Error(String(e)));
+  await retargetTitleLinksTo(files, dest, links).catch(kept);
+  if (!keyed && was !== null) await dropTitleKey(files, dest, was).catch(kept);
+  if (unfinished.length > 0) throw allUnfinished(unfinished);
   return dest;
 }
 
@@ -325,7 +381,7 @@ export async function retitleCard(
   const retried = options.retry && source !== "heading";
   if (sameTitle(title, current) && !retried) return file.path;
   if (source === "heading") {
-    await retitleInHeading(files.writer, file.path, current, title);
+    await retitleInHeading(files, file.path, current, title);
     return file.path;
   }
   const was = source === "frontmatter" ? current : null;

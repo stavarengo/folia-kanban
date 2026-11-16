@@ -36,14 +36,13 @@ export function useFieldDraft(
   const pending = useRef<Promise<boolean> | null>(null);
   // Set by a commit asked for while another is in flight: it runs once that one is through.
   const again = useRef(false);
-  const failedText = useRef<string | null>(null);
-  const [failed, setFailedState] = useState(false);
-  const setFailed = (text: string | null) => {
-    failedText.current = text;
-    setFailedState(text !== null);
-  };
-  const persisted = useRef(value);
-  persisted.current = value;
+  const { failedText, failed, setFailed } = useFailedText();
+  const persisted = useLatest(value);
+  // A save can start long after the render that asked for it: one queued behind another runs
+  // when that one is through, by which time the card's file may have another name. So what a
+  // save calls is always what the newest render handed over, never what an older one closed on.
+  const latestCommit = useLatest(onCommit);
+  const latestNormalize = useLatest(normalize);
   useEffect(() => {
     if (pending.current !== null || failedText.current !== null) return;
     const before = base.current;
@@ -58,18 +57,18 @@ export function useFieldDraft(
       return pending.current;
     }
     const typed = latest.current;
-    const next = normalize(typed);
+    const next = latestNormalize.current(typed);
     if (next === null) return false;
     if (next !== typed) setDraft(next);
     const retry = failedText.current === next;
     // Against the value as the field would show it: a blur with nothing typed writes nothing.
-    if (next === normalize(persisted.current) && !retry) {
+    if (next === latestNormalize.current(persisted.current) && !retry) {
       setFailed(null);
       base.current = persisted.current;
       return true;
     }
     const from = persisted.current;
-    const answer = onCommit(next, retry);
+    const answer = latestCommit.current(next, retry);
     if (!answer) {
       setFailed(null);
       base.current = next;
@@ -95,16 +94,37 @@ export function useFieldDraft(
     pending.current = done;
     return done;
   };
-  const commit = () => {
-    void save();
-  };
+  const commit = () => void save();
   /** Give up what is typed: the field reads what the note says again. */
   const revert = () => {
     setFailed(null);
     base.current = persisted.current;
     setDraft(persisted.current);
   };
-  return { draft, setDraft, commit, flush: save, revert, failed };
+  /** Whether the field holds anything the note does not: typed, being saved, or refused. */
+  const unsaved = () =>
+    pending.current !== null ||
+    failedText.current !== null ||
+    latestNormalize.current(latest.current) !== latestNormalize.current(persisted.current);
+  return { draft, setDraft, commit, flush: save, revert, failed, unsaved };
+}
+
+/** The text of the save that failed: read by the saves that follow, and drawn as a flag. */
+function useFailedText() {
+  const failedText = useRef<string | null>(null);
+  const [failed, setFailedState] = useState(false);
+  const setFailed = (text: string | null) => {
+    failedText.current = text;
+    setFailedState(text !== null);
+  };
+  return { failedText, failed, setFailed };
+}
+
+/** What the newest render was given, for work that runs after the render that started it. */
+function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
 }
 
 export const trimmed = (v: string) => v.trim();

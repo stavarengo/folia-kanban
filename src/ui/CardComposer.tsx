@@ -24,6 +24,10 @@ export function useCardComposer(
     else setAdding(true);
   };
   const cancel = () => {
+    // A card being written is not cancelled by closing its composer, and a write that then failed
+    // would fail with nobody looking. The composer stays for the answer: it closes itself when
+    // the card exists, and shows the reason when it does not.
+    if (draft.sending) return;
     setAdding(false);
     draft.clear();
   };

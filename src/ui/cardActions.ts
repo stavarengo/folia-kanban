@@ -17,7 +17,7 @@ export interface CardActionDeps {
   load: () => Promise<boolean>;
   notify: (text: string, tone?: "success" | "error") => void;
   reportError: (e: unknown) => void;
-  refusedByLane: (columnId: string, card: Card) => boolean;
+  refusedByLane: (columnId: string, card: Card) => string | null;
   onUpdateSettings: (patch: SettingsPatch) => void;
   setSelected: Dispatch<SetStateAction<string | null>>;
 }
@@ -136,7 +136,7 @@ export function cardViewActions(
 async function moveTo(d: CardActionDeps, card: Card, columnId: string): Promise<boolean> {
   const b = d.boardRef.current;
   if (!b) return false;
-  if (d.refusedByLane(columnId, laneSubject(b, card))) return false;
+  if (d.refusedByLane(columnId, laneSubject(b, card)) !== null) return false;
   try {
     await moveCardTo(d.repo, b, { card, columnId });
     return true;

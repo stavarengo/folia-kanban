@@ -185,13 +185,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     inlineEdit: settings.addCardFlow === "inline-edit",
   });
   // Whether the board's own chrome is on screen at all — the two renders below stand in for it,
-  // one while the first load is in flight and one when a load has failed, and neither has a root
-  // or a search box. A boolean rather than the board object so a reload, which builds a new board
+  // one while the first load is in flight and one when it has failed, and neither has a root or a
+  // search box. A boolean rather than the board object so a reload, which builds a new board
   // every time, does not churn everything keyed on this.
-  useSearchShortcut(host, board !== null && error === null, searchRef);
+  useSearchShortcut(host, board !== null, searchRef);
 
-  if (error) return <div className="folia-error">Couldn’t load the board: {error}</div>;
-  if (!board) return <div className="folia-loading">Loading board…</div>;
+  // Only a board that was never read is replaced by its error. One that was read and cannot be
+  // read again stays on screen as it was, with the error over it: taking it away would take the
+  // open panel and every title being typed on the board with it.
+  if (!board) return <NoBoard error={error} />;
 
   const { shown, detail } = panel.render(board);
   return (
@@ -215,11 +217,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
           totalCount={view.counts.total}
           canFilterMine={settings.userName.trim() !== ""}
         />
-        {board.cardFolderWarning && (
-          <div className="folia-card-folder-notice" role="status">
-            {board.cardFolderWarning}
-          </div>
-        )}
+        <BoardNotices error={error} folderWarning={board.cardFolderWarning} />
         <div className="folia-main" role="region" aria-label="Board">
           <Board
             board={board}
@@ -239,6 +237,39 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
         )}
       </div>
     </BoardContexts>
+  );
+}
+
+/** What stands in for a board that has not been read: its first load, or why that failed. */
+function NoBoard({ error }: { error: string | null }) {
+  return error ? (
+    <div className="folia-error">Couldn’t load the board: {error}</div>
+  ) : (
+    <div className="folia-loading">Loading board…</div>
+  );
+}
+
+/** What is said over the board: that it could not be read again, and what is wrong with its folder. */
+function BoardNotices({
+  error,
+  folderWarning,
+}: {
+  error: string | null;
+  folderWarning: string | undefined;
+}) {
+  return (
+    <>
+      {error && (
+        <div className="folia-refresh-error" role="alert">
+          Couldn’t refresh the board: {error}. It is shown as it was last read.
+        </div>
+      )}
+      {folderWarning && (
+        <div className="folia-card-folder-notice" role="status">
+          {folderWarning}
+        </div>
+      )}
+    </>
   );
 }
 

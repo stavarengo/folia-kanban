@@ -81,12 +81,23 @@
 }
 
 /* Why a typed title was not saved, beside the field that still holds it: under the add-card
-   composer, the create form, a tile's rename box and the panel's Title field. */
-.folia-title-error {
+   composer, the create form, a tile's rename box, the subcard box and the panel's Title field.
+   And why a panel is still open on a card the board no longer has. */
+.folia-title-error,
+.folia-card-gone {
   margin: 0;
   font-size: var(--font-smaller);
   color: var(--text-error);
   overflow-wrap: anywhere;
+}
+
+/* A board that could not be read again, over the board as it was last read. */
+.folia-refresh-error {
+  padding: 0.5em var(--size-4-3);
+  font-size: var(--font-smaller);
+  color: var(--text-error);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
+  flex: 0 0 auto;
 }
 
 .folia-card-folder-notice {

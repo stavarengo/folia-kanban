@@ -1,6 +1,6 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { PartlyWritten } from "../model/repo";
-import { LeaveGuardContext } from "./detailDialog";
+import type { Settled } from "./detailDialog";
 
 /**
  * An add-something box that empties as it sends: a failed write hands the text back, into an
@@ -37,21 +37,19 @@ export function titleFailure(e: unknown): TitleFailure {
 }
 
 /**
- * How a held write ended. Not sent, the text stays in its field; `failure` is why, for the field
- * to show, and is left out when the person has already been told.
+ * How a held write ended. Not sent, the text stays in its field, and `failure` is why, for the
+ * field to show: there is no way for a title to stay unsent without its reason beside it.
  */
-export interface HeldOutcome {
-  sent: boolean;
-  failure?: TitleFailure;
-}
+export type HeldOutcome = { sent: true } | { sent: false; failure: TitleFailure };
 
 /**
  * A field for text that must never be lost: the title of a card about to be made. Unlike
  * {@link useInlineDraft} it does not empty as it sends. The text stays until the write has gone
  * through, and when it has not, it is still there, with the reason, to fix and send again.
  *
- * Inside the detail panel the write in flight also holds the panel (see `LeaveGuard`): a dialog
- * closed before the answer is in waits for it, and stays when the answer is a failure.
+ * What it answers about itself (`settle`, `unsaved`, `failed`, `giveUp`) is what `usePanelHold`
+ * holds the detail panel with, so a field in the panel keeps the panel for as long as a title in
+ * it is being written or was refused.
  */
 export function useHeldDraft() {
   const [value, setValueState] = useState("");
@@ -61,14 +59,19 @@ export function useHeldDraft() {
     latest.current = text;
     setValueState(text);
   };
-  /** Why the last send did not go through, shown until the text is sent again. */
-  const [error, setError] = useState<TitleFailure | null>(null);
+  /** Why the last send did not go through, shown until the text is sent again or given up. */
+  const [error, setErrorState] = useState<TitleFailure | null>(null);
+  const refused = useRef(false);
+  const setError = (failure: TitleFailure | null) => {
+    refused.current = failure !== null;
+    setErrorState(failure);
+  };
   // The write in flight. It blocks a second send (Enter, then the button), and its outcome is
   // what leaving the panel waits for.
   const inFlight = useRef<Promise<boolean> | null>(null);
   const [sending, setSending] = useState(false);
-  const guard = useContext(LeaveGuardContext);
-  useEffect(() => guard?.hold(() => inFlight.current ?? true), [guard]);
+  /** Whether a refused title is still in the field. Emptied by hand, there is nothing to keep. */
+  const holdsRefused = () => refused.current && latest.current.trim() !== "";
   /**
    * Send the text through `write`. `onLetGo` runs when the write went through and the field was
    * emptied for it, which it is not when more was typed while the write was in flight.
@@ -84,7 +87,7 @@ export function useHeldDraft() {
         inFlight.current = null;
         setSending(false);
         if (!outcome.sent) {
-          setError(outcome.failure ?? null);
+          setError(outcome.failure);
           return false;
         }
         // Words typed while the write was in flight are the start of the next one, and stay.
@@ -99,7 +102,17 @@ export function useHeldDraft() {
     setValue("");
     setError(null);
   };
-  return { value, setValue, error, sending, send, clear };
+  return {
+    value,
+    setValue,
+    error,
+    sending,
+    send,
+    clear,
+    /** Safe to leave at once with nothing refused; otherwise as the write in flight ends. */
+    settle: (): Settled => inFlight.current ?? !holdsRefused(),
+    unsaved: () => inFlight.current !== null || holdsRefused(),
+  };
 }
 
 export type HeldDraft = ReturnType<typeof useHeldDraft>;

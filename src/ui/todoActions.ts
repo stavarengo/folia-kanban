@@ -97,7 +97,7 @@ async function moveTodo(
   // more take one by hand.
   if (columnId !== null) {
     const todo = todoTile(b, path, line, columnId);
-    if (todo && d.refusedByLane(columnId, todo)) return;
+    if (todo && d.refusedByLane(columnId, todo) !== null) return;
   }
   // The line is named, so the one `null` left here is the line already standing, BY THE
   // READING THIS CHOICE WAS MADE AGAINST, where it was just sent — which is the reading

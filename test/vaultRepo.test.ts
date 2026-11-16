@@ -1431,6 +1431,67 @@ describe("retitling a card", () => {
       );
       expect(app.vault.getFileByPath("basic/Cards/Parent epic, renamed.md")).not.toBeNull();
     });
+
+    it("reads as the note's name when the link has to be written with its folder", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Parent epic.md", card("status: todo"));
+      // The new name is taken elsewhere in the vault, so a link to the card needs its folder.
+      app.vault.addFile("Archive/Parent epic for the migration.md", "old");
+      app.vault.addFile("basic/Cards/Follow up.md", card('title: "After [[Parent epic]]"'));
+      app.vault.addFile("basic/Cards/Aliased.md", card('title: "See [[Parent epic|the epic]]"'));
+
+      await repo.renameCard("basic/Cards/Parent epic.md", "Parent epic for the migration");
+
+      expect(app.vault.frontmatter("basic/Cards/Follow up.md")["title"]).toBe(
+        "After [[basic/Cards/Parent epic for the migration|Parent epic for the migration]]",
+      );
+      expect(app.vault.frontmatter("basic/Cards/Aliased.md")["title"]).toBe(
+        "See [[basic/Cards/Parent epic for the migration|the epic]]",
+      );
+    });
+
+    it("leaves a title another writer changed since it was read, and names the card", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Plan.md", card("status: todo"));
+      app.vault.addFile("basic/Cards/Compare.md", card('title: "Compare with [[Plan]]"'));
+      const rename = app.fileManager.renameFile.bind(app.fileManager);
+      vi.spyOn(app.fileManager, "renameFile").mockImplementationOnce(async (file, to) => {
+        await rename(file, to);
+        // The moment the file has moved, another writer makes a new `Plan` and links to both.
+        app.vault.addFile("basic/Cards/Plan.md", card("status: todo"));
+        app.vault.writeFrontmatter("basic/Cards/Compare.md", (fm) => {
+          fm["title"] = "Compare [[Renamed]] with [[Plan]]";
+        });
+      });
+
+      const failed = await failureOf(repo.renameCard("basic/Cards/Plan.md", "Renamed"));
+
+      // Their `[[Plan]]` names the new note, and must not be pointed at the card that moved.
+      expect(app.vault.frontmatter("basic/Cards/Compare.md")["title"]).toBe(
+        "Compare [[Renamed]] with [[Plan]]",
+      );
+      expect(failed).toBeInstanceOf(PartlyWritten);
+      expect(failed.message).toBe(
+        "The card was retitled, but the title of Compare.md was changed while that was being saved, so the link to the card in it was left alone. Check that title by hand.",
+      );
+    });
+
+    it("reports both when the link and the card's own old `title` are left behind", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Old.md", card("title: Old title"));
+      app.vault.addFile("basic/Cards/Follow up.md", card('title: "After [[Old]]"'));
+      vi.spyOn(app.fileManager, "processFrontMatter").mockRejectedValue(new Error("EBUSY"));
+
+      const failed = await failureOf(repo.renameCard("basic/Cards/Old.md", "New"));
+
+      expect(failed).toBeInstanceOf(PartlyWritten);
+      // A retry no longer finds the stale link, so this is the one time it is named.
+      expect(failed.message).toBe(
+        "The card was retitled, but the link to it in the title of Follow up.md could not be updated: EBUSY. Edit that title by hand. The file is now called New.md, but the note's old `title` property could not be removed, so the card still shows it: EBUSY. Try again.",
+      );
+      expect(app.vault.getFileByPath("basic/Cards/New.md")).not.toBeNull();
+      expect(app.vault.frontmatter("basic/Cards/Follow up.md")["title"]).toBe("After [[Old]]");
+    });
   });
 
   describe("on a board that reads titles from headings (`card-title: heading`)", () => {
@@ -1452,6 +1513,26 @@ describe("retitling a card", () => {
 
       expect(app.vault.text(path)).toBe(card("status: todo", "\n# Learn C#\n"));
       expect((await repo.loadBoard()).cards[path]?.title).toBe("Learn C#");
+    });
+
+    it("says why in plain words when the heading cannot be written, with no path", async () => {
+      const { app, repo } = setup(HEADING_BOARD);
+      const path = "basic/Cards/01-fix.md";
+      app.vault.addFile(path, card("status: todo", "\n# Fix the export\n"));
+      const raw = Object.assign(
+        new Error("EACCES: permission denied, open '/vault/basic/Cards/01-fix.md'"),
+        { code: "EACCES" },
+      );
+      vi.spyOn(app.vault, "process").mockRejectedValueOnce(raw);
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const failed = await failureOf(repo.renameCard(path, "New"));
+
+      expect(failed.message).toBe(
+        "The file or its folder cannot be written to (permission denied).",
+      );
+      expect(logged).toHaveBeenCalledWith("Folia Kanban: a write failed", raw);
+      logged.mockRestore();
     });
 
     it("refuses when the heading is gone by the time the title is written, and writes nothing", async () => {

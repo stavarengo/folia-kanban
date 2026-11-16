@@ -9,14 +9,13 @@ import {
   normalizeTitle,
   plainTitleText,
   resolveTitle,
-  retargetTitleLinks,
   retitleHeading,
   sameTitle,
   sanitizeFilename,
   titleFileName,
-  titleMarkdown,
   withoutRepeatedHeading,
 } from "../src/model/cardTitle";
+import { retargetTitleLinks, titleMarkdown } from "../src/model/titleMarkdown";
 
 const slugNote = `---
 status: todo
@@ -128,6 +127,14 @@ describe("fitFileName", () => {
   it("leaves no trailing dot or space where it cut", () => {
     expect(fitFileName(`${"a".repeat(98)}. bcd`)).toBe("a".repeat(98));
   });
+  it("keeps the last word when the cut lands exactly at its end", () => {
+    const title = "Investigate why the nightly build fails";
+    // 27 units hold "Investigate why the nightly" to the letter: nothing was cut mid-word.
+    expect(fitFileName(title, { units: 27 })).toBe("Investigate why the nightly");
+    expect(fitFileName(title, { units: 26 })).toBe("Investigate why the");
+    expect(fitFileName(title, { chars: 27 })).toBe("Investigate why the nightly");
+    expect(fitFileName("語 ".repeat(40), { bytes: 7 })).toBe("語 語");
+  });
 });
 
 describe("cardFileName", () => {
@@ -154,6 +161,11 @@ describe("cardFileName", () => {
     // Counted as Windows counts a path: two units for each of these.
     expect(cardFileName("😀".repeat(25), 0, 30)).toBe(`${"😀".repeat(13)}.md`);
     expect(cardFileName("😀".repeat(25), 3, 30)).toBe(`${"😀".repeat(12)} 3.md`);
+  });
+  it("fills the room a folder leaves to the last character when a word ends there", () => {
+    const name = cardFileName("Investigate why the nightly build fails", 0, 30);
+    expect(name).toBe("Investigate why the nightly.md");
+    expect(name).toHaveLength(30);
   });
 });
 
@@ -299,10 +311,15 @@ describe("titleMarkdown", () => {
     expect(titleMarkdown('![a](<my image.png> "t") **x**')).toBe('[a](<my image.png> "t") **x**');
     expect(titleMarkdown("![[a] b](c.png)")).toBe("[[a] b](c.png)");
   });
-  it("leaves an exclamation mark that opens no image where it was typed", () => {
-    expect(titleMarkdown("Wait![1] is **this** right")).toBe("Wait![1] is **this** right");
+  it("escapes an exclamation mark before a bracket it opens no image with, which reads the same", () => {
+    expect(titleMarkdown("Wait![1] is **this** right")).toBe("Wait\\![1] is **this** right");
     expect(titleMarkdown("\\![[Diagram]] **x**")).toBe("\\![[Diagram]] **x**");
-    expect(titleMarkdown("![[never closed **x**")).toBe("![[never closed **x**");
+    expect(titleMarkdown("![[never closed **x**")).toBe("\\![[never closed **x**");
+    // A second mark would otherwise be left standing before the link the first one wrapped.
+    expect(titleMarkdown("!![[Diagram]] **x**")).toBe("\\![[Diagram]] **x**");
+    expect(titleMarkdown("Really! [yes](https://x.example)")).toBe(
+      "Really! [yes](https://x.example)",
+    );
   });
   it("leaves a code span exactly as typed", () => {
     expect(titleMarkdown("see `![[note]]` and `![a](b.png)`")).toBe(
@@ -382,6 +399,78 @@ describe("titleMarkdown", () => {
       }
     });
 
+    it("draws no image whatever its address or caption holds", () => {
+      for (const title of [
+        "![a](<a(b.png>) **x**",
+        '![a](a.png "caption (hi") **x**',
+        "![a](a.png 'it (is') **x**",
+        "![a](a.png (cap\\)tion)) **x**",
+        "![a]( <a b.png> ) **x**",
+        "![a](a\\).png) **x**",
+        "![a <http://x]y> b](i.png) **x**",
+        '![a <b title="]"> c](i.png) **x**',
+        "![](<img src=q]>) **x**",
+        "!![a](b.png) **x**",
+        "![a](javascript:x) **x**",
+      ]) {
+        const { blocks, inline } = drawn(title);
+        expect(blocks, title).toEqual(INLINE_BLOCKS);
+        expect(inline, title).not.toContain("image");
+        expect(inline, title).not.toContain("html_inline");
+      }
+    });
+
+    it("draws no raw HTML from the address of a link that is not one", () => {
+      for (const title of [
+        "[a [b](c) d](<img src=q>)",
+        "[![a](i.png)](<img src=q>)",
+        '[a](javascript:x "<img src=q>")',
+        "[a](x <img src=q>)",
+        "[[x]](<img src=q>)",
+      ]) {
+        const { blocks, inline } = drawn(title);
+        expect(blocks, title).toEqual(INLINE_BLOCKS);
+        expect(inline, title).not.toContain("image");
+        expect(inline, title).not.toContain("html_inline");
+      }
+    });
+
+    it("draws nothing but inline text from any mix of the characters markup is made of", () => {
+      const PARTS = [
+        "!", "[", "]", "(", ")", "<", ">", '"', "'", "\\", "`", " ", "a", "b.png",
+        "http://x", "[[", "]]", "img src=q", "/", "=", "javascript:", "|",
+      ]; // prettier-ignore
+      // A fixed sequence, so a failure names a title that fails again on the next run.
+      let seed = 20261116;
+      const next = (below: number) => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return Math.floor((seed / 4294967296) * below);
+      };
+      for (let n = 0; n < 6000; n++) {
+        const title = Array.from({ length: 2 + next(12) }, () => PARTS[next(PARTS.length)]).join(
+          "",
+        );
+        const { blocks, inline } = drawn(title);
+        if (blocks.length > 0) expect(blocks, title).toEqual(INLINE_BLOCKS);
+        expect(inline, title).not.toContain("image");
+        expect(inline, title).not.toContain("html_inline");
+      }
+    });
+
+    it("leaves the address of a link exactly as it was typed", () => {
+      const href = (title: string) =>
+        md
+          .parse(titleMarkdown(title), {})
+          .flatMap((t) => t.children ?? [])
+          .find((t) => t.type === "link_open")
+          ?.attrGet("href");
+      expect(titleMarkdown("[Go]( <abc> ) **today**")).toBe("[Go]( <abc> ) **today**");
+      expect(href("[Go]( <abc> ) **today**")).toBe("abc");
+      expect(href("[Go](<a b.md>) **today**")).toBe("a%20b.md");
+      expect(href('[Go]( <a(b.md> "why (now" ) **today**')).toBe("a(b.md");
+      expect(href("[Go](a_(b).md 'it (is') **today**")).toBe("a_(b).md");
+    });
+
     it("still draws a link where an image was typed", () => {
       expect(drawn("**x** ![a [b]](image.png)").inline).toContain("link_open");
       expect(drawn('![a](<my image.png> "t")').inline).toContain("link_open");
@@ -435,6 +524,39 @@ describe("retargetTitleLinks", () => {
       "[[Parent epic never closed",
     ])
       expect(retargetTitleLinks(title, moved, to), title).toBe(title);
+  });
+  it("leaves a web address alone, though it spells a wikilink", () => {
+    const plan = (linkpath: string) => linkpath === "Plan";
+    for (const title of [
+      "[query](https://example.com/[[Plan]])",
+      '[query](https://example.com/x "see [[Plan]]")',
+      "[query](<a [[Plan]] b.md>)",
+      "![chart](img/[[Plan]].png) review",
+    ])
+      expect(retargetTitleLinks(title, plan, "Renamed"), title).toBe(title);
+    // The label of such a link is text like any other, and a link typed in it follows the note.
+    expect(
+      retargetTitleLinks("[about [[Plan]]](https://example.com/[[Plan]])", plan, "Renamed"),
+    ).toBe("[about [[Renamed]]](https://example.com/[[Plan]])");
+    // What only looks like the start of a link is text, and the wikilink after it still follows.
+    expect(retargetTitleLinks("[x](a b [[Plan]]", plan, "Renamed")).toBe("[x](a b [[Renamed]]");
+  });
+  it("names the note in an alias when the link has to be written with its folder", () => {
+    const pathTo = "Cards/Parent epic, the migration";
+    expect(retargetTitleLinks("see [[Parent epic]]", moved, pathTo)).toBe(
+      "see [[Cards/Parent epic, the migration|Parent epic, the migration]]",
+    );
+    expect(retargetTitleLinks("see [[Parent epic#Scope]]", moved, pathTo)).toBe(
+      "see [[Cards/Parent epic, the migration#Scope|Parent epic, the migration > Scope]]",
+    );
+    // A link that already says how it reads keeps saying it.
+    expect(retargetTitleLinks("see [[Parent epic|the epic]]", moved, pathTo)).toBe(
+      "see [[Cards/Parent epic, the migration|the epic]]",
+    );
+    // One that was written with its folder showed the folder before, and still does.
+    expect(
+      retargetTitleLinks("see [[Old/Parent epic]]", (l) => l === "Old/Parent epic", pathTo),
+    ).toBe("see [[Cards/Parent epic, the migration]]");
   });
   it("rewrites each link to the note, and only those", () => {
     expect(

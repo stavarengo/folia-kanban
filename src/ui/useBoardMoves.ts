@@ -6,7 +6,9 @@ import { resolveDrop } from "../model/board";
 import { addCard, moveCardOver } from "../model/boardOps";
 import { laneFill, laneRefusal, prospectiveCard } from "../model/lanes";
 import { laneSubject } from "./cardActions";
-import { titleFailure, type HeldOutcome } from "./useInlineDraft";
+import { titleFailure, type HeldOutcome, type TitleFailure } from "./useInlineDraft";
+
+const NOT_LOADED: TitleFailure = { reason: "The board has not loaded yet", partly: false };
 
 /** The board's own writes: a card dropped somewhere, a card added to a column, and the lane rule both answer to. */
 export function useBoardMoves({
@@ -35,14 +37,15 @@ export function useBoardMoves({
    * with the reason instead: nothing is written, and the card returns to where it was.
    */
   const refusedByLane = useCallback(
-    (columnId: string, card: Card): boolean => {
+    (columnId: string, card: Card): string | null => {
       const b = boardRef.current;
       const ctx = matchCtxRef.current;
-      if (!b || !ctx) return false;
+      if (!b || !ctx) return null;
       const why = laneRefusal(b, columnId, card, ctx);
-      if (why === null) return false;
-      notify(`${why} Nothing was changed.`, "error");
-      return true;
+      if (why === null) return null;
+      const refusal = `${why} Nothing was changed.`;
+      notify(refusal, "error");
+      return refusal;
     },
     [notify, boardRef, matchCtxRef],
   );
@@ -52,7 +55,7 @@ export function useBoardMoves({
       const b = boardRef.current;
       if (!b) return;
       const resolved = resolveDrop(b, dragged.path, overId);
-      if (resolved && refusedByLane(resolved.columnId, laneSubject(b, dragged))) {
+      if (resolved && refusedByLane(resolved.columnId, laneSubject(b, dragged)) !== null) {
         // Board holds the make-room gap open across the drop and clears it when a reloaded board
         // arrives, so a refusal still has to reload: that is what puts the card back where it was
         // rather than leaving it in a gap no column draws.
@@ -79,12 +82,13 @@ export function useBoardMoves({
     async (columnId: string, title: string): Promise<HeldOutcome> => {
       const b = boardRef.current;
       const ctx = matchCtxRef.current;
-      if (!b || !ctx) return { sent: false };
+      if (!b || !ctx) return { sent: false, failure: NOT_LOADED };
       // A lane's rule is written onto the card where it names a plain value, so adding to an
       // `area:research` lane makes a research card. What is left is judged before the note exists:
       // a title that misses a lane's words, say, is a card that lane would never draw.
       const fill = laneFill(b, columnId, ctx);
-      if (refusedByLane(columnId, prospectiveCard(title, columnId, fill))) return { sent: false };
+      const refused = refusedByLane(columnId, prospectiveCard(title, columnId, fill));
+      if (refused !== null) return { sent: false, failure: { reason: refused, partly: false } };
       let path: string;
       try {
         path = await addCard(repo, { title, columnId, fill });

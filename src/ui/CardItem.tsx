@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";
+import { memo, useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card, CardStats, ContextConfig } from "../model/types";
@@ -23,9 +23,9 @@ import {
 } from "./context";
 import { useReducedMotion } from "./useReducedMotion";
 import { TitleError, TitleText } from "./TitleFields";
-import { useTitleEditAt, useTitleEdits } from "./titleEdits";
 import { tileName } from "./cardWords";
 import { useTileEvents } from "./useTileEvents";
+import { useTitleEdit } from "./useTitleEdit";
 import {
   AgentCountdown,
   CardActions,
@@ -233,6 +233,7 @@ function CardFace({
     control.current?.focus({ preventScroll: true });
     onOpen();
   };
+  const name = tileName(card, view.unread, view.launchPending, view.agentRuns);
   return (
     <>
       {/* a11y exception (no-static-element-interactions): role + tabIndex come from the spread dnd attributes (sortable: role="button", tabIndex=0) or the explicit non-draggable branch */}
@@ -245,38 +246,20 @@ function CardFace({
         onClick={onOpen}
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
-        aria-label={tileName(card, view.unread, view.launchPending, view.agentRuns)}
+        aria-label={name}
         aria-current={selected ? "true" : undefined}
       />
       {/* a11y exception (no-static-element-interactions, click-events-have-key-events): a pointer's way to the card over everything the tile draws; the keyboard's is the `.folia-card-open` button beside it */}
       <div
         className="folia-card-main"
+        // The card's whole title, in words, for the pointer: the app shows a label on hover, and
+        // the control above, which carries the same one, takes no pointer. This is how a title
+        // clipped to three lines is read without opening the card.
+        aria-label={name}
         {...pointerListeners(drag?.listeners)}
         onClick={openByPointer}
       >
-        {title.editing != null ? (
-          <>
-            <input
-              ref={title.inputRef}
-              className="folia-card-title-input"
-              value={title.editing}
-              aria-label="Card title"
-              aria-invalid={title.error !== null}
-              // Stop the face's click/pointer handlers (open, drag) from firing while editing.
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              onChange={(e) => title.setEditing(e.target.value)}
-              onKeyDown={title.onKeyDown}
-              onFocus={title.onFocus}
-              onBlur={title.onBlur}
-            />
-            <TitleError failure={title.error} />
-          </>
-        ) : (
-          <div className="folia-card-title">
-            <TitleText title={card.title} sourcePath={card.path} />
-          </div>
-        )}
+        <TileTitle card={card} title={title} />
         <CardChips card={card} ctx={view.ctx} chips={view.chips} />
         <CardProgress stats={card.stats} />
         {!view.subitemsCollapsed && view.hasNextTodosPreview && (
@@ -284,6 +267,36 @@ function CardFace({
         )}
         <CardMeta stats={card.stats} unread={view.unread} />
       </div>
+    </>
+  );
+}
+
+/** The card's title on its tile: drawn, or the box it is being renamed in, with why that failed. */
+function TileTitle({ card, title }: { card: Card; title: ReturnType<typeof useTitleEdit> }) {
+  if (title.editing == null) {
+    return (
+      <div className="folia-card-title">
+        <TitleText title={card.title} sourcePath={card.path} />
+      </div>
+    );
+  }
+  return (
+    <>
+      <input
+        ref={title.inputRef}
+        className="folia-card-title-input"
+        value={title.editing}
+        aria-label="Card title"
+        aria-invalid={title.error !== null}
+        // Stop the face's click/pointer handlers (open, drag) from firing while editing.
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onChange={(e) => title.setEditing(e.target.value)}
+        onKeyDown={title.onKeyDown}
+        onFocus={title.onFocus}
+        onBlur={title.onBlur}
+      />
+      <TitleError failure={title.error} />
     </>
   );
 }
@@ -319,89 +332,6 @@ function useTileSortable(id: string, draggable: boolean) {
     zIndex: isDragging ? 1 : undefined,
   };
   return { attributes, listeners, setNodeRef, setActivatorNodeRef, style, isDragging };
-}
-
-/**
- * #12 inline title edit. Entered via the right-click menu's "Rename" (a single title click can't
- * trigger it — that opens the detail), which swaps the title for an <input> seeded with it.
- *
- * What is typed, and why its last save failed, are kept by the board and not by this tile (see
- * `TitleEdits`): a retitle renames the file, which replaces the tile with a new one, and the new
- * one has to open on the same text and the same reason.
- */
-function useTitleEdit(card: Card) {
-  const actions = useBoardActions();
-  const edits = useTitleEdits();
-  const edit = useTitleEditAt(card.path);
-  const id = edit?.id ?? null;
-  const inputRef = useRef<HTMLInputElement>(null);
-  const commit = () => {
-    const open = edits.at(card.path);
-    // One save at a time: Enter, then the blur it causes, is one commit.
-    if (!open || open.saving) return;
-    const typed = open.text;
-    const next = typed.trim();
-    // A save that failed is sent again even when the card already reads that title: the title
-    // may be in the note, with the file still to rename after it.
-    const retry = open.failure !== null;
-    // Otherwise rename only on a real change; empty/whitespace is rejected (revert).
-    if (!next || (next === card.title && !retry)) {
-      edits.close(open.id);
-      return;
-    }
-    edits.change(open.id, { saving: true, failure: null });
-    // The input closes only once the title is written: whatever stops the rename, the text is
-    // still in it, with the reason underneath, to fix and send again or to abandon with Escape.
-    void actions.renameCard(card.path, next, retry).then((failure) => {
-      const now = edits.byId(open.id);
-      // Abandoned with Escape while the save was in flight.
-      if (!now) return;
-      if (failure !== null) edits.change(open.id, { saving: false, failure });
-      // Words typed while the rename was being written are a newer draft, and stay.
-      else if (now.text === typed) edits.close(open.id);
-      else edits.change(open.id, { saving: false });
-    });
-  };
-  const onKeyDown = (e: KeyboardEvent) => {
-    e.stopPropagation(); // keep typing (incl. Space) out of the dnd keyboard sensor
-    if (e.key === "Enter") {
-      e.preventDefault();
-      commit();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      if (id !== null) edits.close(id); // cancel — no write
-    }
-  };
-  // A rename that has just been opened takes the focus with its text selected. One that was
-  // already open, on a tile drawn anew for its card, takes the focus back only if it had it, and
-  // keeps the caret: selecting the text there would have the next key replace it.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (id === null || !el) return;
-    if (edits.takeFirstFocus(id)) {
-      el.focus();
-      el.select();
-    } else if (edits.hadFocus(id)) {
-      el.focus();
-    }
-  }, [id, edits]);
-  return {
-    editing: edit?.text ?? null,
-    error: edit?.failure ?? null,
-    /** Open the rename on `card`, as it reads now. */
-    start: (now: Card) => edits.type(now.path, now.title),
-    setEditing: (text: string) => edits.type(card.path, text),
-    inputRef,
-    onKeyDown,
-    onFocus: () => {
-      if (id !== null) edits.setFocused(id, true);
-    },
-    onBlur: (e: { currentTarget: HTMLElement }) => {
-      // An input taken away with its tile did not lose the focus to anything.
-      if (id !== null && e.currentTarget.isConnected) edits.setFocused(id, false);
-      commit();
-    },
-  };
 }
 
 function tileClassName(

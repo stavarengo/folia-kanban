@@ -1,9 +1,10 @@
-import type { RefObject } from "react";
+import { useContext, type RefObject } from "react";
 import type { Board, CardBody, SubItem } from "../model/types";
 import { isTodoLine, syncSubcardLines, type LinkResolver } from "../model/board";
 import { setSubtaskDone } from "../model/boardOps";
 import { plainTitleText } from "../model/cardTitle";
 import { useBoardActions, useMatchContext, useRepo } from "./context";
+import { DetailDialogContext } from "./detailDialog";
 import { HostDropdown, HostIconButton } from "./hostControls";
 import { TitleError } from "./TitleFields";
 import {
@@ -13,6 +14,7 @@ import {
   type InlineDraft,
   type TitleFailure,
 } from "./useInlineDraft";
+import { GIVE_UP, usePanelHold } from "./usePanelHold";
 
 type Mutate = (fn: () => Promise<unknown>) => Promise<boolean>;
 
@@ -115,7 +117,7 @@ function SubtaskColumnPicker({ board, path, item: s, resolve, mutate }: RowProps
             // Giving a subcard a column of its own is the same write, judged the
             // same way — a lane draws by its rule and takes no card by hand.
             const childCard = board.cards[child];
-            if (childCard && actions.refusedByLane(value, childCard)) return;
+            if (childCard && actions.refusedByLane(value, childCard) !== null) return;
             await repo.setFrontmatter(child, { status: value });
             const sync = syncSubcardLines(board, child, value);
             if (sync) await repo.applyMove(sync);
@@ -224,6 +226,13 @@ function AddSubcard({
   inputRef: RefObject<HTMLInputElement>;
   add: (title: string) => Promise<HeldOutcome>;
 }) {
+  const inDialog = useContext(DetailDialogContext) !== null;
+  const hold = usePanelHold(inputRef, {
+    failed: draft.error !== null,
+    settle: draft.settle,
+    unsaved: draft.unsaved,
+    giveUp: draft.clear,
+  });
   return (
     <div className="folia-add-inline">
       <input
@@ -233,11 +242,18 @@ function AddSubcard({
         aria-label="Add a subcard"
         aria-invalid={draft.error !== null}
         onChange={(e) => draft.setValue(e.target.value)}
+        onFocus={hold.onFocus}
+        onBlur={hold.onBlur}
         onKeyDown={(e) => {
           if (e.key === "Enter") draft.send(add);
         }}
       />
-      <TitleError failure={draft.error} />
+      <TitleError
+        failure={draft.error}
+        {...(inDialog && draft.error
+          ? { hint: GIVE_UP[draft.error.partly ? "partly" : "unmade"] }
+          : {})}
+      />
     </div>
   );
 }

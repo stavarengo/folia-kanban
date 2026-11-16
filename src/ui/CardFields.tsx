@@ -182,7 +182,7 @@ export function CardFields({
             void mutate(async () => {
               // The panel's Status field is a column change like any other, so a lane that
               // would not draw the card refuses it here too.
-              if (actions.refusedByLane(status, card)) return;
+              if (actions.refusedByLane(status, card) !== null) return;
               await repo.setFrontmatter(path, { status });
               // If this card is somebody's subcard, its `- [ ] [[link]]` lines follow the
               // column, as a dragged tile's would.

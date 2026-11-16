@@ -75,6 +75,16 @@ interface NameLimits {
 }
 
 /**
+ * A name cut before `next`, taken back to the space before the word it cut into when one is near.
+ * A cut that fell exactly where a word ends has cut no word, and keeps it.
+ */
+function backToWord(cut: string, next: string | undefined): string {
+  if (next === undefined || /\s/.test(next)) return cut;
+  const space = cut.lastIndexOf(" ");
+  return space > cut.length * 0.6 ? cut.slice(0, space) : cut;
+}
+
+/**
  * Cut a name to its limits, at a word boundary when one is near. A cut never lands inside a
  * character, whichever limit asked for it.
  */
@@ -92,8 +102,7 @@ export function fitFileName(
     kept.pop();
     cut = kept.join("");
   }
-  const space = cut.lastIndexOf(" ");
-  if (space > cut.length * 0.6) cut = cut.slice(0, space);
+  cut = backToWord(cut, all[kept.length]);
   return cut.replace(/[. ]+$/, "") || "Untitled card";
 }
 
@@ -195,174 +204,6 @@ export function cardFileName(title: string, n = 0, room = Infinity): string {
 export function hasInlineMarkdown(title: string): boolean {
   // `test` on a global expression remembers where it stopped; `search` does not.
   return plainTitleText(title) !== title.trim() || title.search(BARE_URL_RE) !== -1;
-}
-
-/**
- * Where the backslash escape or the code span that starts at `i` ends, or `i` when neither starts
- * there. Both are read as one piece: nothing inside them is markup.
- */
-function atomEnd(s: string, i: number): number {
-  if (s[i] === "\\") return Math.min(i + 2, s.length);
-  if (s[i] !== "`") return i;
-  let open = i;
-  while (s[open] === "`") open++;
-  for (let j = open; j < s.length; ) {
-    if (s[j] !== "`") {
-      j++;
-      continue;
-    }
-    let close = j;
-    while (s[close] === "`") close++;
-    // A code span closes on a run of backticks as long as the one that opened it.
-    if (close - j === open - i) return close;
-    j = close;
-  }
-  // Backticks that never close are text.
-  return open;
-}
-
-/** The index of the bracket closing the one at `open`, counting the pairs nested inside it. */
-function closingBracket(s: string, open: number, opener: string, closer: string): number {
-  let depth = 0;
-  for (let i = open; i < s.length; ) {
-    const end = atomEnd(s, i);
-    if (end > i) {
-      i = end;
-      continue;
-    }
-    if (s[i] === opener) depth++;
-    else if (s[i] === closer && --depth === 0) return i;
-    i++;
-  }
-  return -1;
-}
-
-/** The inline link `[label](address …)` whose label opens at `open`, or null when none does. */
-function inlineLinkAt(
-  s: string,
-  open: number,
-): { label: string; inside: string; end: number } | null {
-  const labelEnd = closingBracket(s, open, "[", "]");
-  if (labelEnd === -1 || s[labelEnd + 1] !== "(") return null;
-  const end = closingBracket(s, labelEnd + 1, "(", ")");
-  if (end === -1) return null;
-  return {
-    label: s.slice(open + 1, labelEnd),
-    inside: s.slice(labelEnd + 2, end),
-    end: end + 1,
-  };
-}
-
-// `<https://…>` and `<name@host>`: links, and the only uses of `<…>` a title keeps as markup.
-const AUTOLINK_AT_RE = /^<(?:[a-z][a-z0-9+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>]+)>/i;
-// What follows a `<` that opens a tag, a comment or a declaration.
-const HTML_AFTER_RE = /^[a-z/!?]/i;
-
-/** A stretch of a title as it goes to the renderer, and where reading goes on after it. */
-interface Piece {
-  text: string;
-  end: number;
-}
-
-/** An escape or a code span, kept as it is. */
-function atomAt(s: string, i: number): Piece | null {
-  const end = atomEnd(s, i);
-  return end > i ? { text: s.slice(i, end), end } : null;
-}
-
-/** An embed or an image, written as the link it wraps. */
-function embedAt(s: string, i: number): Piece | null {
-  if (!s.startsWith("![", i)) return null;
-  // `![[note]]`: without its mark it is the wikilink, which is read on from here.
-  if (s.startsWith("[[", i + 1) && s.includes("]]", i + 3)) return { text: "", end: i + 1 };
-  const image = inlineLinkAt(s, i + 1);
-  if (!image) return null;
-  const address = /^<([^>]*)>|^\S*/.exec(image.inside.trim());
-  const label = inlineOnly(image.label) || (address?.[1] ?? address?.[0] ?? "");
-  return { text: `[${label}](${image.inside})`, end: image.end };
-}
-
-/** A `<`: kept with what it opens when that is a link's, escaped when it would open HTML. */
-function angleAt(s: string, i: number, before: string): Piece | null {
-  if (s[i] !== "<") return null;
-  const rest = s.slice(i);
-  // An address in angle brackets, `[label](<a b.md>)`, is the link's and is kept whole.
-  const kept = before.endsWith("](") ? /^<[^<>]*>/.exec(rest) : AUTOLINK_AT_RE.exec(rest);
-  if (kept) return { text: kept[0], end: i + kept[0].length };
-  return HTML_AFTER_RE.test(rest.slice(1, 2)) ? { text: "\\<", end: i + 1 } : null;
-}
-
-/** Obsidian's `%%`, which hides what follows it. */
-function commentAt(s: string, i: number): Piece | null {
-  return s.startsWith("%%", i) ? { text: "\\%\\%", end: i + 2 } : null;
-}
-
-/**
- * One line of a title with everything that is not inline text taken out of the renderer's reach.
- * An image or an embed is written as the link it wraps, raw HTML is escaped so it shows as typed,
- * and so is Obsidian's `%%`. Code spans and escapes are kept as they are.
- */
-function inlineOnly(s: string): string {
-  let out = "";
-  for (let i = 0; i < s.length; ) {
-    const piece = atomAt(s, i) ??
-      embedAt(s, i) ??
-      angleAt(s, i, out) ??
-      commentAt(s, i) ?? { text: s.charAt(i), end: i + 1 };
-    out += piece.text;
-    i = piece.end;
-  }
-  return out;
-}
-
-// What would open a block when it starts a line: a heading, a quote, a list, a rule, a code or
-// math fence. A numbered list is told apart below, since its marker is escaped after the number.
-const BLOCK_START_RE =
-  /^(?:#{1,6}(?:\s|$)|>|[-+*](?:\s|$)|`{3,}|~{3,}|\$\$|([-*_])(?:\s*\1){2,}\s*$)/;
-// A link reference definition or a footnote: a whole line that draws nothing where it stands.
-const DEFINITION_RE = /^\[[^\]]+\]:/;
-
-/**
- * A title as the Markdown handed to the renderer. A title is one line of inline text, so what
- * would open a block is escaped and shows as typed, raw HTML shows as typed, and an image or an
- * embed (`![](image)`, `![[note]]`), which would draw a picture or a whole note inside a tile, is
- * read as the link it wraps.
- */
-export function titleMarkdown(title: string): string {
-  const line = inlineOnly(title.replace(/\s+/g, " ").trim());
-  if (BLOCK_START_RE.test(line) || DEFINITION_RE.test(line)) return `\\${line}`;
-  return line.replace(/^(\d{1,9})([.)])(?=\s|$)/, "$1\\$2");
-}
-
-/**
- * `title` with each `[[wikilink]]` to a note that `moved` names pointed at `to` instead, the
- * way a link-aware rename rewrites one in a note's text: its `#heading`, its `|alias` and its
- * embed mark are kept. A link typed inside a code span is text, and stays.
- */
-export function retargetTitleLinks(
-  title: string,
-  moved: (linkpath: string) => boolean,
-  to: string,
-): string {
-  let out = "";
-  for (let i = 0; i < title.length; ) {
-    const atom = atomEnd(title, i);
-    const close = atom === i && title.startsWith("[[", i) ? title.indexOf("]]", i + 2) : -1;
-    if (close === -1) {
-      const next = Math.max(atom, i + 1);
-      out += title.slice(i, next);
-      i = next;
-      continue;
-    }
-    const inner = title.slice(i + 2, close);
-    const rest = inner.search(/[#|]/);
-    const linkpath = rest === -1 ? inner : inner.slice(0, rest);
-    out += moved(linkpath.trim())
-      ? `[[${to}${rest === -1 ? "" : inner.slice(rest)}]]`
-      : `[[${inner}]]`;
-    i = close + 2;
-  }
-  return out;
 }
 
 /** Normalize a raw `card-title` frontmatter value; anything but `heading` means the file name. */

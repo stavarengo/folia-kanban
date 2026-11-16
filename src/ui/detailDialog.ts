@@ -15,31 +15,53 @@ export const DetailDialogContext = createContext<DetailDialogControls | null>(nu
  */
 export type Settled = boolean | Promise<boolean>;
 
+/** What a field holding a title tells the panel about the text in it. */
+export interface PanelHold {
+  /** Whether the panel may be left: at once, or as the save this starts or waits for ends. */
+  settle(): Settled;
+  /**
+   * Whether leaving now would lose text: typed and not saved, being saved, or refused. Asked
+   * where nobody can be made to wait, such as the card's own note going away.
+   */
+  unsaved(): boolean;
+}
+
 /**
  * What stands between the panel and anything that would take it off the screen: closing its
- * dialog, or pointing it at another card. A field holding a title registers here, and the panel
- * is left only once every one of them has settled. A title whose save fails as the panel is being
- * left would otherwise fail with nobody looking, and its text would go with the field.
+ * dialog, pointing it at another card or at the create form, or its card going away. A field
+ * holding a title registers here, and the panel is left only once every one of them has settled.
+ * A title whose save fails as the panel is being left would otherwise fail with nobody looking,
+ * and its text would go with the field.
  */
 export class LeaveGuard {
-  private held = new Set<() => Settled>();
+  private held = new Set<PanelHold>();
 
-  /** Have `settle` asked before the panel is left, until the returned function is called. */
-  hold(settle: () => Settled): () => void {
-    this.held.add(settle);
+  /** Have `field` asked before the panel is left, until the returned function is called. */
+  hold(field: PanelHold): () => void {
+    this.held.add(field);
     return () => {
-      this.held.delete(settle);
+      this.held.delete(field);
     };
   }
 
   /** Ask every held field. Answers `true` at once when none of them has anything to wait for. */
   settle = (): Settled => {
-    const answers = [...this.held].map((settle) => settle());
+    const answers = [...this.held].map((field) => field.settle());
     if (answers.every((answer) => answer === true)) return true;
     return Promise.all(answers.map((answer) => Promise.resolve(answer))).then((all) =>
       all.every(Boolean),
     );
   };
+
+  /** Whether any held field has text that leaving would lose. */
+  unsaved = (): boolean => [...this.held].some((field) => field.unsaved());
+
+  /** Run `go`, which takes the panel's fields away, once every one of them lets it. */
+  leave(go: () => void): void {
+    const settled = this.settle();
+    if (settled === true) go();
+    else if (settled !== false) void settled.then((ok) => ok && go());
+  }
 }
 
 /** Provided around the detail panel; absent for a field that is not in one. */

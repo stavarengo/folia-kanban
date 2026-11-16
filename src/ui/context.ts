@@ -176,10 +176,11 @@ export interface BoardActions {
   reportError(e: unknown): void;
   /**
    * Would filing a card into `columnId` leave it drawn nowhere? A lane draws by its rule and owns
-   * nothing, so a card the rule rejects must not be written there. Says why and returns true when
-   * it refused; every path that sets a card's column asks this before writing.
+   * nothing, so a card the rule rejects must not be written there. Says why in a notice and
+   * answers with that reason when it refused, `null` when it did not; every path that sets a
+   * card's column asks this before writing.
    */
-  refusedByLane(columnId: string, card: Card): boolean;
+  refusedByLane(columnId: string, card: Card): string | null;
   /**
    * Move a card to the board's "done" column, if one exists. The card as the caller drew it: for a
    * checklist line standing in a column of its own, that tile is the reading the move is held to.

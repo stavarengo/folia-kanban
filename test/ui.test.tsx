@@ -3618,10 +3618,9 @@ describe("search filter (single source of truth)", () => {
     expect(host.bound()).toBe(false);
   });
 
-  it("gives the '/' back when a board that had loaded fails to reload", async () => {
-    // The error screen replaces the board's chrome without clearing the board itself, so a guard
-    // that only asks whether a board was ever loaded would leave the key registered for a search
-    // box that is no longer rendered — and Obsidian would cancel every "/" the user pressed.
+  it("keeps the '/' while a board that had loaded cannot be read again", async () => {
+    // The board stays on screen as it was last read, search box included, with the error over
+    // it, so the key still has somewhere to go.
     const host = fakeHost();
     const repo = makeRepo();
     render(
@@ -3638,13 +3637,16 @@ describe("search filter (single source of truth)", () => {
 
     repo.failLoadWith = "card folder is a file";
     act(() => repo.notify());
-    await screen.findByText(/Couldn’t load the board/);
-    expect(host.bound()).toBe(false);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t refresh the board: card folder is a file. It is shown as it was last read.",
+    );
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(host.bound()).toBe(true);
 
-    // And takes it back once the board can be read again.
+    // The error goes once the board can be read again.
     repo.failLoadWith = null;
     act(() => repo.notify());
-    await screen.findByText("Alpha");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
     expect(host.bound()).toBe(true);
   });
 
@@ -4959,7 +4961,7 @@ describe("unread comments", () => {
     // The tile's own name carries it too: it is what a screen reader says for the card's button,
     // which the badge is not part of.
     expect(
-      within(alpha).getByLabelText("Alpha, 1 unread comment, a reply to yours"),
+      within(alpha).getByRole("button", { name: "Alpha, 1 unread comment, a reply to yours" }),
     ).toBeInTheDocument();
   });
 
@@ -4975,7 +4977,7 @@ describe("unread comments", () => {
       }),
     );
     expect(
-      await screen.findByLabelText("Alpha, 1 of 2 subtasks done, 1 unread comment"),
+      await screen.findByRole("button", { name: "Alpha, 1 of 2 subtasks done, 1 unread comment" }),
     ).toBeInTheDocument();
   });
 
@@ -7532,12 +7534,12 @@ describe("a board read before a change can land after it (20260828.02)", () => {
       newer.catch(() => {});
       rejectNewer(new Error("newest read failed"));
     });
-    await screen.findByText(/Couldn.t load the board/);
+    await screen.findByText(/Couldn.t refresh the board/);
     await act(async () => {
       resolveOlder(olderBoard);
     });
     // The stale success must not clear an error raised by the newer, still-current request.
-    expect(screen.queryByText(/Couldn.t load the board/)).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn.t refresh the board/)).toBeInTheDocument();
   });
 
   it("still opens the card it just created once a load that overtook the add-card flow's own load resolves", async () => {

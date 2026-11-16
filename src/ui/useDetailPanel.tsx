@@ -45,9 +45,11 @@ export function useDetailPanel(
   const [focusSeq, setFocusSeq] = useState(0);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selected;
-  const renamedTo = useSelectionFollowsFile(repo, board, selectedRef, setSelected);
-  // What a title field holds the panel with while its text is unsaved (see `LeaveGuard`).
+  // What a title field holds the panel with while its text is unsaved (see `LeaveGuard`). Every
+  // way of taking the panel's fields away asks it first: closing the dialog, pointing the panel
+  // elsewhere (`guard.leave` below), and the card's own note going away.
   const guard = useMemo(() => new LeaveGuard(), []);
+  const renamedTo = useSelectionFollowsFile(repo, board, { selectedRef, setSelected, guard });
 
   const openCard = useOpenCard(guard, selectedRef, {
     setSelected,
@@ -58,7 +60,7 @@ export function useDetailPanel(
     setFocusSeq,
   });
 
-  const panelActions = usePanelActions(openCard, {
+  const panelActions = usePanelActions(guard, openCard, {
     setSelected,
     setCreateColumn,
     setOpenId,
@@ -66,11 +68,15 @@ export function useDetailPanel(
   });
 
   /** Open a card the inline composer just added, with its description focused for editing. */
-  const showCreated = useCallback((path: string) => {
-    setFocusNew(true);
-    setOpenId((n) => n + 1);
-    setSelected(path);
-  }, []);
+  const showCreated = useCallback(
+    (path: string) =>
+      guard.leave(() => {
+        setFocusNew(true);
+        setOpenId((n) => n + 1);
+        setSelected(path);
+      }),
+    [guard],
+  );
 
   const closeDetail = () => {
     setSelected(null);
@@ -104,6 +110,8 @@ export function useDetailPanel(
       {
         selected,
         renamedTo,
+        // Asked as the board is drawn, which is when a card it no longer has would close the panel.
+        unsaved: guard.unsaved(),
         createColumn,
         openId,
         focusNew,
@@ -166,9 +174,7 @@ function useOpenCard(
       }
       // Pointing the panel at another card takes this one's fields away, so a title still being
       // saved is waited for first, and one that cannot be saved keeps the panel where it is.
-      const settled = guard.settle();
-      if (settled === true) open();
-      else if (settled !== false) void settled.then((ok) => ok && open());
+      guard.leave(open);
     },
     [guard, selectedRef],
   );
@@ -179,6 +185,7 @@ function useOpenCard(
  * so the actions object they are part of keeps its identity.
  */
 function usePanelActions(
+  guard: LeaveGuard,
   openCard: (path: string, andThen?: () => void) => void,
   set: {
     setSelected: Dispatch<SetStateAction<string | null>>;
@@ -191,19 +198,44 @@ function usePanelActions(
   return useMemo(
     () => ({
       open: (path) => openCard(path),
-      startCreate: (col) => {
-        set.setSelected(null);
-        set.setCreateColumn(col);
-        set.setOpenId((n) => n + 1);
-      },
+      startCreate: (col) =>
+        guard.leave(() => {
+          set.setSelected(null);
+          set.setCreateColumn(col);
+          set.setOpenId((n) => n + 1);
+        }),
       addSubcard: (path) => {
         // The subcard needs a title; route through the detail's existing add-subcard input
         // (which calls repo.addSubcard on Enter) rather than inventing a separate prompt.
         openCard(path, () => set.setFocusAddSubcard(true));
       },
     }),
-    [openCard],
+    [guard, openCard],
   );
+}
+
+/** Whether the board can answer for the selected card: it has it, or is about to under a new path. */
+function cardOnBoard(
+  b: BoardModel,
+  p: { selected: string | null; renamedTo: { from: string; to: string } | null },
+): boolean {
+  return p.selected != null && (b.cards[p.selected] != null || p.renamedTo?.to === p.selected);
+}
+
+/**
+ * A card the board no longer has closes its panel, unless a title typed there is unsaved: the
+ * panel then stays on what it last knew of the card, saying so, until the text is given up.
+ */
+function cardGone(
+  b: BoardModel,
+  p: {
+    selected: string | null;
+    renamedTo: { from: string; to: string } | null;
+    unsaved: boolean;
+    createColumn: string | null;
+  },
+): boolean {
+  return p.selected != null && p.createColumn == null && p.unsaved && !cardOnBoard(b, p);
 }
 
 function panelFor(
@@ -211,6 +243,7 @@ function panelFor(
   p: {
     selected: string | null;
     renamedTo: { from: string; to: string } | null;
+    unsaved: boolean;
     createColumn: string | null;
     openId: number;
     focusNew: boolean;
@@ -226,37 +259,39 @@ function panelFor(
   },
 ) {
   const { selected, createColumn } = p;
-  const detailOpen =
-    selected != null && (b.cards[selected] != null || p.renamedTo?.to === selected);
+  const gone = cardGone(b, p);
+  const detailOpen = gone || cardOnBoard(b, p);
   // The create form hands over to the card it made once the board draws that card, whichever load
   // brought it. Waiting on one particular load would not do: a newer one can supersede it.
   if (createColumn != null && detailOpen) on.handOver();
   const createMode = createColumn != null && !detailOpen;
   // Both branches share `openId` as their key on purpose: the create form and the card it creates
   // are one panel the user never sees close, so they must be one mounted component.
-  const detail = detailOpen ? (
-    <CardDetail
-      key={p.openId}
-      path={selected}
-      board={b}
-      focusNew={p.focusNew}
-      focusAddSubcard={p.focusAddSubcard}
-      focusSeq={p.focusSeq}
-      onClose={on.close}
-      onNavigate={on.navigate}
-      onChanged={on.changed}
-    />
-  ) : createMode ? (
-    <CardDetail
-      key={p.openId}
-      path=""
-      board={b}
-      createColumn={createColumn}
-      onClose={on.close}
-      onChanged={on.changed}
-      onCreated={on.created}
-    />
-  ) : null;
+  const detail =
+    detailOpen && selected != null ? (
+      <CardDetail
+        key={p.openId}
+        path={selected}
+        board={b}
+        focusNew={p.focusNew}
+        focusAddSubcard={p.focusAddSubcard}
+        focusSeq={p.focusSeq}
+        gone={gone}
+        onClose={on.close}
+        onNavigate={on.navigate}
+        onChanged={on.changed}
+      />
+    ) : createMode ? (
+      <CardDetail
+        key={p.openId}
+        path=""
+        board={b}
+        createColumn={createColumn}
+        onClose={on.close}
+        onChanged={on.changed}
+        onCreated={on.created}
+      />
+    ) : null;
   return { shown: detailOpen || createMode, detail };
 }
 
@@ -277,8 +312,15 @@ function panelFor(
 function useSelectionFollowsFile(
   repo: CardRepository,
   board: BoardModel | null,
-  selectedRef: { readonly current: string | null },
-  setSelected: Dispatch<SetStateAction<string | null>>,
+  {
+    selectedRef,
+    setSelected,
+    guard,
+  }: {
+    selectedRef: { readonly current: string | null };
+    setSelected: Dispatch<SetStateAction<string | null>>;
+    guard: LeaveGuard;
+  },
 ) {
   const [renamedTo, setRenamedTo] = useState<{ from: string; to: string } | null>(null);
   useEffect(
@@ -289,10 +331,12 @@ function useSelectionFollowsFile(
         const next = remapPath(cur, op);
         if (next === cur) return;
         // A delete leaves nothing to follow: the selection clears and the panel closes at once.
+        // Unless a title typed in it is unsaved, which keeps the panel (see `panelFor`).
+        if (next === null && guard.unsaved()) return;
         setRenamedTo(next === null ? null : { from: cur, to: next });
         setSelected(next);
       }),
-    [repo, selectedRef, setSelected],
+    [repo, selectedRef, setSelected, guard],
   );
   // The window closes on the first board that can actually answer for the new path: one that has
   // the card there, or one that no longer has it under the old path either (moved out of the card

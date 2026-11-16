@@ -63,10 +63,10 @@ import {
   cardFileName,
   normalizeTitle,
   resolveTitle,
-  retargetTitleLinks,
   retitleHeading,
   sameTitle,
 } from "../src/model/cardTitle";
+import { retargetTitleLinks } from "../src/model/titleMarkdown";
 import { isSelfRelation, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
 import {

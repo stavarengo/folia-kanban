@@ -28,6 +28,11 @@ interface Props {
   createColumn?: string;
   /** Called with the new card's path after a successful create. */
   onCreated?: (path: string) => void;
+  /**
+   * The card's note is gone from the board, and the panel is kept only because a title typed in
+   * it is unsaved. It shows what it last knew of the card, and says so.
+   */
+  gone?: boolean;
   /** When set, focus the description textarea on mount (fresh card from an add-card flow). */
   focusNew?: boolean;
   /** When set, focus the "Add a subcard" input (the context-menu "Add subcard" action). */
@@ -255,6 +260,16 @@ function CardSections({
   );
 }
 
+/** Said in a panel kept open on a card the board no longer has, for the title typed in it. */
+function GoneNote() {
+  return (
+    <p className="folia-card-gone" role="alert">
+      This card is no longer on the board: its note was deleted or moved away. What you typed here
+      is kept until you discard it.
+    </p>
+  );
+}
+
 export function CardDetail({
   path,
   board,
@@ -266,6 +281,7 @@ export function CardDetail({
   focusNew,
   focusAddSubcard,
   focusSeq,
+  gone = false,
 }: Props) {
   // The board reloads on a debounce, so for a moment after this card's file is renamed or moved
   // the board still knows the card only under its old path. Keep showing what it last said about
@@ -334,6 +350,7 @@ export function CardDetail({
         }
         actions={<CardHeaderActions card={card} path={path} deleting={panel.deleting} />}
       >
+        {gone && <GoneNote />}
         <CardSections path={path} board={board} card={card} onNavigate={onNavigate} panel={panel} />
       </DetailScroll>
     </DetailFrame>
