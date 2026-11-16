@@ -32,7 +32,7 @@ interface Props {
   filter: Filter;
   doneColumnId: string | null;
   /** A card drop: the card as it was when it was picked up, and the id it was released over. */
-  onMove: (card: Card, overId: string) => void;
+  onMove: (card: Card, overId: string) => Promise<void>;
   onAddCard: (columnId: string, title: string) => Promise<HeldOutcome>;
 }
 

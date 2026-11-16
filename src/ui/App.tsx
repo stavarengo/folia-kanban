@@ -153,8 +153,11 @@ interface Props {
 }
 
 export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
-  const { board, error, load } = useBoardLoad(repo);
-  const panel = useDetailPanel(repo, board, load);
+  // Everything below reads and writes through `source`, the repository the board on screen was
+  // read from: a board kept while another repository's is still on its way is never handed that
+  // other repository's actions.
+  const { board, source, error, current, load } = useBoardLoad(repo);
+  const panel = useDetailPanel(source, board, load);
   // #9: the search input is the SINGLE source of truth for board filtering. The board's active
   // filter is `parseFilter(query)` (§1); the preset chips just edit this one string.
   const [query, setQuery] = useState("");
@@ -174,8 +177,9 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
     selected: panel.selected,
   });
   const writes = useBoardWrites({
-    repo,
+    repo: source,
     board,
+    current,
     load,
     panel,
     matchCtx: view.matchCtx,
@@ -192,14 +196,15 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
 
   // Only a board that was never read is replaced by its error. One that was read and cannot be
   // read again stays on screen as it was, with the error over it: taking it away would take the
-  // open panel and every title being typed on the board with it.
+  // open panel and every title being typed on the board with it. Nothing is written from it
+  // meanwhile (see `refusedAsStale` in `useBoardWrites`).
   if (!board) return <NoBoard error={error} />;
 
   const { shown, detail } = panel.render(board);
   return (
     <BoardContexts
       settings={settingsValue}
-      repo={repo}
+      repo={source}
       actions={writes.actions}
       contexts={view.contexts}
       relations={view.relations}
@@ -226,7 +231,7 @@ export function App({ repo, settings, onUpdateSettings, today, host }: Props) {
             wipLimits={view.wipLimits}
             filter={view.filter}
             doneColumnId={view.doneColumnId}
-            onMove={(card, overId) => void writes.onMove(card, overId)}
+            onMove={writes.onMove}
             onAddCard={writes.onAddCard}
           />
         </div>

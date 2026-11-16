@@ -17,6 +17,8 @@ export interface CardActionDeps {
   load: () => Promise<boolean>;
   notify: (text: string, tone?: "success" | "error") => void;
   reportError: (e: unknown) => void;
+  /** See `useStaleRefusal`: asked first by every write that is worked out from the board. */
+  refusedAsStale: () => string | null;
   refusedByLane: (columnId: string, card: Card) => string | null;
   onUpdateSettings: (patch: SettingsPatch) => void;
   setSelected: Dispatch<SetStateAction<string | null>>;
@@ -117,7 +119,10 @@ export function cardViewActions(
             : withoutKey(s.commentsSeen, path),
         };
       }),
-    moveWithinColumn: (path, dir) => moveWithinColumn(d, path, dir),
+    moveWithinColumn: (path, dir) => {
+      // The slot a card moves to is worked out from the column as the board draws it.
+      if (d.refusedAsStale() === null) moveWithinColumn(d, path, dir);
+    },
     columnEdges: (path) => {
       const b = boardRef.current;
       if (!b) return { canMoveUp: false, canMoveDown: false };

@@ -18,6 +18,7 @@ export function useBoardMoves({
   load,
   notify,
   reportError,
+  refusedAsStale,
   inlineEdit,
   showCreated,
 }: {
@@ -27,6 +28,7 @@ export function useBoardMoves({
   load: () => Promise<boolean>;
   notify: (text: string, tone?: "success" | "error") => void;
   reportError: (e: unknown) => void;
+  refusedAsStale: () => string | null;
   /** 'inline-edit': an added card opens in the detail panel, its description focused. */
   inlineEdit: boolean;
   showCreated: (path: string) => void;
@@ -35,9 +37,15 @@ export function useBoardMoves({
    * A lane is a view of its rule and never an owner of a card, so filing one into a lane it does
    * not match would leave the card claiming a column that will not draw it. The write is refused
    * with the reason instead: nothing is written, and the card returns to where it was.
+   *
+   * Every write that files a card into a column asks this first, so it is also where a board that
+   * is not current refuses them all (see `useStaleRefusal`): its columns and their rules are the
+   * ones it was last read with.
    */
   const refusedByLane = useCallback(
     (columnId: string, card: Card): string | null => {
+      const stale = refusedAsStale();
+      if (stale !== null) return stale;
       const b = boardRef.current;
       const ctx = matchCtxRef.current;
       if (!b || !ctx) return null;
@@ -47,13 +55,13 @@ export function useBoardMoves({
       notify(refusal, "error");
       return refusal;
     },
-    [notify, boardRef, matchCtxRef],
+    [notify, refusedAsStale, boardRef, matchCtxRef],
   );
 
   const onMove = useCallback(
     async (dragged: Card, overId: string) => {
       const b = boardRef.current;
-      if (!b) return;
+      if (!b || refusedAsStale() !== null) return;
       const resolved = resolveDrop(b, dragged.path, overId);
       if (resolved && refusedByLane(resolved.columnId, laneSubject(b, dragged)) !== null) {
         // Board holds the make-room gap open across the drop and clears it when a reloaded board
@@ -71,7 +79,7 @@ export function useBoardMoves({
         await load();
       }
     },
-    [repo, load, reportError, refusedByLane, boardRef],
+    [repo, load, reportError, refusedAsStale, refusedByLane, boardRef],
   );
 
   /**

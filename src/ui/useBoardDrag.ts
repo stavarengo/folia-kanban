@@ -17,8 +17,11 @@ import { useBoardActions } from "./context";
 export function useBoardDrag(
   board: BoardModel,
   columnIds: string[],
-  /** A card drop: the card as it was when it was picked up, and the id it was released over. */
-  onMove: (card: Card, overId: string) => void,
+  /**
+   * A card drop: the card as it was when it was picked up, and the id it was released over.
+   * Answers once the move is through and the board has been read again, or was refused.
+   */
+  onMove: (card: Card, overId: string) => Promise<void>,
 ) {
   const actions = useBoardActions();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -48,6 +51,13 @@ export function useBoardDrag(
   useEffect(() => {
     if (activeRef.current == null) setDragReloc(null);
   }, [board]);
+  // A drop that was refused, or whose reload failed, brings no new board. Its gap is closed when
+  // the move has answered, which a board that did arrive has done already. A drag begun since
+  // owns the gap by then, and keeps it.
+  const drop = (card: Card, overId: string) =>
+    void onMove(card, overId).finally(() => {
+      if (activeRef.current == null) setDragReloc(null);
+    });
 
   // Columns and cards share one DndContext, so both are registered droppables. When a COLUMN is
   // being dragged, restrict collision to column droppables only — otherwise closestCorners can
@@ -106,7 +116,7 @@ export function useBoardDrag(
       // planDrop's split). KEEP `dragReloc` through the drop tween + persist; the board-effect
       // clears it once the reloaded board lands the card at this exact slot (no jump).
       // Nothing was picked up that a board could name, so no reload is coming to close the gap.
-      if (activeCard) onMove(activeCard, reloc.beforePath ?? reloc.toColumn);
+      if (activeCard) drop(activeCard, reloc.beforePath ?? reloc.toColumn);
       else setDragReloc(null);
       return;
     }
@@ -114,7 +124,7 @@ export function useBoardDrag(
     // the destination, so planDrop + onMove keep the verified tween. No gap to clear.
     const plan = planDrop(board, String(e.active.id), String(e.over.id), columnIds);
     if (plan.kind === "reorderColumns") actions.reorderColumns(plan.activeId, plan.overId);
-    else if (plan.kind === "moveCard" && activeCard) onMove(activeCard, plan.overId);
+    else if (plan.kind === "moveCard" && activeCard) drop(activeCard, plan.overId);
   };
   const onDragCancel = () => {
     setActiveId(null);

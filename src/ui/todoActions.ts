@@ -21,6 +21,8 @@ export function todoActions(
       return line && isTodoLine(line) ? line : null;
     },
     toggleTodo: (path, line, done) => {
+      // A tick also moves a line that claims a column, and where to is worked out from the board.
+      if (d.refusedAsStale() !== null) return;
       void (async () => {
         try {
           // The line as the caller read it, text and all: the write refuses rather than tick a
@@ -47,6 +49,7 @@ export function todoActions(
       })();
     },
     moveTodo: (path, line, columnId) => {
+      if (d.refusedAsStale() !== null) return;
       void (async () => {
         try {
           await moveTodo(d, path, line, columnId);

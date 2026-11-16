@@ -23,6 +23,7 @@ const EMPTY_PRIORITIES: readonly string[] = [];
 export function useBoardWrites({
   repo,
   board,
+  current,
   load,
   panel,
   matchCtx,
@@ -33,6 +34,8 @@ export function useBoardWrites({
 }: {
   repo: CardRepository;
   board: BoardModel | null;
+  /** Whether `board` is the repository's own as last read (see `useBoardLoad`). */
+  current: boolean;
   load: () => Promise<boolean>;
   panel: ReturnType<typeof useDetailPanel>;
   matchCtx: MatchContext;
@@ -54,6 +57,7 @@ export function useBoardWrites({
   // across single-card edits so memoized cards don't all re-render.
   const boardRef = useRef<BoardModel | null>(null);
   boardRef.current = board;
+  const refusedAsStale = useStaleRefusal(board !== null && !current, load, notify);
   // The write paths run long after this render, so they read the match context here rather than
   // closing over this render's value.
   const matchCtxRef = useRef<MatchContext | null>(null);
@@ -65,6 +69,7 @@ export function useBoardWrites({
     load,
     notify,
     reportError,
+    refusedAsStale,
     inlineEdit,
     showCreated: panel.showCreated,
   });
@@ -75,6 +80,7 @@ export function useBoardWrites({
       load,
       notify,
       reportError,
+      refusedAsStale,
       refusedByLane: moves.refusedByLane,
       onUpdateSettings,
       setSelected: panel.setSelected,
@@ -88,6 +94,35 @@ export function useBoardWrites({
   // What is typed into a tile's rename box is a write not made yet, and is kept with the writes.
   const titleEdits = useTitleEditsStore(repo);
   return { actions, onMove: moves.onMove, onAddCard: moves.onAddCard, titleEdits };
+}
+
+const STALE =
+  "The board on screen may be out of date, so Folia is reading it again. Try again once it has loaded. Nothing was changed.";
+
+/**
+ * The refusal every write worked out from the board answers to. A board kept on screen because it
+ * could not be read again, or because another board's is still on its way, shows what the vault
+ * held then: a column list written from it would undo a column added since, and a move would be
+ * placed among cards that are no longer there. So such a write is refused, the person is told
+ * why, and the board is read again, which is what lifts the refusal. Answers with the refusal, or
+ * `null` when the board is current.
+ *
+ * A write that names one note and says what to put in it (a title, a comment, a field) is not
+ * worked out from the board, and is not asked.
+ */
+function useStaleRefusal(
+  stale: boolean,
+  load: () => Promise<boolean>,
+  notify: (text: string, tone?: "success" | "error") => void,
+) {
+  const staleRef = useRef(stale);
+  staleRef.current = stale;
+  return useCallback((): string | null => {
+    if (!staleRef.current) return null;
+    notify(STALE, "error");
+    void load();
+    return STALE;
+  }, [load, notify]);
 }
 
 /**
@@ -116,6 +151,7 @@ function useActionsValue({
     load,
     notify,
     reportError,
+    refusedAsStale,
     refusedByLane,
     onUpdateSettings,
     setSelected,
@@ -129,6 +165,7 @@ function useActionsValue({
       load,
       notify,
       reportError,
+      refusedAsStale,
       refusedByLane,
       onUpdateSettings,
       setSelected,
@@ -155,6 +192,7 @@ function useActionsValue({
     load,
     notify,
     reportError,
+    refusedAsStale,
     refusedByLane,
     columns,
     onUpdateSettings,

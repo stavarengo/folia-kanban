@@ -13,6 +13,8 @@ interface ColumnActionDeps {
   repo: CardRepository;
   /** The latest board, read when an action runs rather than when the actions were built. */
   boardRef: { readonly current: BoardModel | null };
+  /** See `useStaleRefusal`: a column list is never written from a board that is not current. */
+  refusedAsStale: () => string | null;
   load: () => Promise<boolean>;
   notify: (text: string, tone?: "success" | "error") => void;
   reportError: (e: unknown) => void;
@@ -20,7 +22,10 @@ interface ColumnActionDeps {
 
 /** The column writes: each one rewrites the board note's column list, then reloads. */
 export function columnActions(d: ColumnActionDeps): ColumnActions {
-  const { repo, boardRef, load } = d;
+  const { repo, load } = d;
+  // Each write replaces the board note's whole column list with one built from the board, so the
+  // board it is built from has to be the one the note holds now.
+  const current = () => (d.refusedAsStale() === null ? d.boardRef.current : null);
   const setColumnsAndReload = async (cols: ColumnDef[]) => {
     try {
       await repo.setColumns(cols);
@@ -30,13 +35,13 @@ export function columnActions(d: ColumnActionDeps): ColumnActions {
   };
   return {
     renameColumn: (id, title) => {
-      const b = boardRef.current;
+      const b = current();
       const t = title.trim();
       if (!b || !t) return;
       void setColumnsAndReload(b.config.columns.map((c) => (c.id === id ? { ...c, title: t } : c)));
     },
     updateColumn: (id, patch) => {
-      const b = boardRef.current;
+      const b = current();
       if (!b) return;
       // Merge the patch onto the current def; serializeColumns then drops anything equal to its
       // default (group:"none", sort:"manual", opacity:1, parked:false) or blank, so the write
@@ -46,7 +51,7 @@ export function columnActions(d: ColumnActionDeps): ColumnActions {
       );
     },
     moveColumn: (id, dir) => {
-      const b = boardRef.current;
+      const b = current();
       if (!b) return;
       const cols = [...b.config.columns];
       const i = cols.findIndex((c) => c.id === id);
@@ -59,7 +64,7 @@ export function columnActions(d: ColumnActionDeps): ColumnActions {
       void setColumnsAndReload(cols);
     },
     reorderColumns: (activeId, overId) => {
-      const b = boardRef.current;
+      const b = current();
       if (!b) return;
       const next = moveColumn(b.config.columns, activeId, overId);
       if (next === b.config.columns) return; // no-op (same slot / unknown id)
@@ -67,7 +72,7 @@ export function columnActions(d: ColumnActionDeps): ColumnActions {
     },
     deleteColumn: (id) => deleteColumn(d, id),
     addColumn: (title) => {
-      const b = boardRef.current;
+      const b = current();
       const t = title.trim();
       if (!b || !t) return;
       const existing = new Set(b.config.columns.map((c) => c.id));
@@ -87,6 +92,7 @@ export function columnActions(d: ColumnActionDeps): ColumnActions {
 /** Delete a column once the person confirms, rehoming its cards to the nearest plain column. */
 function deleteColumn(d: ColumnActionDeps, id: string): void {
   const { repo, boardRef, load, notify, reportError } = d;
+  if (d.refusedAsStale() !== null) return;
   // Refused before asking, so nobody confirms a delete that cannot happen, and worked out
   // again after: the board may have reloaded while the dialog was open.
   const asked = boardRef.current && columnDeletePlan(boardRef.current, id);
@@ -101,8 +107,9 @@ function deleteColumn(d: ColumnActionDeps, id: string): void {
       message: `Delete "${asked.title}"? Its cards move to a neighbouring column.`,
       cta: "Delete",
     });
-    const b = boardRef.current;
-    const plan = ok && b ? columnDeletePlan(b, id) : null;
+    // Asked again: the board may have failed to reload while the dialog was open.
+    const b = ok && d.refusedAsStale() === null ? boardRef.current : null;
+    const plan = b ? columnDeletePlan(b, id) : null;
     if (!b || !plan) return;
     if ("refusal" in plan) {
       notify(plan.refusal, "error");

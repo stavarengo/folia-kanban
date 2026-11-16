@@ -4395,6 +4395,32 @@ describe("cross-column make-room (live relocation gap)", () => {
     expect(cardsIn("Doing")).not.toContain("Tasks/Alpha.md");
   });
 
+  it("refuses a drop on a board that could not be read again, and snaps the card back", async () => {
+    // No board arrives to close the gap the drag opened: the refused drop has to close it itself.
+    placeCards();
+    const user = userEvent.setup();
+    const repo = crossRepo();
+    render_(repo);
+    const main = (await screen.findByText("Alpha"))
+      .closest(".folia-card")!
+      .querySelector(".folia-card-open") as HTMLElement;
+    repo.failLoadWith = "the vault cannot be read";
+    act(() => repo.notify());
+    await screen.findByText(/Couldn’t refresh the board/);
+    const moved = vi.spyOn(repo, "applyMove");
+    main.focus();
+    await user.keyboard("{ }");
+    await crossIntoDoing(user);
+    await waitFor(() => expect(cardsIn("Doing")).toContain("Tasks/Alpha.md"));
+    await user.keyboard("{ }"); // drop it
+
+    await expectNotice(repo, /The board on screen may be out of date/);
+    expect(moved).not.toHaveBeenCalled();
+    expect(repo.files.get("Tasks/Alpha.md")?.fm["status"]).toBe("todo");
+    await waitFor(() => expect(cardsIn("Todo")).toContain("Tasks/Alpha.md"));
+    expect(cardsIn("Doing")).not.toContain("Tasks/Alpha.md");
+  });
+
   it("lets the same drop through once the card matches the lane's rule", async () => {
     placeCards();
     const user = userEvent.setup();
