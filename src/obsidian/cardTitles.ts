@@ -237,35 +237,56 @@ async function titleLinksTo(
 
 /**
  * Point the links in one card's title at `dest`, and say how it went: `"changed"` for a title
- * that is no longer the one the links were read from, and the reason for a write that failed.
+ * that is no longer the one the links were read from, `"moved"` for a card that is no longer the
+ * note at the path they were read in, and the reason for a write that failed.
  *
  * Only that very title is rewritten, and only where the card still is. By now the old name is
- * free, so the same linkpath in a title written since may name a new note of that name, and
- * rewriting it would point somebody else's link at the card that moved.
+ * free, so the same linkpath in a title written since may name a new note of that name, and read
+ * from another folder it may name a different note altogether: rewriting it would point somebody
+ * else's link at the card that moved. All of it is judged inside the write, on the note the write
+ * is made on. A check made before it says nothing about a card moved while the write was waiting.
  */
 async function retargetOne(
   { app, writer }: CardFiles,
   dest: string,
   card: TFile,
   seen: TitleLinks,
-): Promise<"done" | "changed" | { failed: string }> {
-  if (card.path !== seen.path) return "changed";
-  let changed = false;
+): Promise<"done" | "changed" | "moved" | { failed: string }> {
+  const moved = () => card.path !== seen.path || app.vault.getFileByPath(seen.path) !== card;
+  // Asked first as well: a write addressed to a path the card has left would only fail to find it.
+  if (moved()) return "moved";
+  const judged: { kept: "changed" | "moved" | null } = { kept: null };
   try {
-    await writer.editKey(card.path, TITLE_KEY, (value) => {
-      changed = value !== seen.title;
-      return changed
+    await writer.editKey(seen.path, TITLE_KEY, (value) => {
+      judged.kept = moved() ? "moved" : value !== seen.title ? "changed" : null;
+      return judged.kept !== null
         ? value
         : retargetTitleLinks(
             seen.title,
             (linkpath) => seen.linkpaths.has(linkpath),
-            linkTextTo(app, dest, card.path),
+            linkTextTo(app, dest, seen.path),
           );
     });
   } catch (e) {
     return { failed: failure(app, e) };
   }
-  return changed ? "changed" : "done";
+  return judged.kept ?? "done";
+}
+
+/** What is said of the cards whose title links were left alone, for one card or for several. */
+function leftAlone(why: "changed" | "moved", cards: readonly string[]): string {
+  const [only] = cards;
+  const one = cards.length === 1 && only !== undefined;
+  const names = cards.join(", ");
+  const happened =
+    why === "changed"
+      ? one
+        ? `the title of ${only} was changed while that was being saved, so the link to the card in it was left alone`
+        : `the titles of ${names} were changed while that was being saved, so the links to the card in them were left alone`
+      : one
+        ? `${only} was moved or replaced while that was being saved, so the link to the card in its title was left alone`
+        : `${names} were moved or replaced while that was being saved, so the links to the card in their titles were left alone`;
+  return `The card was retitled, but ${happened}. Check ${one ? "that title" : "those titles"} by hand.`;
 }
 
 /** Point the title links collected by {@link titleLinksTo} at the file's new path. */
@@ -275,12 +296,15 @@ async function retargetTitleLinksTo(
   links: ReadonlyMap<TFile, TitleLinks>,
 ): Promise<void> {
   const stale: string[] = [];
-  const changed: string[] = [];
+  const left: Record<"changed" | "moved", string[]> = { changed: [], moved: [] };
   let why = "";
   for (const [card, seen] of links) {
     const outcome = await retargetOne(files, dest, card, seen);
-    if (outcome === "changed") changed.push(card.name);
-    else if (outcome !== "done") {
+    if (outcome === "done") continue;
+    // A card that moved is named as it was read: its file may have another name by now.
+    if (outcome === "moved") left.moved.push(baseName(seen.path));
+    else if (outcome === "changed") left.changed.push(card.name);
+    else {
       stale.push(card.name);
       why = outcome.failed;
     }
@@ -290,12 +314,8 @@ async function retargetTitleLinksTo(
     unfinished.push(
       `The card was retitled, but the link to it in the title of ${stale.join(", ")} could not be updated: ${why}. Edit ${stale.length === 1 ? "that title" : "those titles"} by hand.`,
     );
-  if (changed.length > 0)
-    unfinished.push(
-      changed.length === 1
-        ? `The card was retitled, but the title of ${changed[0]} was changed while that was being saved, so the link to the card in it was left alone. Check that title by hand.`
-        : `The card was retitled, but the titles of ${changed.join(", ")} were changed while that was being saved, so the links to the card in them were left alone. Check those titles by hand.`,
-    );
+  for (const kind of ["changed", "moved"] as const)
+    if (left[kind].length > 0) unfinished.push(leftAlone(kind, left[kind]));
   if (unfinished.length > 0) throw new PartlyWritten(unfinished.join(" "));
 }
 

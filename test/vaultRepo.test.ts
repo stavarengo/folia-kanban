@@ -1476,6 +1476,52 @@ describe("retitling a card", () => {
       );
     });
 
+    it("leaves the title of a card that was moved since it was read, and names the card", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Plan.md", card("status: todo"));
+      app.vault.addFile("Archive/Plan.md", "old");
+      app.vault.addFile("basic/Cards/Compare.md", card('title: "Compare with [[Plan]]"'));
+      const write = app.fileManager.processFrontMatter.bind(app.fileManager);
+      vi.spyOn(app.fileManager, "processFrontMatter").mockImplementation(async (file, fn) => {
+        // The write was asked for where the card was. Before it is made, the card is moved to a
+        // folder where `[[Plan]]` names another note, and the write follows the file there.
+        if (file.path === "basic/Cards/Compare.md") app.vault.move(file, "Archive/Compare.md");
+        return write(file, fn);
+      });
+
+      const failed = await failureOf(repo.renameCard("basic/Cards/Plan.md", "Renamed"));
+
+      // Its title reads the same, but from there the link is to `Archive/Plan.md`: not ours.
+      expect(app.vault.frontmatter("Archive/Compare.md")["title"]).toBe("Compare with [[Plan]]");
+      expect(failed).toBeInstanceOf(PartlyWritten);
+      expect(failed.message).toBe(
+        "The card was retitled, but Compare.md was moved or replaced while that was being saved, so the link to the card in its title was left alone. Check that title by hand.",
+      );
+    });
+
+    it("leaves the title of a note that took a referring card's place", async () => {
+      const { app, repo } = setup();
+      app.vault.addFile("basic/Cards/Plan.md", card("status: todo"));
+      app.vault.addFile("basic/Cards/Compare.md", card('title: "Compare with [[Plan]]"'));
+      const write = app.fileManager.processFrontMatter.bind(app.fileManager);
+      vi.spyOn(app.fileManager, "processFrontMatter").mockImplementation(async (file, fn) => {
+        // The card is deleted, and another note with the same title is made where it was.
+        if (file.path === "basic/Cards/Compare.md" && app.vault.getFileByPath(file.path) === file) {
+          app.vault.remove(file);
+          app.vault.addFile("basic/Cards/Compare.md", card('title: "Compare with [[Plan]]"'));
+        }
+        return write(file, fn);
+      });
+
+      const failed = await failureOf(repo.renameCard("basic/Cards/Plan.md", "Renamed"));
+
+      expect(app.vault.frontmatter("basic/Cards/Compare.md")["title"]).toBe(
+        "Compare with [[Plan]]",
+      );
+      expect(failed).toBeInstanceOf(PartlyWritten);
+      expect(failed.message).toContain("Compare.md was moved or replaced");
+    });
+
     it("reports both when the link and the card's own old `title` are left behind", async () => {
       const { app, repo } = setup();
       app.vault.addFile("basic/Cards/Old.md", card("title: Old title"));
