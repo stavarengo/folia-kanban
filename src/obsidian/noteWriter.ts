@@ -118,6 +118,39 @@ export class NoteWriter {
   }
 
   /**
+   * Rewrite one key INSIDE the frontmatter write, from the value the note holds at that moment
+   * rather than from one read before it: what another writer put there in between is what
+   * `rewrite` is given. It answers with the key's new value, with `undefined` to remove the key,
+   * or with the value it was given to leave the note alone. Returns whether the note changed and
+   * the value the decision was made on; a key that stays as it is writes nothing.
+   */
+  async editKey(
+    path: string,
+    key: string,
+    rewrite: (value: unknown) => unknown,
+  ): Promise<{ changed: boolean; before: unknown }> {
+    const stays = (fm: Record<string, unknown>, next: unknown) =>
+      next === undefined ? !(key in fm) : key in fm && sameValue(fm[key], next);
+    const seen = await this.currentFrontmatter(path);
+    if (seen !== null && stays(seen, rewrite(seen[key])))
+      return { changed: false, before: seen[key] };
+    const result: { changed: boolean; before: unknown } = { changed: false, before: undefined };
+    this.markWrite(path);
+    await this.app.fileManager.processFrontMatter(
+      this.file(path),
+      (fm: Record<string, unknown>) => {
+        result.before = fm[key];
+        const next = rewrite(fm[key]);
+        if (stays(fm, next)) return;
+        if (next === undefined) delete fm[key];
+        else fm[key] = next;
+        result.changed = true;
+      },
+    );
+    return result;
+  }
+
+  /**
    * Rewrite a note's text through `fn`. Returns whether it changed; when `fn` would hand the text
    * back as it is, nothing is written. `fn` is run once on a fresh read to decide that, and again
    * inside `process`, on the text the write is actually made on — so it must be a pure function of

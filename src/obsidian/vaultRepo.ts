@@ -68,7 +68,7 @@ import {
   subtaskRemovedLine,
 } from "../model/history";
 import { normalizeTitle } from "../model/cardTitle";
-import type { CardRepository } from "../model/repo";
+import { PartlyWritten, type CardRepository } from "../model/repo";
 import type { FileOp } from "../model/pathOps";
 import { parseFrontmatter, sameValue } from "./frontmatter";
 import {
@@ -78,7 +78,8 @@ import {
   type ResolvedBoardConfig,
 } from "./boardConfig";
 import { cardFilesIn, readCard, readContexts } from "./cardNotes";
-import { createCardNote, failure, retitleCard } from "./cardTitles";
+import { createCardNote, retitleCard } from "./cardTitles";
+import { failure } from "./failures";
 import { NoteWriter } from "./noteWriter";
 import { followLink, linkTextTo, relationTargetPath, resolveLink } from "./vaultLinks";
 import { renderMarkdown } from "./markdownRender";
@@ -312,8 +313,8 @@ export class VaultRepository implements CardRepository {
     } catch (e) {
       // The child exists from here on. Told only that adding failed, a caller adds it again and
       // the board ends up with two.
-      throw new Error(
-        `"${normalizeTitle(title)}" was created at ${childPath}, but linking it from its parent failed: ${failure(e)}. Link it by hand rather than adding it again.`,
+      throw new PartlyWritten(
+        `"${normalizeTitle(title)}" was created at ${childPath}, but linking it from its parent failed: ${failure(this.app, e)}. Link it by hand rather than adding it again.`,
         { cause: e },
       );
     }
@@ -383,12 +384,23 @@ export class VaultRepository implements CardRepository {
     showMenu(rows, at);
   }
 
-  async renameCard(path: string, newTitle: string): Promise<string> {
+  async renameCard(
+    path: string,
+    newTitle: string,
+    options: { retry?: boolean } = {},
+  ): Promise<string> {
     const file = this.file(path);
     const title = normalizeTitle(newTitle);
     if (!title) return path; // blank title — no-op, per the CardRepository contract
-    const { titleMode } = await this.readConfig();
-    return retitleCard({ app: this.app, writer: this.writer }, file, title, titleMode);
+    const config = await this.readConfig();
+    return retitleCard({ app: this.app, writer: this.writer }, file, title, {
+      titleMode: config.titleMode,
+      retry: options.retry === true,
+      cards: () => {
+        const folder = this.app.vault.getFolderByPath(config.cardFolder);
+        return folder === null ? [] : cardFilesIn(folder, this.boardPath);
+      },
+    });
   }
 
   async openCard(path: string, evt?: MouseEvent): Promise<void> {

@@ -201,6 +201,12 @@ export interface ProgressBarControl extends HostControl {
 }
 
 /**
+ * A write that got part of the way. What its message opens with was stored, and the rest says what
+ * is left to do, so a caller still holding the text being saved must not report that text as lost.
+ */
+export class PartlyWritten extends Error {}
+
+/**
  * Every write below leaves a note byte for byte as it was, history included, when what it would
  * store is what the note already holds. A history line records a change, so no change, no line.
  */
@@ -302,9 +308,14 @@ export interface CardRepository {
    * and goes with the need for it. On a `card-title: heading` board, a title read from the note's
    * first heading is written back to that heading instead. Returns the card's (possibly new)
    * path. A blank/unchanged title is a no-op that returns the original path. A failure throws,
-   * and says so when part of the change was already written.
+   * and is a {@link PartlyWritten} when part of the change was already written.
+   *
+   * `retry` says this title was saved before and the save did not go through whole. The retitle
+   * is then carried out even though the card already reads that title, which is what names the
+   * file after a title whose rename had failed. Without it a card whose file was named apart from
+   * its title on purpose keeps that name.
    */
-  renameCard(path: string, newTitle: string): Promise<string>;
+  renameCard(path: string, newTitle: string, options?: { retry?: boolean }): Promise<string>;
 
   /** Persist column definitions to the board note frontmatter. */
   setColumns(columns: ColumnDef[]): Promise<void>;

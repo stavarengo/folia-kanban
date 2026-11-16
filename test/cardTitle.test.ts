@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
+import MarkdownIt from "markdown-it";
 import {
   FILE_NAME_CHARS,
   asTitleMode,
+  cardFileName,
   fitFileName,
   hasInlineMarkdown,
   normalizeTitle,
   plainTitleText,
   resolveTitle,
+  retargetTitleLinks,
+  retitleHeading,
   sameTitle,
   sanitizeFilename,
-  setHeadingTitle,
   titleFileName,
   titleMarkdown,
   withoutRepeatedHeading,
@@ -40,6 +43,14 @@ describe("normalizeTitle and sameTitle", () => {
     expect(sameTitle(NFD, NFC)).toBe(true);
     expect(sameTitle("plan", "Plan")).toBe(false);
   });
+  it("drops control characters, which nobody can see or type on purpose", () => {
+    expect(normalizeTitle("Bell\u0007and\ttab and\u001fUS control\u007f chars")).toBe(
+      "Belland tab andUS control chars",
+    );
+    expect(normalizeTitle("next\u0085line \u009b and \u0000 nul")).toBe("nextline and nul");
+    // What joins an emoji into one character is not a control character, and stays.
+    expect(normalizeTitle("family 👨‍👩‍👧 photo")).toBe("family 👨‍👩‍👧 photo");
+  });
 });
 
 describe("sanitizeFilename", () => {
@@ -63,6 +74,15 @@ describe("sanitizeFilename", () => {
     expect(sanitizeFilename("LPT9.backup")).toBe("LPT9 card.backup");
     expect(sanitizeFilename("Console")).toBe("Console");
     expect(sanitizeFilename("CON artist")).toBe("CON artist");
+  });
+  it("renames the device names Windows spells with a superscript digit, and the console's two", () => {
+    expect(sanitizeFilename("COM¹")).toBe("COM¹ card");
+    expect(sanitizeFilename("lpt²")).toBe("lpt² card");
+    expect(sanitizeFilename("Com³.log")).toBe("Com³ card.log");
+    expect(sanitizeFilename("CONIN$")).toBe("CONIN$ card");
+    expect(sanitizeFilename("conout$")).toBe("conout$ card");
+    // Only ¹, ² and ³ name a port.
+    expect(sanitizeFilename("COM⁴")).toBe("COM⁴");
   });
   it("falls back to a name when nothing usable is left", () => {
     expect(sanitizeFilename("???")).toBe("Untitled card");
@@ -94,13 +114,46 @@ describe("fitFileName", () => {
     const cut = fitFileName(family.repeat(20));
     expect(cut.length % family.length).toBe(0);
     expect(new TextEncoder().encode(cut).length).toBeLessThanOrEqual(200);
-    expect(fitFileName(`${"a".repeat(9)}éz`, 10)).toBe(`${"a".repeat(9)}é`);
+    expect(fitFileName(`${"a".repeat(9)}éz`, { chars: 10 })).toBe(`${"a".repeat(9)}é`);
   });
   it("honours a tighter limit, for a folder whose path leaves little room", () => {
-    expect(fitFileName("Fix the export path on Windows today", 25)).toBe("Fix the export path on");
+    expect(fitFileName("Fix the export path on Windows today", { chars: 25 })).toBe(
+      "Fix the export path on",
+    );
+  });
+  it("counts a limit on the path the way Windows does, in UTF-16 units, and still cuts at a character", () => {
+    // Each of these is one character and two units.
+    expect(fitFileName("😀".repeat(25), { units: 21 })).toBe("😀".repeat(10));
   });
   it("leaves no trailing dot or space where it cut", () => {
     expect(fitFileName(`${"a".repeat(98)}. bcd`)).toBe("a".repeat(98));
+  });
+});
+
+describe("cardFileName", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s).length;
+
+  it("is the title with its extension, and a number once the name is taken", () => {
+    expect(cardFileName("Fix the export path")).toBe("Fix the export path.md");
+    expect(cardFileName("Fix the export path", 2)).toBe("Fix the export path 2.md");
+    expect(cardFileName("x".repeat(FILE_NAME_CHARS))).toBe(`${"x".repeat(FILE_NAME_CHARS)}.md`);
+  });
+  it("keeps the whole file name within 200 bytes, extension and number included", () => {
+    // 66 of these are 198 bytes: with `.md` that is one over.
+    expect(cardFileName("語".repeat(90))).toBe(`${"語".repeat(65)}.md`);
+    expect(cardFileName("語".repeat(66))).toBe(`${"語".repeat(65)}.md`);
+    for (const n of [0, 1, 9, 10, 123])
+      expect(bytes(cardFileName("😀".repeat(51), n)), String(n)).toBeLessThanOrEqual(200);
+    expect(cardFileName("😀".repeat(51), 1)).toBe(`${"😀".repeat(48)} 1.md`);
+  });
+  it("keeps the whole file name within the room a folder leaves, extension and number included", () => {
+    const title = "Fix the export path on Windows before the release";
+    expect(cardFileName(title, 0, 30)).toBe("Fix the export path on.md");
+    for (const n of [0, 1, 12])
+      expect(cardFileName(title, n, 30).length, String(n)).toBeLessThanOrEqual(30);
+    // Counted as Windows counts a path: two units for each of these.
+    expect(cardFileName("😀".repeat(25), 0, 30)).toBe(`${"😀".repeat(13)}.md`);
+    expect(cardFileName("😀".repeat(25), 3, 30)).toBe(`${"😀".repeat(12)} 3.md`);
   });
 });
 
@@ -120,6 +173,10 @@ describe("plainTitleText", () => {
     expect(plainTitleText("![[Diagram]] review")).toBe("Diagram review");
     expect(plainTitleText("![chart](img/chart.png)")).toBe("chart");
     expect(plainTitleText("![](img/chart.png)")).toBe("img/chart.png");
+  });
+  it("reads a label that holds brackets of its own", () => {
+    expect(plainTitleText("**x** ![a [b]](image.png)")).toBe("x a [b]");
+    expect(plainTitleText("[see [1]](https://example.com)")).toBe("see [1]");
   });
   it("reads emphasis, strikethrough, highlight and code as their words", () => {
     expect(plainTitleText("**Fix** the *export* __path__ _now_")).toBe("Fix the export path now");
@@ -235,6 +292,155 @@ describe("titleMarkdown", () => {
   it("is one line, whatever it was given", () => {
     expect(titleMarkdown("one\n# two **three**")).toBe("one # two **three**");
   });
+  it("turns an image into a link whatever its label holds", () => {
+    expect(titleMarkdown("**x** ![a [b]](image.png)")).toBe("**x** [a [b]](image.png)");
+    expect(titleMarkdown("![a `]` b](image.png) **x**")).toBe("[a `]` b](image.png) **x**");
+    expect(titleMarkdown("![one ![two](2.png)](1.png)")).toBe("[one [two](2.png)](1.png)");
+    expect(titleMarkdown('![a](<my image.png> "t") **x**')).toBe('[a](<my image.png> "t") **x**');
+    expect(titleMarkdown("![[a] b](c.png)")).toBe("[[a] b](c.png)");
+  });
+  it("leaves an exclamation mark that opens no image where it was typed", () => {
+    expect(titleMarkdown("Wait![1] is **this** right")).toBe("Wait![1] is **this** right");
+    expect(titleMarkdown("\\![[Diagram]] **x**")).toBe("\\![[Diagram]] **x**");
+    expect(titleMarkdown("![[never closed **x**")).toBe("![[never closed **x**");
+  });
+  it("leaves a code span exactly as typed", () => {
+    expect(titleMarkdown("see `![[note]]` and `![a](b.png)`")).toBe(
+      "see `![[note]]` and `![a](b.png)`",
+    );
+    expect(titleMarkdown("``a ` ![[b]]`` then ![[c]]")).toBe("``a ` ![[b]]`` then [[c]]");
+    expect(titleMarkdown("`<b>` and `%%x%%`")).toBe("`<b>` and `%%x%%`");
+  });
+  it("shows raw HTML as typed instead of handing it to the renderer", () => {
+    expect(titleMarkdown('**x** <img src="a.png">')).toBe('**x** \\<img src="a.png">');
+    expect(titleMarkdown("a <b>bold</b> **c**")).toBe("a \\<b>bold\\</b> **c**");
+    expect(titleMarkdown("<!-- gone --> **c**")).toBe("\\<!-- gone --> **c**");
+    expect(titleMarkdown("<div>**c**</div>")).toBe("\\<div>**c**\\</div>");
+  });
+  it("keeps an autolink, a bare `<` and an address written in angle brackets", () => {
+    for (const t of [
+      "see <https://example.com/x> **now**",
+      "mail <someone@example.com> **now**",
+      "a < b and **c**",
+      "[a](<my file.md>) **c**",
+    ])
+      expect(titleMarkdown(t), t).toBe(t);
+  });
+  it("escapes what would make the whole line disappear", () => {
+    // A link reference definition and a footnote draw nothing where they stand.
+    expect(titleMarkdown("[JIRA-12]: https://jira.example/12")).toBe(
+      "\\[JIRA-12]: https://jira.example/12",
+    );
+    expect(titleMarkdown("[^1]: a **note**")).toBe("\\[^1]: a **note**");
+    // Obsidian hides everything after `%%`.
+    expect(titleMarkdown("50%% off **today**")).toBe("50\\%\\% off **today**");
+  });
+
+  describe("as a CommonMark renderer reads it", () => {
+    // Obsidian's renderer cannot run here. This one reads the same CommonMark, raw HTML switched
+    // on as Obsidian has it, and stands in for the question the string alone cannot answer: is
+    // anything drawn but one line of inline text?
+    const md = new MarkdownIt({ html: true });
+    const INLINE_BLOCKS = ["paragraph_open", "inline", "paragraph_close"];
+    const drawn = (title: string) => {
+      const tokens = md.parse(titleMarkdown(title), {});
+      return {
+        blocks: tokens.map((t) => t.type),
+        inline: tokens.flatMap((t) => t.children ?? []).map((t) => t.type),
+        code: tokens
+          .flatMap((t) => t.children ?? [])
+          .filter((t) => t.type === "code_inline")
+          .map((t) => t.content),
+      };
+    };
+
+    it("draws one paragraph of inline text, with no image and no HTML, whatever the title", () => {
+      for (const title of [
+        "**x** ![a [b]](image.png)",
+        "![chart](img/chart.png) review",
+        "![one ![two](2.png)](1.png)",
+        '![a](<my image.png> "t") **x**',
+        "![a `]` b](image.png) **x**",
+        '**x** <img src="a.png" onerror="alert(1)">',
+        "a <b>bold</b> **c**",
+        "<div>**c**</div>",
+        "<!-- gone --> **c**",
+        "<script>alert(1)</script> **c**",
+        "# Fix **now**",
+        "> quote *this*",
+        "- [ ] `task`",
+        "1. first **thing**",
+        "```js `x`",
+        "[JIRA-12]: https://jira.example/12",
+        "| a | **b** |",
+        "    indented **code**",
+      ]) {
+        const { blocks, inline } = drawn(title);
+        expect(blocks, title).toEqual(INLINE_BLOCKS);
+        expect(inline, title).not.toContain("image");
+        expect(inline, title).not.toContain("html_inline");
+      }
+    });
+
+    it("still draws a link where an image was typed", () => {
+      expect(drawn("**x** ![a [b]](image.png)").inline).toContain("link_open");
+      expect(drawn('![a](<my image.png> "t")').inline).toContain("link_open");
+    });
+
+    it("draws a code span with exactly what was typed inside it", () => {
+      expect(drawn("see `![[note]]` and `![a](b.png)`").code).toEqual(["![[note]]", "![a](b.png)"]);
+      expect(drawn("`<img src=x>` **y**").code).toEqual(["<img src=x>"]);
+    });
+
+    it("keeps an autolink a link", () => {
+      expect(drawn("see <https://example.com/x> **now**").inline).toContain("link_open");
+    });
+  });
+});
+
+describe("retargetTitleLinks", () => {
+  const moved = (linkpath: string) => linkpath === "Parent epic";
+  const to = "Parent epic, the migration";
+
+  it("points a wikilink at the note's new name", () => {
+    expect(
+      retargetTitleLinks(
+        "Follow up on [[Parent epic]] and the [vendor quote](https://example.com/quote)",
+        moved,
+        to,
+      ),
+    ).toBe(
+      "Follow up on [[Parent epic, the migration]] and the [vendor quote](https://example.com/quote)",
+    );
+  });
+  it("keeps the alias, the heading and the embed mark a link was written with", () => {
+    expect(retargetTitleLinks("see [[Parent epic|the epic]]", moved, to)).toBe(
+      "see [[Parent epic, the migration|the epic]]",
+    );
+    expect(retargetTitleLinks("see [[Parent epic#Scope]]", moved, to)).toBe(
+      "see [[Parent epic, the migration#Scope]]",
+    );
+    expect(retargetTitleLinks("see [[Parent epic#Scope|scope]]", moved, to)).toBe(
+      "see [[Parent epic, the migration#Scope|scope]]",
+    );
+    expect(retargetTitleLinks("![[Parent epic]] review", moved, to)).toBe(
+      "![[Parent epic, the migration]] review",
+    );
+  });
+  it("leaves every other link, and a link typed as code, as it was", () => {
+    for (const title of [
+      "see [[Another note]] and [[Parent epics]]",
+      "type `[[Parent epic]]` to link it",
+      "no link to Parent epic here",
+      "[[Parent epic never closed",
+    ])
+      expect(retargetTitleLinks(title, moved, to), title).toBe(title);
+  });
+  it("rewrites each link to the note, and only those", () => {
+    expect(
+      retargetTitleLinks("[[Parent epic]] before [[Other]] and [[Parent epic|it]]", moved, to),
+    ).toBe("[[Parent epic, the migration]] before [[Other]] and [[Parent epic, the migration|it]]");
+  });
 });
 
 describe("asTitleMode", () => {
@@ -315,6 +521,16 @@ describe("resolveTitle", () => {
       "Fix the export path",
     );
   });
+  it("heading: reads a hash that hugs the text as text; only hashes after a space close a heading", () => {
+    expect(resolveTitle("x", {}, "# C#\n", "heading").title).toBe("C#");
+    expect(resolveTitle("x", {}, "## Learn F# and C# ##\n", "heading").title).toBe(
+      "Learn F# and C#",
+    );
+    expect(resolveTitle("x", {}, "# Fix it #\n", "heading").title).toBe("Fix it");
+    expect(resolveTitle("x", {}, "# Fix it \\#\n", "heading").title).toBe("Fix it \\#");
+    // A heading of nothing but its closing hashes has no text to be a title.
+    expect(resolveTitle("x", {}, "# ##\n\n## Real title\n", "heading").title).toBe("Real title");
+  });
   it("heading: never takes a title from the parser's own section headings", () => {
     const text = "## Subtasks\n- [ ] [[Child]]\n\n## Comments\n\n## History\n";
     expect(resolveTitle("01-fix", {}, text, "heading")).toEqual({
@@ -324,36 +540,71 @@ describe("resolveTitle", () => {
   });
 });
 
-describe("setHeadingTitle", () => {
+describe("retitleHeading", () => {
+  const WAS = "Fix the export path on Windows";
+  const written = (text: string, from: string, to: string) => {
+    const outcome = retitleHeading(text, from, to);
+    if (!("text" in outcome)) throw new Error(`refused: ${JSON.stringify(outcome)}`);
+    return outcome.text;
+  };
+
   it("rewrites only the first heading's line, keeping its marker and every other byte", () => {
-    expect(setHeadingTitle(slugNote, "Fix the export path on macOS")).toBe(
+    expect(written(slugNote, WAS, "Fix the export path on macOS")).toBe(
       slugNote.replace("on Windows", "on macOS"),
     );
   });
   it("targets the heading a heading board displays", () => {
     const text = "## Question\n\n## Rename the widget helpers\n";
-    expect(setHeadingTitle(text, "Context")).toBe("## Context\n\n## Rename the widget helpers\n");
-  });
-  it("leaves a note with no heading alone", () => {
-    expect(setHeadingTitle("just text\n", "x")).toBe("just text\n");
-  });
-  it("leaves the parser's section headings untouched", () => {
-    const text = "## Subtasks\n- [ ] [[Child]]\n";
-    expect(setHeadingTitle(text, "Plan release")).toBe(text);
+    expect(written(text, "Question", "Context")).toBe(
+      "## Context\n\n## Rename the widget helpers\n",
+    );
   });
   it("keeps an indent, and the heading's closing hashes but not a hash inside the text", () => {
-    expect(setHeadingTitle("   # Fix the export path\n", "Fix it later")).toBe(
+    expect(written("   # Fix the export path\n", "Fix the export path", "Fix it later")).toBe(
       "   # Fix it later\n",
     );
-    expect(setHeadingTitle("## Old title goes here ##\n", "New title")).toBe("## New title ##\n");
-    expect(setHeadingTitle("# Fix the C# export path\n", "New title here")).toBe(
+    expect(written("## Old title goes here ##\n", "Old title goes here", "New title")).toBe(
+      "## New title ##\n",
+    );
+    expect(written("# Fix the C# export path\n", "Fix the C# export path", "New title here")).toBe(
       "# New title here\n",
     );
   });
   it("keeps a CRLF line ending on the edited line", () => {
-    expect(setHeadingTitle("# Old title here\r\n\r\nbody\r\n", "New title here")).toBe(
+    expect(written("# Old title here\r\n\r\nbody\r\n", "Old title here", "New title here")).toBe(
       "# New title here\r\n\r\nbody\r\n",
     );
+  });
+  it("writes a title that ends in a hash, which reads back whole", () => {
+    expect(written("# Old\n", "Old", "C#")).toBe("# C#\n");
+    expect(resolveTitle("x", {}, "# C#\n", "heading").title).toBe("C#");
+  });
+  it("refuses when the heading it was asked to replace is gone or says something else", () => {
+    // Another writer got there first: nothing may be written over what the note says now.
+    expect(retitleHeading("just text\n", "Old", "New")).toEqual({ refused: "moved", found: null });
+    expect(retitleHeading("## Subtasks\n- [ ] [[Child]]\n", "Old", "New")).toEqual({
+      refused: "moved",
+      found: null,
+    });
+    expect(retitleHeading("# Edited elsewhere\n", "Old", "New")).toEqual({
+      refused: "moved",
+      found: "Edited elsewhere",
+    });
+  });
+  it("refuses a title the heading would not read back as", () => {
+    // A lone closing hash is the heading's own syntax, and a section name is the plugin's.
+    expect(retitleHeading("# Old\n", "Old", "Fix it #")).toEqual({
+      refused: "unreadable",
+      readsAs: "Fix it",
+    });
+    expect(retitleHeading("# Old\n\nbody\n", "Old", "Subtasks")).toEqual({
+      refused: "unreadable",
+      readsAs: null,
+    });
+    expect(retitleHeading("# Old\n\n## Later\n", "Old", "comments")).toEqual({
+      refused: "unreadable",
+      readsAs: "Later",
+    });
   });
 });
 
@@ -394,6 +645,12 @@ describe("withoutRepeatedHeading", () => {
       "# [Fix export](https://example.com)\nbody\n",
     ])
       expect(withoutRepeatedHeading(text, "Fix export"), text).toBeNull();
+  });
+  it("keeps a heading whose text ends in a hash the title does not have", () => {
+    // `# C#` is the heading "C#", not "C" with a closing hash.
+    expect(withoutRepeatedHeading("# C#\nbody\n", "C")).toBeNull();
+    expect(withoutRepeatedHeading("# C#\nbody\n", "C#")).toBe("body\n");
+    expect(withoutRepeatedHeading("# C #\nbody\n", "C")).toBe("body\n");
   });
   it("only looks at the body's first line of text", () => {
     expect(withoutRepeatedHeading("Intro.\n\n# Fix export\n", "Fix export")).toBeNull();

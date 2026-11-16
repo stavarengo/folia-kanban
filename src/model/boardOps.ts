@@ -12,7 +12,7 @@ import type { Board, Card, CardFrontmatter, SubItem } from "./types";
 import { moveCard, resolveDrop, syncSubtaskClaim } from "./board";
 import { samePriority } from "./priorities";
 import type { CardRepository } from "./repo";
-import { StaleLineError } from "./repo";
+import { PartlyWritten, StaleLineError } from "./repo";
 
 /**
  * Where a move lands: a column, and a slot in it. An absent `index` means the end of the column.
@@ -172,7 +172,7 @@ export async function addCard(
   try {
     await writeNewCardFields(repo, path, target.fill);
   } catch (e) {
-    throw new Error(
+    throw new PartlyWritten(
       `"${target.title}" was added, but giving it what its column's rule asks for failed: ${e instanceof Error ? e.message : String(e)}. The card is at ${path}; set the rest by hand rather than adding it again.`,
       { cause: e },
     );

@@ -10,7 +10,7 @@ import { setCardPriority, setSubtaskDone, writeNewCardFields } from "../model/bo
 import { SCALAR_ONLY_KEYS, TOOL_REFUSALS } from "../model/properties";
 import { BLOCKS } from "../model/relationships";
 import type { CardRepository } from "../model/repo";
-import { StaleLineError } from "../model/repo";
+import { PartlyWritten, StaleLineError } from "../model/repo";
 import { laneWarning, refuseLaneMismatch, requireColumn } from "./columnChecks";
 import { moveCard } from "./moveCard";
 import { refuseAuthor, refuseMultilineEntry, refuseUnsafeDescription } from "./refusals";
@@ -120,8 +120,11 @@ async function retitle(
     return await repo.renameCard(path, title);
   } catch (e) {
     const why = (e instanceof Error ? e.message : String(e)).replace(/\.$/, "");
+    // A retitle that got part of the way says what was stored itself; calling it "not retitled"
+    // on top of that would contradict it.
+    const outcome = e instanceof PartlyWritten ? "only partly retitled" : "not retitled";
     throw new ToolError(
-      `The card was not retitled: ${why}.${othersWritten ? " The other changes in this call were written." : ""} Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.`,
+      `The card was ${outcome}: ${why}.${othersWritten ? " The other changes in this call were written." : ""} Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.`,
     );
   }
 }

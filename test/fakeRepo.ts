@@ -60,12 +60,12 @@ import {
 
 import {
   TITLE_KEY,
-  fitFileName,
+  cardFileName,
   normalizeTitle,
   resolveTitle,
+  retargetTitleLinks,
+  retitleHeading,
   sameTitle,
-  setHeadingTitle,
-  titleFileName,
 } from "../src/model/cardTitle";
 import { isSelfRelation, withRelation, withoutRelation } from "../src/model/relationships";
 import { mergePriorities, serializePriorities } from "../src/model/priorities";
@@ -372,12 +372,11 @@ export class FakeRepo implements CardRepository {
    */
   private cardPath(folder: string, title: string, except?: string): string {
     const prefix = folder ? `${folder}/` : "";
-    const base = fitFileName(titleFileName(title));
     const taken = (p: string) =>
       p !== except && [...this.files.keys()].some((k) => k.toLowerCase() === p.toLowerCase());
-    let dest = `${prefix}${base}.md`;
-    for (let n = 1; taken(dest); n++) dest = `${prefix}${base} ${n}.md`;
-    return dest;
+    let n = 0;
+    while (taken(`${prefix}${cardFileName(title, n)}`)) n++;
+    return `${prefix}${cardFileName(title, n)}`;
   }
 
   async createCard(rawTitle: string, status: string): Promise<string> {
@@ -420,16 +419,23 @@ export class FakeRepo implements CardRepository {
     this.emitFileOp({ kind: "delete", path });
   }
 
-  async renameCard(path: string, newTitle: string): Promise<string> {
+  async renameCard(
+    path: string,
+    newTitle: string,
+    options: { retry?: boolean } = {},
+  ): Promise<string> {
     const e = this.entry(path);
     const title = normalizeTitle(newTitle);
     if (!title) return path; // blank title — no-op, per the CardRepository contract
     // Mirrors the vault adapter: the file follows the title, the `title` key holds what the file
     // name cannot, and a title a heading board reads from the heading is written back there.
     const { title: current, source } = this.resolveTitle(e);
-    if (sameTitle(title, current)) return path; // unchanged — no write
+    // Unchanged is no write, unless a save that failed halfway is being retried.
+    if (sameTitle(title, current) && (!options.retry || source === "heading")) return path;
     if (source === "heading") {
-      e.body = setHeadingTitle(e.body, title);
+      const outcome = retitleHeading(e.body, current, title);
+      if (!("text" in outcome)) throw new Error(`A heading cannot hold "${title}".`);
+      e.body = outcome.text;
       return path;
     }
     const shadowed =
@@ -459,6 +465,10 @@ export class FakeRepo implements CardRepository {
     // link-aware fileManager.renameFile, keeping buildBoard's `## Subtasks` graph correct).
     for (const other of this.files.values()) {
       other.body = rewriteWikilinks(other.body, oldBase, newBase);
+      // The adapter rewrites a link inside another card's `title` too; Obsidian's rename does not.
+      const title = other.fm[TITLE_KEY];
+      if (typeof title === "string")
+        other.fm[TITLE_KEY] = retargetTitleLinks(title, (link) => link === oldBase, newBase);
     }
     // The vault reports the plugin's own file operations too, so the fake does the same — that is
     // what makes a test cover the in-app path and the listener path running over each other.
@@ -552,8 +562,30 @@ export class FakeRepo implements CardRepository {
     return true;
   }
 
+  /**
+   * Set to draw links as the app's renderer does, as anchors a test can click or audit. Off, the
+   * renderer shows the Markdown it was handed, which is what most tests want to read.
+   */
+  drawLinks = false;
+
   renderMarkdown(el: HTMLElement, markdown: string): () => void {
-    el.textContent = markdown;
+    if (!this.drawLinks) {
+      el.textContent = markdown;
+    } else {
+      el.replaceChildren();
+      for (const part of markdown.split(/(\[\[[^\]]+\]\]|\[[^\]]*\]\([^)]*\))/)) {
+        const wiki = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/.exec(part);
+        const inline = /^\[([^\]]*)\]\(([^)]*)\)$/.exec(part);
+        if (!wiki && !inline) {
+          el.append(part);
+          continue;
+        }
+        const a = el.ownerDocument.createElement("a");
+        a.setAttribute("href", wiki ? (wiki[1] ?? "") : (inline?.[2] ?? ""));
+        a.textContent = wiki ? (wiki[2] ?? wiki[1] ?? "") : (inline?.[1] ?? "");
+        el.append(a);
+      }
+    }
     return () => {
       el.textContent = "";
     };

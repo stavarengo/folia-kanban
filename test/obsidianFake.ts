@@ -162,6 +162,12 @@ export class TFolder extends TAbstractFile {
 
 /** The adapter's dialogs extend and build these; no suite here opens one, so they only exist. */
 export class Modal {}
+
+/** A view on one file. Obsidian reports a view's file as the active one only while `navigation`. */
+export class FileView {
+  file: TFile | null = null;
+  navigation = true;
+}
 export class Setting {}
 export class Notice {}
 

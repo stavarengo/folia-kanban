@@ -10,7 +10,7 @@ import {
   removeRepeatedHeadings,
 } from "../src/obsidian/repeatedHeadings";
 import type { ConfirmRequest } from "../src/model/repo";
-import { FakeApp } from "./obsidianFake";
+import { FakeApp, FileView } from "./obsidianFake";
 
 const BOARD = "basic/Board.md";
 const CONFIG = "folia-board: true\ncard-folder: ./Cards\ncolumns:\n  - todo\n  - done";
@@ -224,16 +224,27 @@ describe("removing headings that repeat the card title", () => {
 });
 
 describe("the command", () => {
-  /** Register on a stand-in plugin, with `active` as the note in front. */
-  function registered(active: string | null) {
+  /** A note shown in the Markdown editor, which Obsidian may navigate away from. */
+  class NoteView extends FileView {}
+  /** The board's own view, which it may not (see `KanbanView.navigation`). */
+  class BoardView extends FileView {
+    override navigation = false;
+  }
+
+  /** Register on a stand-in plugin, with `active` in front, shown by a view of class `View`. */
+  function registered(active: string | null, View: new () => FileView = NoteView) {
     const app = new FakeApp();
     app.vault.addFile(BOARD, note(CONFIG, ""));
     app.vault.addFile("basic/Note.md", "plain");
     const commands: { id: string; name: string; checkCallback: (checking: boolean) => boolean }[] =
       [];
     const plugin = { addCommand: (c: (typeof commands)[number]) => commands.push(c) };
+    const view =
+      active === null ? null : Object.assign(new View(), { file: app.vault.getFileByPath(active) });
+    // As Obsidian answers: the active file is that of a view it may navigate, and no other.
     const workspace = {
-      getActiveFile: () => (active === null ? null : app.vault.getFileByPath(active)),
+      getActiveFile: () => (view?.navigation ? view.file : null),
+      getActiveViewOfType: (type: new () => unknown) => (view instanceof type ? view : null),
     };
     const tabs = { isBoard: (f: TFile) => f.path === BOARD };
     registerRepeatedHeadingsCommand(
@@ -244,7 +255,7 @@ describe("the command", () => {
     return commands;
   }
 
-  it("is offered under its name while a board is in front, and only then", () => {
+  it("is offered under its name while a board note is in front, and only then", () => {
     const [command] = registered(BOARD);
     expect(command).toMatchObject({
       id: "remove-repeated-title-headings",
@@ -253,5 +264,10 @@ describe("the command", () => {
     expect(command?.checkCallback(true)).toBe(true);
     expect(registered("basic/Note.md")[0]?.checkCallback(true)).toBe(false);
     expect(registered(null)[0]?.checkCallback(true)).toBe(false);
+  });
+
+  it("is offered while the board itself is open, whose tab Obsidian reports no active file for", () => {
+    expect(registered(BOARD, BoardView)[0]?.checkCallback(true)).toBe(true);
+    expect(registered("basic/Note.md", BoardView)[0]?.checkCallback(true)).toBe(false);
   });
 });

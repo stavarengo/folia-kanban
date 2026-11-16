@@ -2,7 +2,7 @@
 // `# heading` repeating the title; the heading is ordinary description now, so on such a card the
 // title shows twice. This removes the heading where it says nothing the title does not.
 
-import type { App, Plugin, TFile } from "obsidian";
+import { FileView, type App, type Plugin, type TFile } from "obsidian";
 import { resolveTitle, withoutRepeatedHeading } from "../model/cardTitle";
 import type { ConfirmRequest } from "../model/repo";
 import type { TitleMode } from "../model/types";
@@ -113,13 +113,22 @@ export async function removeRepeatedHeadings(
   );
 }
 
-/** Offer the cleanup as a command, on whichever board is in front. */
+/**
+ * The note the tab in front shows. Asked of the view rather than through `getActiveFile`, which
+ * answers only for a view Obsidian may navigate away from: the board's own view is not one, so
+ * with a board open it reports no file at all.
+ */
+function noteInFront(app: App): TFile | null {
+  return app.workspace.getActiveViewOfType(FileView)?.file ?? app.workspace.getActiveFile();
+}
+
+/** Offer the cleanup as a command, on whichever board is in front: open as a board, or as Markdown. */
 export function registerRepeatedHeadingsCommand(plugin: Plugin, app: App, tabs: BoardTabs): void {
   plugin.addCommand({
     id: "remove-repeated-title-headings",
     name: REMOVE_REPEATED_HEADINGS_COMMAND_NAME,
     checkCallback: (checking) => {
-      const file = app.workspace.getActiveFile();
+      const file = noteInFront(app);
       if (file === null || !tabs.isBoard(file)) return false;
       if (!checking) {
         void removeRepeatedHeadings(app, file.path, {

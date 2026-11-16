@@ -5,6 +5,7 @@ import type { BoardHost } from "../src/mcp/host";
 import type { BoardConfig, Card, HistoryScope } from "../src/model/types";
 import { buildBoard } from "../src/model/board";
 import { resolveCardPath } from "../src/mcp/tool";
+import { PartlyWritten } from "../src/model/repo";
 import { isMine } from "../src/model/unread";
 import { FakeRepo } from "./fakeRepo";
 
@@ -1790,6 +1791,21 @@ describe("a card's one title, through the tools", () => {
       "The card was not retitled: EBUSY: the file is in use. Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.",
     );
     expect((await repo.loadBoard()).cards["Tasks/Ship it.md"]?.title).toBe("Ship it");
+  });
+
+  it("update_card says a retitle got part of the way when the title was saved and the file was not renamed", async () => {
+    const { host, repo } = fixture();
+    repo.renameCard = () =>
+      Promise.reject(
+        new PartlyWritten(
+          "The title was saved, but the file could not be renamed to match: EBUSY. It is still called Ship it.md. Try again to rename it.",
+        ),
+      );
+    await expect(
+      call(host, "update_card", { board: "Board.md", card: "Tasks/Ship it.md", title: LINKED }),
+    ).rejects.toThrow(
+      "The card was only partly retitled: The title was saved, but the file could not be renamed to match: EBUSY. It is still called Ship it.md. Try again to rename it. Read the card again before retrying",
+    );
   });
 
   it("update_card says which half landed when the fields were written and the retitle was not", async () => {
