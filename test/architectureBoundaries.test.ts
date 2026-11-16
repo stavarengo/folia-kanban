@@ -33,6 +33,8 @@ const tree: Record<string, string> = {
   "src/ui/stats.ts": 'import type { Stats } from "fs";\nexport type S = Stats;\n',
   "src/frontmatter.ts": 'export const parse = () => import("yaml");\n',
   "src/model/yamlDoc.ts": 'import type { Document } from "yaml";\nexport type Doc = Document;\n',
+  "src/render.ts": 'import MarkdownIt from "markdown-it";\nexport const md = new MarkdownIt();\n',
+  "src/ui/tokens.ts": 'import type { Token } from "markdown-it";\nexport type T = Token;\n',
   "src/model/typed.ts": 'export type App = import("obsidian").App;\n',
   "src/mcp/lazy.ts": 'export const load = () => import("@codemirror/view");\n',
   "src/model/b.ts": "export const b = 1;\n",
@@ -126,11 +128,14 @@ describe("architecture boundaries (dependency-cruiser)", () => {
       "only-adapter-and-shell-reach-the-app: src/model/typed.ts → obsidian",
       "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → electron",
       "only-adapter-and-shell-reach-the-app: src/ui/Bridge.ts → obsidian",
+      // yaml and markdown-it are test-only: shipped code may not import either anywhere,
+      // type-only or dynamically.
+      "src-never-imports-test-only-packages: src/frontmatter.ts → npm:yaml/dist/index.js",
+      "src-never-imports-test-only-packages: src/model/yamlDoc.ts → npm:yaml/dist/index.js",
+      "src-never-imports-test-only-packages: src/render.ts → npm:markdown-it/dist/index.cjs.js",
+      "src-never-imports-test-only-packages: src/ui/tokens.ts → npm:markdown-it/dist/index.cjs.js",
       // G7: shipped code never imports test/.
       "src-never-imports-test: src/model/a.ts → test/fake.ts",
-      // yaml is test-only: shipped code may not import it anywhere, type-only or dynamically.
-      "src-never-imports-yaml: src/frontmatter.ts → npm:yaml/dist/index.js",
-      "src-never-imports-yaml: src/model/yamlDoc.ts → npm:yaml/dist/index.js",
       // G2: the UI reaches none of the adapter, MCP or the shell, directly or through type-only
       // hops (Bridge → toolsLink.ts → mcp, App → hop → main.ts).
       "ui-never-reaches-adapter-mcp-or-shell: src/ui/App.tsx → src/main.ts",

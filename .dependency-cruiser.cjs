@@ -18,8 +18,9 @@ const { builtinModules } = require("node:module");
 // the last node_modules segment and are not anchored.
 /** The UI's rendering stack, which the model and MCP may not use. */
 const uiPackages = "node_modules/(react|react-dom|@dnd-kit)/";
-/** A test-only devDependency: shipped code parses YAML with Obsidian's parseYaml. */
-const yamlPackage = "node_modules/yaml/";
+/** Test-only devDependencies, by the package or its types: yaml stands in for Obsidian's parser
+ *  and markdown-it for its renderer. Shipped code uses the app's own, through the adapter. */
+const testOnlyPackages = "node_modules/(@types/)?(yaml|markdown-it)/";
 
 /** What Obsidian supplies at runtime (esbuild.config.mjs marks them external). Uninstalled, each
  *  stays a bare specifier; installed (as a devDependency for its types, say), it resolves into
@@ -92,12 +93,12 @@ module.exports = {
       to: { path: uiPackages },
     },
     {
-      name: "src-never-imports-yaml",
+      name: "src-never-imports-test-only-packages",
       severity: "error",
       comment:
-        "yaml is a devDependency the tests use to stand in for Obsidian's parser. Shipped code parses YAML with Obsidian's parseYaml, through the adapter.",
+        "yaml and markdown-it are devDependencies the tests use to stand in for Obsidian's parser and renderer. Shipped code parses YAML with Obsidian's parseYaml and renders Markdown with its renderer, both through the adapter.",
       from: { path: "^src/" },
-      to: { path: yamlPackage },
+      to: { path: testOnlyPackages },
     },
     {
       name: "src-never-imports-test",
@@ -120,8 +121,8 @@ module.exports = {
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
     // Outside src, only what a rule needs an end to find is let in: the app's modules, Node's
-    // builtins, test/, yaml and the packages the model and MCP may not use. Narrowing this makes the
-    // rules that point at them pass vacuously.
-    includeOnly: ["^src/", "^test/", appModules, uiPackages, yamlPackage, nodeBuiltins],
+    // builtins, test/, the test-only packages and the ones the model and MCP may not use. Narrowing
+    // this makes the rules that point at them pass vacuously.
+    includeOnly: ["^src/", "^test/", appModules, uiPackages, testOnlyPackages, nodeBuiltins],
   },
 };
