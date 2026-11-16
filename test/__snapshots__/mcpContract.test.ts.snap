@@ -186,7 +186,7 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
       "openWorldHint": false,
       "readOnlyHint": false,
     },
-    "description": "Change a card's title, description, priority, due date or any other frontmatter property. Set a value to null to clear it. Use move_card for the column.",
+    "description": "Change a card's title, description, priority, due date or any other frontmatter property. Set priority, due or a property to null to clear it. Use move_card for the column.",
     "inputSchema": {
       "properties": {
         "board": {
@@ -261,6 +261,10 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
             "type": "string",
           },
           "type": "object",
+        },
+        "retryTitle": {
+          "description": "Set to true, with the same \`title\`, after a call answered that the card was only partly retitled. The retitle is then carried out even though the card already reads that title, which is what renames a file whose rename had failed. Without it a title the card already has changes nothing, so a file named apart from its title on purpose keeps its name.",
+          "type": "boolean",
         },
         "title": {
           "description": "The card's new title. Its file is renamed to match and links to it follow, so the reply's \`path\` is the one to use from then on.",

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { TOOLS } from "../src/mcp/tools";
 import { handleMessage, type ServerInfo } from "../src/mcp/protocol";
 import type { BoardHost } from "../src/mcp/host";
@@ -1806,6 +1806,41 @@ describe("a card's one title, through the tools", () => {
     ).rejects.toThrow(
       "The card was only partly retitled: The title was saved, but the file could not be renamed to match: EBUSY. It is still called Ship it.md. Try again to rename it. Read the card again before retrying",
     );
+  });
+
+  it("update_card finishes a retitle that got part of the way when told it is a retry", async () => {
+    const { host, repo } = fixture();
+    const asked = vi.spyOn(repo, "renameCard").mockImplementationOnce(async (path) => {
+      // The title is stored; the file is the part that could not follow.
+      repo.files.get(path)!.fm["title"] = LINKED;
+      throw new PartlyWritten(
+        "The title was saved, but the file could not be renamed to match: EBUSY. It is still called Ship it.md. Try again to rename it.",
+      );
+    });
+    const args = { board: "Board.md", card: "Tasks/Ship it.md", title: LINKED };
+    await expect(call(host, "update_card", args)).rejects.toThrow(
+      "Then send the same title again with `retryTitle: true`: without it a title the card already has is left as it is, and so is its file.",
+    );
+
+    // The card already reads that title, so the same call again is a no-op: a file named apart
+    // from its title on purpose must stay that way.
+    expect(await call(host, "update_card", args)).toEqual({ path: "Tasks/Ship it.md" });
+    expect(repo.files.has("Tasks/Ship it.md")).toBe(true);
+
+    const done = (await call(host, "update_card", { ...args, retryTitle: true })) as {
+      path: string;
+    };
+    expect(asked).toHaveBeenLastCalledWith("Tasks/Ship it.md", LINKED, { retry: true });
+    expect(done.path).not.toBe("Tasks/Ship it.md");
+    expect(repo.files.has("Tasks/Ship it.md")).toBe(false);
+    expect(repo.files.get(done.path)!.fm["title"]).toBe(LINKED);
+  });
+
+  it("update_card refuses a retry that names no title to retry", async () => {
+    const { host } = fixture();
+    await expect(
+      call(host, "update_card", { board: "Board.md", card: "Tasks/Ship it.md", retryTitle: true }),
+    ).rejects.toThrow("`retryTitle` goes with the `title` it retries.");
   });
 
   it("update_card says which half landed when the fields were written and the retitle was not", async () => {

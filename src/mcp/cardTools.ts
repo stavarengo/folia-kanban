@@ -108,23 +108,29 @@ function refuseArrayForScalarKey(key: string, value: unknown): void {
 /**
  * Retitle the card and answer with its path afterwards. A retitle that failed is never reported
  * as done, and the caller is told when the rest of its call did land, so a retry repeats only the
- * title.
+ * title. One that got part of the way is told how to finish it: the title may already be stored,
+ * and a call that only names it again would find nothing to change.
  */
 async function retitle(
   repo: CardRepository,
   path: string,
   title: string,
-  othersWritten: boolean,
+  { retry, othersWritten }: { retry: boolean; othersWritten: boolean },
 ): Promise<string> {
   try {
-    return await repo.renameCard(path, title);
+    return await repo.renameCard(path, title, { retry });
   } catch (e) {
     const why = (e instanceof Error ? e.message : String(e)).replace(/\.$/, "");
+    const partly = e instanceof PartlyWritten;
     // A retitle that got part of the way says what was stored itself; calling it "not retitled"
     // on top of that would contradict it.
-    const outcome = e instanceof PartlyWritten ? "only partly retitled" : "not retitled";
+    const outcome = partly ? "only partly retitled" : "not retitled";
+    const others = othersWritten ? " The other changes in this call were written." : "";
+    const finish = partly
+      ? " Then send the same title again with `retryTitle: true`: without it a title the card already has is left as it is, and so is its file."
+      : "";
     throw new ToolError(
-      `The card was ${outcome}: ${why}.${othersWritten ? " The other changes in this call were written." : ""} Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.`,
+      `The card was ${outcome}: ${why}.${others} Read the card again before retrying, since a retitle that fails halfway can still have renamed its file.${finish}`,
     );
   }
 }
@@ -221,7 +227,7 @@ const updateCard = tool({
   name: "update_card",
   title: "Update a card",
   description:
-    "Change a card's title, description, priority, due date or any other frontmatter property. Set a value to null to clear it. Use move_card for the column.",
+    "Change a card's title, description, priority, due date or any other frontmatter property. Set priority, due or a property to null to clear it. Use move_card for the column.",
   input: z
     .object({
       board: boardArg,
@@ -231,6 +237,12 @@ const updateCard = tool({
         .optional()
         .describe(
           "The card's new title. Its file is renamed to match and links to it follow, so the reply's `path` is the one to use from then on.",
+        ),
+      retryTitle: z
+        .boolean()
+        .optional()
+        .describe(
+          "Set to true, with the same `title`, after a call answered that the card was only partly retitled. The retitle is then carried out even though the card already reads that title, which is what renames a file whose rename had failed. Without it a title the card already has changes nothing, so a file named apart from its title on purpose keeps its name.",
         ),
       description: z.string().optional(),
       priority: z
@@ -261,7 +273,10 @@ const updateCard = tool({
         v.due !== undefined ||
         v.properties !== undefined,
       { message: "Give at least one field to change." },
-    ),
+    )
+    .refine((v) => v.retryTitle === undefined || v.title !== undefined, {
+      message: "`retryTitle` goes with the `title` it retries.",
+    }),
   run: async (host, args) => {
     const { repo, board } = await openBoard(host, args.board);
     const path = resolveNotePath(board, args.card);
@@ -281,8 +296,11 @@ const updateCard = tool({
     // Last, so a failed field write leaves the card where the caller last saw it, under the name
     // they addressed it by, rather than renamed with half the change applied.
     if (args.title === undefined) return { path };
-    const { title, board: _board, card: _card, ...others } = args;
-    return { path: await retitle(repo, path, title, Object.keys(others).length > 0) };
+    const { title, retryTitle, board: _board, card: _card, ...others } = args;
+    const othersWritten = Object.keys(others).length > 0;
+    return {
+      path: await retitle(repo, path, title, { retry: retryTitle === true, othersWritten }),
+    };
   },
 });
 
