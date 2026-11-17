@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0](https://github.com/stavarengo/folia-kanban/compare/0.7.0...0.8.0) (2026-11-17)
+
+### ⚠ BREAKING CHANGES
+
+* `card-title: auto` no longer guesses a title from the shape of the file name: `auto`, an omitted property and any unknown value now mean the file name. A note's top heading is no longer its title, so boards that relied on headings must set `card-title: heading`.
+
+### Features
+
+* give each card one title that names its file ([db4908f](https://github.com/stavarengo/folia-kanban/commit/db4908f37c6415ac5dea943f25a780b37f0d9c6a))
+
+### Bug Fixes
+
+* **deps:** bump zod to 4.6.6 for GHSA-mrhx-c7xc-m3w5 ([5f5ed15](https://github.com/stavarengo/folia-kanban/commit/5f5ed1519bf2f36245bc53ba69ba21d957ea801a))
+* give a failed title the reason of its own write ([e8920d6](https://github.com/stavarengo/folia-kanban/commit/e8920d630b4ba8e3f52b68b52a36bc7e297713b3))
+* keep a typed title whatever happens around its save ([c280290](https://github.com/stavarengo/folia-kanban/commit/c280290b47026663e5f1540752e8802f8f3d5e3c))
+* keep web addresses out of title-link rewrites ([8c6f834](https://github.com/stavarengo/folia-kanban/commit/8c6f834c3f83c8120698f7016c68ef7280d54b6e))
+* let update_card finish a partly saved retitle ([019fed0](https://github.com/stavarengo/folia-kanban/commit/019fed0d7b2a1a06c8b9c08b4fdfd8e3992fa909))
+* never drop a title typed on the board ([5aaae7a](https://github.com/stavarengo/folia-kanban/commit/5aaae7a680ab689260aea79da4c5a18ed63da8c0))
+* recheck a referring card inside its title-link write ([f47b27a](https://github.com/stavarengo/folia-kanban/commit/f47b27ad767d21bdcb3c6e7cb2f3b6d8e38193fd))
+* save a queued title to the card's renamed file ([1b9101b](https://github.com/stavarengo/folia-kanban/commit/1b9101b9827b420a3adb18926f50904c8e752cfb))
+* store a card's title safely against races, limits and stale links ([df55cda](https://github.com/stavarengo/folia-kanban/commit/df55cda7ec5431b9205307a67c09ca891f928d1c))
+* write nothing worked out from a stale board ([01187f2](https://github.com/stavarengo/folia-kanban/commit/01187f2a66a012d5bee028d21cea2d9d7b4bcba4))
+
+### Documentation
+
+* describe agent access and agent columns as the current release works ([cc72250](https://github.com/stavarengo/folia-kanban/commit/cc7225006957fe5f0443e5e6db0731d41944da71))
+* describe one title per card and update the example vault ([275374a](https://github.com/stavarengo/folia-kanban/commit/275374aadf66d0f037b63610794e109e64153d8f))
+* keep the decisions log and release guide to what readers can check ([15c4581](https://github.com/stavarengo/folia-kanban/commit/15c4581a7daba2efdd9971dcbc1b1b7926a84966))
+* show the card detail panel with its single Title field ([f69235b](https://github.com/stavarengo/folia-kanban/commit/f69235b7c3b551cbd310af92ee74c236d3a47bc0))
+
 ## [0.7.0](https://github.com/stavarengo/folia-kanban/compare/0.6.4...0.7.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES
