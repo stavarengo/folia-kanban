@@ -213,15 +213,11 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
           "description": "Due date \`YYYY-MM-DD\`, or null to clear it.",
         },
         "priority": {
-          "anyOf": [
-            {
-              "type": "string",
-            },
-            {
-              "type": "null",
-            },
-          ],
           "description": "A priority value, or null to clear it. A value the board does not know yet is added to its vocabulary, exactly as typing one into the card's details does.",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "properties": {
           "additionalProperties": {
@@ -240,16 +236,10 @@ exports[`the MCP contract > publishes this exact tool surface, annotations and a
               },
               {
                 "items": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                    },
-                    {
-                      "type": "number",
-                    },
-                    {
-                      "type": "boolean",
-                    },
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
                   ],
                 },
                 "type": "array",
